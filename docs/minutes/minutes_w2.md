@@ -19,15 +19,18 @@
 | **8**   | Yee Cheng Ng      | 540444920      | yeng0449           |              |
 
 Attendances: 
+
 Apologies: 
+
 Submission Date: 15/08/26
 
 ### **Weekly Group Meeting Minutes**
+
 Time: 
 Venue: 
 Meeting Minute Taker: Marsya Amanda
 
-| #   | Agenda Item                                         | Description/ Comments | Decision/Action | Who? | Items for escalation |
+| #   | Agenda Item       | Description/ Comments          | Decision/Action | Who? | Items for escalation |
 | --- | --------------------------------------------------- | --------------------- | --------------- | ---- | -------------------- |
 | 1   | What has been completed?                            |                       |                 |      |                      |
 | 2   | What is in progress?                                |                       |                 |      |                      |
@@ -71,19 +74,23 @@ _Note: Each action must be tagged with one person's name and include a deliverab
 ### **Weekly Client Meeting Minutes**
 
 Time: 13/08/2026, 11:00-12:00 AEST, 1st Meeting
+
 Venue: Remote (Zoom)
+
 Meeting Minute Taker: Marsya Amanda
+
 Attendances: Declan Schulz, Hongjie Deng, Khanh Phan, Marsya Amanda, Nick Chen, Shuhao Zhang, William Alexander, Yee Cheng Ng
+
 Apologies: N/A
 
 | #   | Agenda Item                                         | Description/ Comments | Decision/Action | Who? | Items for escalation |
 | --- | --------------------------------------------------- | --------------------- | --------------- | ---- | -------------------- |
-| 1   | What has been completed?  
-    | Team-client introduction, walk-through of communication channels, discuss project requirements, expectations and scope, establish a weekly meeting time, and discuss different project pathways. | Decided Thursday 11am weekly client meeting and decide to research audio. | All members | Review project requirements and provided resources in communication channels. |
-| 2   | What is in progress?                                |                       | Project plan, background research, coordinating media types to research relative to other groups and communicate to client | Do individual research first, discuss in second internal meeting on 17/08/26 at 5pm | All members | Create & communicate project plan to client
-| 3   | What needs to be completed before the next meeting? |                       | Decide data/media type to research for capstone, confirm weekly meeting time | Conduct internal meeting, communicate decision through discord | All members | See previous
+| 1   | What has been completed?  | Team-client introduction, walk-through of communication channels, discuss project requirements, expectations and scope, establish a weekly meeting time, and discuss different project pathways. | Decided Thursday 11am weekly client meeting and decide to research audio. | All members | Review project requirements and provided resources in communication channels. |
+| 2   | What is in progress? | Project plan, background research, coordinating media types to research relative to other groups and communicate to client | Do individual research first, discuss in second internal meeting on 17/08/26 at 5pm | All members | Create & communicate project plan to client
+| 3   | What needs to be completed before the next meeting? | Decide data/media type to research for capstone, confirm weekly meeting time | Conduct internal meeting, communicate decision through discord | All members | See previous
 
 **Main Discussions**
+
 - The agenda for the meeting was: introductions, exploration of communication channel, review project requirements and expectation, and establish a weekly meeting time.
 - Client presented resources to be used as an initial starting point of research for the porject.
 - Client explained the problem statement, project context, client requiremements and expectations.
@@ -93,6 +100,7 @@ Apologies: N/A
 - Members discuss media type of preference to research.
 
 **Key Takeaways**
+
 - Decide weekly client meeting time at Thursday 11am.
 - Group communicates to client that the group prefers to research audio media.
 - Client expects cross-collaboration to happen between teams and comparable projects is expected.
@@ -100,10 +108,12 @@ Apologies: N/A
 - There are five main areas that groups can explore: VFX/3d, music and audio, illustration/2D,text, and principal photography and videography.
 
 **What Happened**
+
 - Initial client meeting arranged and conducted
 - Client establishes communication channel
 
 **What's Next**
+
 - Discuss project plan
 - Discuss project area in more detail
 
@@ -112,13 +122,16 @@ Apologies: N/A
 #### **Declan Schulz**
 Student ID: 540894767
 
-**Goals** 
+**Goals**
+
 - Learn more about the topic after receiving the allocation and get to know the client.
 
-**Progress Made** 
+**Progress Made**
+
 - Read through and watched the resources posted by the client on the discord. Learned about content credentials and the current state of provenance scoring.
 
-**Blockers to Progress/Issues** 
+**Blockers to Progress/Issues**
+
 - No issues as of yet, the only blocker to further research is the allocation of our specific media format focus, which was discussed at our meeting with the client.
 
 #### **Hongjie Deng**
@@ -142,15 +155,15 @@ Student ID: 530800451
 #### **Marsya Amanda**
 Student ID: 530344829
 
-**Goals** 
+**Goals** \
 - Clarify project requirements, expectations, and scope.
 - Take meeting minutes for w2
 - Go through different project areas
 
-**Progress Made**
+**Progress Made** \
 - All goals satisfied in the meeting and internal meeting.
 
-**Blockers to Progress/Issues** 
+**Blockers to Progress/Issues**  \
 - Progress delayed due to issues with coordinating schedules for an internal meeting time. 
 - Multiple and disjointed communication channels lead to confusion, losing deadlines, etc
 
