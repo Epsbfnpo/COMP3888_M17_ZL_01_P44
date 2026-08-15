@@ -197,8 +197,14 @@ Student ID: 540722172
 #### **Yee Cheng Ng**
 Student ID: 540444920
 
-**Goals** _\[What were your goals? These should be the ones outlined in last week's minutes\]_
+**Goals** 
 
-**Progress Made** _\[What progress was made? Are the goals satisfied?\]_
+- Learn more about the domain of audio provenance scoring and explore how authenticity and content credentials can be evaluated for audio media.
 
-**Blockers to Progress/Issues** _\[What stopped you from making progress? What issues need group or client decisions?\]_
+**Progress Made** 
+
+- Read through the resources provided by the client and reviewed relevant research papers. Began brainstorming potential provenance scoring pipelines and approaches for evaluating audio authenticity.
+
+**Blockers to Progress/Issues** 
+
+- No blockers at this stage.
