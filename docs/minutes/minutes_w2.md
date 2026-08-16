@@ -18,58 +18,53 @@
 | **7**   | William Alexander | 540722172      | wale0194           |              |
 | **8**   | Yee Cheng Ng      | 540444920      | yeng0449           |              |
 
-Attendances: 
+Attendances: Declan Schulz, Hongjie Deng, Khanh Phan, Marsya Amanda, Nick Chen, Shuhao Zhang, William Alexander, Yee Cheng Ng
 
-Apologies: 
+Apologies:  NA
 
 Submission Date: 15/08/26
 
 ### **Weekly Group Meeting Minutes**
 
-Time: 
-Venue: 
+Time: 16/08/26, 18:00-19:00 AEST
+
+Venue: Remote (zoom)
+
 Meeting Minute Taker: Marsya Amanda
 
-| #   | Agenda Item       | Description/ Comments          | Decision/Action | Who? | Items for escalation |
+
+| #   | Agenda Item                                         | Description/ Comments | Decision/Action | Who? | Items for escalation |
 | --- | --------------------------------------------------- | --------------------- | --------------- | ---- | -------------------- |
-| 1   | What has been completed?                            |                       |                 |      |                      |
-| 2   | What is in progress?                                |                       |                 |      |                      |
-| 3   | What is working well?                               |                       |                 |      |                      |
-| 4   | What needs improvement?                             |                       |                 |      |                      |
-| 5   | Reminders                                           |                       |                 |      |                      |
-| 6   | What needs to be completed before the next meeting? |                       |                 |      |                      |
-| 7   | What's Next                                         |                       |                 |      |                      |
-| …   | …..                                                 |                       |                 |      |                      |
+| 1   | What has been completed?                            | Audit w2 deliverables and discuss future deadlines | Assign deliverables to different people, organise github repository, validate deliverables before submission | All members | Detailed initial project plan |
+| 2   | What is in progress?                                | Initial project plan, project background research | Setup document tabs for project plan and background research | All members | As above |
+| 3   | What is working well?                               | Organisation of deliverables and deadlines, cooperation | Continue frequent updates through communication channels | All members | Add deadlines to google doc |
+| 4   | What needs improvement?                             | Make communication more succinct | Modify communication style; use bullet points | All members |    Future communication |
 
 **Main Discussions**
 
-_\[What we have discussed during the meeting with client, an example could be found as follows.\]_
-
-- x person presented …
-- y asked …
+- Audit of w2 deliverables (deed, group contract, XP summary, minutes of meeting)
+- Reorganisation of github repository and code commit practices
+- Discussion of weekly XP roles, expectations
+- Discussion of future deadlines
+- Client's resource list
 
 **Key Takeaways**
 
-_\[Key points we can take/learn/conclude from the meeting, an example could be found as follows.\]_
-
-- Use xx method to ...
-- Xxx needs to be updated.
-- Xxx would be a tool to help ...
+- Decide on music as media type to research for project
+- Decide on github committing message conventions 
+- minutes of meeting to be done by Marsya
+- setup document for initial project plan
 
 **What Happened**
 
-- From last week XXX was completed
-- From last week, YYY is carried over and is present in the What's Next list
+- Initial project plan document commenced
+- Group deed, contract to be submitted by Hong
+- All deliverables to be submitted by 9pm 16/08/26
 
 **What's Next**
 
-_\[Actions for the coming weeks, an example could be found as follows._
-
-_Note: Each action must be tagged with one person's name and include a deliverable.\]_
-
-- Mickey is responsible for ensuring the team will finish XXX part by next week
-- Donald is responsible for ensuring the codebase on github will compile correctly by next week.
-- Jungliu is responsible for creating the project report on a shared document and writing the introduction
+- next week's assigned manager to take W3 minutes
+- write up ihitial project plan in in-tutorial meeting
 
 ### **Weekly Client Meeting Minutes**
 
