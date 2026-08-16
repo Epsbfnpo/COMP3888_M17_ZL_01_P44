@@ -187,14 +187,14 @@ Student ID: 540658848
 Student ID: 540740693
 
 **Goals** 
-study about the domain of audio provenance scoring and explore how real and content credentials can be evaluated for audio media.
-Progress Made
+- study about the domain of audio provenance scoring and explore how real and content credentials can be evaluated for audio media.
+
 
 **Progress Made** 
-Read through the resources provided by the client. Discuss and research about potential provenance scoring pipelines and approaches for evaluating audio authenticity.
+- Read through the resources provided by the client. Discuss and research about potential provenance scoring pipelines and approaches for evaluating audio authenticity.
 
 **Blockers to Progress/Issues** 
-No Blockers so far
+- No Blockers so far
 
 #### **William Alexander**
 Student ID: 540722172
