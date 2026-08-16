@@ -1,0 +1,24 @@
+Peter:
+In summary XP is a style of programming that focuses on versatility based on the fast changing environment, instead of releasing everything at the same time a feedback loop is created for versatility, constantly changing and improving instead of releasing everything at once.
+build small -> test -> feedback ->improve -> repeat
+
+Hongjie Deng:
+XP is an agile software development framework to make software higher quality and make the team more responsive to changing client needs through short development cycles. Core values in XP are communication, simplicity , feedback , courage and respect. XP requires to change and improve constantly, rather than releasing everything at once.
+
+Declan:
+Extreme Programming is an agile software development methodology which aims to deliver software quickly while retaining high quality. It prioritises frequent releases, and keeping the code as simple as possible. The idea is also to remain responsive to customer feedback rather than stick strictly to a long term plan. Most important features are identified through user stories, developers work on a small feature, code is tested continuously and customer feedback is provided.
+
+Yee: 
+Extreme Programming (XP) is an Agile software development methodology that focuses on delivering high-quality software through frequent customer feedback, simple design, and continuous improvement. Key engineering practices include Pair Programming, Test-Driven Development (TDD), and Continuous Integration (CI) to improve code quality and enable rapid adaptation to changing requirements. XP also defines roles such as the Coach, Tracker, Customer, Programmer, and Tester to support effective collaboration. Unlike Scrum, which primarily manages project planning and team workflow through sprints and backlogs, XP emphasises how software is engineered using disciplined development practices.
+
+Shuhao:
+Extreme Programming (XP) is an Agile software development methodology that focuses on producing high-quality software through short development cycles, frequent customer feedback, continuous testing, and close teamwork. XP encourages practices such as pair programming, test-driven development (TDD), continuous integration, simple design, frequent small releases, and continuous code refactoring. It allows development teams to respond quickly to changing requirements while regularly delivering working software to customers.
+
+Marsya Amanda:
+Extreme Programming (XP) is an Agile software development methodology which prioritises high-quality code and quick delivery turnaround times through conducting strong engineering practices. Some of these practices include pair programming, assigning rotating roles, working on tight client-feedback loops, and test-driven development.
+
+William:
+Extreme Programming (XP) is a lightweight, iterative approach to software development that emphasizes proven engineering practices applied rigorously and consistently in order to improve software quality and adaptability to changing requirements. It's expressed through practices like pair programming, test-driven development, continuous integration, small and frequent releases, simple design, collective code ownership, an on-site customer for rapid clarification, and shared coding standards. XP suits small-to-medium teams facing dynamic requirements where tight customer collaboration and high code quality are priorities.
+
+Nick:
+XP programming is a method of programming which aims to produce higher quality code whilst also improving the work life balance of development teams. It is a type of agile software development and so focuses on having short development cycles which allow for easier feedback and changes depending on customer requirements. Furthermore, XP also incorporates concepts such as pair programming and will aim to implement features before they are needed. Overall, it can help to maintain code simplicity and clarity especially during times when customer requirements change.
