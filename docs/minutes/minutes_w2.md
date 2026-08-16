@@ -153,11 +153,15 @@ Student ID: 540227655
 #### **Khanh Phan**
 Student ID: 530800451
 
-**Goals** _\[What were your goals? These should be the ones outlined in last week's minutes\]_
+**Goals** 
+- Get to know the client/create bonds.
+- Ask for clarification of the objective and goal of the product.
 
-**Progress Made** _\[What progress was made? Are the goals satisfied?\]_
+**Progress Made** 
+- We meet the client and agree to do a face to face meeting in the future, in addition we are able to clarify what to do and unanimously agree to do audio for this project. Additionally, we also got some resource about the core idea of what the client expect.
 
-**Blockers to Progress/Issues** _\[What stopped you from making progress? What issues need group or client decisions?\]_
+**Blockers to Progress/Issues** 
+- No issue are yet to submerge, the only problem is to find a good time to meet for team and client long term.
 
 #### **Marsya Amanda**
 Student ID: 530344829
