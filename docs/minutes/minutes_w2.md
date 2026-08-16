@@ -203,11 +203,17 @@ Student ID: 540740693
 #### **William Alexander**
 Student ID: 540722172
 
-**Goals** _\[What were your goals? These should be the ones outlined in last week's minutes\]_
+**Goals**
 
-**Progress Made** _\[What progress was made? Are the goals satisfied?\]_
+Meet the client and learn more about the nature of the project, current progress with the issue of AI and existing standards
 
-**Blockers to Progress/Issues** _\[What stopped you from making progress? What issues need group or client decisions?\]_
+**Progress Made**
+
+Read through resources provided by client and completed my own research
+
+**Blockers to Progress/Issues**
+
+No significant blockers yet.
 
 #### **Yee Cheng Ng**
 Student ID: 540444920
