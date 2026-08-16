@@ -137,11 +137,18 @@ Student ID: 540894767
 #### **Hongjie Deng**
 Student ID: 540227655
 
-**Goals** _\[What were your goals? These should be the ones outlined in last week's minutes\]_
+**Goals**
 
-**Progress Made** _\[What progress was made? Are the goals satisfied?\]_
+- Get to know the client.
+- Clarify project requirements and select the project data theme  
 
-**Blockers to Progress/Issues** _\[What stopped you from making progress? What issues need group or client decisions?\]_
+**Progress Made** 
+
+- All goals are satisfied. We met the client online via zoom and decided to pick up audio topic for our project.We also get a bunch of resources about the project from the clients. 
+
+**Blockers to Progress/Issues** 
+
+- The programming language used in the project is still under discussion.  
 
 #### **Khanh Phan**
 Student ID: 530800451
