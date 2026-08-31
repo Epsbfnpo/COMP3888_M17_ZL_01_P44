@@ -1,0 +1,29 @@
+{
+  "id": "provenance.c2pa",
+
+  "match": {
+    "provenance.c2pa.present": true
+  },
+
+  "expectation": {
+    "type" : "optional",
+    "conditions" : ###
+  },
+
+  "weights": {
+    "integrity": 1.0,
+    "attestation_strength": 1.0
+  },
+
+  "forge_cost": {
+    "level": 4,
+    "rationale": "Cryptographically bound provenance is difficult to alter without detection, although it does not itself prove human authorship."
+  },
+
+  "validation_rules": [
+    "c2pa_manifest_valid",
+    "c2pa_signature_valid",
+    "c2pa_content_binding_valid",
+    "c2pa_ingredient_relationships_valid"
+  ]
+}

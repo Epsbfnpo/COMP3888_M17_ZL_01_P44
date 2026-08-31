@@ -1,0 +1,94 @@
+{
+    "schema_version" : 
+    "bundle_id" : 
+
+    "domain_profile" :
+
+    "domain_profile" :
+
+    "final_artifact_id" :
+
+    "artifacts": [
+        {
+            "id" :
+            "file" : {
+                "path" :
+                "media_type" ##audio/wav
+            },
+
+            "hash" : {
+                "hash_method" :
+                "value" :
+            },
+
+            "type" : {
+                "general" : ###These three attributes are used to match the evidence profile
+                "subtype" :
+                "role" : ##for example: take , stem , comp-sheet
+            },
+
+            "metadata" : {
+                "duration_seconds" :   
+                "sample_rate" :
+                "channels" :
+                ###Maybe we need more
+            },
+
+            "provenance" : {
+                "c2pa" : {
+                    ##discussion 
+                    ""
+                    {
+                        "present" : true,
+
+                    }
+
+                    {
+                        "present" : false,
+                    }
+                    
+                    
+                    ""
+                }
+            },
+
+            "extension" : {
+                "audio" {
+                    ##needs discussion
+                    {
+                        "rin" : {
+                            "sessions" : []
+                            "contributors" : []
+                            "equipment" :  []
+                            "recording_components" : []
+                        },
+
+                        "ern" : {
+                                "contains_ai": ###partly/complete/none
+                                "ai_contributions": []
+                            }
+
+                    }
+                }
+            }
+        }
+    ]
+
+    "relationship" [
+        {
+            "id" : 
+
+            "from" :  
+
+            "to" :  
+
+            "realtion_type" :  ####parentOf/componentOf/inputTo/supports/documents
+                                         
+        }
+
+    ]
+
+
+
+
+}

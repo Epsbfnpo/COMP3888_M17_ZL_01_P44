@@ -1,0 +1,395 @@
+{
+  "profile_id": ,
+
+  "domain": "audio",
+
+  "weight_scale": {
+    "min": 0.0,
+    "max": 1.0,
+  },
+
+  "forge_cost_scale": {
+    "min": 1,
+    "max": ###
+  },
+
+
+
+
+
+  
+  "evidence_classes": [
+
+    {
+      "id": "audio.demo",
+
+      "match": {
+        "general": "audio",
+        "subtype": "recording",
+        "role": "demo"
+      },
+
+      "expectation": {
+        "type": "optional"
+      },
+
+      "weights": {
+        "completeness": ###
+        "integrity": ####
+        "process_continuity": ###
+      },
+
+      "forge_cost": {
+        "level": ###
+        "rationale": ###
+      },
+
+      "validation_rules": [
+        "hash_valid",
+        "audio_metadata_valid",
+        "timestamp_consistent",
+        "relationship_consistent"
+      ]
+    },
+
+
+    {
+      "id": "audio.raw-take",
+
+      "match": {
+        "general": "audio",
+        "subtype": "recording",
+        "role": "take"
+      },
+
+      "expectation": {
+        "type": "conditional",
+        "when": "workflow.includes_recorded_performance"
+      },
+
+      "weights": {
+        "completeness": ##
+        "integrity": #
+        "process_continuity": #
+      },
+
+      "forge_cost": {
+        "level": ##
+        "rationale": ###
+      },
+
+      "validation_rules": [
+        "hash_valid",
+        "audio_metadata_valid",
+        "timestamp_consistent",
+        "relationship_consistent"
+      ]
+    },
+
+
+    {
+      "id": "audio.raw-track",
+
+      "match": {
+        "general": "audio",
+        "subtype": "recording",
+        "role": "multitrack"
+      },
+
+      "expectation": {
+        "type": "conditional",
+        "when": "workflow.includes_multitrack_recording"
+      },
+
+      "weights": {
+        "completeness": ###
+        "integrity": ###
+        "process_continuity": ####
+      },
+
+      "forge_cost": {
+        "level": ###
+        "rationale": ###
+      },
+
+      "validation_rules": [
+        "hash_valid",
+        "audio_metadata_valid",
+        "track_alignment_consistent",
+        "timestamp_consistent",
+        "relationship_consistent"
+      ]
+    },
+
+
+    {
+      "id": "audio.cue-sheet",
+
+      "match": {
+        "general": "document",
+        "subtype": "production-document",
+        "role": "cue-sheet"
+      },
+
+      "expectation": {
+        "type": "optional"
+      },
+
+      "weights": {
+        "completeness": ###
+        "integrity": ####
+        "process_continuity": ###
+      },
+
+      "forge_cost": {
+        "level": ###
+        "rationale": ####
+      },
+
+      "validation_rules": [
+        "document_parse_valid",
+        "referenced_artifacts_exist",
+        "cue_entries_consistent",
+        "timestamp_consistent"
+      ]
+    },
+
+
+    {
+      "id": "audio.comp-sheet",
+
+      "match": {
+        "general": "document",
+        "subtype": "production-document",
+        "role": "comp-sheet"
+      },
+
+      "expectation": {
+        "type": "conditional",
+        "when": "workflow.includes_take_selection"
+      },
+
+      "weights": {
+        "completeness": ###
+        "integrity": ###
+        "process_continuity": ###
+      },
+
+      "forge_cost": {
+        "level": ###
+        "rationale": ####
+      },
+
+      "validation_rules": [
+        "document_parse_valid",
+        "referenced_takes_exist",
+        "selected_regions_valid",
+        "selection_relationship_consistent"
+      ]
+    },
+
+
+    {
+      "id": "audio.stem",
+
+      "match": {
+        "general": "audio",
+        "subtype": "mix-output",
+        "role": "stem"
+      },
+
+      "expectation": {
+        "type": "conditional",
+        "when": "workflow.includes_stem_export"
+      },
+
+      "weights": {
+        "completeness": ###
+        "integrity": ###
+        "process_continuity": ###
+      },
+
+      "forge_cost": {
+        "level": ###
+        "rationale": ###
+      },
+
+      "validation_rules": [
+        "hash_valid",
+        "audio_metadata_valid",
+        "relationship_consistent",
+        "duration_consistent"
+      ]
+    },
+
+
+    {
+      "id": "audio.mix",
+
+      "match": {
+        "general": "audio",
+        "subtype": "mix-output",
+        "role": "mix"
+      },
+
+      "expectation": {
+        "type": "conditional",
+        "when": "workflow.includes_mixing"
+      },
+
+      "weights": {
+        "completeness": ###
+        "integrity": ##
+        "process_continuity": ###
+      },
+
+      "forge_cost": {
+        "level": ##
+        "rationale": ####
+      },
+
+      "validation_rules": [
+        "hash_valid",
+        "audio_metadata_valid",
+        "timestamp_consistent",
+        "relationship_consistent"
+      ]
+    },
+
+
+    {
+      "id": "audio.master",
+
+      "match": {
+        "general": "audio",
+        "subtype": "final-output",
+        "role": "master"
+      },
+
+      "expectation": {
+        "type": "conditional",
+        "when": "workflow.includes_mastering"
+      },
+
+      "weights": {
+        "completeness": #
+        "integrity": ##
+        "process_continuity": ###
+      },
+
+      "forge_cost": {
+        "level": ###
+        "rationale": ###
+      },
+
+      "validation_rules": [
+        "hash_valid",
+        "audio_metadata_valid",
+        "timestamp_consistent",
+        "parent_mix_relationship_consistent"
+      ]
+    },
+
+
+    {
+      "id": "audio.daw-project",
+
+      "match": {
+        "general": "project",
+        "subtype": "daw-session",
+        "role": "production-session"
+      },
+
+      "expectation": {
+        "type": "optional"
+      },
+
+      "weights": {
+        "completeness": ###
+        "integrity": ###
+        "process_continuity": ####
+      },
+
+      "forge_cost": {
+        "level": ###
+        "rationale": ####
+      },
+
+      "validation_rules": [
+        "project_parse_valid",
+        "referenced_artifacts_exist",
+        "timeline_consistent",
+        "relationship_consistent"
+      ]
+    },
+
+
+    {
+      "id": "audio.ddex-rin",
+
+      "match": {
+        "general": "metadata",
+        "subtype": "ddex",
+        "role": "rin"
+      },
+
+      "expectation": {
+        "type": "optional"
+      },
+
+      "weights": {
+        "completeness": ###
+        "integrity": ####
+        "process_continuity": ####
+      },
+
+      "forge_cost": {
+        "level": ####
+        "rationale": #####
+      },
+
+      "validation_rules": [
+        "rin_schema_valid",
+        "referenced_artifacts_exist",
+        "session_consistent",
+        "contributor_consistent",
+        "recording_component_consistent"
+      ]
+    },
+
+
+    {
+      "id": "audio.ddex-ern",
+
+      "match": {
+        "general": "metadata",
+        "subtype": "ddex",
+        "role": "ern"
+      },
+
+      "expectation": {
+        "type": "optional"
+      },
+
+      "weights": {
+        "completeness": ###
+        "integrity": ####
+        "process_continuity": ####
+        "declaration_consistency": ####
+      },
+
+      "forge_cost": {
+        "level": ####
+        "rationale": ####
+      },
+
+      "validation_rules": [
+        "ern_schema_valid",
+        "referenced_release_exists",
+        "ai_declaration_parsed",
+        "declaration_consistent"
+      ]
+    }
+
+  ]
+}
