@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- SYNTHETIC fixture for parser unit tests only. Hand-written, not a DDEX-compliant or authoritative RIN sample. -->
+<RecordingInformationNotification xmlns="http://ddex.net/xml/rin/20">
+  <SessionList>
+    <Session>
+      <SessionId>S1</SessionId>
+      <Date>2025-03-01</Date>
+      <Location>Studio A</Location>
+      <PartyList>
+        <Party>
+          <PartyId>P1</PartyId>
+          <Name>Jane Doe</Name>
+          <Role>Producer</Role>
+        </Party>
+      </PartyList>
+      <EquipmentList>
+        <Equipment>
+          <EquipmentId>E1</EquipmentId>
+          <Description>Neumann U87</Description>
+          <EquipmentType>Microphone</EquipmentType>
+        </Equipment>
+      </EquipmentList>
+    </Session>
+  </SessionList>
+  <RecordingComponentList>
+    <RecordingComponent>
+      <ComponentId>C1</ComponentId>
+      <Title>Lead Vocal Take 3</Title>
+      <Role>Vocal</Role>
+    </RecordingComponent>
+  </RecordingComponentList>
+</RecordingInformationNotification>

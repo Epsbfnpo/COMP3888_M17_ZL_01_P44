@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- SYNTHETIC fixture for parser unit tests only. Hand-written, not a DDEX-compliant or authoritative ERN sample.
+     Deliberately omits title and release type to test that missing/optional fields are left None rather than fabricated. -->
+<NewReleaseMessage xmlns="http://ddex.net/xml/ern/43">
+  <ReleaseList>
+    <Release>
+      <ReleaseId>R2</ReleaseId>
+    </Release>
+  </ReleaseList>
+</NewReleaseMessage>

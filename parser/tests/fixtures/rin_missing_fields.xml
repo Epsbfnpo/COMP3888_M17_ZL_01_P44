@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- SYNTHETIC fixture for parser unit tests only. Hand-written, not a DDEX-compliant or authoritative RIN sample.
+     Deliberately omits Date, Location, EquipmentList, Party/Role, and RecordingComponentList to test that
+     missing/optional fields are left None/empty rather than fabricated. -->
+<RecordingInformationNotification xmlns="http://ddex.net/xml/rin/20">
+  <SessionList>
+    <Session>
+      <SessionId>S2</SessionId>
+      <PartyList>
+        <Party>
+          <PartyId>P2</PartyId>
+          <Name>John Smith</Name>
+        </Party>
+      </PartyList>
+    </Session>
+  </SessionList>
+</RecordingInformationNotification>

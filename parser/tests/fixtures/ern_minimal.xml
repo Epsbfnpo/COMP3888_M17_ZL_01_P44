@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- SYNTHETIC fixture for parser unit tests only. Hand-written, not a DDEX-compliant or authoritative ERN sample.
+     Contains no AI-declaration content; see ern_parser.py for why that extraction is unsupported in this baseline. -->
+<NewReleaseMessage xmlns="http://ddex.net/xml/ern/43">
+  <ReleaseList>
+    <Release>
+      <ReleaseId>R1</ReleaseId>
+      <ReferenceTitle>
+        <TitleText>Test Album</TitleText>
+      </ReferenceTitle>
+      <ReleaseType>Album</ReleaseType>
+    </Release>
+  </ReleaseList>
+</NewReleaseMessage>
