@@ -1,94 +1,71 @@
 {
-    "schema_version" : 
-    "bundle_id" : 
+  "schema_version": "",
+  "bundle_id": "",
 
-    "domain_profile" :
+  "domain_profile": "",
 
-    "domain_profile" :
+  "final_artifact_id": "",
 
-    "final_artifact_id" :
+  "artifacts": [
+    {
+      "id": "",
 
-    "artifacts": [
-        {
-            "id" :
-            "file" : {
-                "path" :
-                "media_type" ##audio/wav
-            },
+      "file": {
+        "path": "",
+        "media_type": ""
+        // Example: audio/wav
+      },
 
-            "hash" : {
-                "hash_method" :
-                "value" :
-            },
+      "hash": {
+        "hash_method": "",
+        "value": ""
+      },
 
-            "type" : {
-                "general" : ###These three attributes are used to match the evidence profile
-                "subtype" :
-                "role" : ##for example: take , stem , comp-sheet
-            },
+      "type": {
+        "general": "",
+        "subtype": "",
+        "role": ""
+        // These attributes are used to match artifacts against the evidence profile. Example role: take, stem, comp-sheet.
+      },
 
-            "metadata" : {
-                "duration_seconds" :   
-                "sample_rate" :
-                "channels" :
-                ###Maybe we need more
-            },
+      "metadata": {
+        "duration_seconds": null,
+        "sample_rate": null,
+        "channels": null
+      },
 
-            "provenance" : {
-                "c2pa" : {
-                    ##discussion 
-                    ""
-                    {
-                        "present" : true,
-
-                    }
-
-                    {
-                        "present" : false,
-                    }
-                    
-                    
-                    ""
-                }
-            },
-
-            "extension" : {
-                "audio" {
-                    ##needs discussion
-                    {
-                        "rin" : {
-                            "sessions" : []
-                            "contributors" : []
-                            "equipment" :  []
-                            "recording_components" : []
-                        },
-
-                        "ern" : {
-                                "contains_ai": ###partly/complete/none
-                                "ai_contributions": []
-                            }
-
-                    }
-                }
-            }
+      "provenance": {
+        "c2pa": {
+          "present": false
         }
-    ]
+      },
 
-    "relationship" [
-        {
-            "id" : 
+      "extension": {
+        "audio": {
+          "rin": {
+            "sessions": [],
+            "contributors": [],
+            "equipment": [],
+            "recording_components": []
+          },
 
-            "from" :  
-
-            "to" :  
-
-            "realtion_type" :  ####parentOf/componentOf/inputTo/supports/documents
-                                         
+          "ern": {
+            "contains_ai": null,
+            "ai_contributions": []
+          }
         }
+      }
+    }
+  ],
 
-    ]
+  "relationships": [
+    {
+      "id": "",
+      "from": "",
+      "to": "",
 
-
-
-
+      "relation_type": ""
+      // Examples: parentOf, componentOf, inputTo, supports, documents.
+    }
+  ]
 }
