@@ -6,8 +6,8 @@
   },
 
   "expectation": {
-    "type" : "optional",
-    "conditions" : ###
+    "type": "optional"
+    // C2PA should remain optional. Missing C2PA should not imply weak/fake provenance.
   },
 
   "weights": {
