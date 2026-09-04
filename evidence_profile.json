@@ -1,25 +1,19 @@
 {
-  "profile_id": ,
+  "profile_id": "",
 
   "domain": "audio",
 
   "weight_scale": {
     "min": 0.0,
-    "max": 1.0,
+    "max": 1.0
   },
 
   "forge_cost_scale": {
     "min": 1,
-    "max": ###
+    "max": null
   },
 
-
-
-
-
-  
   "evidence_classes": [
-
     {
       "id": "audio.demo",
 
@@ -34,14 +28,14 @@
       },
 
       "weights": {
-        "completeness": ###
-        "integrity": ####
-        "process_continuity": ###
+        "completeness": null,
+        "integrity": null,
+        "process_continuity": null
       },
 
       "forge_cost": {
-        "level": ###
-        "rationale": ###
+        "level": null,
+        "rationale": ""
       },
 
       "validation_rules": [
@@ -51,7 +45,6 @@
         "relationship_consistent"
       ]
     },
-
 
     {
       "id": "audio.raw-take",
@@ -68,14 +61,14 @@
       },
 
       "weights": {
-        "completeness": ##
-        "integrity": #
-        "process_continuity": #
+        "completeness": null,
+        "integrity": null,
+        "process_continuity": null
       },
 
       "forge_cost": {
-        "level": ##
-        "rationale": ###
+        "level": null,
+        "rationale": ""
       },
 
       "validation_rules": [
@@ -85,7 +78,6 @@
         "relationship_consistent"
       ]
     },
-
 
     {
       "id": "audio.raw-track",
@@ -102,14 +94,14 @@
       },
 
       "weights": {
-        "completeness": ###
-        "integrity": ###
-        "process_continuity": ####
+        "completeness": null,
+        "integrity": null,
+        "process_continuity": null
       },
 
       "forge_cost": {
-        "level": ###
-        "rationale": ###
+        "level": null,
+        "rationale": ""
       },
 
       "validation_rules": [
@@ -120,7 +112,6 @@
         "relationship_consistent"
       ]
     },
-
 
     {
       "id": "audio.cue-sheet",
@@ -136,14 +127,14 @@
       },
 
       "weights": {
-        "completeness": ###
-        "integrity": ####
-        "process_continuity": ###
+        "completeness": null,
+        "integrity": null,
+        "process_continuity": null
       },
 
       "forge_cost": {
-        "level": ###
-        "rationale": ####
+        "level": null,
+        "rationale": ""
       },
 
       "validation_rules": [
@@ -153,7 +144,6 @@
         "timestamp_consistent"
       ]
     },
-
 
     {
       "id": "audio.comp-sheet",
@@ -170,14 +160,14 @@
       },
 
       "weights": {
-        "completeness": ###
-        "integrity": ###
-        "process_continuity": ###
+        "completeness": null,
+        "integrity": null,
+        "process_continuity": null
       },
 
       "forge_cost": {
-        "level": ###
-        "rationale": ####
+        "level": null,
+        "rationale": ""
       },
 
       "validation_rules": [
@@ -187,7 +177,6 @@
         "selection_relationship_consistent"
       ]
     },
-
 
     {
       "id": "audio.stem",
@@ -204,14 +193,14 @@
       },
 
       "weights": {
-        "completeness": ###
-        "integrity": ###
-        "process_continuity": ###
+        "completeness": null,
+        "integrity": null,
+        "process_continuity": null
       },
 
       "forge_cost": {
-        "level": ###
-        "rationale": ###
+        "level": null,
+        "rationale": ""
       },
 
       "validation_rules": [
@@ -221,7 +210,6 @@
         "duration_consistent"
       ]
     },
-
 
     {
       "id": "audio.mix",
@@ -238,14 +226,14 @@
       },
 
       "weights": {
-        "completeness": ###
-        "integrity": ##
-        "process_continuity": ###
+        "completeness": null,
+        "integrity": null,
+        "process_continuity": null
       },
 
       "forge_cost": {
-        "level": ##
-        "rationale": ####
+        "level": null,
+        "rationale": ""
       },
 
       "validation_rules": [
@@ -255,7 +243,6 @@
         "relationship_consistent"
       ]
     },
-
 
     {
       "id": "audio.master",
@@ -272,14 +259,14 @@
       },
 
       "weights": {
-        "completeness": #
-        "integrity": ##
-        "process_continuity": ###
+        "completeness": null,
+        "integrity": null,
+        "process_continuity": null
       },
 
       "forge_cost": {
-        "level": ###
-        "rationale": ###
+        "level": null,
+        "rationale": ""
       },
 
       "validation_rules": [
@@ -289,7 +276,6 @@
         "parent_mix_relationship_consistent"
       ]
     },
-
 
     {
       "id": "audio.daw-project",
@@ -305,14 +291,14 @@
       },
 
       "weights": {
-        "completeness": ###
-        "integrity": ###
-        "process_continuity": ####
+        "completeness": null,
+        "integrity": null,
+        "process_continuity": null
       },
 
       "forge_cost": {
-        "level": ###
-        "rationale": ####
+        "level": null,
+        "rationale": ""
       },
 
       "validation_rules": [
@@ -322,7 +308,6 @@
         "relationship_consistent"
       ]
     },
-
 
     {
       "id": "audio.ddex-rin",
@@ -338,14 +323,14 @@
       },
 
       "weights": {
-        "completeness": ###
-        "integrity": ####
-        "process_continuity": ####
+        "completeness": null,
+        "integrity": null,
+        "process_continuity": null
       },
 
       "forge_cost": {
-        "level": ####
-        "rationale": #####
+        "level": null,
+        "rationale": ""
       },
 
       "validation_rules": [
@@ -356,7 +341,6 @@
         "recording_component_consistent"
       ]
     },
-
 
     {
       "id": "audio.ddex-ern",
@@ -372,15 +356,15 @@
       },
 
       "weights": {
-        "completeness": ###
-        "integrity": ####
-        "process_continuity": ####
-        "declaration_consistency": ####
+        "completeness": null,
+        "integrity": null,
+        "process_continuity": null,
+        "declaration_consistency": null
       },
 
       "forge_cost": {
-        "level": ####
-        "rationale": ####
+        "level": null,
+        "rationale": ""
       },
 
       "validation_rules": [
@@ -390,6 +374,5 @@
         "declaration_consistent"
       ]
     }
-
   ]
 }
