@@ -1,44 +1,52 @@
 {
-  "schema_version": "",
+  "schema_version": "0.0.2",
   "bundle_id": "",
 
   "domain_profile": "",
 
-  "final_artifact_id": "",
+  "hash_method": "sha256",
 
-  "artifacts": [
+  "final_artefact_hash": "",
+
+  "artefacts": [
     {
-      "id": "",
+      "artefact_hash": "",
 
       "file": {
         "path": "",
         "media_type": ""
-        // Example: audio/wav
       },
 
-      "hash": {
-        "hash_method": "",
-        "value": ""
-      },
 
-      "type": {
-        "general": "",
-        "subtype": "",
-        "role": ""
-        // These attributes are used to match artifacts against the evidence profile. Example role: take, stem, comp-sheet.
-      },
+      "artefact_type": "",
 
-      "metadata": {
-        "duration_seconds": null,
-        "sample_rate": null,
-        "channels": null
+      "attributes": {
+        "technical": {
+          "duration_seconds": null,
+          "sample_rate": null,
+          "channels": null,
+          "bit_depth": null
+        },
+        "source_metadata": {}
       },
 
       "provenance": {
         "c2pa": {
-          "present": false
+          "present": false,
+          "manifest_id": null,
+          "claim": {
+            "claim_id": null,
+            "assertion_refs": []
+          },
+          "assertions": [],
+          "ingredient_refs": [],
+          "action_refs": [],
+          "integrity": {
+            "signature_present": false,
+            "signature_status": "not_available"
+          }
         }
-      },
+    },
 
       "extension": {
         "audio": {
@@ -63,9 +71,10 @@
       "id": "",
       "from": "",
       "to": "",
-
-      "relation_type": ""
-      // Examples: parentOf, componentOf, inputTo, supports, documents.
+      "relationship_type": ""
     }
   ]
 }
+
+
+
