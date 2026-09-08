@@ -1,80 +1,21 @@
 {
-  "schema_version": "0.0.2",
-  "bundle_id": "",
-
-  "domain_profile": "",
-
+  "schema_version": "0.0.3",
   "hash_method": "sha256",
-
   "final_artefact_hash": "",
-
   "artefacts": [
     {
       "artefact_hash": "",
-
-      "file": {
-        "path": "",
-        "media_type": ""
-      },
-
-
-      "artefact_type": "",
-
+      "artefact_type": "", 
       "attributes": {
-        "technical": {
-          "duration_seconds": null,
-          "sample_rate": null,
-          "channels": null,
-          "bit_depth": null
-        },
-        "source_metadata": {}
+        
       },
-
-      "provenance": {
-        "c2pa": {
-          "present": false,
-          "manifest_id": null,
-          "claim": {
-            "claim_id": null,
-            "assertion_refs": []
-          },
-          "assertions": [],
-          "ingredient_refs": [],
-          "action_refs": [],
-          "integrity": {
-            "signature_present": false,
-            "signature_status": "not_available"
-          }
+      "evidence": [
+        {
+          "hash": "",
+          "relationship_type": "",
+          "attributes": {}
         }
-    },
-
-      "extension": {
-        "audio": {
-          "rin": {
-            "sessions": [],
-            "contributors": [],
-            "equipment": [],
-            "recording_components": []
-          },
-
-          "ern": {
-            "contains_ai": null,
-            "ai_contributions": []
-          }
-        }
-      }
-    }
-  ],
-
-  "relationships": [
-    {
-      "id": "",
-      "from": "",
-      "to": "",
-      "relationship_type": ""
+      ]
     }
   ]
 }
-
-
-
