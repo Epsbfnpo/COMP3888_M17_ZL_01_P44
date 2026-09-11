@@ -1,21 +1,768 @@
 {
-  "schema_version": "0.0.3",
-  "hash_method": "sha256",
-  "final_artefact_hash": "",
-  "artefacts": [
-    {
-      "artefact_hash": "",
-      "artefact_type": "", 
-      "attributes": {
-        
-      },
-      "evidence": [
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://comp3888.example/m17/music-evidence-bundle-0.0.3.schema.json",
+  "title": "COMP3888 M17 music evidence bundle",
+  "description": "A strict, machine-readable subset of Ben's libevchain JSON format using the artefact and relationship types registered by music_evidence_types.py.",
+  "$comment": "JSON Schema cannot portably enforce cross-reference constraints: the final hash and every evidence hash must resolve, artefact hashes must be unique, relationship endpoints must be compatible, and the graph must be acyclic. A bundle builder/validator must enforce these runtime rules before assessment. For audio artefacts, technical/source_metadata hold parser-observed values while declared_technical/declared_source_metadata preserve external claims for integrity comparison. Evidence edges must come from explicit submitter or traceable machine-readable declarations; system suggestions remain outside the bundle.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "hash_method",
+    "final_artefact_hash",
+    "artefacts"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "0.0.3"
+    },
+    "hash_method": {
+      "const": "sha256"
+    },
+    "final_artefact_hash": {
+      "$ref": "#/$defs/sha256"
+    },
+    "artefacts": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 256,
+      "uniqueItems": true,
+      "items": {
+        "$ref": "#/$defs/artefact"
+      }
+    }
+  },
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "nullableString": {
+      "type": ["string", "null"]
+    },
+    "nullableInteger": {
+      "type": ["integer", "null"]
+    },
+    "nullableNumber": {
+      "type": ["number", "null"]
+    },
+    "nullableNonNegativeNumber": {
+      "type": ["number", "null"],
+      "minimum": 0
+    },
+    "nullableStringArray": {
+      "type": ["array", "null"],
+      "items": {
+        "type": "string"
+      }
+    },
+    "creationMethod": {
+      "oneOf": [
         {
-          "hash": "",
-          "relationship_type": "",
-          "attributes": {}
+          "enum": ["recorded", "synthesised", "ai-generated"]
+        },
+        {
+          "type": "array",
+          "items": {
+            "enum": ["recorded", "synthesised", "ai-generated"]
+          }
+        }
+      ]
+    },
+    "technicalAudio": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "media_type": {"$ref": "#/$defs/nullableString"},
+        "duration_seconds": {"$ref": "#/$defs/nullableNonNegativeNumber"},
+        "sample_rate_hz": {"$ref": "#/$defs/nullableInteger"},
+        "channels": {"$ref": "#/$defs/nullableInteger"},
+        "bit_depth": {"$ref": "#/$defs/nullableInteger"},
+        "format": {"$ref": "#/$defs/nullableString"},
+        "codec_subtype": {"$ref": "#/$defs/nullableString"},
+        "file_size_bytes": {"$ref": "#/$defs/nullableInteger"}
+      }
+    },
+    "sourceMetadata": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "original_filename": {"$ref": "#/$defs/nullableString"},
+        "author": {"$ref": "#/$defs/nullableString"},
+        "license": {"$ref": "#/$defs/nullableString"},
+        "description": {"$ref": "#/$defs/nullableString"},
+        "submitted_at": {"$ref": "#/$defs/nullableString"},
+        "updated_at": {"$ref": "#/$defs/nullableString"},
+        "originator": {"$ref": "#/$defs/nullableString"},
+        "originator_reference": {"$ref": "#/$defs/nullableString"},
+        "origination_date": {"$ref": "#/$defs/nullableString"},
+        "origination_time": {"$ref": "#/$defs/nullableString"},
+        "time_reference_samples": {"$ref": "#/$defs/nullableInteger"},
+        "umid": {"$ref": "#/$defs/nullableString"},
+        "coding_history": {"$ref": "#/$defs/nullableString"},
+        "software": {"$ref": "#/$defs/nullableString"},
+        "artist": {"$ref": "#/$defs/nullableString"},
+        "engineer": {"$ref": "#/$defs/nullableString"},
+        "comment": {"$ref": "#/$defs/nullableString"}
+      }
+    },
+    "parserDiagnostics": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "parser": {"$ref": "#/$defs/nullableString"},
+        "warnings": {"$ref": "#/$defs/nullableStringArray"}
+      }
+    },
+    "c2paProvenance": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "present": {"type": ["boolean", "null"]},
+        "active_manifest_label": {"$ref": "#/$defs/nullableString"},
+        "assertions": {},
+        "ingredients": {},
+        "signature_info": {},
+        "validation_status": {}
+      }
+    },
+    "rawProduction": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "track_name": {"$ref": "#/$defs/nullableString"},
+        "source_role": {"$ref": "#/$defs/nullableString"},
+        "instrument": {"$ref": "#/$defs/nullableString"},
+        "capture_method": {"$ref": "#/$defs/nullableString"},
+        "equipment": {"$ref": "#/$defs/nullableStringArray"}
+      }
+    },
+    "editedProduction": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "track_name": {"$ref": "#/$defs/nullableString"},
+        "source_role": {"$ref": "#/$defs/nullableString"},
+        "instrument": {"$ref": "#/$defs/nullableString"}
+      }
+    },
+    "stemProduction": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "stem_name": {"$ref": "#/$defs/nullableString"},
+        "stem_role": {"$ref": "#/$defs/nullableString"},
+        "source_role": {"$ref": "#/$defs/nullableString"},
+        "instrument": {"$ref": "#/$defs/nullableString"}
+      }
+    },
+    "mixProduction": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "mix_name": {"$ref": "#/$defs/nullableString"},
+        "mix_stage": {"$ref": "#/$defs/nullableString"}
+      }
+    },
+    "masterProduction": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "master_name": {"$ref": "#/$defs/nullableString"}
+      }
+    },
+    "sampleProduction": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "sample_name": {"$ref": "#/$defs/nullableString"},
+        "sample_category": {"$ref": "#/$defs/nullableString"}
+      }
+    },
+    "unclassifiedProduction": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "declared_role": {"$ref": "#/$defs/nullableString"}
+      }
+    },
+    "audioRawAttributes": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "creation_method": {"$ref": "#/$defs/creationMethod"},
+        "technical": {"$ref": "#/$defs/technicalAudio"},
+        "declared_technical": {"$ref": "#/$defs/technicalAudio"},
+        "production": {"$ref": "#/$defs/rawProduction"},
+        "source_metadata": {"$ref": "#/$defs/sourceMetadata"},
+        "declared_source_metadata": {"$ref": "#/$defs/sourceMetadata"},
+        "provenance": {"$ref": "#/$defs/c2paProvenance"},
+        "parser_diagnostics": {"$ref": "#/$defs/parserDiagnostics"}
+      }
+    },
+    "audioEditedAttributes": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "creation_method": {"$ref": "#/$defs/creationMethod"},
+        "technical": {"$ref": "#/$defs/technicalAudio"},
+        "declared_technical": {"$ref": "#/$defs/technicalAudio"},
+        "production": {"$ref": "#/$defs/editedProduction"},
+        "source_metadata": {"$ref": "#/$defs/sourceMetadata"},
+        "declared_source_metadata": {"$ref": "#/$defs/sourceMetadata"},
+        "provenance": {"$ref": "#/$defs/c2paProvenance"},
+        "parser_diagnostics": {"$ref": "#/$defs/parserDiagnostics"}
+      }
+    },
+    "audioStemAttributes": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "creation_method": {"$ref": "#/$defs/creationMethod"},
+        "technical": {"$ref": "#/$defs/technicalAudio"},
+        "declared_technical": {"$ref": "#/$defs/technicalAudio"},
+        "production": {"$ref": "#/$defs/stemProduction"},
+        "source_metadata": {"$ref": "#/$defs/sourceMetadata"},
+        "declared_source_metadata": {"$ref": "#/$defs/sourceMetadata"},
+        "provenance": {"$ref": "#/$defs/c2paProvenance"},
+        "parser_diagnostics": {"$ref": "#/$defs/parserDiagnostics"}
+      }
+    },
+    "audioMixAttributes": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "creation_method": {"$ref": "#/$defs/creationMethod"},
+        "technical": {"$ref": "#/$defs/technicalAudio"},
+        "declared_technical": {"$ref": "#/$defs/technicalAudio"},
+        "production": {"$ref": "#/$defs/mixProduction"},
+        "source_metadata": {"$ref": "#/$defs/sourceMetadata"},
+        "declared_source_metadata": {"$ref": "#/$defs/sourceMetadata"},
+        "provenance": {"$ref": "#/$defs/c2paProvenance"},
+        "parser_diagnostics": {"$ref": "#/$defs/parserDiagnostics"}
+      }
+    },
+    "audioMasterAttributes": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "creation_method": {"$ref": "#/$defs/creationMethod"},
+        "technical": {"$ref": "#/$defs/technicalAudio"},
+        "declared_technical": {"$ref": "#/$defs/technicalAudio"},
+        "production": {"$ref": "#/$defs/masterProduction"},
+        "source_metadata": {"$ref": "#/$defs/sourceMetadata"},
+        "declared_source_metadata": {"$ref": "#/$defs/sourceMetadata"},
+        "provenance": {"$ref": "#/$defs/c2paProvenance"},
+        "parser_diagnostics": {"$ref": "#/$defs/parserDiagnostics"}
+      }
+    },
+    "audioSampleAttributes": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "creation_method": {"$ref": "#/$defs/creationMethod"},
+        "technical": {"$ref": "#/$defs/technicalAudio"},
+        "declared_technical": {"$ref": "#/$defs/technicalAudio"},
+        "production": {"$ref": "#/$defs/sampleProduction"},
+        "source_metadata": {"$ref": "#/$defs/sourceMetadata"},
+        "declared_source_metadata": {"$ref": "#/$defs/sourceMetadata"},
+        "provenance": {"$ref": "#/$defs/c2paProvenance"},
+        "parser_diagnostics": {"$ref": "#/$defs/parserDiagnostics"}
+      }
+    },
+    "audioUnclassifiedAttributes": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "creation_method": {"$ref": "#/$defs/creationMethod"},
+        "technical": {"$ref": "#/$defs/technicalAudio"},
+        "declared_technical": {"$ref": "#/$defs/technicalAudio"},
+        "production": {"$ref": "#/$defs/unclassifiedProduction"},
+        "source_metadata": {"$ref": "#/$defs/sourceMetadata"},
+        "declared_source_metadata": {"$ref": "#/$defs/sourceMetadata"},
+        "provenance": {"$ref": "#/$defs/c2paProvenance"},
+        "parser_diagnostics": {"$ref": "#/$defs/parserDiagnostics"}
+      }
+    },
+    "cueSheetAttributes": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "document": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "song_title": {"$ref": "#/$defs/nullableString"},
+            "style": {"$ref": "#/$defs/nullableString"},
+            "key": {"$ref": "#/$defs/nullableString"},
+            "tempo_bpm": {"$ref": "#/$defs/nullableNumber"},
+            "musical_structure": {"$ref": "#/$defs/nullableStringArray"}
+          }
+        },
+        "source_metadata": {"$ref": "#/$defs/sourceMetadata"}
+      }
+    },
+    "compSheetAttributes": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "document": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "song_title": {"$ref": "#/$defs/nullableString"},
+            "lyrics": {"$ref": "#/$defs/nullableString"},
+            "take_selections": {"$ref": "#/$defs/nullableStringArray"},
+            "comp_notes": {"$ref": "#/$defs/nullableStringArray"}
+          }
+        },
+        "source_metadata": {"$ref": "#/$defs/sourceMetadata"}
+      }
+    },
+    "dawSessionAttributes": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "technical": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "project_format": {"$ref": "#/$defs/nullableString"},
+            "creator": {"$ref": "#/$defs/nullableString"},
+            "creator_version": {"$ref": "#/$defs/nullableString"}
+          }
+        },
+        "production": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "project_name": {"$ref": "#/$defs/nullableString"},
+            "tempo_bpm": {"$ref": "#/$defs/nullableNumber"},
+            "timesig_numerator": {"$ref": "#/$defs/nullableInteger"},
+            "timesig_denominator": {"$ref": "#/$defs/nullableInteger"},
+            "master_volume": {"$ref": "#/$defs/nullableNumber"},
+            "master_pitch": {"$ref": "#/$defs/nullableNumber"},
+            "tracks": {},
+            "media_references": {},
+            "automation": {},
+            "plugins": {}
+          }
+        },
+        "source_metadata": {"$ref": "#/$defs/sourceMetadata"}
+      }
+    },
+    "ddexRinAttributes": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "production": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "session_id": {"$ref": "#/$defs/nullableString"},
+            "session_date": {"$ref": "#/$defs/nullableString"},
+            "location": {"$ref": "#/$defs/nullableString"},
+            "contributors": {},
+            "contributor_roles": {},
+            "equipment": {},
+            "recording_components": {},
+            "sessions": {}
+          }
+        },
+        "source_metadata": {"$ref": "#/$defs/sourceMetadata"},
+        "parser_diagnostics": {"$ref": "#/$defs/parserDiagnostics"}
+      }
+    },
+    "ddexErnAttributes": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "release": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "release_id": {"$ref": "#/$defs/nullableString"},
+            "title": {"$ref": "#/$defs/nullableString"},
+            "release_type": {"$ref": "#/$defs/nullableString"},
+            "releases": {}
+          }
+        },
+        "AI-declaration": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "value": {}
+          }
+        },
+        "source_metadata": {"$ref": "#/$defs/sourceMetadata"},
+        "parser_diagnostics": {"$ref": "#/$defs/parserDiagnostics"}
+      }
+    },
+    "c2paAttributes": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "provenance": {"$ref": "#/$defs/c2paProvenance"},
+        "source_metadata": {"$ref": "#/$defs/sourceMetadata"},
+        "parser_diagnostics": {"$ref": "#/$defs/parserDiagnostics"}
+      }
+    },
+    "relationshipAttributesBase": {
+      "type": "object",
+      "required": ["assertion_origin"],
+      "properties": {
+        "assertion_origin": {
+          "enum": [
+            "submitter",
+            "daw-session",
+            "c2pa-ingredient",
+            "ddex-rin",
+            "ddex-ern"
+          ]
+        },
+        "confirmed_by_submitter": {
+          "type": "boolean"
+        },
+        "reference_pointer": {
+          "$ref": "#/$defs/nullableString"
+        },
+        "claim_rationale": {
+          "$ref": "#/$defs/nullableString"
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "required": ["assertion_origin"],
+            "properties": {
+              "assertion_origin": {
+                "enum": ["daw-session", "c2pa-ingredient", "ddex-rin", "ddex-ern"]
+              }
+            }
+          },
+          "then": {
+            "required": ["reference_pointer"],
+            "properties": {
+              "reference_pointer": {"type": "string", "minLength": 1}
+            }
+          }
+        }
+      ]
+    },
+    "derivedFromAttributes": {
+      "allOf": [
+        {"$ref": "#/$defs/relationshipAttributesBase"},
+        {
+          "type": "object",
+          "properties": {
+            "transformation_description": {"$ref": "#/$defs/nullableString"}
+          }
+        }
+      ],
+      "unevaluatedProperties": false
+    },
+    "editedFromAttributes": {
+      "allOf": [
+        {"$ref": "#/$defs/relationshipAttributesBase"},
+        {
+          "type": "object",
+          "properties": {
+            "source_start_seconds": {"$ref": "#/$defs/nullableNonNegativeNumber"},
+            "source_end_seconds": {"$ref": "#/$defs/nullableNonNegativeNumber"},
+            "target_start_seconds": {"$ref": "#/$defs/nullableNonNegativeNumber"},
+            "edit_operations": {"$ref": "#/$defs/nullableStringArray"}
+          }
+        }
+      ],
+      "unevaluatedProperties": false
+    },
+    "compedFromAttributes": {
+      "allOf": [
+        {"$ref": "#/$defs/relationshipAttributesBase"},
+        {
+          "type": "object",
+          "properties": {
+            "source_start_seconds": {"$ref": "#/$defs/nullableNonNegativeNumber"},
+            "source_end_seconds": {"$ref": "#/$defs/nullableNonNegativeNumber"},
+            "target_start_seconds": {"$ref": "#/$defs/nullableNonNegativeNumber"},
+            "target_end_seconds": {"$ref": "#/$defs/nullableNonNegativeNumber"},
+            "take_label": {"$ref": "#/$defs/nullableString"}
+          }
+        }
+      ],
+      "unevaluatedProperties": false
+    },
+    "stemmedFromAttributes": {
+      "allOf": [
+        {"$ref": "#/$defs/relationshipAttributesBase"},
+        {
+          "type": "object",
+          "properties": {
+            "timeline_offset_seconds": {"$ref": "#/$defs/nullableNumber"},
+            "source_role": {"$ref": "#/$defs/nullableString"},
+            "track_id": {"$ref": "#/$defs/nullableString"}
+          }
+        }
+      ],
+      "unevaluatedProperties": false
+    },
+    "mixedFromAttributes": {
+      "allOf": [
+        {"$ref": "#/$defs/relationshipAttributesBase"},
+        {
+          "type": "object",
+          "properties": {
+            "timeline_offset_seconds": {"$ref": "#/$defs/nullableNumber"},
+            "source_role": {"$ref": "#/$defs/nullableString"},
+            "declared_gain_db": {"$ref": "#/$defs/nullableNumber"},
+            "declared_pan": {
+              "type": ["number", "null"],
+              "minimum": -1,
+              "maximum": 1
+            }
+          }
+        }
+      ],
+      "unevaluatedProperties": false
+    },
+    "masteredFromAttributes": {
+      "allOf": [
+        {"$ref": "#/$defs/relationshipAttributesBase"},
+        {
+          "type": "object",
+          "properties": {
+            "input_sample_rate_hz": {"$ref": "#/$defs/nullableInteger"},
+            "output_sample_rate_hz": {"$ref": "#/$defs/nullableInteger"},
+            "input_bit_depth": {"$ref": "#/$defs/nullableInteger"},
+            "output_bit_depth": {"$ref": "#/$defs/nullableInteger"},
+            "target_loudness_lufs": {"$ref": "#/$defs/nullableNumber"}
+          }
+        }
+      ],
+      "unevaluatedProperties": false
+    },
+    "excerptedFromAttributes": {
+      "allOf": [
+        {"$ref": "#/$defs/relationshipAttributesBase"},
+        {
+          "type": "object",
+          "properties": {
+            "source_start_seconds": {"$ref": "#/$defs/nullableNonNegativeNumber"},
+            "source_end_seconds": {"$ref": "#/$defs/nullableNonNegativeNumber"},
+            "target_start_seconds": {"$ref": "#/$defs/nullableNonNegativeNumber"}
+          }
+        }
+      ],
+      "unevaluatedProperties": false
+    },
+    "renderedFromAttributes": {
+      "allOf": [
+        {"$ref": "#/$defs/relationshipAttributesBase"},
+        {
+          "type": "object",
+          "properties": {
+            "render_profile": {"$ref": "#/$defs/nullableString"},
+            "render_timestamp": {"$ref": "#/$defs/nullableString"}
+          }
+        }
+      ],
+      "unevaluatedProperties": false
+    },
+    "convertedFromAttributes": {
+      "allOf": [
+        {"$ref": "#/$defs/relationshipAttributesBase"},
+        {
+          "type": "object",
+          "properties": {
+            "source_format": {"$ref": "#/$defs/nullableString"},
+            "target_format": {"$ref": "#/$defs/nullableString"}
+          }
+        }
+      ],
+      "unevaluatedProperties": false
+    },
+    "documentedByAttributes": {
+      "allOf": [
+        {"$ref": "#/$defs/relationshipAttributesBase"},
+        {
+          "type": "object",
+          "properties": {
+            "document_role": {"$ref": "#/$defs/nullableString"},
+            "referenced_item": {"$ref": "#/$defs/nullableString"}
+          }
+        }
+      ],
+      "unevaluatedProperties": false
+    },
+    "attestedByAttributes": {
+      "allOf": [
+        {"$ref": "#/$defs/relationshipAttributesBase"},
+        {
+          "type": "object",
+          "properties": {
+            "assertion_label": {"$ref": "#/$defs/nullableString"}
+          }
+        }
+      ],
+      "unevaluatedProperties": false
+    },
+    "relationshipType": {
+      "enum": [
+        "derived_from",
+        "edited_from",
+        "comped_from",
+        "stemmed_from",
+        "mixed_from",
+        "mastered_from",
+        "excerpted_from",
+        "rendered_from",
+        "converted_from",
+        "documented_by",
+        "attested_by"
+      ]
+    },
+    "evidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["hash", "relationship_type", "attributes"],
+      "properties": {
+        "hash": {"$ref": "#/$defs/sha256"},
+        "relationship_type": {"$ref": "#/$defs/relationshipType"},
+        "attributes": {"type": "object"}
+      },
+      "allOf": [
+        {
+          "if": {"properties": {"relationship_type": {"const": "derived_from"}}},
+          "then": {"properties": {"attributes": {"$ref": "#/$defs/derivedFromAttributes"}}}
+        },
+        {
+          "if": {"properties": {"relationship_type": {"const": "edited_from"}}},
+          "then": {"properties": {"attributes": {"$ref": "#/$defs/editedFromAttributes"}}}
+        },
+        {
+          "if": {"properties": {"relationship_type": {"const": "comped_from"}}},
+          "then": {"properties": {"attributes": {"$ref": "#/$defs/compedFromAttributes"}}}
+        },
+        {
+          "if": {"properties": {"relationship_type": {"const": "stemmed_from"}}},
+          "then": {"properties": {"attributes": {"$ref": "#/$defs/stemmedFromAttributes"}}}
+        },
+        {
+          "if": {"properties": {"relationship_type": {"const": "mixed_from"}}},
+          "then": {"properties": {"attributes": {"$ref": "#/$defs/mixedFromAttributes"}}}
+        },
+        {
+          "if": {"properties": {"relationship_type": {"const": "mastered_from"}}},
+          "then": {"properties": {"attributes": {"$ref": "#/$defs/masteredFromAttributes"}}}
+        },
+        {
+          "if": {"properties": {"relationship_type": {"const": "excerpted_from"}}},
+          "then": {"properties": {"attributes": {"$ref": "#/$defs/excerptedFromAttributes"}}}
+        },
+        {
+          "if": {"properties": {"relationship_type": {"const": "rendered_from"}}},
+          "then": {"properties": {"attributes": {"$ref": "#/$defs/renderedFromAttributes"}}}
+        },
+        {
+          "if": {"properties": {"relationship_type": {"const": "converted_from"}}},
+          "then": {"properties": {"attributes": {"$ref": "#/$defs/convertedFromAttributes"}}}
+        },
+        {
+          "if": {"properties": {"relationship_type": {"const": "documented_by"}}},
+          "then": {"properties": {"attributes": {"$ref": "#/$defs/documentedByAttributes"}}}
+        },
+        {
+          "if": {"properties": {"relationship_type": {"const": "attested_by"}}},
+          "then": {"properties": {"attributes": {"$ref": "#/$defs/attestedByAttributes"}}}
+        }
+      ]
+    },
+    "artefactType": {
+      "enum": [
+        "audio/raw-take",
+        "audio/raw-track",
+        "audio/edited-take",
+        "audio/stem",
+        "audio/mix",
+        "audio/master",
+        "audio/sample",
+        "audio/unclassified",
+        "text/cue-sheet",
+        "text/comp-sheet",
+        "project/daw-session",
+        "metadata/ddex-rin",
+        "metadata/ddex-ern",
+        "provenance/c2pa"
+      ]
+    },
+    "artefact": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["artefact_hash", "artefact_type", "attributes", "evidence"],
+      "properties": {
+        "artefact_hash": {"$ref": "#/$defs/sha256"},
+        "artefact_type": {"$ref": "#/$defs/artefactType"},
+        "attributes": {"type": "object"},
+        "evidence": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {"$ref": "#/$defs/evidence"}
+        }
+      },
+      "allOf": [
+        {
+          "if": {"properties": {"artefact_type": {"enum": ["audio/raw-take", "audio/raw-track"]}}},
+          "then": {"properties": {"attributes": {"$ref": "#/$defs/audioRawAttributes"}}}
+        },
+        {
+          "if": {"properties": {"artefact_type": {"const": "audio/edited-take"}}},
+          "then": {"properties": {"attributes": {"$ref": "#/$defs/audioEditedAttributes"}}}
+        },
+        {
+          "if": {"properties": {"artefact_type": {"const": "audio/stem"}}},
+          "then": {"properties": {"attributes": {"$ref": "#/$defs/audioStemAttributes"}}}
+        },
+        {
+          "if": {"properties": {"artefact_type": {"const": "audio/mix"}}},
+          "then": {"properties": {"attributes": {"$ref": "#/$defs/audioMixAttributes"}}}
+        },
+        {
+          "if": {"properties": {"artefact_type": {"const": "audio/master"}}},
+          "then": {"properties": {"attributes": {"$ref": "#/$defs/audioMasterAttributes"}}}
+        },
+        {
+          "if": {"properties": {"artefact_type": {"const": "audio/sample"}}},
+          "then": {"properties": {"attributes": {"$ref": "#/$defs/audioSampleAttributes"}}}
+        },
+        {
+          "if": {"properties": {"artefact_type": {"const": "audio/unclassified"}}},
+          "then": {"properties": {"attributes": {"$ref": "#/$defs/audioUnclassifiedAttributes"}}}
+        },
+        {
+          "if": {"properties": {"artefact_type": {"const": "text/cue-sheet"}}},
+          "then": {"properties": {"attributes": {"$ref": "#/$defs/cueSheetAttributes"}}}
+        },
+        {
+          "if": {"properties": {"artefact_type": {"const": "text/comp-sheet"}}},
+          "then": {"properties": {"attributes": {"$ref": "#/$defs/compSheetAttributes"}}}
+        },
+        {
+          "if": {"properties": {"artefact_type": {"const": "project/daw-session"}}},
+          "then": {"properties": {"attributes": {"$ref": "#/$defs/dawSessionAttributes"}}}
+        },
+        {
+          "if": {"properties": {"artefact_type": {"const": "metadata/ddex-rin"}}},
+          "then": {"properties": {"attributes": {"$ref": "#/$defs/ddexRinAttributes"}}}
+        },
+        {
+          "if": {"properties": {"artefact_type": {"const": "metadata/ddex-ern"}}},
+          "then": {"properties": {"attributes": {"$ref": "#/$defs/ddexErnAttributes"}}}
+        },
+        {
+          "if": {"properties": {"artefact_type": {"const": "provenance/c2pa"}}},
+          "then": {"properties": {"attributes": {"$ref": "#/$defs/c2paAttributes"}}}
         }
       ]
     }
-  ]
+  }
 }

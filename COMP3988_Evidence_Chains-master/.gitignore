@@ -1,0 +1,7 @@
+# Local audio test files
+*.ogg
+*.wav
+
+# Python cache files
+__pycache__/
+*.egg-info

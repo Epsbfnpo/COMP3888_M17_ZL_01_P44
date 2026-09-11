@@ -1,0 +1,81 @@
+{
+  "schema_version": "0.0.3",
+  "hash_method": "sha256",
+  "files": [
+    {
+      "id": "raw-vocal",
+      "path": "objects/raw-vocal.wav",
+      "artefact_type": "audio/raw-take",
+      "final": false,
+      "attributes": {
+        "creation_method": "recorded",
+        "production": {
+          "track_name": "Lead Vocal Take 3",
+          "source_role": "lead-vocal"
+        }
+      }
+    },
+    {
+      "id": "vocal-sample",
+      "path": "objects/vocal-sample.wav",
+      "artefact_type": "audio/sample",
+      "final": true,
+      "attributes": {
+        "creation_method": "recorded",
+        "production": {
+          "sample_name": "Vocal phrase",
+          "sample_category": "vocal"
+        }
+      }
+    },
+    {
+      "id": "rin-document",
+      "path": "objects/session-rin.xml",
+      "artefact_type": "metadata/ddex-rin",
+      "final": false,
+      "attributes": {}
+    },
+    {
+      "id": "ern-document",
+      "path": "objects/release-ern.xml",
+      "artefact_type": "metadata/ddex-ern",
+      "final": false,
+      "attributes": {}
+    }
+  ],
+  "relationships": [
+    {
+      "target": "vocal-sample",
+      "source": "raw-vocal",
+      "relationship_type": "excerpted_from",
+      "attributes": {
+        "assertion_origin": "submitter",
+        "confirmed_by_submitter": true,
+        "source_start_seconds": 0.0,
+        "source_end_seconds": 0.25,
+        "target_start_seconds": 0.0,
+        "claim_rationale": "Declared by the submitter."
+      }
+    },
+    {
+      "target": "vocal-sample",
+      "source": "rin-document",
+      "relationship_type": "documented_by",
+      "attributes": {
+        "assertion_origin": "ddex-rin",
+        "reference_pointer": "Session[S-001]",
+        "document_role": "recording-session"
+      }
+    },
+    {
+      "target": "vocal-sample",
+      "source": "ern-document",
+      "relationship_type": "documented_by",
+      "attributes": {
+        "assertion_origin": "ddex-ern",
+        "reference_pointer": "Release[REL-001]",
+        "document_role": "release-message"
+      }
+    }
+  ]
+}

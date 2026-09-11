@@ -1,0 +1,140 @@
+{
+  "profile_id": "comp3888-music-balanced",
+  "profile_version": "0.1.2",
+  "domain": "audio",
+  "score_scale": {
+    "min": 0.0,
+    "max": 1.0
+  },
+  "axis_semantics": {
+    "completeness": "Coverage of evidence expected from the workflow visible in the graph. Missing evidence lowers coverage but is not evidence of deception.",
+    "integrity": "Consistency of assessed files, reparsed WAV metadata, external declarations, relationship endpoints and checkable relationship parameters. Value reports consistency; confidence reports evidential strength and coverage.",
+    "attestation_strength": "Strength of cryptographic or independently verifiable provenance. C2PA absence is unassessed, not a failure.",
+    "ai_disclosure": "Clarity and coverage of explicit AI-use declarations. It does not estimate whether content is AI-generated."
+  },
+
+  
+  "availability_semantics": {
+    "available": "The profile assessed the relevant evidence with sufficient coverage.",
+    "partial": "Some relevant evidence was assessed, but important checks or files were unavailable.",
+    "unavailable": "The profile had no basis for this axis. Its value and confidence must be null."
+  },
+  "overall_score": {
+    "enabled": false,
+    "rationale": "The four axes answer different questions and are not combined without a target-owned policy."
+  },
+  "forge_cost_scale": {
+    "min": 1,
+    "max": 5,
+    "direction": "higher means harder to fabricate consistently",
+    "warning": "Forge cost affects confidence in an integrity assessment; it never proves that evidence is authentic."
+  },
+  "artefact_forge_cost": {
+    "audio/raw-take": 4,
+    "audio/raw-track": 4,
+    "audio/edited-take": 3,
+    "audio/stem": 2,
+    "audio/mix": 2,
+    "audio/master": 2,
+    "audio/sample": 2,
+    "audio/unclassified": 1,
+    "text/cue-sheet": 2,
+    "text/comp-sheet": 1,
+    "project/daw-session": 5,
+    "metadata/ddex-rin": 1,
+    "metadata/ddex-ern": 1,
+    "provenance/c2pa": 5
+  },
+  "relationship_origin": {
+    "submitter": {
+      "forge_cost": 1,
+      "base_confidence": 0.2
+    },
+    "ddex-rin": {
+      "forge_cost": 1,
+      "base_confidence": 0.25
+    },
+    "ddex-ern": {
+      "forge_cost": 1,
+      "base_confidence": 0.25
+    },
+    "daw-session": {
+      "forge_cost": 4,
+      "base_confidence": 0.35
+    },
+    "c2pa-ingredient": {
+      "forge_cost": 5,
+      "base_confidence": 0.4
+    }
+  },
+
+
+
+  "expectations": {
+    "incoming_relationships": {
+      "audio/edited-take": ["edited_from", "comped_from", "derived_from"],
+      "audio/stem": ["stemmed_from", "rendered_from", "derived_from"],
+      "audio/mix": ["mixed_from", "rendered_from", "derived_from"],
+      "audio/master": ["mastered_from", "rendered_from", "derived_from"],
+      "audio/sample": ["excerpted_from", "derived_from"]
+    },
+
+
+
+    "primary_ancestor_types": [
+      "audio/raw-take",
+      "audio/raw-track",
+      "project/daw-session"
+    ],
+
+
+    "primary_ancestor_required_for_final_types": [
+      "audio/edited-take",
+      "audio/stem",
+      "audio/mix",
+      "audio/master",
+      "audio/sample"
+    ],
+    "optional_types": [
+      "text/cue-sheet",
+      "text/comp-sheet",
+      "metadata/ddex-rin",
+      "metadata/ddex-ern",
+      "provenance/c2pa"
+    ]
+  },
+  "integrity": {
+    "relationship_parameter_bonus": 0.1,
+    "submitter_confirmation_bonus": 0.05,
+    "maximum_claim_only_confidence": 0.5,
+    "contradiction_value_ceiling": 0.25,
+    "rules": [
+      "bound_file_hash_matches",
+      "stored_audio_metadata_matches_bound_wav",
+      "declared_audio_metadata_matches_parser_observations",
+      "relationship_endpoints_valid",
+      "relationship_attributes_valid",
+      "declared_time_window_consistent",
+      "declared_format_lineage_consistent",
+      "declared_mastering_parameters_consistent"
+    ]
+  },
+  "attestation": {
+    "c2pa_optional": true,
+    "levels": {
+      "manifest_present": 0.25,
+      "signature_present": 0.5,
+      "cryptographically_valid": 0.75,
+      "credential_trusted": 1.0
+    },
+    "metadata_only_confidence_ceiling": 0.4
+  },
+  "ai_disclosure": {
+    "sources": [
+      "audio.creation_method",
+      "metadata/ddex-ern.AI-declaration"
+    ],
+    "absence_is_unavailable": true,
+    "rationale": "A clear human, mixed or AI declaration receives disclosure credit; the value is not a human-authorship probability."
+  }
+}
