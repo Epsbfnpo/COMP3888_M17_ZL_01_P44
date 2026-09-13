@@ -315,7 +315,7 @@ class TestEvaluateBundleConsistentCase:
 
 class TestIntegrityContradictions:
 
-    def test_declared_metadata_contradiction_caps_integrity(self, excerpt_setup):
+    def test_declared_metadata_contradiction_caps_integrity(self, excerpt_setup): # declared sample rate \neq actual
         contradicted = copy.deepcopy(excerpt_setup.bundle)
         contradicted["artefacts"][0]["attributes"]["declared_technical"] = {
             "sample_rate_hz": 44100
