@@ -1,0 +1,6 @@
+
+[c2pa]
+c2pa-python>=0.5
+
+[dev]
+pytest>=8

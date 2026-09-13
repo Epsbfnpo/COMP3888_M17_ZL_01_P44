@@ -1,0 +1,9 @@
+Metadata-Version: 2.4
+Name: comp3888-provenance-parsers
+Version: 0.1.0
+Summary: Baseline C2PA / DDEX-RIN / DDEX-ERN metadata parsers (raw extraction only, no scoring/normalization)
+Requires-Python: >=3.10
+Provides-Extra: c2pa
+Requires-Dist: c2pa-python>=0.5; extra == "c2pa"
+Provides-Extra: dev
+Requires-Dist: pytest>=8; extra == "dev"

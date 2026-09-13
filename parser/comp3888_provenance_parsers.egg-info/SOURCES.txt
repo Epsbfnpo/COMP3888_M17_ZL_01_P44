@@ -1,0 +1,15 @@
+README.md
+c2pa_parser.py
+ern_parser.py
+pyproject.toml
+rin_parser.py
+common/__init__.py
+common/xml_utils.py
+comp3888_provenance_parsers.egg-info/PKG-INFO
+comp3888_provenance_parsers.egg-info/SOURCES.txt
+comp3888_provenance_parsers.egg-info/dependency_links.txt
+comp3888_provenance_parsers.egg-info/requires.txt
+comp3888_provenance_parsers.egg-info/top_level.txt
+tests/test_c2pa_parser.py
+tests/test_ern_parser.py
+tests/test_rin_parser.py

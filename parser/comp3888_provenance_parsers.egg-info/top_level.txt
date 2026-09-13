@@ -1,0 +1,4 @@
+c2pa_parser
+common
+ern_parser
+rin_parser
