@@ -1,0 +1,1039 @@
+{
+    "schema_version": "1.0",
+    "bundle_id": "b0ee1013-8e07-4e31-8893-ba4612b46423",
+    "domain_profile": "audio",
+    "final_artifact_id": "",
+    "artifacts": [
+        {
+            "id": "take_001",
+            "file": {
+                "path": "data\\run_run_run\\takes\\01_Kick.wav",
+                "media_type": "audio/wav"
+            },
+            "hash": {
+                "hash_method": "sha256",
+                "value": "291479d4dc70511f73c901ac2b46e565e85d98d9d8119cd53df07c3fa59763ff"
+            },
+            "type": {
+                "general": "audio",
+                "subtype": "recording",
+                "role": "take"
+            },
+            "metadata": {
+                "duration_seconds": 216.55990929705214,
+                "sample_rate": 44100,
+                "channels": 1
+            },
+            "provenance": {
+                "c2pa": {
+                    "present": false
+                }
+            },
+            "extension": {
+                "audio": {
+                    "rin": {
+                        "sessions": [],
+                        "contributors": [],
+                        "equipment": [],
+                        "recording_components": []
+                    },
+                    "ern": {
+                        "contains_ai": null,
+                        "ai_contributions": []
+                    }
+                },
+                "wave": {
+                    "sample_width": 3,
+                    "bit_depth": 24,
+                    "num_frames": 9550292
+                }
+            }
+        },
+        {
+            "id": "take_002",
+            "file": {
+                "path": "data\\run_run_run\\takes\\02_Rim.wav",
+                "media_type": "audio/wav"
+            },
+            "hash": {
+                "hash_method": "sha256",
+                "value": "cbec2916f0936a1e6a86da284c5d399c615be351de4b5d2980bd373e1d2be0d9"
+            },
+            "type": {
+                "general": "audio",
+                "subtype": "recording",
+                "role": "take"
+            },
+            "metadata": {
+                "duration_seconds": 216.55990929705214,
+                "sample_rate": 44100,
+                "channels": 1
+            },
+            "provenance": {
+                "c2pa": {
+                    "present": false
+                }
+            },
+            "extension": {
+                "audio": {
+                    "rin": {
+                        "sessions": [],
+                        "contributors": [],
+                        "equipment": [],
+                        "recording_components": []
+                    },
+                    "ern": {
+                        "contains_ai": null,
+                        "ai_contributions": []
+                    }
+                },
+                "wave": {
+                    "sample_width": 3,
+                    "bit_depth": 24,
+                    "num_frames": 9550292
+                }
+            }
+        },
+        {
+            "id": "take_003",
+            "file": {
+                "path": "data\\run_run_run\\takes\\03_HiHat.wav",
+                "media_type": "audio/wav"
+            },
+            "hash": {
+                "hash_method": "sha256",
+                "value": "378c0327de8864cdccfd1880f835bb294aadfecf99c404892feca2a9b4ca4959"
+            },
+            "type": {
+                "general": "audio",
+                "subtype": "recording",
+                "role": "take"
+            },
+            "metadata": {
+                "duration_seconds": 216.55990929705214,
+                "sample_rate": 44100,
+                "channels": 1
+            },
+            "provenance": {
+                "c2pa": {
+                    "present": false
+                }
+            },
+            "extension": {
+                "audio": {
+                    "rin": {
+                        "sessions": [],
+                        "contributors": [],
+                        "equipment": [],
+                        "recording_components": []
+                    },
+                    "ern": {
+                        "contains_ai": null,
+                        "ai_contributions": []
+                    }
+                },
+                "wave": {
+                    "sample_width": 3,
+                    "bit_depth": 24,
+                    "num_frames": 9550292
+                }
+            }
+        },
+        {
+            "id": "take_004",
+            "file": {
+                "path": "data\\run_run_run\\takes\\04_Overheads.wav",
+                "media_type": "audio/wav"
+            },
+            "hash": {
+                "hash_method": "sha256",
+                "value": "9edfb847e5a6220d8c513e40bdcd4c00091d9a00546668b068f508c270e8c8fe"
+            },
+            "type": {
+                "general": "audio",
+                "subtype": "recording",
+                "role": "take"
+            },
+            "metadata": {
+                "duration_seconds": 218.23596371882087,
+                "sample_rate": 44100,
+                "channels": 2
+            },
+            "provenance": {
+                "c2pa": {
+                    "present": false
+                }
+            },
+            "extension": {
+                "audio": {
+                    "rin": {
+                        "sessions": [],
+                        "contributors": [],
+                        "equipment": [],
+                        "recording_components": []
+                    },
+                    "ern": {
+                        "contains_ai": null,
+                        "ai_contributions": []
+                    }
+                },
+                "wave": {
+                    "sample_width": 3,
+                    "bit_depth": 24,
+                    "num_frames": 9624206
+                }
+            }
+        },
+        {
+            "id": "take_005",
+            "file": {
+                "path": "data\\run_run_run\\takes\\05_SnareUp.wav",
+                "media_type": "audio/wav"
+            },
+            "hash": {
+                "hash_method": "sha256",
+                "value": "8039510cec122d4f6757a1f158d5ca363df2697ecca3fced8bbb0ae183996f46"
+            },
+            "type": {
+                "general": "audio",
+                "subtype": "recording",
+                "role": "take"
+            },
+            "metadata": {
+                "duration_seconds": 216.63006802721088,
+                "sample_rate": 44100,
+                "channels": 2
+            },
+            "provenance": {
+                "c2pa": {
+                    "present": false
+                }
+            },
+            "extension": {
+                "audio": {
+                    "rin": {
+                        "sessions": [],
+                        "contributors": [],
+                        "equipment": [],
+                        "recording_components": []
+                    },
+                    "ern": {
+                        "contains_ai": null,
+                        "ai_contributions": []
+                    }
+                },
+                "wave": {
+                    "sample_width": 3,
+                    "bit_depth": 24,
+                    "num_frames": 9553386
+                }
+            }
+        },
+        {
+            "id": "take_006",
+            "file": {
+                "path": "data\\run_run_run\\takes\\06_SnareDown.wav",
+                "media_type": "audio/wav"
+            },
+            "hash": {
+                "hash_method": "sha256",
+                "value": "17f19cfe1927a7761afc5492be5444ad6483bb48a480779c1ea768297c0eefb7"
+            },
+            "type": {
+                "general": "audio",
+                "subtype": "recording",
+                "role": "take"
+            },
+            "metadata": {
+                "duration_seconds": 216.63006802721088,
+                "sample_rate": 44100,
+                "channels": 2
+            },
+            "provenance": {
+                "c2pa": {
+                    "present": false
+                }
+            },
+            "extension": {
+                "audio": {
+                    "rin": {
+                        "sessions": [],
+                        "contributors": [],
+                        "equipment": [],
+                        "recording_components": []
+                    },
+                    "ern": {
+                        "contains_ai": null,
+                        "ai_contributions": []
+                    }
+                },
+                "wave": {
+                    "sample_width": 3,
+                    "bit_depth": 24,
+                    "num_frames": 9553386
+                }
+            }
+        },
+        {
+            "id": "take_007",
+            "file": {
+                "path": "data\\run_run_run\\takes\\07_Cymbal.wav",
+                "media_type": "audio/wav"
+            },
+            "hash": {
+                "hash_method": "sha256",
+                "value": "23f0b6641d3255f86bdab45b4a9d42f2c170d12c1bfc9f9602c1d52d60990442"
+            },
+            "type": {
+                "general": "audio",
+                "subtype": "recording",
+                "role": "take"
+            },
+            "metadata": {
+                "duration_seconds": 216.63006802721088,
+                "sample_rate": 44100,
+                "channels": 1
+            },
+            "provenance": {
+                "c2pa": {
+                    "present": false
+                }
+            },
+            "extension": {
+                "audio": {
+                    "rin": {
+                        "sessions": [],
+                        "contributors": [],
+                        "equipment": [],
+                        "recording_components": []
+                    },
+                    "ern": {
+                        "contains_ai": null,
+                        "ai_contributions": []
+                    }
+                },
+                "wave": {
+                    "sample_width": 3,
+                    "bit_depth": 24,
+                    "num_frames": 9553386
+                }
+            }
+        },
+        {
+            "id": "take_008",
+            "file": {
+                "path": "data\\run_run_run\\takes\\08_BassDI.wav",
+                "media_type": "audio/wav"
+            },
+            "hash": {
+                "hash_method": "sha256",
+                "value": "59f353c93bc230e3082e923a6723f8a27056ff1fed4a3f3582565c930169f449"
+            },
+            "type": {
+                "general": "audio",
+                "subtype": "recording",
+                "role": "take"
+            },
+            "metadata": {
+                "duration_seconds": 216.63006802721088,
+                "sample_rate": 44100,
+                "channels": 1
+            },
+            "provenance": {
+                "c2pa": {
+                    "present": false
+                }
+            },
+            "extension": {
+                "audio": {
+                    "rin": {
+                        "sessions": [],
+                        "contributors": [],
+                        "equipment": [],
+                        "recording_components": []
+                    },
+                    "ern": {
+                        "contains_ai": null,
+                        "ai_contributions": []
+                    }
+                },
+                "wave": {
+                    "sample_width": 3,
+                    "bit_depth": 24,
+                    "num_frames": 9553386
+                }
+            }
+        },
+        {
+            "id": "take_009",
+            "file": {
+                "path": "data\\run_run_run\\takes\\09_ElecGtr1.wav",
+                "media_type": "audio/wav"
+            },
+            "hash": {
+                "hash_method": "sha256",
+                "value": "26e181b72ff7a7e1f3f125dc2d350faa1c9a668b51d0d44a2a184a7fb23c5a2a"
+            },
+            "type": {
+                "general": "audio",
+                "subtype": "recording",
+                "role": "take"
+            },
+            "metadata": {
+                "duration_seconds": 219.39421768707484,
+                "sample_rate": 44100,
+                "channels": 1
+            },
+            "provenance": {
+                "c2pa": {
+                    "present": false
+                }
+            },
+            "extension": {
+                "audio": {
+                    "rin": {
+                        "sessions": [],
+                        "contributors": [],
+                        "equipment": [],
+                        "recording_components": []
+                    },
+                    "ern": {
+                        "contains_ai": null,
+                        "ai_contributions": []
+                    }
+                },
+                "wave": {
+                    "sample_width": 3,
+                    "bit_depth": 24,
+                    "num_frames": 9675285
+                }
+            }
+        },
+        {
+            "id": "take_010",
+            "file": {
+                "path": "data\\run_run_run\\takes\\10_ElecGtr2.wav",
+                "media_type": "audio/wav"
+            },
+            "hash": {
+                "hash_method": "sha256",
+                "value": "defb01cc8a38c5586cbf7f9dec713fe94aad1ddf1bdc2a1af1db4cdaaa78aa49"
+            },
+            "type": {
+                "general": "audio",
+                "subtype": "recording",
+                "role": "take"
+            },
+            "metadata": {
+                "duration_seconds": 219.39421768707484,
+                "sample_rate": 44100,
+                "channels": 1
+            },
+            "provenance": {
+                "c2pa": {
+                    "present": false
+                }
+            },
+            "extension": {
+                "audio": {
+                    "rin": {
+                        "sessions": [],
+                        "contributors": [],
+                        "equipment": [],
+                        "recording_components": []
+                    },
+                    "ern": {
+                        "contains_ai": null,
+                        "ai_contributions": []
+                    }
+                },
+                "wave": {
+                    "sample_width": 3,
+                    "bit_depth": 24,
+                    "num_frames": 9675285
+                }
+            }
+        },
+        {
+            "id": "take_011",
+            "file": {
+                "path": "data\\run_run_run\\takes\\11_ElecGtr3.wav",
+                "media_type": "audio/wav"
+            },
+            "hash": {
+                "hash_method": "sha256",
+                "value": "02c77f51afea246ce430491cfc30b204d98e574bab85bab0a95a36a9dcc7df14"
+            },
+            "type": {
+                "general": "audio",
+                "subtype": "recording",
+                "role": "take"
+            },
+            "metadata": {
+                "duration_seconds": 216.63006802721088,
+                "sample_rate": 44100,
+                "channels": 1
+            },
+            "provenance": {
+                "c2pa": {
+                    "present": false
+                }
+            },
+            "extension": {
+                "audio": {
+                    "rin": {
+                        "sessions": [],
+                        "contributors": [],
+                        "equipment": [],
+                        "recording_components": []
+                    },
+                    "ern": {
+                        "contains_ai": null,
+                        "ai_contributions": []
+                    }
+                },
+                "wave": {
+                    "sample_width": 3,
+                    "bit_depth": 24,
+                    "num_frames": 9553386
+                }
+            }
+        },
+        {
+            "id": "take_012",
+            "file": {
+                "path": "data\\run_run_run\\takes\\12_ElecGtr4.wav",
+                "media_type": "audio/wav"
+            },
+            "hash": {
+                "hash_method": "sha256",
+                "value": "37022eac096d018d8c8e3c652bf88199e17b46bd5377870e3e5283dc032baf88"
+            },
+            "type": {
+                "general": "audio",
+                "subtype": "recording",
+                "role": "take"
+            },
+            "metadata": {
+                "duration_seconds": 216.62768707482994,
+                "sample_rate": 44100,
+                "channels": 2
+            },
+            "provenance": {
+                "c2pa": {
+                    "present": false
+                }
+            },
+            "extension": {
+                "audio": {
+                    "rin": {
+                        "sessions": [],
+                        "contributors": [],
+                        "equipment": [],
+                        "recording_components": []
+                    },
+                    "ern": {
+                        "contains_ai": null,
+                        "ai_contributions": []
+                    }
+                },
+                "wave": {
+                    "sample_width": 3,
+                    "bit_depth": 24,
+                    "num_frames": 9553281
+                }
+            }
+        },
+        {
+            "id": "take_013",
+            "file": {
+                "path": "data\\run_run_run\\takes\\13_OrganHigh.wav",
+                "media_type": "audio/wav"
+            },
+            "hash": {
+                "hash_method": "sha256",
+                "value": "db8e545210ed2ec7d9427f0fddfc8c028dffd49132391e5fc1c8c7216594e7bf"
+            },
+            "type": {
+                "general": "audio",
+                "subtype": "recording",
+                "role": "take"
+            },
+            "metadata": {
+                "duration_seconds": 216.63020408163266,
+                "sample_rate": 44100,
+                "channels": 2
+            },
+            "provenance": {
+                "c2pa": {
+                    "present": false
+                }
+            },
+            "extension": {
+                "audio": {
+                    "rin": {
+                        "sessions": [],
+                        "contributors": [],
+                        "equipment": [],
+                        "recording_components": []
+                    },
+                    "ern": {
+                        "contains_ai": null,
+                        "ai_contributions": []
+                    }
+                },
+                "wave": {
+                    "sample_width": 3,
+                    "bit_depth": 24,
+                    "num_frames": 9553392
+                }
+            }
+        },
+        {
+            "id": "take_014",
+            "file": {
+                "path": "data\\run_run_run\\takes\\14_OrganLow.wav",
+                "media_type": "audio/wav"
+            },
+            "hash": {
+                "hash_method": "sha256",
+                "value": "950f8532ad563635d5f48b5bf372f4fce6606a3ec31d31abb46e9d4a02bc1df2"
+            },
+            "type": {
+                "general": "audio",
+                "subtype": "recording",
+                "role": "take"
+            },
+            "metadata": {
+                "duration_seconds": 216.63006802721088,
+                "sample_rate": 44100,
+                "channels": 1
+            },
+            "provenance": {
+                "c2pa": {
+                    "present": false
+                }
+            },
+            "extension": {
+                "audio": {
+                    "rin": {
+                        "sessions": [],
+                        "contributors": [],
+                        "equipment": [],
+                        "recording_components": []
+                    },
+                    "ern": {
+                        "contains_ai": null,
+                        "ai_contributions": []
+                    }
+                },
+                "wave": {
+                    "sample_width": 3,
+                    "bit_depth": 24,
+                    "num_frames": 9553386
+                }
+            }
+        },
+        {
+            "id": "take_015",
+            "file": {
+                "path": "data\\run_run_run\\takes\\15_Piano1.wav",
+                "media_type": "audio/wav"
+            },
+            "hash": {
+                "hash_method": "sha256",
+                "value": "0f46c3bb9d21373f42c1c611424e8c85df065f884f2cabf555b18595af1e118d"
+            },
+            "type": {
+                "general": "audio",
+                "subtype": "recording",
+                "role": "take"
+            },
+            "metadata": {
+                "duration_seconds": 216.63006802721088,
+                "sample_rate": 44100,
+                "channels": 1
+            },
+            "provenance": {
+                "c2pa": {
+                    "present": false
+                }
+            },
+            "extension": {
+                "audio": {
+                    "rin": {
+                        "sessions": [],
+                        "contributors": [],
+                        "equipment": [],
+                        "recording_components": []
+                    },
+                    "ern": {
+                        "contains_ai": null,
+                        "ai_contributions": []
+                    }
+                },
+                "wave": {
+                    "sample_width": 3,
+                    "bit_depth": 24,
+                    "num_frames": 9553386
+                }
+            }
+        },
+        {
+            "id": "take_016",
+            "file": {
+                "path": "data\\run_run_run\\takes\\16_Piano2.wav",
+                "media_type": "audio/wav"
+            },
+            "hash": {
+                "hash_method": "sha256",
+                "value": "425bb6d9317740aa09e5e3d774278ceac429546fdb12638cf6fa846abb7b9253"
+            },
+            "type": {
+                "general": "audio",
+                "subtype": "recording",
+                "role": "take"
+            },
+            "metadata": {
+                "duration_seconds": 216.62768707482994,
+                "sample_rate": 44100,
+                "channels": 2
+            },
+            "provenance": {
+                "c2pa": {
+                    "present": false
+                }
+            },
+            "extension": {
+                "audio": {
+                    "rin": {
+                        "sessions": [],
+                        "contributors": [],
+                        "equipment": [],
+                        "recording_components": []
+                    },
+                    "ern": {
+                        "contains_ai": null,
+                        "ai_contributions": []
+                    }
+                },
+                "wave": {
+                    "sample_width": 3,
+                    "bit_depth": 24,
+                    "num_frames": 9553281
+                }
+            }
+        },
+        {
+            "id": "take_017",
+            "file": {
+                "path": "data\\run_run_run\\takes\\17_LeadVoxRawTake1.wav",
+                "media_type": "audio/wav"
+            },
+            "hash": {
+                "hash_method": "sha256",
+                "value": "7f14f4e18f9f37decd72fd23c933d1f53cc6c0bae8ec8df79d6e767263fed6fe"
+            },
+            "type": {
+                "general": "audio",
+                "subtype": "recording",
+                "role": "take"
+            },
+            "metadata": {
+                "duration_seconds": 187.7555328798186,
+                "sample_rate": 44100,
+                "channels": 1
+            },
+            "provenance": {
+                "c2pa": {
+                    "present": false
+                }
+            },
+            "extension": {
+                "audio": {
+                    "rin": {
+                        "sessions": [],
+                        "contributors": [],
+                        "equipment": [],
+                        "recording_components": []
+                    },
+                    "ern": {
+                        "contains_ai": null,
+                        "ai_contributions": []
+                    }
+                },
+                "wave": {
+                    "sample_width": 3,
+                    "bit_depth": 24,
+                    "num_frames": 8280019
+                }
+            }
+        },
+        {
+            "id": "take_018",
+            "file": {
+                "path": "data\\run_run_run\\takes\\18_LeadVoxRawTake2.wav",
+                "media_type": "audio/wav"
+            },
+            "hash": {
+                "hash_method": "sha256",
+                "value": "2e9274dc054da535245b6812af7557157b1e087d3e041ce991aaab8605f46e0c"
+            },
+            "type": {
+                "general": "audio",
+                "subtype": "recording",
+                "role": "take"
+            },
+            "metadata": {
+                "duration_seconds": 180.91145124716553,
+                "sample_rate": 44100,
+                "channels": 1
+            },
+            "provenance": {
+                "c2pa": {
+                    "present": false
+                }
+            },
+            "extension": {
+                "audio": {
+                    "rin": {
+                        "sessions": [],
+                        "contributors": [],
+                        "equipment": [],
+                        "recording_components": []
+                    },
+                    "ern": {
+                        "contains_ai": null,
+                        "ai_contributions": []
+                    }
+                },
+                "wave": {
+                    "sample_width": 3,
+                    "bit_depth": 24,
+                    "num_frames": 7978195
+                }
+            }
+        },
+        {
+            "id": "take_019",
+            "file": {
+                "path": "data\\run_run_run\\takes\\19_LeadVoxRawTake3.wav",
+                "media_type": "audio/wav"
+            },
+            "hash": {
+                "hash_method": "sha256",
+                "value": "860afd60c4d516afcc2f3131df64dda3d4add72f8256fde1c425d94b1b9cf4c7"
+            },
+            "type": {
+                "general": "audio",
+                "subtype": "recording",
+                "role": "take"
+            },
+            "metadata": {
+                "duration_seconds": 199.29585034013604,
+                "sample_rate": 44100,
+                "channels": 1
+            },
+            "provenance": {
+                "c2pa": {
+                    "present": false
+                }
+            },
+            "extension": {
+                "audio": {
+                    "rin": {
+                        "sessions": [],
+                        "contributors": [],
+                        "equipment": [],
+                        "recording_components": []
+                    },
+                    "ern": {
+                        "contains_ai": null,
+                        "ai_contributions": []
+                    }
+                },
+                "wave": {
+                    "sample_width": 3,
+                    "bit_depth": 24,
+                    "num_frames": 8788947
+                }
+            }
+        },
+        {
+            "id": "take_020",
+            "file": {
+                "path": "data\\run_run_run\\takes\\20_LeadVoxRawTake4.wav",
+                "media_type": "audio/wav"
+            },
+            "hash": {
+                "hash_method": "sha256",
+                "value": "4352f168b36a7fc9cbcd56ae2766ed0c4fa4f6a4443691a576df0921f54916ac"
+            },
+            "type": {
+                "general": "audio",
+                "subtype": "recording",
+                "role": "take"
+            },
+            "metadata": {
+                "duration_seconds": 186.3391156462585,
+                "sample_rate": 44100,
+                "channels": 1
+            },
+            "provenance": {
+                "c2pa": {
+                    "present": false
+                }
+            },
+            "extension": {
+                "audio": {
+                    "rin": {
+                        "sessions": [],
+                        "contributors": [],
+                        "equipment": [],
+                        "recording_components": []
+                    },
+                    "ern": {
+                        "contains_ai": null,
+                        "ai_contributions": []
+                    }
+                },
+                "wave": {
+                    "sample_width": 3,
+                    "bit_depth": 24,
+                    "num_frames": 8217555
+                }
+            }
+        },
+        {
+            "id": "take_021",
+            "file": {
+                "path": "data\\run_run_run\\takes\\21_LeadVoxComped.wav",
+                "media_type": "audio/wav"
+            },
+            "hash": {
+                "hash_method": "sha256",
+                "value": "531e62db6663d8931b9810cf62829f3085efa9d576b3576b8e4c97c4ec802f48"
+            },
+            "type": {
+                "general": "audio",
+                "subtype": "recording",
+                "role": "take"
+            },
+            "metadata": {
+                "duration_seconds": 193.87795918367348,
+                "sample_rate": 44100,
+                "channels": 1
+            },
+            "provenance": {
+                "c2pa": {
+                    "present": false
+                }
+            },
+            "extension": {
+                "audio": {
+                    "rin": {
+                        "sessions": [],
+                        "contributors": [],
+                        "equipment": [],
+                        "recording_components": []
+                    },
+                    "ern": {
+                        "contains_ai": null,
+                        "ai_contributions": []
+                    }
+                },
+                "wave": {
+                    "sample_width": 3,
+                    "bit_depth": 24,
+                    "num_frames": 8550018
+                }
+            }
+        },
+        {
+            "id": "take_022",
+            "file": {
+                "path": "data\\run_run_run\\takes\\22_BackingVox.wav",
+                "media_type": "audio/wav"
+            },
+            "hash": {
+                "hash_method": "sha256",
+                "value": "aee31eecd327f61571708badfbead3d19e5445e042e4baabe8ff3ad67b297604"
+            },
+            "type": {
+                "general": "audio",
+                "subtype": "recording",
+                "role": "take"
+            },
+            "metadata": {
+                "duration_seconds": 169.34136054421768,
+                "sample_rate": 44100,
+                "channels": 1
+            },
+            "provenance": {
+                "c2pa": {
+                    "present": false
+                }
+            },
+            "extension": {
+                "audio": {
+                    "rin": {
+                        "sessions": [],
+                        "contributors": [],
+                        "equipment": [],
+                        "recording_components": []
+                    },
+                    "ern": {
+                        "contains_ai": null,
+                        "ai_contributions": []
+                    }
+                },
+                "wave": {
+                    "sample_width": 3,
+                    "bit_depth": 24,
+                    "num_frames": 7467954
+                }
+            }
+        },
+        {
+            "id": "comp_001",
+            "file": {
+                "path": "data\\run_run_run\\comp\\Arise_RunRunRun_CompSheet.pdf",
+                "media_type": "application/pdf"
+            },
+            "hash": {
+                "hash_method": "sha256",
+                "value": "ab003353b3242724d5aa5e85d164bb2abddea4f1e35cf53551952b4d8de9e55f"
+            },
+            "type": {
+                "general": "document",
+                "subtype": "production-document",
+                "role": "comp-sheet"
+            },
+            "metadata": {
+                "duration_seconds": null,
+                "sample_rate": null,
+                "channels": null
+            },
+            "provenance": {
+                "c2pa": {
+                    "present": false
+                }
+            },
+            "extension": {
+                "audio": {
+                    "rin": {
+                        "sessions": [],
+                        "contributors": [],
+                        "equipment": [],
+                        "recording_components": []
+                    },
+                    "ern": {
+                        "contains_ai": null,
+                        "ai_contributions": []
+                    }
+                }
+            }
+        }
+    ],
+    "relationships": []
+}

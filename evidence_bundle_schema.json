@@ -13,7 +13,6 @@
       "file": {
         "path": "",
         "media_type": ""
-        // Example: audio/wav
       },
 
       "hash": {
@@ -25,7 +24,6 @@
         "general": "",
         "subtype": "",
         "role": ""
-        // These attributes are used to match artifacts against the evidence profile. Example role: take, stem, comp-sheet.
       },
 
       "metadata": {
@@ -65,7 +63,6 @@
       "to": "",
 
       "relation_type": ""
-      // Examples: parentOf, componentOf, inputTo, supports, documents.
     }
   ]
 }
