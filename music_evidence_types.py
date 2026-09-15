@@ -190,7 +190,7 @@ ARTEFACT_TYPES: Dict[str, Dict[str, Mapping[str, Validator]]] = {
     }),
     "audio/stem": _audio_groups({
         "stem_name": _optional(STR), "stem_role": _optional(STR),
-        "source_role": _optional(STR), "instrument": _optional(STR),
+        "source_role": _optional(STR), "instrument": _optional(STR), # potentially add % match attribute here?
     }),
     "audio/mix": _audio_groups({
         "mix_name": _optional(STR), "mix_stage": _optional(STR),

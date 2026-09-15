@@ -116,8 +116,17 @@
       "relationship_attributes_valid",
       "declared_time_window_consistent",
       "declared_format_lineage_consistent",
-      "declared_mastering_parameters_consistent"
+      "declared_mastering_parameters_consistent",
+      "stem_audio_content_present_in_target"
     ]
+  },
+  "stem_similarity": {
+    "applicable_relationship_types": ["mixed_from", "rendered_from"],
+    "active_correlation_threshold": 0.65,
+    "sample_rate_hz": 22050,
+    "hop_length": 1024,
+    "max_offset_seconds": 5.0,
+    "silence_db": -45.0
   },
   "attestation": {
     "c2pa_optional": true,

@@ -1,0 +1,108 @@
+{
+  "schema_version": "0.0.3",
+  "hash_method": "sha256",
+  "files": [
+    {
+      "id": "drum-stem",
+      "path": "obj_test/drum-stem.wav",
+      "artefact_type": "audio/stem",
+      "final": false,
+      "attributes": {
+        "creation_method": "recorded",
+        "production": {
+          "stem_name": "Drums",
+          "stem_role": "rhythm",
+          "source_role": "drums",
+          "instrument": "drum kit"
+        }
+      }
+    },
+    {
+      "id": "vocal-stem",
+      "path": "obj_test/vocal-stem.wav",
+      "artefact_type": "audio/stem",
+      "final": false,
+      "attributes": {
+        "creation_method": "recorded",
+        "production": {
+          "stem_name": "Lead Vocal",
+          "stem_role": "lead",
+          "source_role": "vocal",
+          "instrument": "vocal"
+        }
+      }
+    },
+    {
+      "id": "fake-stem",
+      "path": "obj_test/fake-stem.wav",
+      "artefact_type": "audio/stem",
+      "final": false,
+      "attributes": {
+        "creation_method": "recorded",
+        "production": {
+          "stem_name": "Guitar",
+          "stem_role": "rhythm",
+          "source_role": "guitar",
+          "instrument": "electric guitar"
+        }
+      }
+    },
+    {
+      "id": "final-song",
+      "path": "obj_test/final-song.wav",
+      "artefact_type": "audio/mix",
+      "final": true,
+      "attributes": {
+        "creation_method": "recorded",
+        "production": {
+          "mix_name": "Final Mix v1",
+          "mix_stage": "final"
+        }
+      }
+    }
+  ],
+  "relationships": [
+    {
+      "target": "final-song",
+      "source": "drum-stem",
+      "relationship_type": "mixed_from",
+      "attributes": {
+        "assertion_origin": "submitter",
+        "confirmed_by_submitter": true,
+        "timeline_offset_seconds": 0.0,
+        "source_role": "drums",
+        "declared_gain_db": -3.0,
+        "declared_pan": 0.0,
+        "claim_rationale": "Declared by the submitter."
+      }
+    },
+    {
+      "target": "final-song",
+      "source": "vocal-stem",
+      "relationship_type": "mixed_from",
+      "attributes": {
+        "assertion_origin": "submitter",
+        "confirmed_by_submitter": true,
+        "timeline_offset_seconds": 0.0,
+        "source_role": "vocal",
+        "declared_gain_db": -2.0,
+        "declared_pan": 0.0,
+        "claim_rationale": "Declared by the submitter."
+      }
+    },
+    {
+      "target": "final-song",
+      "source": "fake-stem",
+      "relationship_type": "mixed_from",
+      "attributes": {
+        "assertion_origin": "submitter",
+        "confirmed_by_submitter": true,
+        "timeline_offset_seconds": 0.0,
+        "source_role": "guitar",
+        "declared_gain_db": -4.0,
+        "declared_pan": 0.3,
+        "claim_rationale": "Declared by the submitter -- negative test case: this stem should NOT actually be present in final-song.wav, to confirm the similarity check catches a false claim."
+      }
+    }
+  ]
+}

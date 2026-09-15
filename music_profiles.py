@@ -35,6 +35,23 @@ import tempfile
 from typing import Any, Dict, Iterable, List, Mapping, Optional, Sequence, Tuple
 import wave
 
+# Audio-content comparison (stem-vs-mix similarity) is an optional signal:
+# most of this module works fine without it, so a missing install must not
+# crash the whole pipeline -- it should just leave that one signal
+# unassessed, the same way c2pa-python is optional for provenance parsing.
+try:
+    import numpy as _np
+    import librosa as _librosa
+    from scipy.signal import fftconvolve as _fftconvolve
+    STEM_MATCH_AVAILABLE = True
+    _STEM_MATCH_IMPORT_ERROR: Optional[str] = None
+except ImportError as _exc:  # pragma: no cover - only hit without optional deps
+    _np = None
+    _librosa = None
+    _fftconvolve = None
+    STEM_MATCH_AVAILABLE = False
+    _STEM_MATCH_IMPORT_ERROR = str(_exc)
+
 
 class ProfileError(ValueError):
     """The profile or supplied evidence cannot be evaluated safely."""
@@ -226,6 +243,109 @@ def _bound_wav_attributes(path: Path) -> Tuple[Optional[Dict[str, Any]], List[st
     }, warnings
 
 
+def _stem_load_audio(path: Path, sample_rate_hz: int) -> "_np.ndarray":
+    y, _ = _librosa.load(str(path), sr=sample_rate_hz, mono=True)
+    return y
+
+
+def _stem_mel_db(y: "_np.ndarray", sample_rate_hz: int, hop_length: int) -> "_np.ndarray":
+    S = _librosa.feature.melspectrogram(y=y, sr=sample_rate_hz, n_mels=64, hop_length=hop_length)
+    return _librosa.power_to_db(S, ref=1.0)
+
+
+def _stem_find_best_offset(song_y: "_np.ndarray", stem_y: "_np.ndarray",
+                           sample_rate_hz: int, max_offset_seconds: float) -> float:
+    """Small-offset cross-correlation of amplitude envelopes.
+
+    Finds lead-in/lead-out padding differences between a raw stem export and
+    the final bounce. Deliberately does not search pitch shifts or tempo
+    ratios: a stem from the same session as the mix should already share its
+    pitch and tempo, unlike an excerpted/pitched sample.
+    """
+    hop = 256
+    song_env = _librosa.feature.rms(y=song_y, hop_length=hop)[0]
+    stem_env = _librosa.feature.rms(y=stem_y, hop_length=hop)[0]
+    song_env = song_env - song_env.mean()
+    stem_env = stem_env - stem_env.mean()
+
+    corr = _fftconvolve(song_env, stem_env[::-1], mode="full")
+    zero_idx = len(stem_env) - 1
+    max_shift_frames = int(max_offset_seconds * sample_rate_hz / hop)
+    lo = max(0, zero_idx - max_shift_frames)
+    hi = min(len(corr), zero_idx + max_shift_frames + 1)
+    window = corr[lo:hi]
+    best_rel = int(_np.argmax(window)) + lo - zero_idx
+    return best_rel * hop / sample_rate_hz
+
+
+def _stem_similarity(stem_path: Path, mix_path: Path, config: Mapping[str, Any]) -> Dict[str, Any]:
+    """Check how much of a stem's audible content correlates with a mix.
+
+    Adapted from the standalone stem_match.py prototype. Returns the raw
+    diagnostics (offset, correlations, active fraction); the caller decides
+    pass/fail against its own threshold.
+    """
+    sample_rate_hz = int(config.get("sample_rate_hz", 22050))
+    hop_length = int(config.get("hop_length", 1024))
+    max_offset_seconds = float(config.get("max_offset_seconds", 5.0))
+    silence_db = float(config.get("silence_db", -45.0))
+
+    song_y = _stem_load_audio(mix_path, sample_rate_hz)
+    stem_y = _stem_load_audio(stem_path, sample_rate_hz)
+
+    offset_sec = _stem_find_best_offset(song_y, stem_y, sample_rate_hz, max_offset_seconds)
+    offset_samples = int(round(offset_sec * sample_rate_hz))
+
+    if offset_samples >= 0:
+        song_aligned = song_y[offset_samples:offset_samples + len(stem_y)]
+        stem_aligned = stem_y[:len(song_aligned)]
+    else:
+        stem_aligned = stem_y[-offset_samples:]
+        song_aligned = song_y[:len(stem_aligned)]
+        stem_aligned = stem_aligned[:len(song_aligned)]
+
+    n = min(len(song_aligned), len(stem_aligned))
+    song_aligned, stem_aligned = song_aligned[:n], stem_aligned[:n]
+    if n < sample_rate_hz:  # less than 1 second of overlap -- nothing meaningful to say
+        return {
+            "offset_seconds": offset_sec,
+            "overall_correlation": 0.0,
+            "active_correlation": 0.0,
+            "active_fraction": 0.0,
+            "insufficient_overlap": True,
+        }
+
+    mel_song = _stem_mel_db(song_aligned, sample_rate_hz, hop_length)
+    mel_stem = _stem_mel_db(stem_aligned, sample_rate_hz, hop_length)
+    m = min(mel_song.shape[1], mel_stem.shape[1])
+    mel_song, mel_stem = mel_song[:, :m], mel_stem[:, :m]
+
+    stem_rms_db = _librosa.power_to_db(
+        _librosa.feature.rms(y=stem_aligned, hop_length=hop_length)[0] ** 2, ref=1.0
+    )[:m]
+    active_mask = stem_rms_db > silence_db
+    active_fraction = float(active_mask.mean()) if m > 0 else 0.0
+
+    a = mel_song - mel_song.mean(axis=0, keepdims=True)
+    b = mel_stem - mel_stem.mean(axis=0, keepdims=True)
+    num = (a * b).sum(axis=0)
+    den = _np.linalg.norm(a, axis=0) * _np.linalg.norm(b, axis=0) + 1e-9
+    frame_sims01 = (_np.clip(num / den, -1.0, 1.0) + 1.0) / 2.0
+
+    overall_correlation = float(frame_sims01.mean())
+    active_correlation = (
+        float(frame_sims01[active_mask].mean()) if active_mask.any() else 0.0
+    )
+
+    return {
+        "offset_seconds": offset_sec,
+        "overall_correlation": overall_correlation,
+        "active_correlation": active_correlation,
+        "active_fraction": active_fraction,
+        "insufficient_overlap": False,
+    }
+
+
 def _values_match(field: str, left: Any, right: Any,
                   sample_rate_hz: Optional[int] = None) -> bool:
     if type(left) is int and type(right) is int:
@@ -412,6 +532,49 @@ class RelationshipIntegrityPass(EvidencePass):
         _append_check(checks, "target_format_matches_target",
                       attrs.get("target_format"), target_tech.get("format"))
 
+        # Audio-content correlation: is the stem's audible content actually
+        # present in the target mix? Unlike the checks above, this compares
+        # waveforms rather than declared/observed metadata, so it is kept out
+        # of `checks` unless it can actually be computed, and its raw
+        # diagnostics are always reported separately even when a pass/fail
+        # verdict isn't possible (e.g. missing dependency or unbound files).
+        stem_similarity: Optional[Dict[str, Any]] = None
+        stem_config = PROFILE.get("stem_similarity")
+        if (stem_config and relationship_name in stem_config.get("applicable_relationship_types", ())
+                and _type_name(source).startswith("audio/")
+                and _type_name(target).startswith("audio/")):
+            source_path, target_path = source.get_file(), target.get_file()
+            if not source_path or not target_path:
+                stem_similarity = {
+                    "assessed": False,
+                    "reason": "stem or target audio file was not bound; content was not compared",
+                }
+            elif not STEM_MATCH_AVAILABLE:
+                stem_similarity = {
+                    "assessed": False,
+                    "reason": ("librosa/numpy/scipy not installed "
+                               f"({_STEM_MATCH_IMPORT_ERROR}); audio content was not compared"),
+                }
+            else:
+                try:
+                    diagnostics = _stem_similarity(Path(source_path), Path(target_path), stem_config)
+                except Exception as exc:
+                    stem_similarity = {
+                        "assessed": False,
+                        "reason": f"stem similarity check failed: {exc}",
+                    }
+                else:
+                    threshold = float(stem_config.get("active_correlation_threshold", 0.65))
+                    passed = (not diagnostics["insufficient_overlap"]
+                              and diagnostics["active_correlation"] >= threshold)
+                    stem_similarity = {
+                        "assessed": True,
+                        "threshold": threshold,
+                        "passed": passed,
+                        **diagnostics,
+                    }
+                    checks.append(("stem_audio_content_present_in_target", passed))
+
         failures = [name for name, passed in checks if not passed]
         value = sum(1 for _, passed in checks if passed) / len(checks)
         origin = attrs.get("assertion_origin", "submitter")
@@ -434,7 +597,7 @@ class RelationshipIntegrityPass(EvidencePass):
             reason += "; contradictions: " + ", ".join(failures)
         elif len(checks) == 2:
             reason += "; no relationship-specific parameter could be cross-checked"
-        return _score(integrity=value), {
+        result = {
             "kind": "relationship-integrity",
             "assessed": True,
             "value": _clamp(value),
@@ -446,7 +609,10 @@ class RelationshipIntegrityPass(EvidencePass):
             "target_hash": target.artefact_hash,
             "source_hash": source.artefact_hash,
             "relationship_type": relationship_name,
-        }, [reason]
+        }
+        if stem_similarity is not None:
+            result["stem_similarity"] = stem_similarity
+        return _score(integrity=value), result, [reason]
 
 
 def _recursive_lookup(value: Any, wanted: Iterable[str]) -> Optional[bool]:

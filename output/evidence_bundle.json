@@ -1,190 +1,166 @@
 {
   "schema_version": "0.0.3",
   "hash_method": "sha256",
-  "final_artefact_hash": "b28f31c7a911f7ee387d0dff2b0b8c129cf5f9427c193d295fd8cf3b7326a6eb",
+  "final_artefact_hash": "0a2c29f42e0570d270f27d268062dab5ab30d86a0ed720b31f8b6735cd268190",
   "artefacts": [
     {
-      "artefact_hash": "8d7532390d9e1215f05cd8c18794a7ad8f4d2f14259d8c6d1f1cb4df31227898",
-      "artefact_type": "audio/raw-take",
+      "artefact_hash": "d3b7aae16d30f1e9132dd5b41388a82a8e1f4012a29163cb153412d15da973f7",
+      "artefact_type": "audio/stem",
       "attributes": {
         "creation_method": "recorded",
         "production": {
-          "track_name": "Lead Vocal Take 3",
-          "source_role": "lead-vocal"
+          "stem_name": "Drums",
+          "stem_role": "rhythm",
+          "source_role": "drums",
+          "instrument": "drum kit"
         },
         "technical": {
           "media_type": "audio/wav",
-          "duration_seconds": 28.208,
-          "sample_rate_hz": 44100,
-          "channels": 1,
-          "bit_depth": 24,
-          "format": "WAV",
-          "codec_subtype": "PCM",
-          "file_size_bytes": 3732552
-        },
-        "source_metadata": {
-          "original_filename": "raw-vocal.wav",
-          "originator": "REAPER",
-          "origination_date": "2015-02-23",
-          "origination_time": "14-27-19",
-          "time_reference_samples": 8276989
-        }
-      },
-      "evidence": []
-    },
-    {
-      "artefact_hash": "b28f31c7a911f7ee387d0dff2b0b8c129cf5f9427c193d295fd8cf3b7326a6eb",
-      "artefact_type": "audio/sample",
-      "attributes": {
-        "creation_method": "recorded",
-        "production": {
-          "sample_name": "Vocal phrase",
-          "sample_category": "vocal"
-        },
-        "technical": {
-          "media_type": "audio/wav",
-          "duration_seconds": 28.668,
+          "duration_seconds": 179.583,
           "sample_rate_hz": 44100,
           "channels": 2,
           "bit_depth": 24,
           "format": "WAV",
           "codec_subtype": "PCM",
-          "file_size_bytes": 7586322
+          "file_size_bytes": 47518350
         },
         "source_metadata": {
-          "original_filename": "vocal-sample.wav",
+          "original_filename": "drum-stem.wav",
           "originator": "REAPER",
-          "origination_date": "2015-02-23",
-          "origination_time": "14-27-15",
-          "time_reference_samples": 8276989
+          "origination_date": "2013-05-29",
+          "origination_time": "17-45-40",
+          "time_reference_samples": 0
+        }
+      },
+      "evidence": []
+    },
+    {
+      "artefact_hash": "c93950984f1a0af37089ed4c1820b4f3b91a3d965caf9be500221599e52c3acd",
+      "artefact_type": "audio/stem",
+      "attributes": {
+        "creation_method": "recorded",
+        "production": {
+          "stem_name": "Lead Vocal",
+          "stem_role": "lead",
+          "source_role": "vocal",
+          "instrument": "vocal"
+        },
+        "technical": {
+          "media_type": "audio/wav",
+          "duration_seconds": 179.267,
+          "sample_rate_hz": 44100,
+          "channels": 1,
+          "bit_depth": 24,
+          "format": "WAV",
+          "codec_subtype": "PCM",
+          "file_size_bytes": 23717652
+        },
+        "source_metadata": {
+          "original_filename": "vocal-stem.wav",
+          "originator": "REAPER",
+          "origination_date": "2013-05-29",
+          "origination_time": "17-56-39",
+          "time_reference_samples": 0
+        }
+      },
+      "evidence": []
+    },
+    {
+      "artefact_hash": "807c28c6091a5d88ac46befe85d30bb1b5ad2f34a3b18cb0a9be5b5d30a9fbfe",
+      "artefact_type": "audio/stem",
+      "attributes": {
+        "creation_method": "recorded",
+        "production": {
+          "stem_name": "Guitar",
+          "stem_role": "rhythm",
+          "source_role": "guitar",
+          "instrument": "electric guitar"
+        },
+        "technical": {
+          "media_type": "audio/wav",
+          "duration_seconds": 215.484,
+          "sample_rate_hz": 44100,
+          "channels": 1,
+          "bit_depth": 24,
+          "format": "WAV",
+          "codec_subtype": "PCM",
+          "file_size_bytes": 28509210
+        },
+        "source_metadata": {
+          "original_filename": "fake-stem.wav",
+          "originator": "REAPER",
+          "origination_date": "2022-03-24",
+          "origination_time": "21-18-37",
+          "time_reference_samples": 0
+        }
+      },
+      "evidence": []
+    },
+    {
+      "artefact_hash": "0a2c29f42e0570d270f27d268062dab5ab30d86a0ed720b31f8b6735cd268190",
+      "artefact_type": "audio/mix",
+      "attributes": {
+        "creation_method": "recorded",
+        "production": {
+          "mix_name": "Final Mix v1",
+          "mix_stage": "final"
+        },
+        "technical": {
+          "media_type": "audio/wav",
+          "duration_seconds": 178.051,
+          "sample_rate_hz": 44100,
+          "channels": 2,
+          "bit_depth": 16,
+          "format": "WAV",
+          "codec_subtype": "PCM",
+          "file_size_bytes": 31408242
+        },
+        "source_metadata": {
+          "original_filename": "final-song.wav",
+          "software": "Lavf63.1.101"
         }
       },
       "evidence": [
         {
-          "hash": "0bdab1d244e4068f8e02a143afa1395b9bc9a3b15648408bddb24ef889dbbe45",
-          "relationship_type": "documented_by",
-          "attributes": {
-            "assertion_origin": "ddex-ern",
-            "reference_pointer": "Release[REL-001]",
-            "document_role": "release-message",
-            "confirmed_by_submitter": false
-          }
-        },
-        {
-          "hash": "a62656044cfc7560e1ed5d4c573b965276e3e54d56092945ba2485bfe2f5f4c6",
-          "relationship_type": "documented_by",
-          "attributes": {
-            "assertion_origin": "ddex-rin",
-            "reference_pointer": "Session[S-001]",
-            "document_role": "recording-session",
-            "confirmed_by_submitter": false
-          }
-        },
-        {
-          "hash": "8d7532390d9e1215f05cd8c18794a7ad8f4d2f14259d8c6d1f1cb4df31227898",
-          "relationship_type": "excerpted_from",
+          "hash": "807c28c6091a5d88ac46befe85d30bb1b5ad2f34a3b18cb0a9be5b5d30a9fbfe",
+          "relationship_type": "mixed_from",
           "attributes": {
             "assertion_origin": "submitter",
             "confirmed_by_submitter": true,
-            "source_start_seconds": 0.0,
-            "source_end_seconds": 0.25,
-            "target_start_seconds": 0.0,
+            "timeline_offset_seconds": 0.0,
+            "source_role": "guitar",
+            "declared_gain_db": -4.0,
+            "declared_pan": 0.3,
+            "claim_rationale": "Declared by the submitter -- negative test case: this stem should NOT actually be present in final-song.wav, to confirm the similarity check catches a false claim."
+          }
+        },
+        {
+          "hash": "c93950984f1a0af37089ed4c1820b4f3b91a3d965caf9be500221599e52c3acd",
+          "relationship_type": "mixed_from",
+          "attributes": {
+            "assertion_origin": "submitter",
+            "confirmed_by_submitter": true,
+            "timeline_offset_seconds": 0.0,
+            "source_role": "vocal",
+            "declared_gain_db": -2.0,
+            "declared_pan": 0.0,
+            "claim_rationale": "Declared by the submitter."
+          }
+        },
+        {
+          "hash": "d3b7aae16d30f1e9132dd5b41388a82a8e1f4012a29163cb153412d15da973f7",
+          "relationship_type": "mixed_from",
+          "attributes": {
+            "assertion_origin": "submitter",
+            "confirmed_by_submitter": true,
+            "timeline_offset_seconds": 0.0,
+            "source_role": "drums",
+            "declared_gain_db": -3.0,
+            "declared_pan": 0.0,
             "claim_rationale": "Declared by the submitter."
           }
         }
       ]
-    },
-    {
-      "artefact_hash": "a62656044cfc7560e1ed5d4c573b965276e3e54d56092945ba2485bfe2f5f4c6",
-      "artefact_type": "metadata/ddex-rin",
-      "attributes": {
-        "production": {
-          "session_id": "S1",
-          "session_date": "2025-03-01",
-          "location": "Studio A",
-          "sessions": [
-            {
-              "session_id": "S1",
-              "date": "2025-03-01",
-              "location": "Studio A",
-              "contributors": [
-                {
-                  "party_id": "P1",
-                  "name": "Jane Doe",
-                  "role": "Producer"
-                }
-              ],
-              "equipment": [
-                {
-                  "equipment_id": "E1",
-                  "description": "Neumann U87",
-                  "equipment_type": "Microphone"
-                }
-              ]
-            }
-          ],
-          "contributors": [
-            {
-              "party_id": "P1",
-              "name": "Jane Doe",
-              "role": "Producer"
-            }
-          ],
-          "contributor_roles": [
-            "Producer"
-          ],
-          "equipment": [
-            {
-              "equipment_id": "E1",
-              "description": "Neumann U87",
-              "equipment_type": "Microphone"
-            }
-          ],
-          "recording_components": [
-            {
-              "component_id": "C1",
-              "title": "Lead Vocal Take 3",
-              "role": "Vocal"
-            }
-          ]
-        },
-        "source_metadata": {
-          "original_filename": "session-rin.xml"
-        },
-        "parser_diagnostics": {
-          "parser": "ddex-rin",
-          "warnings": []
-        }
-      },
-      "evidence": []
-    },
-    {
-      "artefact_hash": "0bdab1d244e4068f8e02a143afa1395b9bc9a3b15648408bddb24ef889dbbe45",
-      "artefact_type": "metadata/ddex-ern",
-      "attributes": {
-        "release": {
-          "release_id": "R1",
-          "title": "Test Album",
-          "release_type": "Album",
-          "releases": [
-            {
-              "release_id": "R1",
-              "title": "Test Album",
-              "release_type": "Album"
-            }
-          ]
-        },
-        "source_metadata": {
-          "original_filename": "release-ern.xml"
-        },
-        "parser_diagnostics": {
-          "parser": "ddex-ern",
-          "warnings": [
-            "AI-declaration extraction is unsupported in this baseline: no authoritative DDEX ERN AI-disclosure element name could be confirmed from a real sample, XSD, or official DDEX reference. contains_ai_declared and ai_contributions are always left None/empty rather than guessed. See parser/README.md."
-          ]
-        }
-      },
-      "evidence": []
     }
   ]
 }

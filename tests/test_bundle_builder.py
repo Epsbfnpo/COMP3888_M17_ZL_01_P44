@@ -153,7 +153,7 @@ def by_type(bundle: dict) -> dict:
 
 
 # --------------------------------------------------------------------------
-# §5 step 1 — manifest shape
+# manifest shape
 # --------------------------------------------------------------------------
 
 class TestManifestValidation:
@@ -246,7 +246,7 @@ class TestManifestValidation:
 
 
 # --------------------------------------------------------------------------
-# §5 step 2 — resolving each file entry
+# resolving each file entry
 # --------------------------------------------------------------------------
 
 class TestFileEntryValidation:
@@ -351,7 +351,7 @@ class TestFileEntryValidation:
 
 
 # --------------------------------------------------------------------------
-# §5 step 6 — exactly one final artefact
+# exactly one final artefact
 # --------------------------------------------------------------------------
 
 class TestFinalArtefactRule:
@@ -377,7 +377,7 @@ class TestFinalArtefactRule:
 
 
 # --------------------------------------------------------------------------
-# §2 principle — identity is content (SHA-256 addressing)
+# identity is content (SHA-256 addressing)
 # --------------------------------------------------------------------------
 
 class TestContentAddressing:
@@ -413,7 +413,7 @@ class TestContentAddressing:
 
 
 # --------------------------------------------------------------------------
-# §2 principle — observed and declared are stored apart
+# observed and declared are stored apart
 # --------------------------------------------------------------------------
 
 class TestDeclaredVsObserved:
@@ -451,7 +451,7 @@ class TestDeclaredVsObserved:
 
 
 # --------------------------------------------------------------------------
-# §2 principle — declared, never inferred / parser-owned groups
+# declared, never inferred / parser-owned groups
 # --------------------------------------------------------------------------
 
 class TestParserOwnedGroups:
@@ -503,7 +503,7 @@ class TestParserOwnedGroups:
 
 
 # --------------------------------------------------------------------------
-# §5 step 3 — parsing by type / WAV integration
+# parsing by type / WAV integration
 # --------------------------------------------------------------------------
 
 class TestWavParsingIntegration:
@@ -555,7 +555,7 @@ class TestWavParsingIntegration:
 
 
 # --------------------------------------------------------------------------
-# §2 principle — declared relationships only, plus §5 step 7 (edges)
+# declared relationships only, plus §5 step 7 (edges)
 # --------------------------------------------------------------------------
 
 class TestRelationshipApplication:
@@ -600,7 +600,7 @@ class TestRelationshipApplication:
 
 
 # --------------------------------------------------------------------------
-# §5 step 8 — publish (schema + EvidenceChain re-validation)
+# publish (schema + EvidenceChain re-validation)
 # --------------------------------------------------------------------------
 
 class TestBundlePublishing:
