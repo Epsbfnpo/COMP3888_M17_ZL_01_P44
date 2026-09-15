@@ -210,8 +210,6 @@ attestation.
 
 - It does not infer a relationship or production role from filenames, file
   order, timestamps, matching metadata, or audio similarity.
-- It does not compare audio samples to prove that one WAV was excerpted,
-  edited, mixed, stemmed, mastered, or otherwise derived from another WAV.
 - It does not perform complete DDEX RIN or ERN XSD validation.
 - It does not extract the newer ERN AI-disclosure extension in this baseline.
 - It does not independently re-run C2PA cryptographic verification, decide
