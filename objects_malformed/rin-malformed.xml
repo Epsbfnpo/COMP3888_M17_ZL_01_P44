@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- SYNTHETIC fixture: intentionally malformed XML (mismatched tags) for parser error-handling tests. -->
+<RecordingInformationNotification xmlns="http://ddex.net/xml/rin/20">
+  <SessionList>
+    <Session>
+      <SessionId>S3</SessionId>
+    </Sesion>
+  </SessionList>
+</RecordingInformationNotification>
