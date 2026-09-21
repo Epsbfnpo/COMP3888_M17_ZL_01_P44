@@ -1,0 +1,16 @@
+jsonschema==4.23.0
+
+# Optional: needed only for the stem-vs-mix audio similarity check in
+# RelationshipIntegrityPass (music_profiles.py). Without these installed,
+# that check is skipped gracefully and reported as unassessed.
+#
+# Pinned to match the versions confirmed working in the match-test
+# environment (2026-09) -- the earlier pins here were an unverified guess
+# and were a full major version behind on both numpy and librosa, which
+# was enough to shift mel-spectrogram correlation results significantly.
+numpy==2.5.2
+scipy==1.18.1
+soundfile==0.14.0
+soxr==1.1.0
+librosa==1.0.0
+pytest==9.1.1
