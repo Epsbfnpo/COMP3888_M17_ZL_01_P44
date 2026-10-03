@@ -1,0 +1,1471 @@
+{
+  "policy_id": "comp3888-music-workflow-evidence",
+  "policy_version": "0.1.0-candidate",
+  "format_version": "1.0.0",
+  "status": "candidate_for_team_and_client_review",
+  "domain": "music_production",
+  "purpose": "Define, per declared music-production workflow, which evidence artefacts and lineage relationships are required, conditional, or optional for completeness assessment.",
+  "scope_warning": "This file defines workflow evidence expectations. It does not document parser support, and evidence presence does not prove authorship, ownership, legality, or factual truth.",
+  "terminology": {
+    "required": "Included in the completeness denominator whenever this workflow is selected. Absence lowers completeness, but does not by itself imply deception or AI use.",
+    "conditional": "Included in the completeness denominator only when its trigger is true for the declared workflow or submission.",
+    "optional": "Validated and reported when present, but excluded from the completeness denominator unless a client policy explicitly promotes it.",
+    "alternative_group": "A requirement satisfied by one qualifying option; alternatives are not all required.",
+    "supporting_evidence": "Evidence that explains or corroborates a production step. It is not automatically proof that the step occurred.",
+    "final_artefact": "The single output designated by the submitter as the target of the submitted evidence graph."
+  },
+  "workflow_selection": {
+    "submitter_must_select_primary_workflow": true,
+    "system_may_suggest_but_must_not_silently_replace": true,
+    "multiple_workflows": "Use one primary workflow and zero or more modifiers. If two independent deliverables exist, assess them as separate submissions unless a bundle profile explicitly supports multiple finals.",
+    "unknown_workflow": "Use custom_or_unknown_workflow. Do not apply a better-known workflow merely from filenames.",
+    "modifiers": [
+      "includes_recorded_performance",
+      "includes_multitrack_recording",
+      "includes_take_editing",
+      "includes_take_selection",
+      "includes_midi_or_sequencing",
+      "includes_samples_or_loops",
+      "includes_mixing",
+      "includes_stem_export",
+      "includes_mastering",
+      "includes_ai_assistance",
+      "includes_ai_generated_audio",
+      "is_commercial_release",
+      "is_sync_or_audiovisual_delivery"
+    ]
+  },
+  "rule_language": {
+    "artifact_presence": "Satisfied when at least min_count reachable artefacts match artifact_types and any stated role constraints.",
+    "relationship_presence": "Satisfied when at least min_count graph edges match relationship_types and endpoint constraints.",
+    "ancestry_path": "Satisfied when the final artefact reaches a qualifying source through allowed_relationship_types.",
+    "declaration_presence": "Satisfied when the normalized submission contains the named declaration with a non-ambiguous value.",
+    "alternative_group": "Satisfied when at least min_satisfied child options are satisfied.",
+    "trigger_syntax": "Simple policy expressions use modifier.<name>, final.type, declaration.<field>, workflow.<field>, and boolean and/or/not. The evaluator must not execute arbitrary code."
+  },
+  "relationship_type_catalog": {
+    "derived_from": {
+      "registry_status": "existing_generic"
+    },
+    "edited_from": {
+      "registry_status": "existing"
+    },
+    "excerpted_from": {
+      "registry_status": "existing"
+    },
+    "comped_from": {
+      "registry_status": "existing"
+    },
+    "stemmed_from": {
+      "registry_status": "existing"
+    },
+    "mixed_from": {
+      "registry_status": "existing"
+    },
+    "mastered_from": {
+      "registry_status": "existing"
+    },
+    "rendered_from": {
+      "registry_status": "proposed_for_daw_and_midi",
+      "meaning": "The target audio was rendered or exported from a DAW session, MIDI sequence, or other executable project source."
+    },
+    "input_to": {
+      "registry_status": "proposed_for_c2pa_or_process_records",
+      "meaning": "The source was used as an input to a recorded process; this does not by itself prove the semantic correctness of the process claim."
+    }
+  },
+  "completeness_policy": {
+    "axis": "completeness",
+    "availability": {
+      "available": "The workflow was selected and all applicable rules could be evaluated.",
+      "partial": "The workflow was selected, but one or more applicable rules could not be evaluated because of unsupported parsers, unreadable artefacts, or unresolved role classification.",
+      "unavailable": "No workflow was selected and no safe workflow-specific expectation set could be determined. value and confidence must be null."
+    },
+    "value_formula": "sum(weight of satisfied applicable required and conditional rules) / sum(weight of all applicable required and conditional rules)",
+    "optional_evidence_in_denominator": false,
+    "unknown_is_zero": false,
+    "unsupported_parser_handling": "Do not silently mark the rule failed. Mark the rule not_assessed, set axis availability to partial, and reduce confidence. A client may separately require manual review.",
+    "duplicate_handling": "Multiple files satisfying the same minimum-count rule do not create extra completeness credit unless the rule explicitly defines quantity-based credit.",
+    "confidence_inputs": [
+      "fraction of applicable rules actually assessed",
+      "parser reliability for the relevant artefact types",
+      "whether artefact roles were parsed, declared, or inferred",
+      "whether lineage relationships are declared, corroborated, or cryptographically attested"
+    ],
+    "interpretation_limits": [
+      "Low completeness means expected evidence is missing or unassessed; it is not proof of forgery.",
+      "High completeness means the expected evidence package is present; it is not proof that every claim is true.",
+      "Completeness, integrity, attestation strength, and AI disclosure remain separate dimensions; this program does not combine them into an overall score or accepted/rejected decision."
+    ]
+  },
+  "common_rules": {
+    "required_for_every_workflow": [
+      {
+        "rule_id": "common.final_artefact",
+        "kind": "artifact_presence",
+        "artifact_types": [
+          "audio/edited-take",
+          "audio/stem",
+          "audio/mix",
+          "audio/master",
+          "audio/sample"
+        ],
+        "role": "final",
+        "min_count": 1,
+        "max_count": 1,
+        "weight": 1.0,
+        "rationale": "Every assessment needs exactly one target artefact."
+      },
+      {
+        "rule_id": "common.submitter_declaration",
+        "kind": "declaration_presence",
+        "declaration": "submitter_confirmation",
+        "weight": 0.5,
+        "rationale": "Records who declared the roles, relationships, and creation methods. This is a claim, not independent verification."
+      },
+      {
+        "rule_id": "common.creation_method_disclosure",
+        "kind": "declaration_presence",
+        "declaration": "artefacts[].creation_method",
+        "coverage": "all_applicable_audio_artefacts",
+        "weight": 0.5,
+        "rationale": "Supports the separate AI-disclosure axis and prevents missing values from being treated as human-created by default."
+      }
+    ],
+    "optional_for_every_workflow": [
+      {
+        "rule_id": "common.c2pa",
+        "kind": "artifact_presence",
+        "artifact_types": [
+          "provenance/c2pa"
+        ],
+        "min_count": 1,
+        "rationale": "Can support signature, content-binding, ingredient, and trust checks when present; absence is not a completeness failure."
+      },
+      {
+        "rule_id": "common.rin",
+        "kind": "artifact_presence",
+        "artifact_types": [
+          "metadata/ddex-rin"
+        ],
+        "min_count": 1,
+        "rationale": "Can corroborate recording-session, contributor, role, and resource metadata."
+      },
+      {
+        "rule_id": "common.ern",
+        "kind": "artifact_presence",
+        "artifact_types": [
+          "metadata/ddex-ern"
+        ],
+        "min_count": 1,
+        "rationale": "Can corroborate release and resource metadata."
+      },
+      {
+        "rule_id": "common.session_log",
+        "kind": "artifact_presence",
+        "artifact_types": [
+          "text/session-log"
+        ],
+        "min_count": 1,
+        "rationale": "May explain dates, participants, equipment, exports, and unusual workflow steps."
+      }
+    ]
+  },
+  "workflows": [
+    {
+      "workflow_id": "recorded_single_performance_to_final",
+      "title": "Single recorded performance to edited final or master",
+      "when_applicable": "A principal source is one recorded vocal or instrument performance, with optional editing, mixing, or mastering.",
+      "example": "A singer records one vocal take, edits it, mixes it with accompaniment, and submits the mix as the final artefact.",
+      "allowed_final_types": [
+        "audio/edited-take",
+        "audio/mix",
+        "audio/master"
+      ],
+      "default_modifiers": [
+        "includes_recorded_performance"
+      ],
+      "required": [
+        {
+          "rule_id": "single.source_take",
+          "kind": "artifact_presence",
+          "artifact_types": [
+            "audio/raw-take",
+            "audio/raw-track"
+          ],
+          "min_count": 1,
+          "weight": 2.0,
+          "rationale": "Provides the primary recorded source."
+        },
+        {
+          "rule_id": "single.source_reaches_final",
+          "kind": "ancestry_path",
+          "source_types": [
+            "audio/raw-take",
+            "audio/raw-track"
+          ],
+          "target": "final",
+          "allowed_relationship_types": [
+            "edited_from",
+            "comped_from",
+            "mixed_from",
+            "mastered_from",
+            "rendered_from",
+            "derived_from"
+          ],
+          "weight": 2.0,
+          "rationale": "Connects the final output to the submitted recording."
+        }
+      ],
+      "conditional": [
+        {
+          "rule_id": "single.edited_take",
+          "trigger": "modifier.includes_take_editing",
+          "kind": "artifact_presence",
+          "artifact_types": [
+            "audio/edited-take"
+          ],
+          "min_count": 1,
+          "weight": 1.0
+        },
+        {
+          "rule_id": "single.pre_master",
+          "trigger": "modifier.includes_mastering and final.type == 'audio/master'",
+          "kind": "artifact_presence",
+          "artifact_types": [
+            "audio/mix"
+          ],
+          "role": "pre_master",
+          "min_count": 1,
+          "weight": 1.0
+        }
+      ],
+      "optional": [
+        "project/daw-session",
+        "text/session-log",
+        "metadata/ddex-rin",
+        "metadata/ddex-ern",
+        "provenance/c2pa"
+      ]
+    },
+    {
+      "workflow_id": "multitrack_recording_mix_master",
+      "title": "Multitrack recording, mixing, and optional mastering",
+      "when_applicable": "Multiple recorded sources are edited or mixed into a final mix or master.",
+      "example": "A band records drums, bass, guitar, and vocals on separate tracks, then produces a stereo mix and final master.",
+      "allowed_final_types": [
+        "audio/mix",
+        "audio/master"
+      ],
+      "default_modifiers": [
+        "includes_recorded_performance",
+        "includes_multitrack_recording",
+        "includes_mixing"
+      ],
+      "required": [
+        {
+          "rule_id": "multitrack.sources",
+          "kind": "artifact_presence",
+          "artifact_types": [
+            "audio/raw-track",
+            "audio/raw-take"
+          ],
+          "min_count": 2,
+          "weight": 2.0,
+          "rationale": "A multitrack claim should expose more than one source recording."
+        },
+        {
+          "rule_id": "multitrack.mix_stage",
+          "kind": "artifact_presence",
+          "artifact_types": [
+            "audio/mix"
+          ],
+          "min_count": 1,
+          "weight": 1.5
+        },
+        {
+          "rule_id": "multitrack.mixed_from",
+          "kind": "relationship_presence",
+          "relationship_types": [
+            "mixed_from",
+            "rendered_from",
+            "derived_from"
+          ],
+          "source_types": [
+            "audio/raw-track",
+            "audio/raw-take",
+            "audio/edited-take",
+            "audio/stem"
+          ],
+          "target_types": [
+            "audio/mix"
+          ],
+          "min_count": 2,
+          "weight": 2.0
+        }
+      ],
+      "conditional": [
+        {
+          "rule_id": "multitrack.mastering",
+          "trigger": "final.type == 'audio/master' or modifier.includes_mastering",
+          "kind": "relationship_presence",
+          "relationship_types": [
+            "mastered_from"
+          ],
+          "source_types": [
+            "audio/mix"
+          ],
+          "target_types": [
+            "audio/master"
+          ],
+          "min_count": 1,
+          "weight": 1.5
+        },
+        {
+          "rule_id": "multitrack.stems",
+          "trigger": "modifier.includes_stem_export",
+          "kind": "artifact_presence",
+          "artifact_types": [
+            "audio/stem"
+          ],
+          "min_count": 1,
+          "weight": 1.0
+        }
+      ],
+      "optional": [
+        "project/daw-session",
+        "project/automation",
+        "text/session-log",
+        "metadata/ddex-rin",
+        "metadata/ddex-ern",
+        "provenance/c2pa"
+      ]
+    },
+    {
+      "workflow_id": "take_comping_and_editing",
+      "title": "Take selection, comping, and editing",
+      "when_applicable": "Two or more takes are selected or combined into an edited performance.",
+      "example": "Five vocal takes are combined into one edited lead-vocal take before mixing.",
+      "allowed_final_types": [
+        "audio/edited-take",
+        "audio/stem",
+        "audio/mix",
+        "audio/master"
+      ],
+      "default_modifiers": [
+        "includes_recorded_performance",
+        "includes_take_editing",
+        "includes_take_selection"
+      ],
+      "required": [
+        {
+          "rule_id": "comping.source_takes",
+          "kind": "artifact_presence",
+          "artifact_types": [
+            "audio/raw-take"
+          ],
+          "min_count": 2,
+          "weight": 2.0
+        },
+        {
+          "rule_id": "comping.edited_output",
+          "kind": "artifact_presence",
+          "artifact_types": [
+            "audio/edited-take"
+          ],
+          "min_count": 1,
+          "weight": 1.5
+        },
+        {
+          "rule_id": "comping.selection_evidence",
+          "kind": "alternative_group",
+          "min_satisfied": 1,
+          "weight": 1.5,
+          "options": [
+            {
+              "kind": "artifact_presence",
+              "artifact_types": [
+                "text/comp-sheet"
+              ],
+              "min_count": 1
+            },
+            {
+              "kind": "artifact_presence",
+              "artifact_types": [
+                "project/daw-session"
+              ],
+              "min_count": 1
+            },
+            {
+              "kind": "relationship_presence",
+              "relationship_types": [
+                "comped_from"
+              ],
+              "min_count": 2
+            }
+          ],
+          "rationale": "Accepts a comp sheet, a readable DAW selection record, or explicit comped_from edges."
+        }
+      ],
+      "conditional": [
+        {
+          "rule_id": "comping.final_lineage",
+          "trigger": "final.type != 'audio/edited-take'",
+          "kind": "ancestry_path",
+          "source_types": [
+            "audio/edited-take"
+          ],
+          "target": "final",
+          "allowed_relationship_types": [
+            "stemmed_from",
+            "mixed_from",
+            "mastered_from",
+            "rendered_from",
+            "derived_from"
+          ],
+          "weight": 1.0
+        }
+      ],
+      "optional": [
+        "text/session-log",
+        "metadata/ddex-rin",
+        "provenance/c2pa"
+      ]
+    },
+    {
+      "workflow_id": "midi_virtual_instrument_production",
+      "title": "MIDI or sequenced virtual-instrument production",
+      "when_applicable": "The musical source is primarily MIDI, sequencing, software instruments, or programmed control data.",
+      "example": "A producer programs a piano part in MIDI, renders it through a virtual instrument, and mixes the rendered audio.",
+      "allowed_final_types": [
+        "audio/stem",
+        "audio/mix",
+        "audio/master"
+      ],
+      "default_modifiers": [
+        "includes_midi_or_sequencing",
+        "includes_mixing"
+      ],
+      "required": [
+        {
+          "rule_id": "midi.sequence_source",
+          "kind": "alternative_group",
+          "min_satisfied": 1,
+          "weight": 2.0,
+          "options": [
+            {
+              "kind": "artifact_presence",
+              "artifact_types": [
+                "project/midi"
+              ],
+              "min_count": 1
+            },
+            {
+              "kind": "artifact_presence",
+              "artifact_types": [
+                "project/daw-session"
+              ],
+              "min_count": 1
+            }
+          ],
+          "rationale": "Requires either a MIDI file or a readable DAW project containing the sequence."
+        },
+        {
+          "rule_id": "midi.rendered_audio",
+          "kind": "artifact_presence",
+          "artifact_types": [
+            "audio/stem",
+            "audio/mix",
+            "audio/master"
+          ],
+          "min_count": 1,
+          "weight": 1.0
+        },
+        {
+          "rule_id": "midi.render_lineage",
+          "kind": "relationship_presence",
+          "relationship_types": [
+            "rendered_from",
+            "derived_from"
+          ],
+          "source_types": [
+            "project/midi",
+            "project/daw-session"
+          ],
+          "target_types": [
+            "audio/stem",
+            "audio/mix",
+            "audio/master"
+          ],
+          "min_count": 1,
+          "weight": 2.0
+        }
+      ],
+      "conditional": [
+        {
+          "rule_id": "midi.automation",
+          "trigger": "workflow.automation_exported_separately == true",
+          "kind": "artifact_presence",
+          "artifact_types": [
+            "project/automation"
+          ],
+          "min_count": 1,
+          "weight": 0.5
+        },
+        {
+          "rule_id": "midi.mastering",
+          "trigger": "final.type == 'audio/master' or modifier.includes_mastering",
+          "kind": "relationship_presence",
+          "relationship_types": [
+            "mastered_from"
+          ],
+          "source_types": [
+            "audio/mix"
+          ],
+          "target_types": [
+            "audio/master"
+          ],
+          "min_count": 1,
+          "weight": 1.0
+        }
+      ],
+      "optional": [
+        "audio/stem",
+        "text/session-log",
+        "metadata/ddex-rin",
+        "metadata/ddex-ern",
+        "provenance/c2pa"
+      ]
+    },
+    {
+      "workflow_id": "hybrid_recorded_and_midi_production",
+      "title": "Hybrid recorded-audio and MIDI production",
+      "when_applicable": "Recorded performances and sequenced or virtual-instrument sources both materially contribute to the final output.",
+      "example": "Recorded vocals and guitar are combined with MIDI drums and synthesizers in one final mix.",
+      "allowed_final_types": [
+        "audio/mix",
+        "audio/master"
+      ],
+      "default_modifiers": [
+        "includes_recorded_performance",
+        "includes_midi_or_sequencing",
+        "includes_mixing"
+      ],
+      "required": [
+        {
+          "rule_id": "hybrid.recorded_source",
+          "kind": "artifact_presence",
+          "artifact_types": [
+            "audio/raw-take",
+            "audio/raw-track"
+          ],
+          "min_count": 1,
+          "weight": 1.5
+        },
+        {
+          "rule_id": "hybrid.midi_source",
+          "kind": "alternative_group",
+          "min_satisfied": 1,
+          "weight": 1.5,
+          "options": [
+            {
+              "kind": "artifact_presence",
+              "artifact_types": [
+                "project/midi"
+              ],
+              "min_count": 1
+            },
+            {
+              "kind": "artifact_presence",
+              "artifact_types": [
+                "project/daw-session"
+              ],
+              "min_count": 1
+            }
+          ]
+        },
+        {
+          "rule_id": "hybrid.mix",
+          "kind": "artifact_presence",
+          "artifact_types": [
+            "audio/mix"
+          ],
+          "min_count": 1,
+          "weight": 1.0
+        },
+        {
+          "rule_id": "hybrid.recorded_reaches_final",
+          "kind": "ancestry_path",
+          "source_types": [
+            "audio/raw-take",
+            "audio/raw-track"
+          ],
+          "target": "final",
+          "allowed_relationship_types": [
+            "edited_from",
+            "stemmed_from",
+            "mixed_from",
+            "mastered_from",
+            "derived_from"
+          ],
+          "weight": 1.5
+        },
+        {
+          "rule_id": "hybrid.midi_reaches_final",
+          "kind": "ancestry_path",
+          "source_types": [
+            "project/midi",
+            "project/daw-session"
+          ],
+          "target": "final",
+          "allowed_relationship_types": [
+            "rendered_from",
+            "stemmed_from",
+            "mixed_from",
+            "mastered_from",
+            "derived_from"
+          ],
+          "weight": 1.5
+        }
+      ],
+      "conditional": [
+        {
+          "rule_id": "hybrid.mastering",
+          "trigger": "final.type == 'audio/master'",
+          "kind": "relationship_presence",
+          "relationship_types": [
+            "mastered_from"
+          ],
+          "min_count": 1,
+          "weight": 1.0
+        }
+      ],
+      "optional": [
+        "audio/stem",
+        "project/automation",
+        "text/session-log",
+        "metadata/ddex-rin",
+        "metadata/ddex-ern",
+        "provenance/c2pa"
+      ]
+    },
+    {
+      "workflow_id": "sample_and_loop_based_production",
+      "title": "Sample- or loop-based production",
+      "when_applicable": "Samples, loops, or excerpts materially contribute to the final production.",
+      "example": "A producer builds a track from a drum loop and a chopped vocal sample, then exports a mix.",
+      "allowed_final_types": [
+        "audio/stem",
+        "audio/mix",
+        "audio/master"
+      ],
+      "default_modifiers": [
+        "includes_samples_or_loops",
+        "includes_mixing"
+      ],
+      "required": [
+        {
+          "rule_id": "sample.sources",
+          "kind": "artifact_presence",
+          "artifact_types": [
+            "audio/sample"
+          ],
+          "min_count": 1,
+          "weight": 2.0
+        },
+        {
+          "rule_id": "sample.lineage",
+          "kind": "ancestry_path",
+          "source_types": [
+            "audio/sample"
+          ],
+          "target": "final",
+          "allowed_relationship_types": [
+            "excerpted_from",
+            "stemmed_from",
+            "mixed_from",
+            "mastered_from",
+            "rendered_from",
+            "derived_from"
+          ],
+          "weight": 2.0
+        }
+      ],
+      "conditional": [
+        {
+          "rule_id": "sample.original_source",
+          "trigger": "workflow.sample_is_self_created == true",
+          "kind": "relationship_presence",
+          "relationship_types": [
+            "excerpted_from"
+          ],
+          "source_types": [
+            "audio/raw-take",
+            "audio/raw-track",
+            "audio/mix"
+          ],
+          "target_types": [
+            "audio/sample"
+          ],
+          "min_count": 1,
+          "weight": 1.0
+        },
+        {
+          "rule_id": "sample.clearance",
+          "trigger": "workflow.sample_is_third_party == true and workflow.client_requires_clearance_document == true",
+          "kind": "artifact_presence",
+          "artifact_types": [
+            "text/license-clearance"
+          ],
+          "min_count": 1,
+          "weight": 0.5,
+          "rationale": "Documentation only; the program does not make a legal determination."
+        }
+      ],
+      "optional": [
+        "project/daw-session",
+        "text/session-log",
+        "metadata/ddex-rin",
+        "metadata/ddex-ern",
+        "provenance/c2pa",
+        "text/license-clearance"
+      ]
+    },
+    {
+      "workflow_id": "remix_or_derivative_production",
+      "title": "Remix, edit, or other derivative production",
+      "when_applicable": "A supplied mix, stem set, or released recording is transformed into a new mix or master.",
+      "example": "A remixer receives vocal and instrumental stems and creates a new dance remix.",
+      "allowed_final_types": [
+        "audio/edited-take",
+        "audio/mix",
+        "audio/master"
+      ],
+      "default_modifiers": [
+        "includes_mixing"
+      ],
+      "required": [
+        {
+          "rule_id": "remix.supplied_source",
+          "kind": "artifact_presence",
+          "artifact_types": [
+            "audio/stem",
+            "audio/mix",
+            "audio/master"
+          ],
+          "role": "source_material",
+          "min_count": 1,
+          "weight": 2.0
+        },
+        {
+          "rule_id": "remix.derivation",
+          "kind": "ancestry_path",
+          "source_types": [
+            "audio/stem",
+            "audio/mix",
+            "audio/master"
+          ],
+          "source_role": "source_material",
+          "target": "final",
+          "allowed_relationship_types": [
+            "edited_from",
+            "mixed_from",
+            "mastered_from",
+            "derived_from"
+          ],
+          "weight": 2.0
+        }
+      ],
+      "conditional": [
+        {
+          "rule_id": "remix.clearance",
+          "trigger": "workflow.client_requires_clearance_document == true",
+          "kind": "artifact_presence",
+          "artifact_types": [
+            "text/license-clearance"
+          ],
+          "min_count": 1,
+          "weight": 0.5
+        }
+      ],
+      "optional": [
+        "project/daw-session",
+        "audio/stem",
+        "text/session-log",
+        "metadata/ddex-ern",
+        "provenance/c2pa",
+        "text/license-clearance"
+      ]
+    },
+    {
+      "workflow_id": "mixing_service_only",
+      "title": "Mixing service from supplied tracks or stems",
+      "when_applicable": "The submitter is evidencing a mixing stage but did not create the original recordings.",
+      "example": "A mixing engineer receives twelve client stems and returns a stereo mix without performing the recordings.",
+      "allowed_final_types": [
+        "audio/mix",
+        "audio/master"
+      ],
+      "default_modifiers": [
+        "includes_mixing"
+      ],
+      "required": [
+        {
+          "rule_id": "mix_service.inputs",
+          "kind": "artifact_presence",
+          "artifact_types": [
+            "audio/raw-track",
+            "audio/edited-take",
+            "audio/stem"
+          ],
+          "role": "client_supplied_input",
+          "min_count": 1,
+          "weight": 2.0
+        },
+        {
+          "rule_id": "mix_service.mix",
+          "kind": "artifact_presence",
+          "artifact_types": [
+            "audio/mix"
+          ],
+          "min_count": 1,
+          "weight": 1.0
+        },
+        {
+          "rule_id": "mix_service.mixed_from",
+          "kind": "relationship_presence",
+          "relationship_types": [
+            "mixed_from",
+            "rendered_from",
+            "derived_from"
+          ],
+          "source_types": [
+            "audio/raw-track",
+            "audio/edited-take",
+            "audio/stem"
+          ],
+          "target_types": [
+            "audio/mix"
+          ],
+          "min_count": 1,
+          "weight": 2.0
+        }
+      ],
+      "conditional": [
+        {
+          "rule_id": "mix_service.mastering",
+          "trigger": "final.type == 'audio/master'",
+          "kind": "relationship_presence",
+          "relationship_types": [
+            "mastered_from"
+          ],
+          "source_types": [
+            "audio/mix"
+          ],
+          "target_types": [
+            "audio/master"
+          ],
+          "min_count": 1,
+          "weight": 1.0
+        }
+      ],
+      "optional": [
+        "audio/reference",
+        "project/daw-session",
+        "project/automation",
+        "text/session-log",
+        "metadata/ddex-rin",
+        "provenance/c2pa"
+      ]
+    },
+    {
+      "workflow_id": "mastering_service_only",
+      "title": "Mastering service from a supplied pre-master",
+      "when_applicable": "The submitter is evidencing mastering of a supplied mix.",
+      "example": "A mastering engineer receives an unmastered stereo mix and returns the final mastered WAV.",
+      "allowed_final_types": [
+        "audio/master"
+      ],
+      "default_modifiers": [
+        "includes_mastering"
+      ],
+      "required": [
+        {
+          "rule_id": "mastering.pre_master",
+          "kind": "artifact_presence",
+          "artifact_types": [
+            "audio/mix"
+          ],
+          "role": "pre_master",
+          "min_count": 1,
+          "weight": 2.0
+        },
+        {
+          "rule_id": "mastering.final_master",
+          "kind": "artifact_presence",
+          "artifact_types": [
+            "audio/master"
+          ],
+          "role": "final",
+          "min_count": 1,
+          "weight": 1.0
+        },
+        {
+          "rule_id": "mastering.relationship",
+          "kind": "relationship_presence",
+          "relationship_types": [
+            "mastered_from"
+          ],
+          "source_types": [
+            "audio/mix"
+          ],
+          "source_role": "pre_master",
+          "target_types": [
+            "audio/master"
+          ],
+          "min_count": 1,
+          "weight": 2.0
+        }
+      ],
+      "conditional": [],
+      "optional": [
+        "audio/reference",
+        "text/session-log",
+        "metadata/ddex-ern",
+        "provenance/c2pa"
+      ]
+    },
+    {
+      "workflow_id": "live_performance_recording",
+      "title": "Live performance recording and post-production",
+      "when_applicable": "A live concert, rehearsal, or location performance is recorded and delivered as a mix or master.",
+      "example": "A concert is captured from a multitrack recorder and later mixed into a live album master.",
+      "allowed_final_types": [
+        "audio/mix",
+        "audio/master"
+      ],
+      "default_modifiers": [
+        "includes_recorded_performance",
+        "includes_mixing"
+      ],
+      "required": [
+        {
+          "rule_id": "live.capture",
+          "kind": "artifact_presence",
+          "artifact_types": [
+            "audio/raw-track",
+            "audio/raw-take"
+          ],
+          "min_count": 1,
+          "weight": 2.0
+        },
+        {
+          "rule_id": "live.capture_reaches_final",
+          "kind": "ancestry_path",
+          "source_types": [
+            "audio/raw-track",
+            "audio/raw-take"
+          ],
+          "target": "final",
+          "allowed_relationship_types": [
+            "edited_from",
+            "stemmed_from",
+            "mixed_from",
+            "mastered_from",
+            "derived_from"
+          ],
+          "weight": 2.0
+        }
+      ],
+      "conditional": [
+        {
+          "rule_id": "live.cue_sheet",
+          "trigger": "workflow.has_multiple_performance_items == true or modifier.is_sync_or_audiovisual_delivery",
+          "kind": "artifact_presence",
+          "artifact_types": [
+            "text/cue-sheet"
+          ],
+          "min_count": 1,
+          "weight": 1.0
+        },
+        {
+          "rule_id": "live.multitrack_count",
+          "trigger": "modifier.includes_multitrack_recording",
+          "kind": "artifact_presence",
+          "artifact_types": [
+            "audio/raw-track"
+          ],
+          "min_count": 2,
+          "weight": 1.0
+        }
+      ],
+      "optional": [
+        "project/daw-session",
+        "text/session-log",
+        "metadata/ddex-rin",
+        "metadata/ddex-ern",
+        "provenance/c2pa"
+      ]
+    },
+    {
+      "workflow_id": "remote_collaborative_production",
+      "title": "Remote or multi-contributor collaborative production",
+      "when_applicable": "Contributors deliver recordings, stems, MIDI, or sessions from multiple locations.",
+      "example": "A vocalist, guitarist, and producer in different cities upload their parts for a shared final mix.",
+      "allowed_final_types": [
+        "audio/stem",
+        "audio/mix",
+        "audio/master"
+      ],
+      "default_modifiers": [
+        "includes_mixing"
+      ],
+      "required": [
+        {
+          "rule_id": "collab.contributor_inputs",
+          "kind": "artifact_presence",
+          "artifact_types": [
+            "audio/raw-take",
+            "audio/raw-track",
+            "audio/edited-take",
+            "audio/stem",
+            "project/midi",
+            "project/daw-session"
+          ],
+          "min_count": 2,
+          "weight": 2.0
+        },
+        {
+          "rule_id": "collab.contributor_declarations",
+          "kind": "declaration_presence",
+          "declaration": "contributors[]",
+          "coverage": "all_declared_contributor_inputs",
+          "weight": 1.0
+        },
+        {
+          "rule_id": "collab.inputs_reach_final",
+          "kind": "ancestry_path",
+          "source_types": [
+            "audio/raw-take",
+            "audio/raw-track",
+            "audio/edited-take",
+            "audio/stem",
+            "project/midi",
+            "project/daw-session"
+          ],
+          "target": "final",
+          "min_distinct_sources": 2,
+          "allowed_relationship_types": [
+            "edited_from",
+            "comped_from",
+            "stemmed_from",
+            "mixed_from",
+            "mastered_from",
+            "rendered_from",
+            "derived_from"
+          ],
+          "weight": 2.0
+        }
+      ],
+      "conditional": [
+        {
+          "rule_id": "collab.rin",
+          "trigger": "workflow.client_requires_structured_contributor_metadata == true",
+          "kind": "artifact_presence",
+          "artifact_types": [
+            "metadata/ddex-rin"
+          ],
+          "min_count": 1,
+          "weight": 1.0
+        }
+      ],
+      "optional": [
+        "metadata/ddex-rin",
+        "metadata/ddex-ern",
+        "text/session-log",
+        "project/daw-session",
+        "provenance/c2pa"
+      ]
+    },
+    {
+      "workflow_id": "ai_assisted_or_generated_production",
+      "title": "AI-assisted or AI-generated music production",
+      "when_applicable": "AI assistance or generated audio is declared for at least one applicable artefact.",
+      "example": "A generated backing track is edited by the producer, combined with recorded vocals, and disclosed as AI-assisted.",
+      "allowed_final_types": [
+        "audio/edited-take",
+        "audio/stem",
+        "audio/mix",
+        "audio/master"
+      ],
+      "default_modifiers": [
+        "includes_ai_assistance"
+      ],
+      "required": [
+        {
+          "rule_id": "ai.disclosure",
+          "kind": "declaration_presence",
+          "declaration": "artefacts[].creation_method",
+          "coverage": "all_ai_applicable_artefacts",
+          "weight": 2.0,
+          "rationale": "Measures disclosure coverage, not the amount of human contribution."
+        },
+        {
+          "rule_id": "ai.lineage",
+          "kind": "ancestry_path",
+          "source_types": [
+            "audio/ai-source",
+            "audio/sample",
+            "audio/raw-take",
+            "project/daw-session",
+            "project/midi"
+          ],
+          "target": "final",
+          "allowed_relationship_types": [
+            "edited_from",
+            "stemmed_from",
+            "mixed_from",
+            "mastered_from",
+            "rendered_from",
+            "derived_from",
+            "input_to"
+          ],
+          "weight": 1.5
+        }
+      ],
+      "conditional": [
+        {
+          "rule_id": "ai.generated_source",
+          "trigger": "modifier.includes_ai_generated_audio",
+          "kind": "artifact_presence",
+          "artifact_types": [
+            "audio/ai-source"
+          ],
+          "min_count": 1,
+          "weight": 1.5
+        },
+        {
+          "rule_id": "ai.generation_record",
+          "trigger": "workflow.client_requires_generation_record == true",
+          "kind": "artifact_presence",
+          "artifact_types": [
+            "metadata/generation-record"
+          ],
+          "min_count": 1,
+          "weight": 1.0
+        }
+      ],
+      "optional": [
+        "metadata/generation-record",
+        "project/daw-session",
+        "text/session-log",
+        "provenance/c2pa"
+      ]
+    },
+    {
+      "workflow_id": "commercial_release_delivery",
+      "title": "Commercial release package delivery",
+      "when_applicable": "The evidence package is intended to support a release delivery in addition to production lineage.",
+      "example": "A label receives a final master together with ERN release metadata and recording credits for distribution.",
+      "allowed_final_types": [
+        "audio/master"
+      ],
+      "default_modifiers": [
+        "includes_mastering",
+        "is_commercial_release"
+      ],
+      "required": [
+        {
+          "rule_id": "release.master",
+          "kind": "artifact_presence",
+          "artifact_types": [
+            "audio/master"
+          ],
+          "role": "final",
+          "min_count": 1,
+          "weight": 1.5
+        },
+        {
+          "rule_id": "release.ern",
+          "kind": "artifact_presence",
+          "artifact_types": [
+            "metadata/ddex-ern"
+          ],
+          "min_count": 1,
+          "weight": 1.5,
+          "rationale": "Release workflow specifically expects structured release and resource metadata."
+        },
+        {
+          "rule_id": "release.production_ancestor",
+          "kind": "ancestry_path",
+          "source_types": [
+            "audio/mix",
+            "audio/stem",
+            "audio/raw-track",
+            "audio/raw-take",
+            "project/daw-session"
+          ],
+          "target": "final",
+          "allowed_relationship_types": [
+            "mastered_from",
+            "mixed_from",
+            "stemmed_from",
+            "rendered_from",
+            "derived_from"
+          ],
+          "weight": 2.0
+        }
+      ],
+      "conditional": [
+        {
+          "rule_id": "release.rin",
+          "trigger": "workflow.includes_recording_session_metadata == true",
+          "kind": "artifact_presence",
+          "artifact_types": [
+            "metadata/ddex-rin"
+          ],
+          "min_count": 1,
+          "weight": 1.0
+        }
+      ],
+      "optional": [
+        "metadata/ddex-rin",
+        "text/cue-sheet",
+        "text/session-log",
+        "provenance/c2pa"
+      ]
+    },
+    {
+      "workflow_id": "sync_or_audiovisual_delivery",
+      "title": "Sync or audiovisual music delivery",
+      "when_applicable": "Music is delivered against picture, scenes, advertisements, games, or other timed media.",
+      "example": "A composer delivers a final mix, stems, and a cue sheet for a short film.",
+      "allowed_final_types": [
+        "audio/stem",
+        "audio/mix",
+        "audio/master"
+      ],
+      "default_modifiers": [
+        "is_sync_or_audiovisual_delivery"
+      ],
+      "required": [
+        {
+          "rule_id": "sync.final_audio",
+          "kind": "artifact_presence",
+          "artifact_types": [
+            "audio/stem",
+            "audio/mix",
+            "audio/master"
+          ],
+          "role": "final",
+          "min_count": 1,
+          "weight": 1.0
+        },
+        {
+          "rule_id": "sync.cue_sheet",
+          "kind": "artifact_presence",
+          "artifact_types": [
+            "text/cue-sheet"
+          ],
+          "min_count": 1,
+          "weight": 2.0
+        }
+      ],
+      "conditional": [
+        {
+          "rule_id": "sync.stems",
+          "trigger": "modifier.includes_stem_export or workflow.delivery_requires_stems == true",
+          "kind": "artifact_presence",
+          "artifact_types": [
+            "audio/stem"
+          ],
+          "min_count": 1,
+          "weight": 1.0
+        },
+        {
+          "rule_id": "sync.clearance",
+          "trigger": "workflow.client_requires_clearance_document == true",
+          "kind": "artifact_presence",
+          "artifact_types": [
+            "text/license-clearance"
+          ],
+          "min_count": 1,
+          "weight": 0.5
+        }
+      ],
+      "optional": [
+        "metadata/ddex-ern",
+        "text/session-log",
+        "provenance/c2pa",
+        "text/license-clearance"
+      ]
+    },
+    {
+      "workflow_id": "stem_delivery_or_reconstruction",
+      "title": "Stem delivery, archival reconstruction, or mix recall",
+      "when_applicable": "The deliverable includes stems intended for downstream mixing, localisation, archiving, or reconstruction.",
+      "example": "A studio archives vocal, drums, bass, and music stems so the mix can be reconstructed later.",
+      "allowed_final_types": [
+        "audio/stem",
+        "audio/mix",
+        "audio/master"
+      ],
+      "default_modifiers": [
+        "includes_stem_export"
+      ],
+      "required": [
+        {
+          "rule_id": "stems.stem_set",
+          "kind": "artifact_presence",
+          "artifact_types": [
+            "audio/stem"
+          ],
+          "min_count": 2,
+          "weight": 2.0
+        },
+        {
+          "rule_id": "stems.source_relationships",
+          "kind": "relationship_presence",
+          "relationship_types": [
+            "stemmed_from",
+            "rendered_from",
+            "derived_from"
+          ],
+          "target_types": [
+            "audio/stem"
+          ],
+          "min_count": 1,
+          "weight": 1.5
+        }
+      ],
+      "conditional": [
+        {
+          "rule_id": "stems.reconstruction_target",
+          "trigger": "workflow.requires_reconstruction_test == true",
+          "kind": "artifact_presence",
+          "artifact_types": [
+            "audio/mix",
+            "audio/master"
+          ],
+          "role": "reference_or_target",
+          "min_count": 1,
+          "weight": 1.0
+        },
+        {
+          "rule_id": "stems.daw_project",
+          "trigger": "workflow.includes_project_archive == true",
+          "kind": "artifact_presence",
+          "artifact_types": [
+            "project/daw-session"
+          ],
+          "min_count": 1,
+          "weight": 1.0
+        }
+      ],
+      "optional": [
+        "project/daw-session",
+        "project/automation",
+        "audio/reference",
+        "text/session-log",
+        "provenance/c2pa"
+      ]
+    },
+    {
+      "workflow_id": "custom_or_unknown_workflow",
+      "title": "Custom or insufficiently classified workflow",
+      "when_applicable": "No predefined workflow safely represents the declared production process.",
+      "example": "An interactive installation generates music from sensors and requires a reviewer-defined evidence set.",
+      "allowed_final_types": [
+        "audio/edited-take",
+        "audio/stem",
+        "audio/mix",
+        "audio/master",
+        "audio/sample"
+      ],
+      "default_modifiers": [],
+      "required": [
+        {
+          "rule_id": "custom.workflow_description",
+          "kind": "declaration_presence",
+          "declaration": "workflow.description",
+          "weight": 1.0
+        },
+        {
+          "rule_id": "custom.at_least_one_source",
+          "kind": "artifact_presence",
+          "artifact_types": [
+            "audio/raw-take",
+            "audio/raw-track",
+            "audio/edited-take",
+            "audio/stem",
+            "audio/mix",
+            "audio/sample",
+            "audio/ai-source",
+            "project/daw-session",
+            "project/midi"
+          ],
+          "role": "source",
+          "min_count": 1,
+          "weight": 1.0
+        },
+        {
+          "rule_id": "custom.source_reaches_final",
+          "kind": "ancestry_path",
+          "source_types": [
+            "audio/raw-take",
+            "audio/raw-track",
+            "audio/edited-take",
+            "audio/stem",
+            "audio/mix",
+            "audio/sample",
+            "audio/ai-source",
+            "project/daw-session",
+            "project/midi"
+          ],
+          "target": "final",
+          "allowed_relationship_types": [
+            "edited_from",
+            "comped_from",
+            "excerpted_from",
+            "stemmed_from",
+            "mixed_from",
+            "mastered_from",
+            "rendered_from",
+            "input_to",
+            "derived_from"
+          ],
+          "weight": 1.0
+        }
+      ],
+      "conditional": [],
+      "optional": [
+        "text/session-log",
+        "text/cue-sheet",
+        "text/comp-sheet",
+        "metadata/ddex-rin",
+        "metadata/ddex-ern",
+        "metadata/generation-record",
+        "provenance/c2pa"
+      ],
+      "assessment_note": "Use availability=partial unless a reviewer confirms the custom expectation set. Do not compare this score directly with a predefined workflow score."
+    }
+  ],
+  "implementation_notes": {
+    "recommended_integration_order": [
+      "Validate this JSON at startup and reject duplicate workflow_id or rule_id values.",
+      "Add workflow_id and modifiers to the submitter UI and submission.json.",
+      "Normalize submission data into metadata/submitter-declaration and metadata/ai-disclosure records.",
+      "Evaluate common required rules, then workflow required rules, then triggered conditional rules.",
+      "Exclude optional rules from the completeness denominator while still validating and reporting them.",
+      "Return per-rule status: satisfied, missing, not_assessed, not_applicable, or invalid.",
+      "Calculate completeness value only from assessed applicable required and conditional rules, and report assessment coverage separately in confidence.",
+      "Version this policy whenever workflows, triggers, weights, or artefact expectations change."
+    ],
+    "client_review_required_for": [
+      "Whether required and conditional classifications match real client workflows",
+      "Whether any optional evidence should become mandatory for a particular delivery contract",
+      "Rule weights and confidence ceilings",
+      "Legal or rights-document scope"
+    ]
+  }
+}

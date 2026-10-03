@@ -1,0 +1,276 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Local music native request v0.1 (proposal, not upstream standard)",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "run_id",
+    "case_id",
+    "profile",
+    "workflow",
+    "chain",
+    "objects",
+    "options"
+  ],
+  "properties": {
+    "run_id": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "case_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "profile": {
+      "type": "string"
+    },
+    "workflow": {
+      "description": "Submitter-selected workflow and declarations used by the workflow completeness policy.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["workflow_id", "modifiers", "declarations"],
+      "properties": {
+        "workflow_id": { "type": "string", "minLength": 1 },
+        "modifiers": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "description": { "type": "string", "minLength": 1 },
+        "declarations": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["submitter_confirmation"],
+          "properties": {
+            "submitter_confirmation": { "type": "boolean" },
+            "contributors": {
+              "type": "array", "uniqueItems": true,
+              "items": { "type": "string", "minLength": 1 }
+            }
+          }
+        },
+        "automation_exported_separately": { "type": "boolean" },
+        "sample_is_self_created": { "type": "boolean" },
+        "sample_is_third_party": { "type": "boolean" },
+        "client_requires_clearance_document": { "type": "boolean" },
+        "has_multiple_performance_items": { "type": "boolean" },
+        "client_requires_structured_contributor_metadata": { "type": "boolean" },
+        "client_requires_generation_record": { "type": "boolean" },
+        "includes_recording_session_metadata": { "type": "boolean" },
+        "delivery_requires_stems": { "type": "boolean" },
+        "requires_reconstruction_test": { "type": "boolean" },
+        "includes_project_archive": { "type": "boolean" }
+      }
+    },
+    "chain": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "hash_method",
+        "final_artefact_hash",
+        "artefacts"
+      ],
+      "properties": {
+        "schema_version": {
+          "const": "0.0.3"
+        },
+        "hash_method": {
+          "const": "sha256"
+        },
+        "final_artefact_hash": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "artefacts": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "artefact_hash",
+              "artefact_type"
+            ],
+            "properties": {
+              "artefact_hash": {
+                "type": "string",
+                "pattern": "^[0-9a-f]{64}$"
+              },
+              "artefact_type": {
+                "type": "string",
+                "minLength": 1
+              },
+              "attributes": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "creation_method": {
+                    "oneOf": [
+                      {
+                        "enum": [
+                          "recorded",
+                          "synthesised",
+                          "ai-generated"
+                        ]
+                      },
+                      {
+                        "type": "array",
+                        "items": {
+                          "enum": [
+                            "recorded",
+                            "synthesised",
+                            "ai-generated"
+                          ]
+                        }
+                      }
+                    ]
+                  },
+                  "technical": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                      "duration_seconds": {
+                        "type": [
+                          "number",
+                          "null"
+                        ],
+                        "minimum": 0
+                      },
+                      "sample_rate_hz": {
+                        "type": [
+                          "integer",
+                          "null"
+                        ],
+                        "minimum": 0
+                      },
+                      "channels": {
+                        "type": [
+                          "integer",
+                          "null"
+                        ],
+                        "minimum": 0
+                      },
+                      "bit_depth": {
+                        "type": [
+                          "integer",
+                          "null"
+                        ],
+                        "minimum": 0
+                      },
+                      "file_size_bytes": {
+                        "type": [
+                          "integer",
+                          "null"
+                        ],
+                        "minimum": 0
+                      },
+                      "format": {
+                        "type": [
+                          "string",
+                          "null"
+                        ]
+                      },
+                      "codec_subtype": {
+                        "type": [
+                          "string",
+                          "null"
+                        ]
+                      }
+                    }
+                  },
+                  "production": {
+                    "type": "object"
+                  },
+                  "source_metadata": {
+                    "type": "object"
+                  }
+                }
+              },
+              "evidence": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "hash",
+                    "relationship_type"
+                  ],
+                  "properties": {
+                    "hash": {
+                      "type": "string",
+                      "pattern": "^[0-9a-f]{64}$"
+                    },
+                    "relationship_type": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "attributes": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "properties": {
+                        "assertion_origin": { "enum": ["submitter", "daw-session", "c2pa-ingredient", "ddex-rin", "ddex-ern"] },
+                        "confirmed_by_submitter": { "type": "boolean" },
+                        "reference_pointer": { "type": ["string", "null"] },
+                        "claim_rationale": { "type": ["string", "null"] },
+                        "transformation_description": { "type": ["string", "null"] },
+                        "derivation_scope": {
+                          "enum": ["linear_edit", "linear_stem", "linear_mix", "master_similarity", null]
+                        },
+                        "source_start_seconds": { "type": ["number", "null"], "minimum": 0 },
+                        "source_end_seconds": { "type": ["number", "null"], "minimum": 0 },
+                        "target_start_seconds": { "type": ["number", "null"], "minimum": 0 },
+                        "target_end_seconds": { "type": ["number", "null"], "minimum": 0 },
+                        "fade_in_seconds": { "type": ["number", "null"], "minimum": 0 },
+                        "fade_out_seconds": { "type": ["number", "null"], "minimum": 0 },
+                        "input_sample_rate_hz": { "type": ["integer", "null"], "minimum": 0 },
+                        "output_sample_rate_hz": { "type": ["integer", "null"], "minimum": 0 },
+                        "input_bit_depth": { "type": ["integer", "null"], "minimum": 0 },
+                        "output_bit_depth": { "type": ["integer", "null"], "minimum": 0 },
+                        "source_format": { "type": ["string", "null"] },
+                        "target_format": { "type": ["string", "null"] }
+                      }
+                    }
+                  }
+                },
+                "maxItems": 128
+              }
+            }
+          }
+        }
+      }
+    },
+    "objects": {
+      "description": "SHA-256 to bundle-relative media URI map. Implementations must reject traversal outside the supplied bundle root.",
+      "type": "object",
+      "minProperties": 1,
+      "propertyNames": {
+        "pattern": "^[0-9a-f]{64}$"
+      },
+      "additionalProperties": {
+        "type": "string",
+        "pattern": "^objects/[0-9a-f]{64}\\.(?:png|mp4|wav|mid|midi|xml|json|c2pa|txt|csv|pdf|zip|als|logicx|ptx)$"
+      }
+    },
+    "options": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "include_reasoning",
+        "offline_only",
+        "timeout_seconds"
+      ],
+      "properties": {
+        "include_reasoning": {
+          "type": "boolean"
+        },
+        "offline_only": {
+          "type": "boolean"
+        },
+        "timeout_seconds": {
+          "type": "integer",
+          "minimum": 1
+        }
+      }
+    }
+  }
+}

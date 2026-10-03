@@ -1,0 +1,157 @@
+{
+  "schema_version": "0.2-candidate",
+  "run_id": "842498bc-b128-4b49-a275-6ce319b4d681",
+  "case_id": "LOCAL-GENERATED-CSEC-WAV",
+  "asset_sha256": "746c90b6d8f6306ce93c347477103c16027d71a4072cf12d10a9f7246ce93d18",
+  "system": {
+    "name": "COMP3888-music-baseline",
+    "version": "0.4.0",
+    "source_revision": "sha256:2e10eec544e85dd907692a0296d89eb2549e0d9d4cddc7e16d3da6f0df710d13"
+  },
+  "execution_status": "succeeded",
+  "axes": {
+    "completeness": {
+      "availability": "partial",
+      "value": 1.0,
+      "confidence": null,
+      "reasoning": "1/1 declared reachable objects were available and hash-matched. No workflow was selected, so workflow expectations were not applied."
+    },
+    "integrity": {
+      "availability": "available",
+      "value": 1.0,
+      "confidence": 0.65,
+      "reasoning": "1 file, 0 relationship, 0 cross-evidence, and 0 applicable audio-derivation checks ran. Hash consistency is not creator authentication."
+    },
+    "attestation_strength": {
+      "availability": "available",
+      "value": 0.0,
+      "confidence": 0.9,
+      "reasoning": "C2PA SDK ran but found no active manifest."
+    },
+    "ai_disclosure": {
+      "availability": "unavailable",
+      "value": null,
+      "confidence": null,
+      "reasoning": "Explicit creation_method declarations cover 0/1 audio artefacts; this is disclosure coverage, not AI detection."
+    }
+  },
+  "validation": {
+    "validation_state": "manifest_absent",
+    "signature_present": false,
+    "signature_valid": null,
+    "cryptographically_valid": null,
+    "credential_trusted": null,
+    "codes": [],
+    "reasons": [
+      "No active manifest found."
+    ]
+  },
+  "findings": [
+    {
+      "code": "WAV_OBSERVATION",
+      "severity": "info",
+      "message": "Measured WAV properties and extracted metadata.",
+      "evidence_hash": "746c90b6d8f6306ce93c347477103c16027d71a4072cf12d10a9f7246ce93d18",
+      "observed": {
+        "duration_seconds": 0.5,
+        "sample_rate_hz": 8000,
+        "channels": 1,
+        "bit_depth": 16,
+        "format": "WAV",
+        "codec_subtype": "PCM",
+        "file_size_bytes": 8044
+      },
+      "embedded_metadata": {
+        "core_format": {
+          "audio_format_code": 1,
+          "audio_format": "PCM",
+          "num_channels": 1,
+          "sample_rate_hz": 8000,
+          "byte_rate": 16000,
+          "block_align": 2,
+          "bits_per_sample": 16,
+          "data_size_bytes": 8000,
+          "duration_seconds": 0.5
+        },
+        "info": {},
+        "broadcast_extension": null,
+        "cue_points": [],
+        "sampler": null,
+        "fact": null,
+        "id3": null,
+        "other_chunks": [],
+        "warnings": []
+      },
+      "claim_mismatches": []
+    },
+    {
+      "code": "PARSER_OBSERVATION",
+      "severity": "info",
+      "message": "audio: parsed",
+      "parser": "wav",
+      "parser_status": "parsed",
+      "parser_result": {
+        "observed": {
+          "duration_seconds": 0.5,
+          "sample_rate_hz": 8000,
+          "channels": 1,
+          "bit_depth": 16,
+          "format": "WAV",
+          "codec_subtype": "PCM",
+          "file_size_bytes": 8044
+        },
+        "embedded_metadata": {
+          "core_format": {
+            "audio_format_code": 1,
+            "audio_format": "PCM",
+            "num_channels": 1,
+            "sample_rate_hz": 8000,
+            "byte_rate": 16000,
+            "block_align": 2,
+            "bits_per_sample": 16,
+            "data_size_bytes": 8000,
+            "duration_seconds": 0.5
+          },
+          "info": {},
+          "broadcast_extension": null,
+          "cue_points": [],
+          "sampler": null,
+          "fact": null,
+          "id3": null,
+          "other_chunks": [],
+          "warnings": []
+        },
+        "claim_mismatches": []
+      },
+      "evidence_hash": "746c90b6d8f6306ce93c347477103c16027d71a4072cf12d10a9f7246ce93d18"
+    },
+    {
+      "code": "AI_DISCLOSURE_MISSING",
+      "severity": "medium",
+      "message": "One or more audio artefacts lack creation_method disclosure."
+    },
+    {
+      "code": "WORKFLOW_POLICY_NOT_APPLIED",
+      "severity": "low",
+      "message": "No workflow was supplied; completeness is legacy declared-object availability only."
+    }
+  ],
+  "processing_ms": 178.20758299990302,
+  "resource_usage": {
+    "cpu_ms": 3.145999999999982,
+    "peak_rss_kib": null
+  },
+  "error": null,
+  "assessment_checks": {
+    "bound_file_integrity": [
+      {
+        "rule": "object_hash_bound",
+        "passed": true,
+        "evidence_hash": "746c90b6d8f6306ce93c347477103c16027d71a4072cf12d10a9f7246ce93d18"
+      }
+    ],
+    "relationship_integrity": [],
+    "cross_evidence": [],
+    "audio_derivation": []
+  }
+}

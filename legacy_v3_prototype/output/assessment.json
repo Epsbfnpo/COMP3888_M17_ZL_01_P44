@@ -1,0 +1,555 @@
+{
+  "profile_id": "comp3888-music-balanced",
+  "profile_version": "0.1.3",
+  "axes": {
+    "completeness": {
+      "availability": "available",
+      "value": 0.2,
+      "confidence": 0.9,
+      "reasoning": "1 of 5 workflow-triggered expectations were satisfied; optional evidence is excluded from the denominator"
+    },
+    "integrity": {
+      "availability": "available",
+      "value": 1.0,
+      "confidence": 0.3129,
+      "reasoning": "7 of 7 file/relationship integrity units assessed; 0 contradiction(s). Forge cost weights consistency and assessment confidence reports coverage; neither proves authorship"
+    },
+    "attestation_strength": {
+      "availability": "unavailable",
+      "value": null,
+      "confidence": null,
+      "reasoning": "no SHA-256-bound file produced an assessable C2PA verification result; stored or submitter-provided provenance fields were not scored"
+    },
+    "ai_disclosure": {
+      "availability": "available",
+      "value": 1.0,
+      "confidence": 0.7,
+      "reasoning": "explicit AI disclosure found on 4 of 4 applicable artefact(s); this score measures disclosure coverage, not likelihood of human authorship"
+    }
+  },
+  "findings": [
+    {
+      "code": "EXPECTED_RELATIONSHIP_ABSENT",
+      "severity": "info",
+      "message": "audio/stem has no expected incoming relationship; this lowers completeness but does not imply forgery",
+      "evidence_hash": "d3b7aae16d30f1e9132dd5b41388a82a8e1f4012a29163cb153412d15da973f7"
+    },
+    {
+      "code": "EXPECTED_RELATIONSHIP_ABSENT",
+      "severity": "info",
+      "message": "audio/stem has no expected incoming relationship; this lowers completeness but does not imply forgery",
+      "evidence_hash": "c93950984f1a0af37089ed4c1820b4f3b91a3d965caf9be500221599e52c3acd"
+    },
+    {
+      "code": "EXPECTED_RELATIONSHIP_ABSENT",
+      "severity": "info",
+      "message": "audio/stem has no expected incoming relationship; this lowers completeness but does not imply forgery",
+      "evidence_hash": "1befdc16b2499405b7c547d9cff007960edf0ed5755fa0113b9cde06475dcbfd"
+    },
+    {
+      "code": "PRIMARY_EVIDENCE_ABSENT",
+      "severity": "info",
+      "message": "No raw recording or DAW session is reachable from the final artefact; this is incomplete, not a contradiction",
+      "evidence_hash": "0a2c29f42e0570d270f27d268062dab5ab30d86a0ed720b31f8b6735cd268190"
+    }
+  ],
+  "checks": {
+    "integrity": {
+      "expected": 7,
+      "assessed": 7,
+      "results": [
+        {
+          "kind": "bound-file-integrity",
+          "assessed": true,
+          "value": 1.0,
+          "confidence": 0.36,
+          "forge_cost": 2,
+          "contradiction": false,
+          "checks": [
+            {
+              "rule": "bound_file_sha256_matches",
+              "passed": true,
+              "declared": "0a2c29f42e0570d270f27d268062dab5ab30d86a0ed720b31f8b6735cd268190",
+              "observed": "0a2c29f42e0570d270f27d268062dab5ab30d86a0ed720b31f8b6735cd268190"
+            },
+            {
+              "rule": "bound_audio_wav_parses_without_warnings",
+              "passed": true,
+              "declared": "valid WAV without parser warnings",
+              "observed": "valid WAV"
+            },
+            {
+              "rule": "technical.media_type_matches_bound_wav",
+              "passed": true,
+              "stored": "audio/wav",
+              "observed": "audio/wav"
+            },
+            {
+              "rule": "technical.duration_seconds_matches_bound_wav",
+              "passed": true,
+              "stored": 178.051,
+              "observed": 178.051
+            },
+            {
+              "rule": "technical.sample_rate_hz_matches_bound_wav",
+              "passed": true,
+              "stored": 44100,
+              "observed": 44100
+            },
+            {
+              "rule": "technical.channels_matches_bound_wav",
+              "passed": true,
+              "stored": 2,
+              "observed": 2
+            },
+            {
+              "rule": "technical.bit_depth_matches_bound_wav",
+              "passed": true,
+              "stored": 16,
+              "observed": 16
+            },
+            {
+              "rule": "technical.format_matches_bound_wav",
+              "passed": true,
+              "stored": "WAV",
+              "observed": "WAV"
+            },
+            {
+              "rule": "technical.codec_subtype_matches_bound_wav",
+              "passed": true,
+              "stored": "PCM",
+              "observed": "PCM"
+            },
+            {
+              "rule": "technical.file_size_bytes_matches_bound_wav",
+              "passed": true,
+              "stored": 31408242,
+              "observed": 31408242
+            },
+            {
+              "rule": "source_metadata.software_matches_bound_wav",
+              "passed": true,
+              "stored": "Lavf63.1.101",
+              "observed": "Lavf63.1.101"
+            }
+          ],
+          "artefact_hash": "0a2c29f42e0570d270f27d268062dab5ab30d86a0ed720b31f8b6735cd268190",
+          "reason": "11/11 file, parser and declaration consistency checks passed for final-song.wav"
+        },
+        {
+          "kind": "bound-file-integrity",
+          "assessed": true,
+          "value": 1.0,
+          "confidence": 0.36,
+          "forge_cost": 2,
+          "contradiction": false,
+          "checks": [
+            {
+              "rule": "bound_file_sha256_matches",
+              "passed": true,
+              "declared": "d3b7aae16d30f1e9132dd5b41388a82a8e1f4012a29163cb153412d15da973f7",
+              "observed": "d3b7aae16d30f1e9132dd5b41388a82a8e1f4012a29163cb153412d15da973f7"
+            },
+            {
+              "rule": "bound_audio_wav_parses_without_warnings",
+              "passed": true,
+              "declared": "valid WAV without parser warnings",
+              "observed": "valid WAV"
+            },
+            {
+              "rule": "technical.media_type_matches_bound_wav",
+              "passed": true,
+              "stored": "audio/wav",
+              "observed": "audio/wav"
+            },
+            {
+              "rule": "technical.duration_seconds_matches_bound_wav",
+              "passed": true,
+              "stored": 179.583,
+              "observed": 179.583
+            },
+            {
+              "rule": "technical.sample_rate_hz_matches_bound_wav",
+              "passed": true,
+              "stored": 44100,
+              "observed": 44100
+            },
+            {
+              "rule": "technical.channels_matches_bound_wav",
+              "passed": true,
+              "stored": 2,
+              "observed": 2
+            },
+            {
+              "rule": "technical.bit_depth_matches_bound_wav",
+              "passed": true,
+              "stored": 24,
+              "observed": 24
+            },
+            {
+              "rule": "technical.format_matches_bound_wav",
+              "passed": true,
+              "stored": "WAV",
+              "observed": "WAV"
+            },
+            {
+              "rule": "technical.codec_subtype_matches_bound_wav",
+              "passed": true,
+              "stored": "PCM",
+              "observed": "PCM"
+            },
+            {
+              "rule": "technical.file_size_bytes_matches_bound_wav",
+              "passed": true,
+              "stored": 47518350,
+              "observed": 47518350
+            },
+            {
+              "rule": "source_metadata.originator_matches_bound_wav",
+              "passed": true,
+              "stored": "REAPER",
+              "observed": "REAPER"
+            },
+            {
+              "rule": "source_metadata.origination_date_matches_bound_wav",
+              "passed": true,
+              "stored": "2013-05-29",
+              "observed": "2013-05-29"
+            },
+            {
+              "rule": "source_metadata.origination_time_matches_bound_wav",
+              "passed": true,
+              "stored": "17-45-40",
+              "observed": "17-45-40"
+            },
+            {
+              "rule": "source_metadata.time_reference_samples_matches_bound_wav",
+              "passed": true,
+              "stored": 0,
+              "observed": 0
+            }
+          ],
+          "artefact_hash": "d3b7aae16d30f1e9132dd5b41388a82a8e1f4012a29163cb153412d15da973f7",
+          "reason": "14/14 file, parser and declaration consistency checks passed for drum-stem.wav"
+        },
+        {
+          "kind": "bound-file-integrity",
+          "assessed": true,
+          "value": 1.0,
+          "confidence": 0.36,
+          "forge_cost": 2,
+          "contradiction": false,
+          "checks": [
+            {
+              "rule": "bound_file_sha256_matches",
+              "passed": true,
+              "declared": "c93950984f1a0af37089ed4c1820b4f3b91a3d965caf9be500221599e52c3acd",
+              "observed": "c93950984f1a0af37089ed4c1820b4f3b91a3d965caf9be500221599e52c3acd"
+            },
+            {
+              "rule": "bound_audio_wav_parses_without_warnings",
+              "passed": true,
+              "declared": "valid WAV without parser warnings",
+              "observed": "valid WAV"
+            },
+            {
+              "rule": "technical.media_type_matches_bound_wav",
+              "passed": true,
+              "stored": "audio/wav",
+              "observed": "audio/wav"
+            },
+            {
+              "rule": "technical.duration_seconds_matches_bound_wav",
+              "passed": true,
+              "stored": 179.267,
+              "observed": 179.267
+            },
+            {
+              "rule": "technical.sample_rate_hz_matches_bound_wav",
+              "passed": true,
+              "stored": 44100,
+              "observed": 44100
+            },
+            {
+              "rule": "technical.channels_matches_bound_wav",
+              "passed": true,
+              "stored": 1,
+              "observed": 1
+            },
+            {
+              "rule": "technical.bit_depth_matches_bound_wav",
+              "passed": true,
+              "stored": 24,
+              "observed": 24
+            },
+            {
+              "rule": "technical.format_matches_bound_wav",
+              "passed": true,
+              "stored": "WAV",
+              "observed": "WAV"
+            },
+            {
+              "rule": "technical.codec_subtype_matches_bound_wav",
+              "passed": true,
+              "stored": "PCM",
+              "observed": "PCM"
+            },
+            {
+              "rule": "technical.file_size_bytes_matches_bound_wav",
+              "passed": true,
+              "stored": 23717652,
+              "observed": 23717652
+            },
+            {
+              "rule": "source_metadata.originator_matches_bound_wav",
+              "passed": true,
+              "stored": "REAPER",
+              "observed": "REAPER"
+            },
+            {
+              "rule": "source_metadata.origination_date_matches_bound_wav",
+              "passed": true,
+              "stored": "2013-05-29",
+              "observed": "2013-05-29"
+            },
+            {
+              "rule": "source_metadata.origination_time_matches_bound_wav",
+              "passed": true,
+              "stored": "17-56-39",
+              "observed": "17-56-39"
+            },
+            {
+              "rule": "source_metadata.time_reference_samples_matches_bound_wav",
+              "passed": true,
+              "stored": 0,
+              "observed": 0
+            }
+          ],
+          "artefact_hash": "c93950984f1a0af37089ed4c1820b4f3b91a3d965caf9be500221599e52c3acd",
+          "reason": "14/14 file, parser and declaration consistency checks passed for vocal-stem.wav"
+        },
+        {
+          "kind": "bound-file-integrity",
+          "assessed": true,
+          "value": 1.0,
+          "confidence": 0.36,
+          "forge_cost": 2,
+          "contradiction": false,
+          "checks": [
+            {
+              "rule": "bound_file_sha256_matches",
+              "passed": true,
+              "declared": "1befdc16b2499405b7c547d9cff007960edf0ed5755fa0113b9cde06475dcbfd",
+              "observed": "1befdc16b2499405b7c547d9cff007960edf0ed5755fa0113b9cde06475dcbfd"
+            },
+            {
+              "rule": "bound_audio_wav_parses_without_warnings",
+              "passed": true,
+              "declared": "valid WAV without parser warnings",
+              "observed": "valid WAV"
+            },
+            {
+              "rule": "technical.media_type_matches_bound_wav",
+              "passed": true,
+              "stored": "audio/wav",
+              "observed": "audio/wav"
+            },
+            {
+              "rule": "technical.duration_seconds_matches_bound_wav",
+              "passed": true,
+              "stored": 179.267,
+              "observed": 179.267
+            },
+            {
+              "rule": "technical.sample_rate_hz_matches_bound_wav",
+              "passed": true,
+              "stored": 44100,
+              "observed": 44100
+            },
+            {
+              "rule": "technical.channels_matches_bound_wav",
+              "passed": true,
+              "stored": 1,
+              "observed": 1
+            },
+            {
+              "rule": "technical.bit_depth_matches_bound_wav",
+              "passed": true,
+              "stored": 24,
+              "observed": 24
+            },
+            {
+              "rule": "technical.format_matches_bound_wav",
+              "passed": true,
+              "stored": "WAV",
+              "observed": "WAV"
+            },
+            {
+              "rule": "technical.codec_subtype_matches_bound_wav",
+              "passed": true,
+              "stored": "PCM",
+              "observed": "PCM"
+            },
+            {
+              "rule": "technical.file_size_bytes_matches_bound_wav",
+              "passed": true,
+              "stored": 23717652,
+              "observed": 23717652
+            },
+            {
+              "rule": "source_metadata.originator_matches_bound_wav",
+              "passed": true,
+              "stored": "REAPER",
+              "observed": "REAPER"
+            },
+            {
+              "rule": "source_metadata.origination_date_matches_bound_wav",
+              "passed": true,
+              "stored": "2013-05-29",
+              "observed": "2013-05-29"
+            },
+            {
+              "rule": "source_metadata.origination_time_matches_bound_wav",
+              "passed": true,
+              "stored": "17-56-39",
+              "observed": "17-56-39"
+            },
+            {
+              "rule": "source_metadata.time_reference_samples_matches_bound_wav",
+              "passed": true,
+              "stored": 0,
+              "observed": 0
+            }
+          ],
+          "artefact_hash": "1befdc16b2499405b7c547d9cff007960edf0ed5755fa0113b9cde06475dcbfd",
+          "reason": "14/14 file, parser and declaration consistency checks passed for good-stem.wav"
+        },
+        {
+          "kind": "relationship-integrity",
+          "assessed": true,
+          "value": 1.0,
+          "confidence": 0.25,
+          "forge_cost": 1,
+          "declared_origin": "submitter",
+          "effective_origin": "submitter",
+          "machine_origin_binding": null,
+          "contradiction": false,
+          "checks": [
+            {
+              "rule": "relationship_endpoints_valid",
+              "passed": true
+            },
+            {
+              "rule": "relationship_attributes_valid",
+              "passed": true
+            }
+          ],
+          "reason": "mixed_from: 2/2 checkable consistency rules passed; claim origin=submitter; no relationship-specific parameter could be cross-checked",
+          "target_hash": "0a2c29f42e0570d270f27d268062dab5ab30d86a0ed720b31f8b6735cd268190",
+          "source_hash": "1befdc16b2499405b7c547d9cff007960edf0ed5755fa0113b9cde06475dcbfd",
+          "relationship_type": "mixed_from",
+          "stem_similarity": {
+            "assessed": false,
+            "reason": "librosa/numpy/scipy not installed (No module named 'librosa'); audio content was not compared"
+          }
+        },
+        {
+          "kind": "relationship-integrity",
+          "assessed": true,
+          "value": 1.0,
+          "confidence": 0.25,
+          "forge_cost": 1,
+          "declared_origin": "submitter",
+          "effective_origin": "submitter",
+          "machine_origin_binding": null,
+          "contradiction": false,
+          "checks": [
+            {
+              "rule": "relationship_endpoints_valid",
+              "passed": true
+            },
+            {
+              "rule": "relationship_attributes_valid",
+              "passed": true
+            }
+          ],
+          "reason": "mixed_from: 2/2 checkable consistency rules passed; claim origin=submitter; no relationship-specific parameter could be cross-checked",
+          "target_hash": "0a2c29f42e0570d270f27d268062dab5ab30d86a0ed720b31f8b6735cd268190",
+          "source_hash": "c93950984f1a0af37089ed4c1820b4f3b91a3d965caf9be500221599e52c3acd",
+          "relationship_type": "mixed_from",
+          "stem_similarity": {
+            "assessed": false,
+            "reason": "librosa/numpy/scipy not installed (No module named 'librosa'); audio content was not compared"
+          }
+        },
+        {
+          "kind": "relationship-integrity",
+          "assessed": true,
+          "value": 1.0,
+          "confidence": 0.25,
+          "forge_cost": 1,
+          "declared_origin": "submitter",
+          "effective_origin": "submitter",
+          "machine_origin_binding": null,
+          "contradiction": false,
+          "checks": [
+            {
+              "rule": "relationship_endpoints_valid",
+              "passed": true
+            },
+            {
+              "rule": "relationship_attributes_valid",
+              "passed": true
+            }
+          ],
+          "reason": "mixed_from: 2/2 checkable consistency rules passed; claim origin=submitter; no relationship-specific parameter could be cross-checked",
+          "target_hash": "0a2c29f42e0570d270f27d268062dab5ab30d86a0ed720b31f8b6735cd268190",
+          "source_hash": "d3b7aae16d30f1e9132dd5b41388a82a8e1f4012a29163cb153412d15da973f7",
+          "relationship_type": "mixed_from",
+          "stem_similarity": {
+            "assessed": false,
+            "reason": "librosa/numpy/scipy not installed (No module named 'librosa'); audio content was not compared"
+          }
+        }
+      ]
+    },
+    "attestation_strength": {
+      "results": [],
+      "critical_failures": 0
+    },
+    "ai_disclosure": {
+      "applicable": 4,
+      "assessed": 4,
+      "results": [
+        {
+          "kind": "ai-disclosure",
+          "assessed": true,
+          "value": 1.0,
+          "confidence": 0.7,
+          "reason": "explicit AI-use/creation-method disclosure found on 0a2c29f42e0570d270f27d268062dab5ab30d86a0ed720b31f8b6735cd268190"
+        },
+        {
+          "kind": "ai-disclosure",
+          "assessed": true,
+          "value": 1.0,
+          "confidence": 0.7,
+          "reason": "explicit AI-use/creation-method disclosure found on d3b7aae16d30f1e9132dd5b41388a82a8e1f4012a29163cb153412d15da973f7"
+        },
+        {
+          "kind": "ai-disclosure",
+          "assessed": true,
+          "value": 1.0,
+          "confidence": 0.7,
+          "reason": "explicit AI-use/creation-method disclosure found on c93950984f1a0af37089ed4c1820b4f3b91a3d965caf9be500221599e52c3acd"
+        },
+        {
+          "kind": "ai-disclosure",
+          "assessed": true,
+          "value": 1.0,
+          "confidence": 0.7,
+          "reason": "explicit AI-use/creation-method disclosure found on 1befdc16b2499405b7c547d9cff007960edf0ed5755fa0113b9cde06475dcbfd"
+        }
+      ]
+    }
+  }
+}

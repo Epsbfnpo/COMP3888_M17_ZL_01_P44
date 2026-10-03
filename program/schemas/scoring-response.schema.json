@@ -1,0 +1,208 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.edu.au/csec3888/common/scoring-response.proposal.schema.json",
+  "title": "Candidate partner scoring response",
+  "description": "A normalized response contract. Execution status, optional policy decision, and score availability are independent.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "run_id",
+    "case_id",
+    "asset_sha256",
+    "system",
+    "execution_status",
+    "axes",
+    "validation",
+    "findings",
+    "processing_ms",
+    "resource_usage"
+  ],
+  "properties": {
+    "schema_version": { "const": "0.2-candidate" },
+    "run_id": { "type": "string", "format": "uuid" },
+    "case_id": { "type": "string", "minLength": 1 },
+    "asset_sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "system": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "version", "source_revision"],
+      "properties": {
+        "name": { "type": "string", "minLength": 1 },
+        "version": { "type": "string", "minLength": 1 },
+        "source_revision": { "type": ["string", "null"] }
+      }
+    },
+    "execution_status": {
+      "enum": ["succeeded", "unsupported", "timeout", "error"]
+    },
+    "axes": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "completeness",
+        "integrity",
+        "attestation_strength",
+        "ai_disclosure"
+      ],
+      "properties": {
+        "completeness": { "$ref": "#/$defs/axisAssessment" },
+        "integrity": { "$ref": "#/$defs/axisAssessment" },
+        "attestation_strength": { "$ref": "#/$defs/axisAssessment" },
+        "ai_disclosure": { "$ref": "#/$defs/axisAssessment" }
+      }
+    },
+    "validation": {
+      "description": "Provenance-validator details. A null field means the target does not expose that state; the object itself is always present.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "validation_state",
+        "signature_present",
+        "signature_valid",
+        "cryptographically_valid",
+        "credential_trusted",
+        "codes",
+        "reasons"
+      ],
+      "properties": {
+        "validation_state": { "type": ["string", "null"] },
+        "signature_present": { "type": ["boolean", "null"] },
+        "signature_valid": { "type": ["boolean", "null"] },
+        "cryptographically_valid": { "type": ["boolean", "null"] },
+        "credential_trusted": { "type": ["boolean", "null"] },
+        "codes": { "type": "array", "items": { "type": "string" } },
+        "reasons": { "type": "array", "items": { "type": "string" } }
+      }
+    },
+    "decision": {
+      "description": "Optional target-owned decision policy. Absence prevents false-accept/false-reject classification.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["policy_name", "policy_version", "value"],
+      "properties": {
+        "policy_name": { "type": "string", "minLength": 1 },
+        "policy_version": { "type": "string", "minLength": 1 },
+        "value": { "enum": ["accepted", "rejected", "needs_review"] },
+        "threshold": { "type": ["number", "null"] }
+      }
+    },
+    "overall_score": {
+      "description": "Optional target-defined aggregate; never required or invented by the red-team adapter.",
+      "type": ["number", "null"],
+      "minimum": 0,
+      "maximum": 1
+    },
+    "workflow_assessment": {
+      "description": "Per-expectation completeness results from the selected workflow policy.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["policy_id", "policy_version", "workflow_id", "workflow_title", "modifiers", "allowed_final_type", "summary", "rule_results"],
+      "properties": {
+        "policy_id": { "type": "string", "minLength": 1 },
+        "policy_version": { "type": "string", "minLength": 1 },
+        "workflow_id": { "type": "string", "minLength": 1 },
+        "workflow_title": { "type": "string", "minLength": 1 },
+        "modifiers": { "type": "array", "items": { "type": "string" }, "uniqueItems": true },
+        "allowed_final_type": { "type": "boolean" },
+        "summary": {
+          "type": "object", "additionalProperties": false,
+          "required": ["applicable_rules", "assessed_rules", "satisfied_rules", "missing_rules"],
+          "properties": {
+            "applicable_rules": { "type": "integer", "minimum": 0 },
+            "assessed_rules": { "type": "integer", "minimum": 0 },
+            "satisfied_rules": { "type": "integer", "minimum": 0 },
+            "missing_rules": { "type": "integer", "minimum": 0 }
+          }
+        },
+        "rule_results": { "type": "array", "items": { "$ref": "#/$defs/workflowRuleResult" } }
+      }
+    },
+    "assessment_checks": {
+      "description": "Detailed outputs from integrity and cross-evidence passes.",
+      "type": "object",
+      "additionalProperties": {
+        "type": "array",
+        "items": { "type": "object" }
+      }
+    },
+    "findings": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": true,
+        "required": ["code", "severity", "message"],
+        "properties": {
+          "code": { "type": "string" },
+          "severity": { "enum": ["info", "low", "medium", "high", "critical"] },
+          "message": { "type": "string" },
+          "evidence_hash": { "type": "string", "pattern": "^[0-9a-f]{64}$" }
+        }
+      }
+    },
+    "processing_ms": { "type": ["number", "null"], "minimum": 0 },
+    "resource_usage": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "cpu_ms": { "type": ["number", "null"], "minimum": 0 },
+        "peak_rss_kib": { "type": ["integer", "null"], "minimum": 0 }
+      }
+    },
+    "error": { "type": ["string", "null"] }
+  },
+  "$defs": {
+    "workflowRuleResult": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["rule_id", "level", "kind", "status", "weight", "reason", "matched_artefact_hashes", "matched_relationships"],
+      "properties": {
+        "rule_id": { "type": "string" },
+        "level": { "enum": ["required", "conditional", "optional"] },
+        "kind": { "type": "string" },
+        "status": { "enum": ["satisfied", "missing", "not_assessed", "not_applicable"] },
+        "weight": { "type": ["number", "null"], "exclusiveMinimum": 0 },
+        "reason": { "type": "string" },
+        "matched_artefact_hashes": { "type": "array", "items": { "type": "string", "pattern": "^[0-9a-f]{64}$" } },
+        "matched_relationships": {
+          "type": "array",
+          "items": {
+            "type": "object", "additionalProperties": false,
+            "required": ["source_hash", "target_hash", "relationship_type"],
+            "properties": {
+              "source_hash": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+              "target_hash": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+              "relationship_type": { "type": "string" }
+            }
+          }
+        },
+        "option_results": { "type": "array", "items": { "$ref": "#/$defs/workflowRuleResult" } }
+      }
+    },
+    "axisAssessment": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["availability", "value", "confidence", "reasoning"],
+      "properties": {
+        "availability": { "enum": ["available", "partial", "unavailable"] },
+        "value": { "type": ["number", "null"], "minimum": 0, "maximum": 1 },
+        "confidence": { "type": ["number", "null"], "minimum": 0, "maximum": 1 },
+        "reasoning": { "type": ["string", "null"] }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": { "availability": { "const": "unavailable" } },
+            "required": ["availability"]
+          },
+          "then": {
+            "properties": {
+              "value": { "const": null },
+              "confidence": { "const": null }
+            }
+          }
+        }
+      ]
+    }
+  }
+}

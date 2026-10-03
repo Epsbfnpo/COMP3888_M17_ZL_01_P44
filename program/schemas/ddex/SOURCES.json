@@ -1,0 +1,9 @@
+{
+  "retrieved_on": "2026-10-03",
+  "sources": [
+    {"standard": "RIN 2.1", "url": "https://service.ddex.net/doc/Standards/RIN/RIN-3171%20-%20RIN%202.1%20%28XSD%29.zip", "download_sha256": "99d529bfb1cf74a10808ff21a579ca1456e9102eae7621a02b70b37d323c68b4"},
+    {"standard": "ERN 4.3", "url": "https://service.ddex.net/xml/ern/43/release-notification.xsd", "download_sha256": "186d9ce6e9401c0bf47b63b7ae6dead01bf48324ba7308ec3074b32b7853f5e9"},
+    {"standard": "DDEX allowed value sets", "url": "https://service.ddex.net/xml/allowed-value-sets/allowed-value-sets.xsd", "download_sha256": "03f290c5a6715e45dcdde5f4fa2b44821c3372331f5bec0b17c802d6fa0e8385"},
+    {"standard": "W3C XML Signature schema", "url": "https://www.w3.org/TR/2002/REC-xmldsig-core-20020212/xmldsig-core-schema.xsd", "download_sha256": "35cf8197da812c85e40d57891b35c94187569ed474a2dac813ce5090dafcd35c"}
+  ]
+}

@@ -1,0 +1,60 @@
+{
+  "schema_version": "0.2-candidate",
+  "run_id": "436fd417-9931-4eb7-b495-1c601d2c38c9",
+  "case_id": "EVAL-8FF5058100370A17",
+  "asset_sha256": "9159fcdf8375c82ef7a8d77ad7a149cd211338eff86b41678933f0649ad5b94d",
+  "system": {
+    "name": "COMP3888-music-baseline",
+    "version": "0.1.0",
+    "source_revision": "sha256:45c37462ab33f8df5bc823e70b83cd9071e99196af3faf5b00af3060ae0d9de6"
+  },
+  "execution_status": "unsupported",
+  "axes": {
+    "completeness": {
+      "availability": "unavailable",
+      "value": null,
+      "confidence": null,
+      "reasoning": "This evaluation has no result for this axis."
+    },
+    "integrity": {
+      "availability": "unavailable",
+      "value": null,
+      "confidence": null,
+      "reasoning": "This evaluation has no result for this axis."
+    },
+    "attestation_strength": {
+      "availability": "unavailable",
+      "value": null,
+      "confidence": null,
+      "reasoning": "This evaluation has no result for this axis."
+    },
+    "ai_disclosure": {
+      "availability": "unavailable",
+      "value": null,
+      "confidence": null,
+      "reasoning": "This evaluation has no result for this axis."
+    }
+  },
+  "validation": {
+    "validation_state": null,
+    "signature_present": null,
+    "signature_valid": null,
+    "cryptographically_valid": null,
+    "credential_trusted": null,
+    "codes": [],
+    "reasons": []
+  },
+  "findings": [
+    {
+      "code": "UNSUPPORTED_INPUT",
+      "severity": "info",
+      "message": "This target evaluates WAV audio only; PNG/MP4 are unsupported."
+    }
+  ],
+  "processing_ms": 95.20874998997897,
+  "resource_usage": {
+    "cpu_ms": 0.24699999999999722,
+    "peak_rss_kib": null
+  },
+  "error": "This target evaluates WAV audio only; PNG/MP4 are unsupported."
+}

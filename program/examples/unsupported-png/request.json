@@ -1,0 +1,26 @@
+{
+  "schema_version": "0.2-candidate",
+  "run_id": "842498bc-b128-4b49-a275-6ce319b4d680",
+  "case_id": "LOCAL-UNSUPPORTED-PNG",
+  "profile": "csec-public-bundle-v0.2-candidate",
+  "bundle": {
+    "case_id": "LOCAL-UNSUPPORTED-PNG",
+    "final-artefact": "d126d616641d42ac8b0a07ec302c9fa1ec049f86200931a0a60c8f3080284b77",
+    "artefacts": [
+      {
+        "hash": "d126d616641d42ac8b0a07ec302c9fa1ec049f86200931a0a60c8f3080284b77",
+        "hash-method": "sha256",
+        "type": "image/png",
+        "evidence": []
+      }
+    ]
+  },
+  "objects": {
+    "d126d616641d42ac8b0a07ec302c9fa1ec049f86200931a0a60c8f3080284b77": "objects/d126d616641d42ac8b0a07ec302c9fa1ec049f86200931a0a60c8f3080284b77.png"
+  },
+  "options": {
+    "include_reasoning": true,
+    "offline_only": true,
+    "timeout_seconds": 60
+  }
+}

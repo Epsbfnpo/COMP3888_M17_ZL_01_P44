@@ -1,0 +1,31 @@
+{
+  "ben_source": "/Users/hongjiedeng/Desktop/COMP3888/COMP3988_Evidence_Chains-master",
+  "ben_git_commit": null,
+  "team_source": "/Users/hongjiedeng/Desktop/COMP3888/COMP3888_M17_ZL_01_P44",
+  "team_git_head": "2e944c2cbe99190778a98d8ca9ee20cc8c145830",
+  "note": "Working-file hashes identify the actual inspected files; Git HEAD does not certify a clean checkout. audio_evchain excluded.",
+  "files": {
+    "ben/src/libevchain/artefact.py": "44093cf0d59fabe9c4972466a09ae57ed8cde833eb12d533466f8141581aaebb",
+    "ben/src/libevchain/builtin_passes/c2pa_pass.py": "81590137080771f67e15cdbee87d478d554855e9918178086d6b49bf397c394f",
+    "ben/src/libevchain/evidence.py": "ed5152b0874847fc581b7b3ad536f37c8535b285366b51ed639900846abed0cf",
+    "ben/src/libevchain/evidence_chain.py": "b7b58a80e35a06a425c475c24a29dd962ec30658620258a0b994fee12f0ba78a",
+    "ben/src/libevchain/exceptions.py": "85ca3cec9cac6f5ffcf791514039d678dd33d62def65cab430468600b3f6784c",
+    "ben/src/libevchain/hash_methods.py": "4e08fef11a1a8a2fc1d68d2f6fac277227a604376888d586b139cc5281ed48b0",
+    "ben/src/libevchain/pipeline/__init__.py": "2867b985d08d58d8bd91451597551faa9928ce23c4fdd15e626cd113d26c5891",
+    "ben/src/libevchain/pipeline/artefact_pass.py": "6dec9ce630ce46487fd05e4d1a0406b90438308831cf2639db11e6e153594253",
+    "ben/src/libevchain/pipeline/evidence_pass.py": "806e4c78b5d4d002cf8a7797fd950b14144559f680dce3a8b1909a30bbc98d8a",
+    "ben/src/libevchain/pipeline/pipeline.py": "ff4c3ef31d402fff0ad8e823680270a2c3355442532f4b72c1fa06a57440b253",
+    "ben/src/libevchain/score.py": "7fa90918072d733b5f09ebaa196bf32b93e6f5a13a39489a744e73defcfbe22e",
+    "ben/src/libevchain/types/__init__.py": "e94b0fe7c3adaeefe24601ac9df79bc7cf647932ef8e1b9f5e433b1b32c9ffd9",
+    "ben/src/libevchain/types/artefact_audio_type.py": "94200f5b17b7c77829b420c834e5cb2b404fa55e0f945429de61adf9785c2d47",
+    "ben/src/libevchain/types/artefact_text_type.py": "622701d03c69c2fe9c6a55db5d39b762b1e31f4db00986dd91c45615059bcd53",
+    "ben/src/libevchain/types/artefact_types.py": "88460051ab53a82326a0034af3a1217eebe4de48f73e706a122fdc52a39effbd",
+    "ben/src/libevchain/types/attribute.py": "4beb8322dc057a703697276a90bff784ae58f3421f8cfc6a50cce2e6feb709f4",
+    "ben/src/libevchain/types/relationship_draft_of_type.py": "1ddbf8309afe800486cea173381f6b7606219f93640d1e31ed49845f6764e06f",
+    "ben/src/libevchain/types/relationship_types.py": "de5c9562bfc2c53445e836a15a9c97744d5751f9352cec919c33313aec529f92",
+    "team/rin_parser.py": "ff771468ac7bab4688185d665e53effd164fa9a0dea98b4bb3756278c4206a2c",
+    "team/ern_parser.py": "63c502c02cbeb94d78f9579cc9ba7c9cba6ae0fea78318f425ad29b39b4e3b8d",
+    "team/c2pa_parser.py": "436057743da4fca0ae3b9ab6c4de304ba9feed3d819d8a61dba8666d38fa5de8",
+    "team/wav_parser 4.33.22 pm.py": "71ab43ddacede0a791f3fb36d02a68982c06f6500bd26fd322243f05e300a6c8"
+  }
+}
