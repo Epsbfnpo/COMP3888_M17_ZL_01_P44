@@ -220,6 +220,7 @@
                         "source_end_seconds": { "type": ["number", "null"], "minimum": 0 },
                         "target_start_seconds": { "type": ["number", "null"], "minimum": 0 },
                         "target_end_seconds": { "type": ["number", "null"], "minimum": 0 },
+                        "gain": { "type": ["number", "null"] },
                         "fade_in_seconds": { "type": ["number", "null"], "minimum": 0 },
                         "fade_out_seconds": { "type": ["number", "null"], "minimum": 0 },
                         "input_sample_rate_hz": { "type": ["integer", "null"], "minimum": 0 },

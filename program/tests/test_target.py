@@ -46,7 +46,12 @@ class TargetTests(unittest.TestCase):
         self.assertNotIn("decision", result)
         self.assertNotIn("overall_score", result)
         self.assertFalse(any(item["code"] == "POLICY_NOT_CONFIGURED" for item in result["findings"]))
-        self.assertEqual(result["axes"]["integrity"]["availability"], "available")
+        self.assertEqual(result["axes"]["integrity"]["availability"], "partial")
+        layers = {item["layer"]: item for item in
+                  result["assessment_checks"]["integrity_layers"]}
+        self.assertFalse(layers["structural_validity"]["contributes_to_integrity"])
+        self.assertFalse(layers["cryptographic_attestation"]["contributes_to_integrity"])
+        self.assertIsNone(result["axes"]["integrity"]["value"])
         self.assertEqual(result["axes"]["ai_disclosure"]["value"], 1.0)
         self.assertIn("workflow_assessment", result)
         self.assertIsNone(result["validation"]["cryptographically_valid"])
@@ -199,6 +204,26 @@ class TargetTests(unittest.TestCase):
                                             for value in samples))
             return Path(temp.name).read_bytes()
 
+    @staticmethod
+    def _deterministic_samples(count, seed=1):
+        state, result = seed, []
+        for _ in range(count):
+            state = (1664525 * state + 1013904223) & 0xffffffff
+            result.append(((state >> 16) & 0xffff) - 32768)
+        return result
+
+    @staticmethod
+    def _linear_attributes(scope, duration, gain, source_start=0.0,
+                           target_start=0.0):
+        return {
+            "derivation_scope": scope,
+            "source_start_seconds": source_start,
+            "source_end_seconds": source_start + duration,
+            "target_start_seconds": target_start,
+            "target_end_seconds": target_start + duration,
+            "gain": gain,
+        }
+
     def test_audio_derivation_pass_matches_declared_linear_mix(self):
         left = [int(5000 * math.sin(index / 17)) for index in range(2000)]
         right = [int(3500 * math.cos(index / 23)) for index in range(2000)]
@@ -208,13 +233,61 @@ class TargetTests(unittest.TestCase):
             specs = [{"type": "audio/stem", "data": self._pcm16(left)},
                      {"type": "audio/stem", "data": self._pcm16(right)},
                      {"type": "audio/mix", "data": self._pcm16(target),
-                      "parents": [(0, "mixed_from", {"derivation_scope": "linear_mix"}),
-                                  (1, "mixed_from", {"derivation_scope": "linear_mix"})]}]
+                      "parents": [(0, "mixed_from", self._linear_attributes(
+                          "linear_mix", 0.25, 0.6)),
+                                  (1, "mixed_from", self._linear_attributes(
+                                      "linear_mix", 0.25, 0.4))]}]
             result = self.score(self._workflow_request(
                 root, "multitrack_recording_mix_master", specs), root)
         check = result["assessment_checks"]["audio_derivation"][0]
         self.assertEqual(check["status"], "matched")
         self.assertLess(check["normalized_rmse"], 0.02)
+        self.assertEqual(check["coverage_ratio"], 1.0)
+        self.assertGreater(check["matched_coverage_ratio"], 0.99)
+        self.assertIn("validation_normalized_rmse", check)
+
+    def test_audio_derivation_requires_sufficient_target_coverage(self):
+        source = self._deterministic_samples(2000, 17)
+        target = source + self._deterministic_samples(2000, 18)
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            specs = [
+                {"type": "audio/stem", "data": self._pcm16(source)},
+                {"type": "audio/mix", "data": self._pcm16(target),
+                 "parents": [(0, "mixed_from", self._linear_attributes(
+                     "linear_mix", 0.25, 1.0))]},
+            ]
+            result = self.score(self._workflow_request(
+                root, "multitrack_recording_mix_master", specs), root)
+        check = result["assessment_checks"]["audio_derivation"][0]
+        self.assertEqual(check["status"], "not_applicable")
+        self.assertLess(check["coverage_ratio"], 0.9)
+        self.assertIn("insufficient_target_coverage", check["manual_review_reasons"])
+
+    def test_audio_derivation_rejects_redundant_correlated_sources(self):
+        first = self._deterministic_samples(2400, 23)
+        second = first.copy()
+        second[0] += 1
+        target = [round(0.4 * left + 0.4 * right)
+                  for left, right in zip(first, second)]
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            specs = [
+                {"type": "audio/stem", "data": self._pcm16(first)},
+                {"type": "audio/stem", "data": self._pcm16(second)},
+                {"type": "audio/mix", "data": self._pcm16(target),
+                 "parents": [(0, "mixed_from", self._linear_attributes(
+                     "linear_mix", 0.3, 0.4)),
+                             (1, "mixed_from", self._linear_attributes(
+                                 "linear_mix", 0.3, 0.4))]},
+            ]
+            result = self.score(self._workflow_request(
+                root, "multitrack_recording_mix_master", specs), root)
+        check = result["assessment_checks"]["audio_derivation"][0]
+        self.assertEqual(check["status"], "not_applicable")
+        self.assertGreaterEqual(check["max_source_correlation"], 0.995)
+        self.assertIn("redundant_or_highly_correlated_sources",
+                      check["manual_review_reasons"])
 
     def test_audio_derivation_pass_contradicts_unrelated_declared_linear_mix(self):
         source = [int(5000 * math.sin(index / 17)) for index in range(2000)]
@@ -223,7 +296,8 @@ class TargetTests(unittest.TestCase):
             root = Path(directory)
             specs = [{"type": "audio/stem", "data": self._pcm16(source)},
                      {"type": "audio/mix", "data": self._pcm16(target),
-                      "parents": [(0, "mixed_from", {"derivation_scope": "linear_mix"})]}]
+                      "parents": [(0, "mixed_from", self._linear_attributes(
+                          "linear_mix", 0.25, 1.0))]}]
             result = self.score(self._workflow_request(
                 root, "multitrack_recording_mix_master", specs), root)
         self.assertEqual(result["assessment_checks"]["audio_derivation"][0]["status"],
@@ -238,8 +312,8 @@ class TargetTests(unittest.TestCase):
             root = Path(directory)
             specs = [{"type": "audio/stem", "data": self._pcm16(source)},
                      {"type": "audio/mix", "data": self._pcm16(target),
-                      "parents": [(0, "mixed_from", {"derivation_scope": "linear_mix",
-                                                       "target_start_seconds": 0.0125})]}]
+                      "parents": [(0, "mixed_from", self._linear_attributes(
+                          "linear_mix", 0.25, 0.7, target_start=0.0125))]}]
             result = self.score(self._workflow_request(
                 root, "multitrack_recording_mix_master", specs), root)
         self.assertEqual(result["assessment_checks"]["audio_derivation"][0]["status"], "matched")
@@ -254,7 +328,42 @@ class TargetTests(unittest.TestCase):
             result = self.score(self._workflow_request(
                 root, "multitrack_recording_mix_master", specs), root)
         self.assertEqual(result["assessment_checks"]["audio_derivation"][0]["status"],
-                         "not_applicable")
+                         "unavailable")
+        self.assertEqual(result["assessment_checks"]["audio_derivation"][0]["reason_code"],
+                         "missing_derivation_parameters")
+
+    def test_audio_derivation_does_not_infer_or_refit_gain(self):
+        source = self._deterministic_samples(2000, 71)
+        target = [round(0.5 * value) for value in source]
+        declared = self._linear_attributes("linear_mix", 0.25, 0.5)
+        missing_gain = copy.deepcopy(declared)
+        del missing_gain["gain"]
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            specs = [
+                {"type": "audio/stem", "data": self._pcm16(source)},
+                {"type": "audio/mix", "data": self._pcm16(target),
+                 "parents": [(0, "mixed_from", missing_gain)]},
+            ]
+            missing_result = self.score(self._workflow_request(
+                root, "multitrack_recording_mix_master", specs), root)
+        missing_check = missing_result["assessment_checks"]["audio_derivation"][0]
+        self.assertEqual(missing_check["status"], "unavailable")
+        self.assertIn("gain", missing_check["missing_parameters"][0]["fields"])
+
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            wrong = self._linear_attributes("linear_mix", 0.25, 0.9)
+            specs = [
+                {"type": "audio/stem", "data": self._pcm16(source)},
+                {"type": "audio/mix", "data": self._pcm16(target),
+                 "parents": [(0, "mixed_from", wrong)]},
+            ]
+            wrong_result = self.score(self._workflow_request(
+                root, "multitrack_recording_mix_master", specs), root)
+        wrong_check = wrong_result["assessment_checks"]["audio_derivation"][0]
+        self.assertEqual(wrong_check["status"], "contradicted")
+        self.assertEqual(wrong_check["declared_gains"], [0.9])
 
     def test_edit_derivation_pass_matches_declared_crop_and_gain(self):
         source = [int(7000 * math.sin(index / 19)) for index in range(2400)]
@@ -270,6 +379,7 @@ class TargetTests(unittest.TestCase):
                      "source_end_seconds": 0.2,
                      "target_start_seconds": 0.0,
                      "target_end_seconds": 0.15,
+                     "gain": 0.7,
                  })]},
             ]
             result = self.score(self._workflow_request(
@@ -277,6 +387,32 @@ class TargetTests(unittest.TestCase):
         check = result["assessment_checks"]["edit_derivation"][0]
         self.assertEqual(check["status"], "matched")
         self.assertEqual(check["verified_scope"], "linear_edit")
+
+    def test_edit_derivation_flags_repeated_source_segment_as_ambiguous(self):
+        block = self._deterministic_samples(3200, 31)
+        middle = self._deterministic_samples(3200, 32)
+        source = block + middle + block
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            specs = [
+                {"type": "audio/raw-take", "data": self._pcm16(source)},
+                {"type": "audio/edited-take", "data": self._pcm16(block),
+                 "parents": [(0, "edited_from", {
+                     "derivation_scope": "linear_edit",
+                     "source_start_seconds": 0.0,
+                     "source_end_seconds": 0.4,
+                     "target_start_seconds": 0.0,
+                     "target_end_seconds": 0.4,
+                     "gain": 1.0,
+                 })]},
+            ]
+            result = self.score(self._workflow_request(
+                root, "take_comping_and_editing", specs), root)
+        check = result["assessment_checks"]["edit_derivation"][0]
+        self.assertEqual(check["status"], "not_applicable")
+        self.assertTrue(check["alternative_source_locations"])
+        self.assertIn("ambiguous_source_segment_location",
+                      check["manual_review_reasons"])
 
     def test_edit_derivation_pass_matches_splice_offsets_and_declared_fades(self):
         first = [int(7000 * math.sin(index / 19)) for index in range(1600)]
@@ -294,7 +430,8 @@ class TargetTests(unittest.TestCase):
             root = Path(directory)
             common = {"derivation_scope": "linear_edit",
                       "source_start_seconds": 0.05, "source_end_seconds": 0.15,
-                      "fade_in_seconds": 0.01, "fade_out_seconds": 0.01}
+                      "fade_in_seconds": 0.01, "fade_out_seconds": 0.01,
+                      "gain": 1.0}
             specs = [
                 {"type": "audio/raw-take", "data": self._pcm16(first)},
                 {"type": "audio/raw-take", "data": self._pcm16(second)},
@@ -322,8 +459,10 @@ class TargetTests(unittest.TestCase):
                 {"type": "audio/raw-track", "data": self._pcm16(first)},
                 {"type": "audio/edited-take", "data": self._pcm16(second)},
                 {"type": "audio/stem", "data": self._pcm16(stem),
-                 "parents": [(0, "stemmed_from", {"derivation_scope": "linear_stem"}),
-                             (1, "stemmed_from", {"derivation_scope": "linear_stem"})]},
+                 "parents": [(0, "stemmed_from", self._linear_attributes(
+                     "linear_stem", 0.25, 0.55)),
+                             (1, "stemmed_from", self._linear_attributes(
+                                 "linear_stem", 0.25, 0.35))]},
             ]
             result = self.score(self._workflow_request(
                 root, "multitrack_recording_mix_master", specs), root)
@@ -345,10 +484,12 @@ class TargetTests(unittest.TestCase):
             "selections": [
                 {"selection_id": "S1", "take_id": "Take A", "source_hash": take_a_hash,
                  "source_start_seconds": 0.05, "source_end_seconds": 0.15,
-                 "target_start_seconds": 0.0, "target_end_seconds": 0.1},
+                 "target_start_seconds": 0.0, "target_end_seconds": 0.1,
+                 "gain": 1.0},
                 {"selection_id": "S2", "take_id": "Take B", "source_hash": take_b_hash,
                  "source_start_seconds": 0.15, "source_end_seconds": 0.25,
-                 "target_start_seconds": 0.1, "target_end_seconds": 0.2},
+                 "target_start_seconds": 0.1, "target_end_seconds": 0.2,
+                 "gain": 1.0},
             ],
         }).encode()
         with tempfile.TemporaryDirectory() as directory:
@@ -367,8 +508,33 @@ class TargetTests(unittest.TestCase):
         self.assertEqual(check["selection_count"], 2)
 
     def test_master_derivation_pass_corroborates_content_continuity(self):
-        source = [int(8500 * math.sin(index / 15) * (0.4 + 0.6 * index / 8000))
-                  for index in range(8000)]
+        source = self._deterministic_samples(8000, 41)
+        master = [round(0.8 * value) for value in source]
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            specs = [
+                {"type": "audio/mix", "data": self._pcm16(source)},
+                {"type": "audio/master", "data": self._pcm16(master),
+                 "parents": [(0, "mastered_from", {
+                     "derivation_scope": "master_similarity",
+                     "source_start_seconds": 0.0,
+                     "source_end_seconds": 1.0,
+                     "target_start_seconds": 0.0,
+                     "target_end_seconds": 1.0,
+                 })]},
+            ]
+            result = self.score(self._workflow_request(
+                root, "mastering_service_only", specs), root)
+        check = result["assessment_checks"]["master_derivation"][0]
+        self.assertEqual(check["status"], "corroborated")
+        self.assertIsNone(check["content_relationship_verified"])
+        self.assertTrue(check["content_continuity_corroborated"])
+        self.assertFalse(check["alignment_ambiguous"])
+        self.assertEqual(check["parameter_source"], "submitter_declared")
+
+    def test_master_derivation_does_not_infer_missing_alignment(self):
+        source = [int(9000 * math.sin(2 * math.pi * index / 100))
+                  for index in range(16000)]
         master = [round(0.8 * value) for value in source]
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
@@ -380,15 +546,97 @@ class TargetTests(unittest.TestCase):
             result = self.score(self._workflow_request(
                 root, "mastering_service_only", specs), root)
         check = result["assessment_checks"]["master_derivation"][0]
-        self.assertEqual(check["status"], "corroborated")
-        self.assertIsNone(check["content_relationship_verified"])
-        self.assertTrue(check["content_continuity_corroborated"])
+        self.assertEqual(check["status"], "unavailable")
+        self.assertEqual(check["reason_code"], "missing_derivation_parameters")
+        self.assertEqual(check["claim_status"], "declared_unverified")
+
+    def test_master_derivation_does_not_replace_declared_alignment(self):
+        source = self._deterministic_samples(8000, 72)
+        shifted = source[1000:] + source[:1000]
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            specs = [
+                {"type": "audio/mix", "data": self._pcm16(source)},
+                {"type": "audio/master", "data": self._pcm16(shifted),
+                 "parents": [(0, "mastered_from", {
+                     "derivation_scope": "master_similarity",
+                     "source_start_seconds": 0.0,
+                     "source_end_seconds": 1.0,
+                     "target_start_seconds": 0.0,
+                     "target_end_seconds": 1.0,
+                 })]},
+            ]
+            result = self.score(self._workflow_request(
+                root, "mastering_service_only", specs), root)
+        check = result["assessment_checks"]["master_derivation"][0]
+        self.assertNotEqual(check["status"], "corroborated")
+        self.assertEqual(check["declared_offset_seconds"], 0.0)
+        self.assertLess(check["declared_alignment_correlation"], 0.2)
+
+    def test_master_derivation_handles_mild_processing_and_sample_rate_conversion(self):
+        source = self._deterministic_samples(16000, 51)
+        processed = []
+        previous = 0
+        for index, value in enumerate(source):
+            filtered = round(0.9 * value + 0.1 * previous)
+            previous = value
+            compressed = max(-14000, min(14000, filtered))
+            dither = (index % 3) - 1
+            processed.append(round(0.75 * compressed) + dither)
+        fade = 80
+        for index in range(fade):
+            processed[index] = round(processed[index] * index / fade)
+            processed[-index - 1] = round(processed[-index - 1] * (index + 1) / fade)
+        converted = processed[::2]
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            specs = [
+                {"type": "audio/mix", "data": self._pcm16(source, rate=8000)},
+                {"type": "audio/master", "data": self._pcm16(converted, rate=4000),
+                 "parents": [(0, "mastered_from", {
+                     "derivation_scope": "master_similarity",
+                     "source_start_seconds": 0.0,
+                     "source_end_seconds": 2.0,
+                     "target_start_seconds": 0.0,
+                     "target_end_seconds": 2.0,
+                     "transformation_description": "mild EQ, limiting, dither, fades, and sample-rate conversion",
+                 })]},
+            ]
+            result = self.score(self._workflow_request(
+                root, "mastering_service_only", specs), root)
+        check = result["assessment_checks"]["master_derivation"][0]
+        self.assertIn(check["status"], {"corroborated", "not_applicable"})
+        self.assertNotEqual(check["status"], "contradicted")
+
+    def test_integrity_layers_do_not_score_endpoint_validity_as_content(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            specs = [
+                {"type": "audio/stem", "data": self._pcm16(
+                    self._deterministic_samples(2000, 61))},
+                {"type": "audio/mix", "data": self._pcm16(
+                    self._deterministic_samples(2000, 62)),
+                 "parents": [(0, "mixed_from")]},
+            ]
+            result = self.score(self._workflow_request(
+                root, "multitrack_recording_mix_master", specs), root)
+        layers = {item["layer"]: item for item in
+                  result["assessment_checks"]["integrity_layers"]}
+        self.assertEqual(layers["structural_validity"]["status"], "matched")
+        self.assertFalse(layers["structural_validity"]["contributes_to_integrity"])
+        self.assertEqual(layers["declaration_consistency"]["status"], "unavailable")
+        self.assertEqual(layers["content_reconstruction"]["status"], "unavailable")
+        self.assertIsNone(result["axes"]["integrity"]["value"])
+        self.assertEqual({item["status"] for item in
+                          result["assessment_checks"]["assessment_status_semantics"]},
+                         {"matched", "corroborated", "contradicted",
+                          "not_applicable", "unavailable"})
 
     def test_comp_sheet_text_parser_extracts_selections(self):
         raw_hash, target_hash = "1" * 64, "2" * 64
         text = ("Song Title: Fixture Song\n"
-                "selection_id|take_id|source_hash|target_hash|source_start_seconds|source_end_seconds|target_start_seconds|target_end_seconds|notes\n"
-                f"S1|Take A|{raw_hash}|{target_hash}|00:00.000|00:00.250|0|0.25|opening phrase\n")
+                "selection_id|take_id|source_hash|target_hash|source_start_seconds|source_end_seconds|target_start_seconds|target_end_seconds|gain|notes\n"
+                f"S1|Take A|{raw_hash}|{target_hash}|00:00.000|00:00.250|0|0.25|0.8|opening phrase\n")
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / "comp.txt"
             path.write_text(text)
@@ -396,6 +644,7 @@ class TargetTests(unittest.TestCase):
         self.assertEqual(parsed["input_format"], "txt")
         self.assertEqual(parsed["selections"][0]["take_id"], "Take A")
         self.assertEqual(parsed["selections"][0]["source_end_seconds"], 0.25)
+        self.assertEqual(parsed["selections"][0]["gain"], 0.8)
         self.assertFalse(parsed["warnings"])
 
     @staticmethod
@@ -453,10 +702,12 @@ class TargetTests(unittest.TestCase):
             "selections": [
                 {"selection_id": "S1", "take_id": "Take A", "source_hash": raw_a_hash,
                  "source_start_seconds": 0.0, "source_end_seconds": 0.2,
-                 "target_start_seconds": 0.0, "target_end_seconds": 0.2},
+                 "target_start_seconds": 0.0, "target_end_seconds": 0.2,
+                 "gain": 1.0},
                 {"selection_id": "S2", "take_id": "Take B", "source_hash": raw_b_hash,
                  "source_start_seconds": 0.2, "source_end_seconds": 0.4,
-                 "target_start_seconds": 0.2, "target_end_seconds": 0.4},
+                 "target_start_seconds": 0.2, "target_end_seconds": 0.4,
+                 "gain": 1.0},
             ]}).encode()
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)

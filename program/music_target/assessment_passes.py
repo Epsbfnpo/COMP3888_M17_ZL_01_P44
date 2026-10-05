@@ -104,7 +104,7 @@ def parse_bound_artefacts(native, chain, wav_observations):
 
 
 class BoundFileIntegrityPass:
-    """Score bundle/file and declared/observed consistency, not authorship."""
+    """Check physical file binding and parser readability, not declarations."""
 
     @staticmethod
     def evaluate(native, bound_hashes, wav_observations, parser_observations):
@@ -113,16 +113,6 @@ class BoundFileIntegrityPass:
             digest = node["artefact_hash"]
             checks.append({"rule": "object_hash_bound", "passed": digest in bound_hashes,
                            "evidence_hash": digest})
-            observed = wav_observations.get(digest)
-            if observed:
-                for key, declared in (node.get("attributes") or {}).get("technical", {}).items():
-                    if declared is None or key not in observed["observed"]:
-                        continue
-                    actual = observed["observed"][key]
-                    passed = (math.isclose(declared, actual, abs_tol=0.002, rel_tol=0)
-                              if key == "duration_seconds" else declared == actual)
-                    checks.append({"rule": f"technical.{key}_matches_observed", "passed": passed,
-                                   "evidence_hash": digest})
             parser = parser_observations.get(digest)
             if parser and parser["status"] == "failed":
                 checks.append({"rule": "declared_type_parser_succeeds", "passed": False,
@@ -136,18 +126,58 @@ class BoundFileIntegrityPass:
         return value, checks, findings
 
 
+class StructuralValidityPass:
+    """Expose graph checks that already succeeded before assessment; never score them as truth."""
+
+    @staticmethod
+    def evaluate(native):
+        checks = [
+            {"rule": "graph_loaded_without_cycle", "passed": True},
+            {"rule": "all_nodes_connected_to_final", "passed": True},
+            {"rule": "declared_hash_references_resolve", "passed": True},
+        ]
+        for target in native["artefacts"]:
+            for edge in target.get("evidence", []):
+                checks.append({
+                    "rule": "relationship_endpoint_roles_registered",
+                    "passed": True,
+                    "source_hash": edge["hash"],
+                    "target_hash": target["artefact_hash"],
+                    "relationship_type": edge["relationship_type"],
+                })
+        return checks
+
+
 class RelationshipIntegrityPass:
-    """Check endpoints and any concrete relationship parameters."""
+    """Check submitted technical and relationship declarations against observations."""
 
     @staticmethod
     def evaluate(native, wav_observations):
         nodes = {item["artefact_hash"]: item for item in native["artefacts"]}
         checks, findings = [], []
+        for node in native["artefacts"]:
+            observed = wav_observations.get(node["artefact_hash"])
+            if not observed:
+                continue
+            for key, declared in (node.get("attributes") or {}).get("technical", {}).items():
+                if declared is None or key not in observed["observed"]:
+                    continue
+                actual = observed["observed"][key]
+                passed = (math.isclose(declared, actual, abs_tol=0.002, rel_tol=0)
+                          if key == "duration_seconds" else declared == actual)
+                checks.append({"rule": f"technical.{key}_matches_observed",
+                               "passed": passed, "evidence_hash": node["artefact_hash"],
+                               "declared": declared, "observed": actual})
+                if not passed:
+                    findings.append(_finding(
+                        "DECLARATION_CONSISTENCY_CONTRADICTION",
+                        f"technical.{key} does not match the bound file.",
+                        node["artefact_hash"], "medium"))
         for target in native["artefacts"]:
             for edge in target.get("evidence", []):
                 source = nodes[edge["hash"]]
                 attrs = edge.get("attributes") or {}
-                current = [{"rule": "relationship_endpoints_registered", "passed": True}]
+                current = []
                 source_duration = (wav_observations.get(source["artefact_hash"]) or {}).get("observed", {}).get("duration_seconds")
                 target_duration = (wav_observations.get(target["artefact_hash"]) or {}).get("observed", {}).get("duration_seconds")
                 if attrs.get("source_start_seconds") is not None and attrs.get("source_end_seconds") is not None:
@@ -215,7 +245,8 @@ class CrossEvidencePass:
                                        "passed": (source, target) in comp_edges,
                                        "selection_id": selection["selection_id"],
                                        "source_hash": source, "target_hash": target})
-                    if target and target in wav_observations:
+                    if (target and target in wav_observations and
+                            selection.get("target_end_seconds") is not None):
                         duration = wav_observations[target]["observed"]["duration_seconds"]
                         checks.append({"rule": "comp_sheet_target_range_within_audio",
                                        "passed": selection["target_end_seconds"] <= duration,
@@ -364,7 +395,8 @@ class ExpandedCrossEvidencePass:
                                        "passed": (source, target) in comp_edges,
                                        "selection_id": selection["selection_id"],
                                        "source_hash": source, "target_hash": target})
-                    if target and target in wav_observations:
+                    if (target and target in wav_observations and
+                            selection.get("target_end_seconds") is not None):
                         duration = wav_observations[target]["observed"]["duration_seconds"]
                         checks.append({"rule": "comp_sheet_target_range_within_audio",
                                        "passed": selection["target_end_seconds"] <= duration,
@@ -527,12 +559,52 @@ class AIDisclosurePass:
         return axis, findings
 
 
+ASSESSMENT_STATUS_SEMANTICS = [
+    {"status": "matched",
+     "meaning": "An exact, explicitly scoped check passed on independent validation data.",
+     "numeric_treatment": "1.0 when the layer is eligible for integrity scoring."},
+    {"status": "corroborated",
+     "meaning": "Independent evidence supports the claim but does not prove exact derivation.",
+     "numeric_treatment": "Reported separately; never silently scored as an exact match."},
+    {"status": "contradicted",
+     "meaning": "An applicable assessed claim conflicts with observed evidence.",
+     "numeric_treatment": "0.0 in its eligible layer and emits a contradiction finding."},
+    {"status": "not_applicable",
+     "meaning": "The check exists but the submitted transformation or evidence is outside its reliable scope.",
+     "numeric_treatment": "Excluded from the denominator; may request manual review."},
+    {"status": "unavailable",
+     "meaning": "The claim may be present, but required evidence or declared parameters were absent or unreadable, so the check did not run.",
+     "numeric_treatment": "Excluded from the denominator and never treated as zero."},
+]
+
+
+def _layer(name, status, value, contributes, reason, check_count,
+           manual_review_reasons=None):
+    return {
+        "layer": name,
+        "status": status,
+        "value": value,
+        "contributes_to_integrity": contributes,
+        "check_count": check_count,
+        "reason": reason,
+        "manual_review_reasons": sorted(set(manual_review_reasons or [])),
+    }
+
+
+def _boolean_status(checks, successful_status="matched"):
+    if not checks:
+        return "unavailable", None
+    value = sum(item["passed"] for item in checks) / len(checks)
+    return (successful_status if value == 1.0 else "contradicted"), value
+
+
 def assess_axes(native, chain, bound_hashes, wav_observations, parser_observations, workflow_input):
     file_value, file_checks, file_findings = BoundFileIntegrityPass.evaluate(
         native, bound_hashes, wav_observations, parser_observations)
     rel_value, rel_checks, rel_findings = RelationshipIntegrityPass.evaluate(native, wav_observations)
     cross_value, cross_checks, cross_findings = ExpandedCrossEvidencePass.evaluate(
         native, workflow_input, parser_observations, wav_observations)
+    structural_checks = StructuralValidityPass.evaluate(native)
     edit_derivations = EditDerivationPass.evaluate(native, chain)
     comp_derivations = CompDerivationPass.evaluate(native, chain, parser_observations)
     stem_derivations = StemDerivationPass.evaluate(native, chain)
@@ -553,21 +625,95 @@ def assess_axes(native, chain, bound_hashes, wav_observations, parser_observatio
                  "The submitted audio contradicts the scoped content-derivation model.",
                  item["target_hash"], "medium", derivation_result=item)
         for item in scored_derivations if item["status"] == "contradicted"]
-    components = [value for value in (file_value, rel_value, cross_value, derivation_value)
-                  if value is not None]
-    integrity = _axis("available" if components else "unavailable",
-                      sum(components) / len(components) if components else None,
-                      0.65 if components else None,
-                      (f"{len(file_checks)} file, {len(rel_checks)} relationship, "
-                       f"{len(cross_checks)} cross-evidence, {len(scored_derivations)} scored derivation, "
-                       f"and {len(corroborated_derivations)} unscored corroboration checks ran. "
-                       "Master corroboration and hash consistency "
-                       "are not creator authentication."))
     attestation, validation, attestation_findings = C2PAAttestationPass.evaluate(parser_observations)
     ai, ai_findings = AIDisclosurePass.evaluate(native)
+
+    file_status, file_layer_value = _boolean_status(file_checks)
+    declaration_status, declaration_layer_value = _boolean_status(rel_checks)
+    cross_status, cross_layer_value = _boolean_status(
+        cross_checks, successful_status="corroborated")
+    if any(item["status"] == "contradicted" for item in scored_derivations):
+        content_status = "contradicted"
+    elif scored_derivations:
+        content_status = "matched"
+    elif corroborated_derivations:
+        content_status = "corroborated"
+    elif any(item["status"] == "not_applicable" for item in all_derivations):
+        content_status = "not_applicable"
+    else:
+        content_status = "unavailable"
+    content_layer_value = derivation_value
+    crypto = validation.get("cryptographically_valid")
+    if crypto is False:
+        cryptographic_status = "contradicted"
+    elif crypto is True:
+        cryptographic_status = "corroborated"
+    elif validation.get("validation_state") == "manifest_absent":
+        cryptographic_status = "not_applicable"
+    else:
+        cryptographic_status = "unavailable"
+
+    review_reasons = [reason for item in all_derivations
+                      for reason in item.get("manual_review_reasons", [])]
+    layers = [
+        _layer("file_integrity", file_status, file_layer_value, True,
+               "SHA-256 binding and parser readability of submitted files.", len(file_checks)),
+        _layer("structural_validity", "matched", 1.0, False,
+               "Graph, references, cycles, connectivity, and endpoint roles passed before assessment; this is not content proof.",
+               len(structural_checks)),
+        _layer("declaration_consistency", declaration_status,
+               declaration_layer_value, True,
+               "Submitted technical and relationship parameters compared with bound media observations.",
+               len(rel_checks)),
+        _layer("content_reconstruction", content_status, content_layer_value,
+               True,
+               "Only submitter-declared ranges and gains are assessed. Missing parameters are unavailable, not adverse; Master continuity corroboration remains unscored.",
+               len(all_derivations), review_reasons),
+        _layer("cross_evidence_support", cross_status, cross_layer_value, True,
+               "Independent parser outputs compared with graph, declarations, and media.",
+               len(cross_checks)),
+        _layer("cryptographic_attestation", cryptographic_status,
+               (attestation.get("value")
+                if cryptographic_status in {"corroborated", "contradicted"} else None), False,
+               "C2PA remains in the separate attestation-strength axis and never inflates integrity.",
+               1 if validation else 0),
+    ]
+    components = [item["value"] for item in layers
+                  if item["contributes_to_integrity"] and item["value"] is not None]
+    contradiction_present = any(
+        item["contributes_to_integrity"] and item["status"] == "contradicted"
+        for item in layers)
+    substantive_support = (content_layer_value is not None or
+                           cross_layer_value is not None)
+    if not components:
+        integrity_availability, integrity_value, integrity_confidence = "unavailable", None, None
+    else:
+        integrity_availability = "available" if len(components) == 4 else "partial"
+        # File/declaration consistency alone would create a misleading perfect-
+        # looking score without content or independent cross-evidence support.
+        integrity_value = (sum(components) / len(components)
+                           if ((len(components) >= 2 and substantive_support) or
+                               contradiction_present) else None)
+        integrity_confidence = round(0.8 * len(components) / 4, 3)
+    integrity = _axis(
+        integrity_availability, integrity_value, integrity_confidence,
+        (f"Integrity has {len(components)}/4 score-eligible evidence layers; missing evidence reduces availability and confidence but is never treated as contradiction. A numeric value is withheld "
+         "without content reconstruction or independent CrossEvidence unless a contradiction exists. "
+         "Structural validity and cryptographic attestation are reported separately and do not raise integrity. "
+         f"{len(corroborated_derivations)} Master/content corroboration result(s) were not scored as exact matches."))
+
+    review_findings = []
+    if review_reasons:
+        review_findings.append(_finding(
+            "MANUAL_REVIEW_RECOMMENDED",
+            "One or more content checks are ambiguous, insufficiently covered, or outside the supported model.",
+            severity="low", review_reasons=sorted(set(review_reasons))))
     checks = {
         "bound_file_integrity": file_checks,
+        "structural_validity": structural_checks,
         "relationship_integrity": rel_checks,
+        "integrity_layers": layers,
+        "assessment_status_semantics": ASSESSMENT_STATUS_SEMANTICS,
         "cross_evidence": cross_checks,
         "edit_derivation": edit_derivations,
         "comp_derivation": comp_derivations,
@@ -576,6 +722,6 @@ def assess_axes(native, chain, bound_hashes, wav_observations, parser_observatio
         "audio_derivation": mix_derivations,
         "master_derivation": master_derivations,
     }
-    findings = (file_findings + rel_findings + cross_findings + derivation_findings +
+    findings = (file_findings + rel_findings + cross_findings + derivation_findings + review_findings +
                 attestation_findings + ai_findings)
     return integrity, attestation, ai, validation, checks, findings

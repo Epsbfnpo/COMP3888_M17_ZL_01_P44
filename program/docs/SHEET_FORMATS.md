@@ -28,6 +28,7 @@ are true.
       "source_end_seconds": 16.8,
       "target_start_seconds": 8.0,
       "target_end_seconds": 12.4,
+      "gain": 1.0,
       "notes": "First chorus phrase"
     }
   ]
@@ -37,10 +38,13 @@ are true.
 The equivalent CSV/TXT header is:
 
 ```text
-selection_id,take_id,source_hash,target_hash,source_start_seconds,source_end_seconds,target_start_seconds,target_end_seconds,notes
+selection_id,take_id,source_hash,target_hash,source_start_seconds,source_end_seconds,target_start_seconds,target_end_seconds,gain,notes
 ```
 
 Times may be numeric seconds or `MM:SS.sss` / `HH:MM:SS.sss` in CSV/TXT.
+`target_end_seconds` and `gain` may be omitted when a CompSheet is used only as
+descriptive evidence, but both are required before `CompDerivationPass` can run.
+The parser does not derive a missing target end or gain.
 
 ## Canonical CueSheet JSON
 

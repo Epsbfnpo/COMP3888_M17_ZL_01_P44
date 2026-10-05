@@ -82,6 +82,7 @@ RELATIONSHIP_ATTRIBUTES = {
     "source_end_seconds": Attribute(AttributeTypes.Any, None),
     "target_start_seconds": Attribute(AttributeTypes.Any, None),
     "target_end_seconds": Attribute(AttributeTypes.Any, None),
+    "gain": Attribute(AttributeTypes.Any, None),
     "fade_in_seconds": Attribute(AttributeTypes.Any, None),
     "fade_out_seconds": Attribute(AttributeTypes.Any, None),
     "input_sample_rate_hz": Attribute(AttributeTypes.Any, None),

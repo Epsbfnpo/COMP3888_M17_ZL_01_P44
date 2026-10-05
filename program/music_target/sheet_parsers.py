@@ -94,6 +94,18 @@ def _seconds(value, field):
     return number
 
 
+def _number(value, field):
+    if value in (None, ""):
+        return None
+    try:
+        number = float(value)
+    except (TypeError, ValueError) as exc:
+        raise SheetParseError(f"Invalid numeric value in {field}.") from exc
+    if not math.isfinite(number):
+        raise SheetParseError(f"{field} must be finite.")
+    return number
+
+
 def _clean_hash(value, field):
     if value in (None, ""):
         return None
@@ -119,6 +131,7 @@ ALIASES = {
     "sourceend": "source_end_seconds", "sourceendtime": "source_end_seconds",
     "targetstart": "target_start_seconds", "targetstarttime": "target_start_seconds",
     "targetend": "target_end_seconds", "targetendtime": "target_end_seconds",
+    "gain": "gain", "lineargain": "gain",
     "cue": "cue_id", "cueid": "cue_id", "cuenumber": "cue_id",
     "cuetitle": "title", "name": "title",
     "start": "start_seconds", "starttime": "start_seconds", "timecode": "start_seconds",
@@ -228,6 +241,7 @@ def _normalise_comp_record(raw, index):
         "source_end_seconds": _seconds(raw.get("source_end_seconds"), "source_end_seconds"),
         "target_start_seconds": _seconds(raw.get("target_start_seconds"), "target_start_seconds"),
         "target_end_seconds": _seconds(raw.get("target_end_seconds"), "target_end_seconds"),
+        "gain": _number(raw.get("gain"), "gain"),
         "notes": _clean_text(raw.get("notes")),
     }
     if not record["take_id"]:
@@ -238,10 +252,8 @@ def _normalise_comp_record(raw, index):
         raise SheetParseError(f"Comp selection {index} source end must be after start.")
     if record["target_start_seconds"] is None:
         raise SheetParseError(f"Comp selection {index} needs target_start_seconds.")
-    duration = record["source_end_seconds"] - record["source_start_seconds"]
-    if record["target_end_seconds"] is None:
-        record["target_end_seconds"] = record["target_start_seconds"] + duration
-    if record["target_end_seconds"] <= record["target_start_seconds"]:
+    if (record["target_end_seconds"] is not None and
+            record["target_end_seconds"] <= record["target_start_seconds"]):
         raise SheetParseError(f"Comp selection {index} target end must be after start.")
     return record
 

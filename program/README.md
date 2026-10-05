@@ -28,11 +28,13 @@ The main approach is to reuse Ben's evidence graph and execution framework, conn
 - The MIDI parser extracts channel and meta events, notes, tempo, time signatures, controllers, and duration in seconds when it can be calculated.
 - CompSheet and CueSheet parsers support strict JSON, CSV, delimited text, and PDF text extraction. See [`docs/SHEET_FORMATS.md`](docs/SHEET_FORMATS.md).
 - Runs file, relationship, and cross-evidence analysis through the actual `EvidenceChain` and `Pipeline` implementations.
-- Includes scoped PCM content checks for `edited_from`, `comped_from`, `stemmed_from`, and `mixed_from`, plus conservative mix-to-master continuity corroboration. Linear edits support declared crops, placements, constant gain, splices, and simple fades. Complex or undocumented processing is not automatically treated as a contradiction.
+- Includes scoped PCM content checks for `edited_from`, `comped_from`, `stemmed_from`, and `mixed_from`, plus conservative mix-to-master continuity corroboration. Exact checks use only submitter-declared ranges, placements, gains, and optional fades; no missing transformation parameter is estimated. Declared reconstruction is evaluated on alternating partitions and reports coverage, matched duration, source redundancy, identifiability, and repeated-segment ambiguity. Complex or undocumented processing is not automatically treated as a contradiction.
+- Master comparison uses only the submitted source and target ranges. A search for competing locations may reduce certainty by exposing ambiguity, but an alternative location is never substituted for the declared one.
 - Separates submitter-declared technical properties from measured file properties and reports inconsistencies.
 - Requires `workflow_id`, `modifiers`, and submitter declarations in `submission.json`, and loads policies for 16 workflow types.
 - `WorkflowCompletenessPass` reports the state of each required, conditional, and optional expectation.
 - Reports integrity, C2PA attestation, and AI disclosure independently. AI disclosure measures declaration coverage; it does not detect AI-generated content.
+- Separates file integrity, structural validity, declaration consistency, content reconstruction, CrossEvidence, and cryptographic attestation. Structural endpoint validity and C2PA do not inflate the integrity value; C2PA remains in the separate attestation-strength axis.
 - Provides CSEC request conversion, a standard response contract, timeout control, and explicit `unsupported` and `error` states.
 - Applies XML size limits and rejects DTD/entity declarations. RIN 2.1 and ERN 4.3 are validated offline with pinned official XSD files, while XSD status remains separate from best-effort field extraction.
 - Binds available RIN `FileReference` and ERN `DeliveryFile` SHA-256 values to recordings/components. Cross-evidence checks cover MIDI, ERN, C2PA ingredients, and AI declaration consistency.
@@ -47,17 +49,47 @@ The four dimensions respect separate evidence boundaries:
 
 A `null` value means not assessed and must not be interpreted as zero. The system intentionally does not produce an overall score, an acceptance/rejection decision, or a human-versus-AI creator classification. Those omissions are design boundaries, not unfinished functionality.
 
+The program does not infer relationships or fill in missing relationship
+parameters. It evaluates only graph edges and transformation parameters supplied
+in the submission. Missing evidence lowers assessment availability and
+confidence; it is not a contradiction and does not directly lower the integrity
+value. When relationship evidence is insufficient, the claim remains
+`declared_unverified`, the content check is `unavailable`, and the integrity
+value may remain `null`.
+
 Content derivation is activated conservatively:
 
 | Relationship | Required evidence/scope | Content result |
 |---|---|---|
-| `edited_from` | `derivation_scope: linear_edit`; optional declared source/target ranges and fades | Exact constant-gain crop, placement, splice, offset, and simple-fade reconstruction |
-| `comped_from` | Parsed CompSheet with source and target hashes/times | Comp timeline reconstruction |
-| `stemmed_from` | `derivation_scope: linear_stem` (legacy `linear_mix` is also accepted) | Exact constant-gain source summation |
-| `mixed_from` | `derivation_scope: linear_mix` | Exact constant-gain mix reconstruction |
-| `mastered_from` | Relationship alone, or optional `derivation_scope: master_similarity` | Non-proving timing, waveform, dynamics, loudness, and coarse spectral corroboration |
+| `edited_from` | `derivation_scope: linear_edit` plus source start/end, target start/end, and gain on every edge; fades are optional | Exact declared crop, placement, splice, gain, and simple-fade reconstruction |
+| `comped_from` | Parsed CompSheet with source/target hashes, source/target start/end, and gain for every assessed selection | Declared comp timeline reconstruction |
+| `stemmed_from` | `derivation_scope: linear_stem` (legacy `linear_mix` is accepted) plus source/target start/end and gain on every edge | Exact declared source summation |
+| `mixed_from` | `derivation_scope: linear_mix` plus source/target start/end and gain on every edge | Exact declared mix reconstruction |
+| `mastered_from` | `derivation_scope: master_similarity` plus declared source and target start/end ranges | Non-proving waveform, dynamics, loudness, and coarse spectral corroboration at the declared position |
 
-`matched` is limited to the declared reconstruction model. `corroborated` is weaker and is reported without being silently scored as exact proof. `not_applicable` means the submitted processing falls outside the supported model or the result is inconclusive.
+`matched` is limited to the declared reconstruction model and independent holdout blocks. `corroborated` is weaker and is reported without being silently scored as exact proof. `contradicted` is an assessed conflict. `not_applicable` means the submitted processing falls outside the supported model or is ambiguous/inconclusive; `unavailable` means there was no evidence to run the check. None of these statuses proves historical provenance by itself.
+
+For example, this edge contains enough information for a linear edit check:
+
+```json
+{
+  "hash": "<source-sha256>",
+  "relationship_type": "edited_from",
+  "attributes": {
+    "derivation_scope": "linear_edit",
+    "source_start_seconds": 10.0,
+    "source_end_seconds": 15.0,
+    "target_start_seconds": 0.0,
+    "target_end_seconds": 5.0,
+    "gain": 0.8
+  }
+}
+```
+
+If any required field is absent, the edge is still retained as a submitter
+claim, but content reconstruction returns `unavailable` with
+`reason_code: missing_derivation_parameters`. The program does not search for a
+replacement range or fit a replacement gain.
 
 ## Run the native example
 
@@ -70,7 +102,7 @@ python3 -m pip install -r requirements-c2pa.txt
 python3 -B run.py --native examples/valid-generated/submission.json --root examples/valid-generated
 ```
 
-The example processes four audio nodes in sequence: `raw-track -> stem -> mix -> master`. The expected result contains `execution_status: succeeded`, four WAV observations, and three relationship observations. This is a software-generated teaching fixture, not verified evidence of human-recorded creation.
+The example processes four audio nodes in sequence: `raw-track -> stem -> mix -> master`. The expected result contains `execution_status: succeeded`, four WAV observations, and three relationship observations. Its legacy relationships intentionally omit detailed derivation parameters, so their content checks are `unavailable` rather than inferred. This is a software-generated teaching fixture, not verified evidence of human-recorded creation.
 
 Exercise two failure boundaries:
 

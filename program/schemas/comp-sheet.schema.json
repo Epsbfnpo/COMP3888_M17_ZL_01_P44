@@ -24,6 +24,7 @@
           "source_end_seconds": { "type": "number", "minimum": 0 },
           "target_start_seconds": { "type": "number", "minimum": 0 },
           "target_end_seconds": { "type": "number", "minimum": 0 },
+          "gain": { "type": "number" },
           "notes": { "type": "string" }
         }
       }

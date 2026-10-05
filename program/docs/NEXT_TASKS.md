@@ -32,34 +32,27 @@ Comp, Stem, Mix, and Master content checks.
    stems reconstructed from a final mix, short partial matches, shuffled stems,
    phase inversion, silence, clipping, and AI-generated process evidence.
 
-3. Harden Edit, Comp, Stem, and Mix reconstruction:
+3. Calibrate the hardened Edit, Comp, Stem, and Mix checks with real labelled
+   audio. Checks now require submitter-declared ranges and gains and never fit
+   missing transformation parameters. Partitioned validation, coverage
+   reporting, correlated-source detection, source-identifiability checks,
+   repeated-segment ambiguity, and provenance disclaimers are implemented;
+   their thresholds still require real-world false-positive/false-negative
+   measurement.
 
-   - estimate gains on one interval and validate them on a held-out interval;
-   - report matched duration and target coverage, and reject insufficient
-     coverage;
-   - detect duplicate/highly correlated sources and ill-conditioned gain fits;
-   - require declared ranges where an unconstrained alignment would be
-     ambiguous;
-   - report whether multiple source locations contain indistinguishable PCM;
-   - avoid treating a successful mathematical reconstruction as provenance.
+4. Calibrate the hardened Master continuity assessment with real mastered
+   material. Master assessment now uses declared source/target ranges; competing
+   locations may expose ambiguity but are never substituted for the declared
+   alignment. Coverage, manual-review reasons, and `corroborated` separation are implemented. Expand labelled tests
+   for stronger EQ, compression, limiting, dither, fades, silence insertion,
+   clipping, and sample-rate conversion.
 
-4. Harden Master continuity assessment:
-
-   - compare the best and second-best time alignment and return inconclusive
-     when the match is not unique;
-   - expose alignment ambiguity and manual-review reasons;
-   - calibrate duration, waveform, envelope, loudness, and spectral thresholds
-     using real mastered material;
-   - test EQ, compression, limiting, dither, fades, silence insertion, clipping,
-     and sample-rate conversion;
-   - keep `corroborated` separate from exact `matched` and cryptographic proof.
-
-5. Calibrate integrity aggregation with labelled data. Separate structural
-   validity, declaration consistency, content reconstruction, CrossEvidence,
-   and cryptographic attestation in both output and weighting. Define explicit
-   handling for `matched`, `corroborated`, `contradicted`, `not_applicable`, and
-   unavailable checks. Endpoint validity alone must not create a misleadingly
-   high relationship score.
+5. Calibrate the separated integrity layers with labelled data and client input.
+   File integrity, structural validity, declaration consistency, content
+   reconstruction, CrossEvidence, and cryptographic attestation are now visible
+   separately; structural validity and cryptographic attestation do not inflate
+   integrity. Confirm the remaining score-eligible layer weights and confidence
+   model without adding an overall decision policy.
 
 6. Decide whether to restore the legacy prototype's `forge_cost` concept. If it
    is retained, use it only as a separately reported confidence/fabrication-

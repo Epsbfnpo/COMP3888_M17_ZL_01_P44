@@ -74,7 +74,7 @@ python3 -B run.py --request /path/to/request.json --root /path/to/case-root
 | Axis | Current meaning |
 |---|---|
 | completeness | Native submissions evaluate applicable workflow expectations; public WAV-only requests retain limited declared-object availability. |
-| integrity | Available file, relationship, CrossEvidence, scoped edit/comp/stem/mix derivation checks, and master content-continuity corroboration. Internal weighting remains under review. |
+| integrity | Separately reports file binding, structural validity, declaration consistency, CrossEvidence, held-out edit/comp/stem/mix reconstruction, and master content-continuity corroboration. Structural validity and C2PA attestation do not raise integrity. Remaining weights require calibration. |
 | attestation_strength | C2PA manifest/validation/trust levels when the optional SDK assesses them; otherwise unavailable. |
 | ai_disclosure | Explicit `creation_method` disclosure coverage, not AI-content detection. |
 
