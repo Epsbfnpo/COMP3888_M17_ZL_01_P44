@@ -22,10 +22,24 @@ def evaluate(request, root, mode):
     response = response_shell(request, mode)
     started, cpu = time.perf_counter(), time.process_time()
     try:
-        native = to_native(request, mode)
+        native, input_report = to_native(request, mode, include_report=True)
         (response["axes"], response["findings"], workflow_assessment,
          validation, assessment_checks) = evaluate_chain(
-            native, request["objects"], root, request.get("workflow"))
+            native, request["objects"], root, request.get("workflow"),
+            allow_disconnected=not input_report["coverage"]["complete"])
+        response["coverage"] = input_report["coverage"]
+        response["unknown_inputs"] = input_report["unknown_inputs"]
+        response["findings"] = input_report["findings"] + response["findings"]
+        if not input_report["coverage"]["complete"]:
+            note = (f" Results cover {input_report['coverage']['evaluated_artefacts']}/"
+                    f"{input_report['coverage']['submitted_artefacts']} artefacts and "
+                    f"{input_report['coverage']['evaluated_relationships']}/"
+                    f"{input_report['coverage']['submitted_relationships']} relationships; "
+                    "unknown values were not inferred.")
+            for assessment in response["axes"].values():
+                if assessment["availability"] == "available":
+                    assessment["availability"] = "partial"
+                assessment["reasoning"] = (assessment.get("reasoning") or "") + note
         if workflow_assessment is not None:
             response["workflow_assessment"] = workflow_assessment
         if assessment_checks:

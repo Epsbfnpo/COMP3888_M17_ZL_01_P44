@@ -126,6 +126,38 @@
         "items": { "type": "object" }
       }
     },
+    "coverage": {
+      "description": "How much of the submitted graph was eligible for evaluation after quarantining unknown values.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["complete", "submitted_artefacts", "evaluated_artefacts", "skipped_artefacts", "submitted_relationships", "evaluated_relationships", "skipped_relationships"],
+      "properties": {
+        "complete": { "type": "boolean" },
+        "submitted_artefacts": { "type": "integer", "minimum": 0 },
+        "evaluated_artefacts": { "type": "integer", "minimum": 0 },
+        "skipped_artefacts": { "type": "integer", "minimum": 0 },
+        "submitted_relationships": { "type": "integer", "minimum": 0 },
+        "evaluated_relationships": { "type": "integer", "minimum": 0 },
+        "skipped_relationships": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "unknown_inputs": {
+      "description": "Unknown submitter-provided values that were skipped without inference or correction.",
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["kind", "value", "action"],
+        "properties": {
+          "kind": { "enum": ["artefact_type", "relationship_type"] },
+          "value": { "type": "string", "minLength": 1 },
+          "action": { "const": "skipped" },
+          "artefact_hash": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+          "source_hash": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+          "target_hash": { "type": "string", "pattern": "^[0-9a-f]{64}$" }
+        }
+      }
+    },
     "findings": {
       "type": "array",
       "items": {

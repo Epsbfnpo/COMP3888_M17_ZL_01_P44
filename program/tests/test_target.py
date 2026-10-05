@@ -836,15 +836,56 @@ class TargetTests(unittest.TestCase):
         request["chain"]["artefacts"][-1]["evidence"][0]["hash"] = "b" * 64
         self.assertIn("undeclared", self.score(request)["error"])
 
-    def test_invalid_relationship_roles_rejected(self):
+    def test_invalid_relationship_roles_are_isolated_to_that_relationship(self):
         request = copy.deepcopy(self.template)
         request["chain"]["artefacts"][-1]["artefact_type"] = "audio/stem"
-        self.assertIn("endpoints", self.score(request)["error"])
+        result = self.score(request)
+        self.assertEqual(result["execution_status"], "succeeded", result["error"])
+        self.assertEqual(result["coverage"]["skipped_relationships"], 1)
+        self.assertTrue(any(item["code"] == "RELATIONSHIP_ENDPOINTS_SKIPPED"
+                            for item in result["findings"]))
+        self.assertTrue(all(axis["availability"] != "available"
+                            for axis in result["axes"].values()))
 
     def test_unconnected_nodes_cannot_inflate_completeness(self):
         request = copy.deepcopy(self.template)
         request["chain"]["artefacts"].append({"artefact_hash": "c" * 64, "artefact_type": "audio"})
         self.assertIn("connected", self.score(request)["error"])
+
+    def test_unknown_nonfinal_artefact_is_quarantined_and_other_files_are_checked(self):
+        request = copy.deepcopy(self.template)
+        request["chain"]["artefacts"][1]["artefact_type"] = "audio/typo-stemm"
+        result = self.score(request)
+        self.assertEqual(result["execution_status"], "succeeded", result["error"])
+        self.assertFalse(result["coverage"]["complete"])
+        self.assertEqual(result["coverage"]["submitted_artefacts"], 4)
+        self.assertEqual(result["coverage"]["evaluated_artefacts"], 3)
+        self.assertEqual(result["unknown_inputs"], [{
+            "kind": "artefact_type", "value": "audio/typo-stemm", "action": "skipped",
+            "artefact_hash": request["chain"]["artefacts"][1]["artefact_hash"],
+        }])
+        self.assertEqual(sum(item["code"] == "WAV_OBSERVATION"
+                             for item in result["findings"]), 3)
+        self.assertTrue(all(axis["availability"] != "available"
+                            for axis in result["axes"].values()))
+
+    def test_unknown_relationship_is_skipped_without_inference(self):
+        request = copy.deepcopy(self.template)
+        request["chain"]["artefacts"][1]["evidence"][0]["relationship_type"] = "stemmed-form"
+        result = self.score(request)
+        self.assertEqual(result["execution_status"], "succeeded", result["error"])
+        self.assertEqual(result["coverage"]["evaluated_artefacts"], 4)
+        self.assertEqual(result["coverage"]["evaluated_relationships"], 2)
+        self.assertEqual(result["unknown_inputs"][0]["value"], "stemmed-form")
+        self.assertFalse(any(item.get("relationship") == "stemmed_from"
+                             for item in result["findings"]))
+
+    def test_unknown_final_artefact_type_still_cannot_form_evaluation_root(self):
+        request = copy.deepcopy(self.template)
+        request["chain"]["artefacts"][-1]["artefact_type"] = "audio/typo-master"
+        result = self.score(request)
+        self.assertEqual(result["execution_status"], "unsupported")
+        self.assertIn("no evaluation root", result["error"])
 
     def test_path_traversal_rejected(self):
         request = copy.deepcopy(self.template)
@@ -895,6 +936,26 @@ class TargetTests(unittest.TestCase):
         self.assertEqual(result["execution_status"], "succeeded", result["error"])
         self.assertEqual(result["axes"]["completeness"]["availability"], "partial")
         self.assertFalse(any(f["code"] == "RELATIONSHIP_OBSERVATION" for f in result["findings"]))
+
+    def test_csec_unknown_relationship_is_reported_while_wav_files_are_checked(self):
+        source = self.template["chain"]["artefacts"][0]["artefact_hash"]
+        target = self.template["chain"]["final_artefact_hash"]
+        bundle = {"case_id": "LOCAL-CSEC-UNKNOWN-RELATIONSHIP", "final-artefact": target,
+                  "artefacts": [
+                      {"hash": source, "hash-method": "sha256", "type": "audio/wav",
+                       "evidence": []},
+                      {"hash": target, "hash-method": "sha256", "type": "audio/wav",
+                       "evidence": [{"hash": source, "hash-method": "sha256",
+                                     "relationship": "draft-of.typo"}]},
+                  ]}
+        request = run.public_bundle_request(bundle)
+        result = run.evaluate(request, self.folder, "csec")
+        self.assertEqual(result["execution_status"], "succeeded", result["error"])
+        self.assertEqual(result["coverage"]["evaluated_artefacts"], 2)
+        self.assertEqual(result["coverage"]["evaluated_relationships"], 0)
+        self.assertEqual(result["unknown_inputs"][0]["value"], "draft-of.typo")
+        self.assertEqual(sum(item["code"] == "WAV_OBSERVATION"
+                             for item in result["findings"]), 2)
 
     def test_timeout_terminates_an_actual_sleeping_worker(self):
         request = copy.deepcopy(self.template)

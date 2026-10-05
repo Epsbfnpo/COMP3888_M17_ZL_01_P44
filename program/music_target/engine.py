@@ -141,25 +141,23 @@ class MusicRelationshipPass(EvidencePass):
 
 
 def collect_results(final_artefact):
-    # Follow evidence once per node: shared ancestors must not be counted twice.
-    visited, observations, relationships = set(), {}, []
-    pending = [final_artefact]
-    while pending:
-        artefact = pending.pop()
-        if artefact.artefact_hash in visited:
-            continue
-        visited.add(artefact.artefact_hash)
+    # Include retained nodes that became disconnected only because an unknown
+    # node or relationship was quarantined.
+    chain = final_artefact._evaluation_chain
+    observations, relationships = {}, []
+    for artefact in chain.artefacts.values():
         if artefact.artefact_type.artefact_type_name.startswith("audio"):
             _, observations[artefact.artefact_hash] = artefact.get_pass_result(WavMetadataPass)
         for edge in artefact.get_evidence():
             _, result = edge.get_pass_result(MusicRelationshipPass)
             relationships.append(result)
-            pending.append(edge.get_evidence_artefact())
     return observations, relationships
 
 
-def evaluate_chain(native, objects, root, workflow=None):
+def evaluate_chain(native, objects, root, workflow=None, allow_disconnected=False):
     chain = EvidenceChain.from_dict(native)
+    for artefact in chain.artefacts.values():
+        artefact._evaluation_chain = chain
     for edge in chain.get_evidence_relationships():
         if not edge.relationship_type.validate_types(
                 edge.get_result_artefact().artefact_type,
@@ -173,7 +171,7 @@ def evaluate_chain(native, objects, root, workflow=None):
         if digest not in reachable:
             reachable.add(digest)
             pending.extend(chain.artefacts[digest].evidence)
-    if reachable != set(chain.artefacts):
+    if reachable != set(chain.artefacts) and not allow_disconnected:
         raise InputError("All declared artefacts must be connected to the final artefact.")
 
     root = Path(root).resolve(strict=True)

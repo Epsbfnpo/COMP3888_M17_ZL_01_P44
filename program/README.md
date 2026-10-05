@@ -49,6 +49,17 @@ The four dimensions respect separate evidence boundaries:
 
 A `null` value means not assessed and must not be interpreted as zero. The system intentionally does not produce an overall score, an acceptance/rejection decision, or a human-versus-AI creator classification. Those omissions are design boundaries, not unfinished functionality.
 
+An unknown non-final `artefact_type` or unknown `relationship_type` is
+quarantined instead of aborting the whole evaluation. Known files and
+relationships are still checked, while `coverage`, `unknown_inputs`, and
+detailed findings report what was omitted. The program does not infer, correct,
+or map an unknown value. Every otherwise available axis is downgraded to
+`partial` when coverage is incomplete. An unknown final artefact type remains
+`unsupported`, and structurally unsafe input such as a dangling hash, duplicate
+node, malformed request, or unrelated supported node remains an `error`.
+A registered relationship whose endpoint roles are incompatible is isolated
+and reported without being applied to the retained graph.
+
 The program does not infer relationships or fill in missing relationship
 parameters. It evaluates only graph edges and transformation parameters supplied
 in the submission. Missing evidence lowers assessment availability and
