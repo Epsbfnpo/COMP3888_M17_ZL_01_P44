@@ -1,0 +1,48 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.edu.au/csec3888/c2pa-redteam/public-bundle.schema.json",
+  "title": "CSEC red-team public evaluation bundle (candidate profile)",
+  "description": "Partner-facing evidence only. Private ground truth, attack labels, expected decisions, execution data, and key paths are forbidden by the exporter allow-list.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["case_id", "final-artefact", "artefacts"],
+  "properties": {
+    "case_id": { "type": "string", "minLength": 1 },
+    "final-artefact": { "$ref": "#/$defs/sha256" },
+    "artefacts": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/artefact" }
+    }
+  },
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "artefact": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["hash", "hash-method", "type", "evidence"],
+      "properties": {
+        "hash": { "$ref": "#/$defs/sha256" },
+        "hash-method": { "const": "sha256" },
+        "type": { "type": "string", "minLength": 1 },
+        "evidence": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/evidence" }
+        }
+      }
+    },
+    "evidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["hash", "hash-method", "relationship"],
+      "properties": {
+        "hash": { "$ref": "#/$defs/sha256" },
+        "hash-method": { "const": "sha256" },
+        "relationship": { "type": "string", "minLength": 1 }
+      }
+    }
+  }
+}

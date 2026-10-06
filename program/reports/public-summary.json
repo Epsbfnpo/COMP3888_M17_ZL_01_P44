@@ -1,0 +1,374 @@
+{
+  "source_revision": "sha256:45c37462ab33f8df5bc823e70b83cd9071e99196af3faf5b00af3060ae0d9de6",
+  "case_count": 11,
+  "execution_counts": {
+    "unsupported": 9,
+    "succeeded": 2
+  },
+  "interpretation": "Execution compatibility only. No private ground truth, decision policy or false-accept/false-reject rates.",
+  "results": [
+    {
+      "case_id": "EVAL-2A3037BF9FB7EA5F",
+      "media_type": "image/png",
+      "execution_status": "unsupported",
+      "axes": {
+        "completeness": {
+          "availability": "unavailable",
+          "value": null,
+          "confidence": null,
+          "reasoning": "This evaluation has no result for this axis."
+        },
+        "integrity": {
+          "availability": "unavailable",
+          "value": null,
+          "confidence": null,
+          "reasoning": "This evaluation has no result for this axis."
+        },
+        "attestation_strength": {
+          "availability": "unavailable",
+          "value": null,
+          "confidence": null,
+          "reasoning": "This evaluation has no result for this axis."
+        },
+        "ai_disclosure": {
+          "availability": "unavailable",
+          "value": null,
+          "confidence": null,
+          "reasoning": "This evaluation has no result for this axis."
+        }
+      },
+      "response": "public-results/EVAL-2A3037BF9FB7EA5F.response.json",
+      "error": "This target evaluates WAV audio only; PNG/MP4 are unsupported."
+    },
+    {
+      "case_id": "EVAL-3F480009B3F3A693",
+      "media_type": "image/png",
+      "execution_status": "unsupported",
+      "axes": {
+        "completeness": {
+          "availability": "unavailable",
+          "value": null,
+          "confidence": null,
+          "reasoning": "This evaluation has no result for this axis."
+        },
+        "integrity": {
+          "availability": "unavailable",
+          "value": null,
+          "confidence": null,
+          "reasoning": "This evaluation has no result for this axis."
+        },
+        "attestation_strength": {
+          "availability": "unavailable",
+          "value": null,
+          "confidence": null,
+          "reasoning": "This evaluation has no result for this axis."
+        },
+        "ai_disclosure": {
+          "availability": "unavailable",
+          "value": null,
+          "confidence": null,
+          "reasoning": "This evaluation has no result for this axis."
+        }
+      },
+      "response": "public-results/EVAL-3F480009B3F3A693.response.json",
+      "error": "This target evaluates WAV audio only; PNG/MP4 are unsupported."
+    },
+    {
+      "case_id": "EVAL-7734FA609F41688C",
+      "media_type": "image/png",
+      "execution_status": "unsupported",
+      "axes": {
+        "completeness": {
+          "availability": "unavailable",
+          "value": null,
+          "confidence": null,
+          "reasoning": "This evaluation has no result for this axis."
+        },
+        "integrity": {
+          "availability": "unavailable",
+          "value": null,
+          "confidence": null,
+          "reasoning": "This evaluation has no result for this axis."
+        },
+        "attestation_strength": {
+          "availability": "unavailable",
+          "value": null,
+          "confidence": null,
+          "reasoning": "This evaluation has no result for this axis."
+        },
+        "ai_disclosure": {
+          "availability": "unavailable",
+          "value": null,
+          "confidence": null,
+          "reasoning": "This evaluation has no result for this axis."
+        }
+      },
+      "response": "public-results/EVAL-7734FA609F41688C.response.json",
+      "error": "This target evaluates WAV audio only; PNG/MP4 are unsupported."
+    },
+    {
+      "case_id": "EVAL-6AF91BB21AD3A321",
+      "media_type": "image/png",
+      "execution_status": "unsupported",
+      "axes": {
+        "completeness": {
+          "availability": "unavailable",
+          "value": null,
+          "confidence": null,
+          "reasoning": "This evaluation has no result for this axis."
+        },
+        "integrity": {
+          "availability": "unavailable",
+          "value": null,
+          "confidence": null,
+          "reasoning": "This evaluation has no result for this axis."
+        },
+        "attestation_strength": {
+          "availability": "unavailable",
+          "value": null,
+          "confidence": null,
+          "reasoning": "This evaluation has no result for this axis."
+        },
+        "ai_disclosure": {
+          "availability": "unavailable",
+          "value": null,
+          "confidence": null,
+          "reasoning": "This evaluation has no result for this axis."
+        }
+      },
+      "response": "public-results/EVAL-6AF91BB21AD3A321.response.json",
+      "error": "This target evaluates WAV audio only; PNG/MP4 are unsupported."
+    },
+    {
+      "case_id": "EVAL-8FF5058100370A17",
+      "media_type": "image/png",
+      "execution_status": "unsupported",
+      "axes": {
+        "completeness": {
+          "availability": "unavailable",
+          "value": null,
+          "confidence": null,
+          "reasoning": "This evaluation has no result for this axis."
+        },
+        "integrity": {
+          "availability": "unavailable",
+          "value": null,
+          "confidence": null,
+          "reasoning": "This evaluation has no result for this axis."
+        },
+        "attestation_strength": {
+          "availability": "unavailable",
+          "value": null,
+          "confidence": null,
+          "reasoning": "This evaluation has no result for this axis."
+        },
+        "ai_disclosure": {
+          "availability": "unavailable",
+          "value": null,
+          "confidence": null,
+          "reasoning": "This evaluation has no result for this axis."
+        }
+      },
+      "response": "public-results/EVAL-8FF5058100370A17.response.json",
+      "error": "This target evaluates WAV audio only; PNG/MP4 are unsupported."
+    },
+    {
+      "case_id": "EVAL-08630E3078C8BD9E",
+      "media_type": "video/mp4",
+      "execution_status": "unsupported",
+      "axes": {
+        "completeness": {
+          "availability": "unavailable",
+          "value": null,
+          "confidence": null,
+          "reasoning": "This evaluation has no result for this axis."
+        },
+        "integrity": {
+          "availability": "unavailable",
+          "value": null,
+          "confidence": null,
+          "reasoning": "This evaluation has no result for this axis."
+        },
+        "attestation_strength": {
+          "availability": "unavailable",
+          "value": null,
+          "confidence": null,
+          "reasoning": "This evaluation has no result for this axis."
+        },
+        "ai_disclosure": {
+          "availability": "unavailable",
+          "value": null,
+          "confidence": null,
+          "reasoning": "This evaluation has no result for this axis."
+        }
+      },
+      "response": "public-results/EVAL-08630E3078C8BD9E.response.json",
+      "error": "This target evaluates WAV audio only; PNG/MP4 are unsupported."
+    },
+    {
+      "case_id": "EVAL-3983A355ED78DBB5",
+      "media_type": "audio/wav",
+      "execution_status": "succeeded",
+      "axes": {
+        "completeness": {
+          "availability": "partial",
+          "value": 1.0,
+          "confidence": null,
+          "reasoning": "1/1 declared reachable objects were available and hash-matched. This measures declared-object availability only; required musical evidence is not yet agreed."
+        },
+        "integrity": {
+          "availability": "unavailable",
+          "value": null,
+          "confidence": null,
+          "reasoning": "Hash and PCM checks completed for available files. A combined integrity scoring policy has not been defined; inspect findings."
+        },
+        "attestation_strength": {
+          "availability": "unavailable",
+          "value": null,
+          "confidence": null,
+          "reasoning": "No signature trust evaluation is implemented in this target."
+        },
+        "ai_disclosure": {
+          "availability": "unavailable",
+          "value": null,
+          "confidence": null,
+          "reasoning": "No verified AI-disclosure extraction/scoring is implemented in this target."
+        }
+      },
+      "response": "public-results/EVAL-3983A355ED78DBB5.response.json",
+      "error": null
+    },
+    {
+      "case_id": "EVAL-13B81E253FDC0B0F",
+      "media_type": "image/png",
+      "execution_status": "unsupported",
+      "axes": {
+        "completeness": {
+          "availability": "unavailable",
+          "value": null,
+          "confidence": null,
+          "reasoning": "This evaluation has no result for this axis."
+        },
+        "integrity": {
+          "availability": "unavailable",
+          "value": null,
+          "confidence": null,
+          "reasoning": "This evaluation has no result for this axis."
+        },
+        "attestation_strength": {
+          "availability": "unavailable",
+          "value": null,
+          "confidence": null,
+          "reasoning": "This evaluation has no result for this axis."
+        },
+        "ai_disclosure": {
+          "availability": "unavailable",
+          "value": null,
+          "confidence": null,
+          "reasoning": "This evaluation has no result for this axis."
+        }
+      },
+      "response": "public-results/EVAL-13B81E253FDC0B0F.response.json",
+      "error": "This target evaluates WAV audio only; PNG/MP4 are unsupported."
+    },
+    {
+      "case_id": "EVAL-CF4152A73AD6B9EC",
+      "media_type": "image/png",
+      "execution_status": "unsupported",
+      "axes": {
+        "completeness": {
+          "availability": "unavailable",
+          "value": null,
+          "confidence": null,
+          "reasoning": "This evaluation has no result for this axis."
+        },
+        "integrity": {
+          "availability": "unavailable",
+          "value": null,
+          "confidence": null,
+          "reasoning": "This evaluation has no result for this axis."
+        },
+        "attestation_strength": {
+          "availability": "unavailable",
+          "value": null,
+          "confidence": null,
+          "reasoning": "This evaluation has no result for this axis."
+        },
+        "ai_disclosure": {
+          "availability": "unavailable",
+          "value": null,
+          "confidence": null,
+          "reasoning": "This evaluation has no result for this axis."
+        }
+      },
+      "response": "public-results/EVAL-CF4152A73AD6B9EC.response.json",
+      "error": "This target evaluates WAV audio only; PNG/MP4 are unsupported."
+    },
+    {
+      "case_id": "EVAL-9A69364FD884E3A8",
+      "media_type": "video/mp4",
+      "execution_status": "unsupported",
+      "axes": {
+        "completeness": {
+          "availability": "unavailable",
+          "value": null,
+          "confidence": null,
+          "reasoning": "This evaluation has no result for this axis."
+        },
+        "integrity": {
+          "availability": "unavailable",
+          "value": null,
+          "confidence": null,
+          "reasoning": "This evaluation has no result for this axis."
+        },
+        "attestation_strength": {
+          "availability": "unavailable",
+          "value": null,
+          "confidence": null,
+          "reasoning": "This evaluation has no result for this axis."
+        },
+        "ai_disclosure": {
+          "availability": "unavailable",
+          "value": null,
+          "confidence": null,
+          "reasoning": "This evaluation has no result for this axis."
+        }
+      },
+      "response": "public-results/EVAL-9A69364FD884E3A8.response.json",
+      "error": "This target evaluates WAV audio only; PNG/MP4 are unsupported."
+    },
+    {
+      "case_id": "EVAL-C63FB025CDCAA23A",
+      "media_type": "audio/wav",
+      "execution_status": "succeeded",
+      "axes": {
+        "completeness": {
+          "availability": "partial",
+          "value": 1.0,
+          "confidence": null,
+          "reasoning": "1/1 declared reachable objects were available and hash-matched. This measures declared-object availability only; required musical evidence is not yet agreed."
+        },
+        "integrity": {
+          "availability": "unavailable",
+          "value": null,
+          "confidence": null,
+          "reasoning": "Hash and PCM checks completed for available files. A combined integrity scoring policy has not been defined; inspect findings."
+        },
+        "attestation_strength": {
+          "availability": "unavailable",
+          "value": null,
+          "confidence": null,
+          "reasoning": "No signature trust evaluation is implemented in this target."
+        },
+        "ai_disclosure": {
+          "availability": "unavailable",
+          "value": null,
+          "confidence": null,
+          "reasoning": "No verified AI-disclosure extraction/scoring is implemented in this target."
+        }
+      },
+      "response": "public-results/EVAL-C63FB025CDCAA23A.response.json",
+      "error": null
+    }
+  ]
+}

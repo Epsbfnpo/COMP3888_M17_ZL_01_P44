@@ -1,0 +1,60 @@
+{
+  "schema_version": "0.2-candidate",
+  "run_id": "842498bc-b128-4b49-a275-6ce319b4d67f",
+  "case_id": "LOCAL-INVALID-HASH",
+  "asset_sha256": "746c90b6d8f6306ce93c347477103c16027d71a4072cf12d10a9f7246ce93d18",
+  "system": {
+    "name": "COMP3888-music-baseline",
+    "version": "0.5.0",
+    "source_revision": "sha256:0c270f8b8ae42032b35acca090a72747f9cac4252f094307297feccbb6a017b0"
+  },
+  "execution_status": "error",
+  "axes": {
+    "completeness": {
+      "availability": "unavailable",
+      "value": null,
+      "confidence": null,
+      "reasoning": "This evaluation has no result for this axis."
+    },
+    "integrity": {
+      "availability": "unavailable",
+      "value": null,
+      "confidence": null,
+      "reasoning": "This evaluation has no result for this axis."
+    },
+    "attestation_strength": {
+      "availability": "unavailable",
+      "value": null,
+      "confidence": null,
+      "reasoning": "This evaluation has no result for this axis."
+    },
+    "ai_disclosure": {
+      "availability": "unavailable",
+      "value": null,
+      "confidence": null,
+      "reasoning": "This evaluation has no result for this axis."
+    }
+  },
+  "validation": {
+    "validation_state": null,
+    "signature_present": null,
+    "signature_valid": null,
+    "cryptographically_valid": null,
+    "credential_trusted": null,
+    "codes": [],
+    "reasons": []
+  },
+  "findings": [
+    {
+      "code": "INVALID_OR_FAILED_INPUT",
+      "severity": "medium",
+      "message": "SHA-256 mismatch for declared object 746c90b6d8f6306ce93c347477103c16027d71a4072cf12d10a9f7246ce93d18."
+    }
+  ],
+  "processing_ms": 150.18104200134985,
+  "resource_usage": {
+    "cpu_ms": 1.0940000000000116,
+    "peak_rss_kib": null
+  },
+  "error": "SHA-256 mismatch for declared object 746c90b6d8f6306ce93c347477103c16027d71a4072cf12d10a9f7246ce93d18."
+}

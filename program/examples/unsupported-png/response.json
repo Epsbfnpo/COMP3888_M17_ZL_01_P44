@@ -1,0 +1,60 @@
+{
+  "schema_version": "0.2-candidate",
+  "run_id": "842498bc-b128-4b49-a275-6ce319b4d680",
+  "case_id": "LOCAL-UNSUPPORTED-PNG",
+  "asset_sha256": "d126d616641d42ac8b0a07ec302c9fa1ec049f86200931a0a60c8f3080284b77",
+  "system": {
+    "name": "COMP3888-music-baseline",
+    "version": "0.5.0",
+    "source_revision": "sha256:0c270f8b8ae42032b35acca090a72747f9cac4252f094307297feccbb6a017b0"
+  },
+  "execution_status": "unsupported",
+  "axes": {
+    "completeness": {
+      "availability": "unavailable",
+      "value": null,
+      "confidence": null,
+      "reasoning": "This evaluation has no result for this axis."
+    },
+    "integrity": {
+      "availability": "unavailable",
+      "value": null,
+      "confidence": null,
+      "reasoning": "This evaluation has no result for this axis."
+    },
+    "attestation_strength": {
+      "availability": "unavailable",
+      "value": null,
+      "confidence": null,
+      "reasoning": "This evaluation has no result for this axis."
+    },
+    "ai_disclosure": {
+      "availability": "unavailable",
+      "value": null,
+      "confidence": null,
+      "reasoning": "This evaluation has no result for this axis."
+    }
+  },
+  "validation": {
+    "validation_state": null,
+    "signature_present": null,
+    "signature_valid": null,
+    "cryptographically_valid": null,
+    "credential_trusted": null,
+    "codes": [],
+    "reasons": []
+  },
+  "findings": [
+    {
+      "code": "UNSUPPORTED_INPUT",
+      "severity": "info",
+      "message": "The final artefact has unregistered type 'image/png'; no evaluation root can be formed."
+    }
+  ],
+  "processing_ms": 149.5497500000056,
+  "resource_usage": {
+    "cpu_ms": 0.5779999999999952,
+    "peak_rss_kib": null
+  },
+  "error": "The final artefact has unregistered type 'image/png'; no evaluation root can be formed."
+}

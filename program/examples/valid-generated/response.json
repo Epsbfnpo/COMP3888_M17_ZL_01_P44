@@ -1,0 +1,1212 @@
+{
+  "schema_version": "0.2-candidate",
+  "run_id": "842498bc-b128-4b49-a275-6ce319b4d67e",
+  "case_id": "LOCAL-GENERATED-VALID",
+  "asset_sha256": "746c90b6d8f6306ce93c347477103c16027d71a4072cf12d10a9f7246ce93d18",
+  "system": {
+    "name": "COMP3888-music-baseline",
+    "version": "0.5.0",
+    "source_revision": "sha256:0c270f8b8ae42032b35acca090a72747f9cac4252f094307297feccbb6a017b0"
+  },
+  "execution_status": "succeeded",
+  "axes": {
+    "completeness": {
+      "availability": "available",
+      "value": 1.0,
+      "confidence": 1.0,
+      "reasoning": "Workflow mastering_service_only: 7/7 assessed required/conditional weight satisfied. Optional evidence is excluded."
+    },
+    "integrity": {
+      "availability": "partial",
+      "value": null,
+      "confidence": 0.4,
+      "reasoning": "Integrity has 2/4 score-eligible evidence layers; missing evidence reduces availability and confidence but is never treated as contradiction. A numeric value is withheld without content reconstruction or independent CrossEvidence unless a contradiction exists. Structural validity and cryptographic attestation are reported separately and do not raise integrity. 0 Master/content corroboration result(s) were not scored as exact matches."
+    },
+    "attestation_strength": {
+      "availability": "unavailable",
+      "value": null,
+      "confidence": null,
+      "reasoning": "C2PA SDK is unavailable, so no cryptographic attestation was assessed."
+    },
+    "ai_disclosure": {
+      "availability": "available",
+      "value": 1.0,
+      "confidence": 0.8,
+      "reasoning": "Explicit creation_method declarations cover 4/4 audio artefacts; this is disclosure coverage, not AI detection."
+    }
+  },
+  "validation": {
+    "validation_state": null,
+    "signature_present": null,
+    "signature_valid": null,
+    "cryptographically_valid": null,
+    "credential_trusted": null,
+    "codes": [],
+    "reasons": []
+  },
+  "findings": [
+    {
+      "code": "WAV_OBSERVATION",
+      "severity": "info",
+      "message": "Measured WAV properties and extracted metadata.",
+      "evidence_hash": "7580f3a09b8a02bdfc6520235e92f6c8318dd3b52002b7eb8a430abc2c007dea",
+      "observed": {
+        "duration_seconds": 0.5,
+        "sample_rate_hz": 8000,
+        "channels": 1,
+        "bit_depth": 16,
+        "format": "WAV",
+        "codec_subtype": "PCM",
+        "file_size_bytes": 8044
+      },
+      "embedded_metadata": {
+        "core_format": {
+          "audio_format_code": 1,
+          "audio_format": "PCM",
+          "num_channels": 1,
+          "sample_rate_hz": 8000,
+          "byte_rate": 16000,
+          "block_align": 2,
+          "bits_per_sample": 16,
+          "data_size_bytes": 8000,
+          "duration_seconds": 0.5
+        },
+        "info": {},
+        "broadcast_extension": null,
+        "cue_points": [],
+        "sampler": null,
+        "fact": null,
+        "id3": null,
+        "other_chunks": [],
+        "warnings": []
+      },
+      "claim_mismatches": []
+    },
+    {
+      "code": "WAV_OBSERVATION",
+      "severity": "info",
+      "message": "Measured WAV properties and extracted metadata.",
+      "evidence_hash": "6aacc6b93785fbbefb186285e5f9c9ce49a6ccc7c2af664fc2f2a21416001ea0",
+      "observed": {
+        "duration_seconds": 0.5,
+        "sample_rate_hz": 8000,
+        "channels": 1,
+        "bit_depth": 16,
+        "format": "WAV",
+        "codec_subtype": "PCM",
+        "file_size_bytes": 8044
+      },
+      "embedded_metadata": {
+        "core_format": {
+          "audio_format_code": 1,
+          "audio_format": "PCM",
+          "num_channels": 1,
+          "sample_rate_hz": 8000,
+          "byte_rate": 16000,
+          "block_align": 2,
+          "bits_per_sample": 16,
+          "data_size_bytes": 8000,
+          "duration_seconds": 0.5
+        },
+        "info": {},
+        "broadcast_extension": null,
+        "cue_points": [],
+        "sampler": null,
+        "fact": null,
+        "id3": null,
+        "other_chunks": [],
+        "warnings": []
+      },
+      "claim_mismatches": []
+    },
+    {
+      "code": "WAV_OBSERVATION",
+      "severity": "info",
+      "message": "Measured WAV properties and extracted metadata.",
+      "evidence_hash": "bc1dd3c26ef5f4d97fbb41e653e93a09c940b53c75229594d82c928727134ca0",
+      "observed": {
+        "duration_seconds": 0.5,
+        "sample_rate_hz": 8000,
+        "channels": 1,
+        "bit_depth": 16,
+        "format": "WAV",
+        "codec_subtype": "PCM",
+        "file_size_bytes": 8044
+      },
+      "embedded_metadata": {
+        "core_format": {
+          "audio_format_code": 1,
+          "audio_format": "PCM",
+          "num_channels": 1,
+          "sample_rate_hz": 8000,
+          "byte_rate": 16000,
+          "block_align": 2,
+          "bits_per_sample": 16,
+          "data_size_bytes": 8000,
+          "duration_seconds": 0.5
+        },
+        "info": {},
+        "broadcast_extension": null,
+        "cue_points": [],
+        "sampler": null,
+        "fact": null,
+        "id3": null,
+        "other_chunks": [],
+        "warnings": []
+      },
+      "claim_mismatches": []
+    },
+    {
+      "code": "WAV_OBSERVATION",
+      "severity": "info",
+      "message": "Measured WAV properties and extracted metadata.",
+      "evidence_hash": "746c90b6d8f6306ce93c347477103c16027d71a4072cf12d10a9f7246ce93d18",
+      "observed": {
+        "duration_seconds": 0.5,
+        "sample_rate_hz": 8000,
+        "channels": 1,
+        "bit_depth": 16,
+        "format": "WAV",
+        "codec_subtype": "PCM",
+        "file_size_bytes": 8044
+      },
+      "embedded_metadata": {
+        "core_format": {
+          "audio_format_code": 1,
+          "audio_format": "PCM",
+          "num_channels": 1,
+          "sample_rate_hz": 8000,
+          "byte_rate": 16000,
+          "block_align": 2,
+          "bits_per_sample": 16,
+          "data_size_bytes": 8000,
+          "duration_seconds": 0.5
+        },
+        "info": {},
+        "broadcast_extension": null,
+        "cue_points": [],
+        "sampler": null,
+        "fact": null,
+        "id3": null,
+        "other_chunks": [],
+        "warnings": []
+      },
+      "claim_mismatches": []
+    },
+    {
+      "code": "RELATIONSHIP_OBSERVATION",
+      "severity": "info",
+      "message": "Relationship diagnostics; scoped edit, comp, stem and mix claims receive content analysis, while mastering receives continuity corroboration.",
+      "source_hash": "7580f3a09b8a02bdfc6520235e92f6c8318dd3b52002b7eb8a430abc2c007dea",
+      "target_hash": "6aacc6b93785fbbefb186285e5f9c9ce49a6ccc7c2af664fc2f2a21416001ea0",
+      "relationship": "stemmed_from",
+      "content_relationship_verified": null,
+      "duration_delta_seconds": 0.0
+    },
+    {
+      "code": "RELATIONSHIP_OBSERVATION",
+      "severity": "info",
+      "message": "Relationship diagnostics; scoped edit, comp, stem and mix claims receive content analysis, while mastering receives continuity corroboration.",
+      "source_hash": "6aacc6b93785fbbefb186285e5f9c9ce49a6ccc7c2af664fc2f2a21416001ea0",
+      "target_hash": "bc1dd3c26ef5f4d97fbb41e653e93a09c940b53c75229594d82c928727134ca0",
+      "relationship": "mixed_from",
+      "content_relationship_verified": null,
+      "duration_delta_seconds": 0.0
+    },
+    {
+      "code": "RELATIONSHIP_OBSERVATION",
+      "severity": "info",
+      "message": "Relationship diagnostics; scoped edit, comp, stem and mix claims receive content analysis, while mastering receives continuity corroboration.",
+      "source_hash": "bc1dd3c26ef5f4d97fbb41e653e93a09c940b53c75229594d82c928727134ca0",
+      "target_hash": "746c90b6d8f6306ce93c347477103c16027d71a4072cf12d10a9f7246ce93d18",
+      "relationship": "mastered_from",
+      "content_relationship_verified": null,
+      "duration_delta_seconds": 0.0
+    },
+    {
+      "code": "PARSER_OBSERVATION",
+      "severity": "info",
+      "message": "audio/raw-track: parsed",
+      "parser": "wav",
+      "parser_status": "parsed",
+      "parser_result": {
+        "observed": {
+          "duration_seconds": 0.5,
+          "sample_rate_hz": 8000,
+          "channels": 1,
+          "bit_depth": 16,
+          "format": "WAV",
+          "codec_subtype": "PCM",
+          "file_size_bytes": 8044
+        },
+        "embedded_metadata": {
+          "core_format": {
+            "audio_format_code": 1,
+            "audio_format": "PCM",
+            "num_channels": 1,
+            "sample_rate_hz": 8000,
+            "byte_rate": 16000,
+            "block_align": 2,
+            "bits_per_sample": 16,
+            "data_size_bytes": 8000,
+            "duration_seconds": 0.5
+          },
+          "info": {},
+          "broadcast_extension": null,
+          "cue_points": [],
+          "sampler": null,
+          "fact": null,
+          "id3": null,
+          "other_chunks": [],
+          "warnings": []
+        },
+        "claim_mismatches": []
+      },
+      "evidence_hash": "7580f3a09b8a02bdfc6520235e92f6c8318dd3b52002b7eb8a430abc2c007dea"
+    },
+    {
+      "code": "PARSER_OBSERVATION",
+      "severity": "info",
+      "message": "audio/stem: parsed",
+      "parser": "wav",
+      "parser_status": "parsed",
+      "parser_result": {
+        "observed": {
+          "duration_seconds": 0.5,
+          "sample_rate_hz": 8000,
+          "channels": 1,
+          "bit_depth": 16,
+          "format": "WAV",
+          "codec_subtype": "PCM",
+          "file_size_bytes": 8044
+        },
+        "embedded_metadata": {
+          "core_format": {
+            "audio_format_code": 1,
+            "audio_format": "PCM",
+            "num_channels": 1,
+            "sample_rate_hz": 8000,
+            "byte_rate": 16000,
+            "block_align": 2,
+            "bits_per_sample": 16,
+            "data_size_bytes": 8000,
+            "duration_seconds": 0.5
+          },
+          "info": {},
+          "broadcast_extension": null,
+          "cue_points": [],
+          "sampler": null,
+          "fact": null,
+          "id3": null,
+          "other_chunks": [],
+          "warnings": []
+        },
+        "claim_mismatches": []
+      },
+      "evidence_hash": "6aacc6b93785fbbefb186285e5f9c9ce49a6ccc7c2af664fc2f2a21416001ea0"
+    },
+    {
+      "code": "PARSER_OBSERVATION",
+      "severity": "info",
+      "message": "audio/mix: parsed",
+      "parser": "wav",
+      "parser_status": "parsed",
+      "parser_result": {
+        "observed": {
+          "duration_seconds": 0.5,
+          "sample_rate_hz": 8000,
+          "channels": 1,
+          "bit_depth": 16,
+          "format": "WAV",
+          "codec_subtype": "PCM",
+          "file_size_bytes": 8044
+        },
+        "embedded_metadata": {
+          "core_format": {
+            "audio_format_code": 1,
+            "audio_format": "PCM",
+            "num_channels": 1,
+            "sample_rate_hz": 8000,
+            "byte_rate": 16000,
+            "block_align": 2,
+            "bits_per_sample": 16,
+            "data_size_bytes": 8000,
+            "duration_seconds": 0.5
+          },
+          "info": {},
+          "broadcast_extension": null,
+          "cue_points": [],
+          "sampler": null,
+          "fact": null,
+          "id3": null,
+          "other_chunks": [],
+          "warnings": []
+        },
+        "claim_mismatches": []
+      },
+      "evidence_hash": "bc1dd3c26ef5f4d97fbb41e653e93a09c940b53c75229594d82c928727134ca0"
+    },
+    {
+      "code": "PARSER_OBSERVATION",
+      "severity": "info",
+      "message": "audio/master: parsed",
+      "parser": "wav",
+      "parser_status": "parsed",
+      "parser_result": {
+        "observed": {
+          "duration_seconds": 0.5,
+          "sample_rate_hz": 8000,
+          "channels": 1,
+          "bit_depth": 16,
+          "format": "WAV",
+          "codec_subtype": "PCM",
+          "file_size_bytes": 8044
+        },
+        "embedded_metadata": {
+          "core_format": {
+            "audio_format_code": 1,
+            "audio_format": "PCM",
+            "num_channels": 1,
+            "sample_rate_hz": 8000,
+            "byte_rate": 16000,
+            "block_align": 2,
+            "bits_per_sample": 16,
+            "data_size_bytes": 8000,
+            "duration_seconds": 0.5
+          },
+          "info": {},
+          "broadcast_extension": null,
+          "cue_points": [],
+          "sampler": null,
+          "fact": null,
+          "id3": null,
+          "other_chunks": [],
+          "warnings": []
+        },
+        "claim_mismatches": []
+      },
+      "evidence_hash": "746c90b6d8f6306ce93c347477103c16027d71a4072cf12d10a9f7246ce93d18"
+    },
+    {
+      "code": "C2PA_PARSER_UNAVAILABLE",
+      "severity": "low",
+      "message": "c2pa-python is not installed; C2PA attestation was not assessed."
+    }
+  ],
+  "processing_ms": 184.76920800458174,
+  "resource_usage": {
+    "cpu_ms": 31.830000000000027,
+    "peak_rss_kib": null
+  },
+  "error": null,
+  "coverage": {
+    "complete": true,
+    "submitted_artefacts": 4,
+    "evaluated_artefacts": 4,
+    "skipped_artefacts": 0,
+    "submitted_relationships": 3,
+    "evaluated_relationships": 3,
+    "skipped_relationships": 0
+  },
+  "unknown_inputs": [],
+  "workflow_assessment": {
+    "policy_id": "comp3888-music-workflow-evidence",
+    "policy_version": "0.1.0-candidate",
+    "workflow_id": "mastering_service_only",
+    "workflow_title": "Mastering service from a supplied pre-master",
+    "modifiers": [
+      "includes_mastering"
+    ],
+    "allowed_final_type": true,
+    "summary": {
+      "applicable_rules": 6,
+      "assessed_rules": 6,
+      "satisfied_rules": 6,
+      "missing_rules": 0
+    },
+    "rule_results": [
+      {
+        "rule_id": "common.final_artefact",
+        "level": "required",
+        "kind": "artifact_presence",
+        "status": "satisfied",
+        "weight": 1.0,
+        "reason": "Found 1 usable bound matching artefact(s); minimum is 1.",
+        "matched_artefact_hashes": [
+          "746c90b6d8f6306ce93c347477103c16027d71a4072cf12d10a9f7246ce93d18"
+        ],
+        "matched_relationships": []
+      },
+      {
+        "rule_id": "common.submitter_declaration",
+        "level": "required",
+        "kind": "declaration_presence",
+        "status": "satisfied",
+        "weight": 0.5,
+        "reason": "Declaration 'submitter_confirmation' is present.",
+        "matched_artefact_hashes": [],
+        "matched_relationships": []
+      },
+      {
+        "rule_id": "common.creation_method_disclosure",
+        "level": "required",
+        "kind": "declaration_presence",
+        "status": "satisfied",
+        "weight": 0.5,
+        "reason": "Declaration 'artefacts[].creation_method' is present.",
+        "matched_artefact_hashes": [],
+        "matched_relationships": []
+      },
+      {
+        "rule_id": "mastering.pre_master",
+        "level": "required",
+        "kind": "artifact_presence",
+        "status": "satisfied",
+        "weight": 2.0,
+        "reason": "Found 1 usable bound matching artefact(s); minimum is 1.",
+        "matched_artefact_hashes": [
+          "bc1dd3c26ef5f4d97fbb41e653e93a09c940b53c75229594d82c928727134ca0"
+        ],
+        "matched_relationships": []
+      },
+      {
+        "rule_id": "mastering.final_master",
+        "level": "required",
+        "kind": "artifact_presence",
+        "status": "satisfied",
+        "weight": 1.0,
+        "reason": "Found 1 usable bound matching artefact(s); minimum is 1.",
+        "matched_artefact_hashes": [
+          "746c90b6d8f6306ce93c347477103c16027d71a4072cf12d10a9f7246ce93d18"
+        ],
+        "matched_relationships": []
+      },
+      {
+        "rule_id": "mastering.relationship",
+        "level": "required",
+        "kind": "relationship_presence",
+        "status": "satisfied",
+        "weight": 2.0,
+        "reason": "Found 1 matching bound relationship(s); minimum is 1.",
+        "matched_artefact_hashes": [],
+        "matched_relationships": [
+          {
+            "source_hash": "bc1dd3c26ef5f4d97fbb41e653e93a09c940b53c75229594d82c928727134ca0",
+            "target_hash": "746c90b6d8f6306ce93c347477103c16027d71a4072cf12d10a9f7246ce93d18",
+            "relationship_type": "mastered_from"
+          }
+        ]
+      },
+      {
+        "rule_id": "common.c2pa",
+        "level": "optional",
+        "kind": "artifact_presence",
+        "status": "missing",
+        "weight": null,
+        "reason": "Found 0 usable bound matching artefact(s); minimum is 1.",
+        "matched_artefact_hashes": [],
+        "matched_relationships": []
+      },
+      {
+        "rule_id": "common.rin",
+        "level": "optional",
+        "kind": "artifact_presence",
+        "status": "missing",
+        "weight": null,
+        "reason": "Found 0 usable bound matching artefact(s); minimum is 1.",
+        "matched_artefact_hashes": [],
+        "matched_relationships": []
+      },
+      {
+        "rule_id": "common.ern",
+        "level": "optional",
+        "kind": "artifact_presence",
+        "status": "missing",
+        "weight": null,
+        "reason": "Found 0 usable bound matching artefact(s); minimum is 1.",
+        "matched_artefact_hashes": [],
+        "matched_relationships": []
+      },
+      {
+        "rule_id": "common.session_log",
+        "level": "optional",
+        "kind": "artifact_presence",
+        "status": "missing",
+        "weight": null,
+        "reason": "Found 0 usable bound matching artefact(s); minimum is 1.",
+        "matched_artefact_hashes": [],
+        "matched_relationships": []
+      },
+      {
+        "rule_id": "mastering_service_only.optional.1",
+        "level": "optional",
+        "kind": "artifact_presence",
+        "status": "missing",
+        "weight": null,
+        "reason": "Found 0 usable bound matching artefact(s); minimum is 1.",
+        "matched_artefact_hashes": [],
+        "matched_relationships": []
+      },
+      {
+        "rule_id": "mastering_service_only.optional.2",
+        "level": "optional",
+        "kind": "artifact_presence",
+        "status": "missing",
+        "weight": null,
+        "reason": "Found 0 usable bound matching artefact(s); minimum is 1.",
+        "matched_artefact_hashes": [],
+        "matched_relationships": []
+      },
+      {
+        "rule_id": "mastering_service_only.optional.3",
+        "level": "optional",
+        "kind": "artifact_presence",
+        "status": "missing",
+        "weight": null,
+        "reason": "Found 0 usable bound matching artefact(s); minimum is 1.",
+        "matched_artefact_hashes": [],
+        "matched_relationships": []
+      },
+      {
+        "rule_id": "mastering_service_only.optional.4",
+        "level": "optional",
+        "kind": "artifact_presence",
+        "status": "missing",
+        "weight": null,
+        "reason": "Found 0 usable bound matching artefact(s); minimum is 1.",
+        "matched_artefact_hashes": [],
+        "matched_relationships": []
+      }
+    ]
+  },
+  "assessment_checks": {
+    "bound_file_integrity": [
+      {
+        "rule": "object_hash_bound",
+        "passed": true,
+        "evidence_hash": "7580f3a09b8a02bdfc6520235e92f6c8318dd3b52002b7eb8a430abc2c007dea"
+      },
+      {
+        "rule": "object_hash_bound",
+        "passed": true,
+        "evidence_hash": "6aacc6b93785fbbefb186285e5f9c9ce49a6ccc7c2af664fc2f2a21416001ea0"
+      },
+      {
+        "rule": "object_hash_bound",
+        "passed": true,
+        "evidence_hash": "bc1dd3c26ef5f4d97fbb41e653e93a09c940b53c75229594d82c928727134ca0"
+      },
+      {
+        "rule": "object_hash_bound",
+        "passed": true,
+        "evidence_hash": "746c90b6d8f6306ce93c347477103c16027d71a4072cf12d10a9f7246ce93d18"
+      }
+    ],
+    "structural_validity": [
+      {
+        "rule": "graph_loaded_without_cycle",
+        "passed": true
+      },
+      {
+        "rule": "all_nodes_connected_to_final",
+        "passed": true
+      },
+      {
+        "rule": "declared_hash_references_resolve",
+        "passed": true
+      },
+      {
+        "rule": "relationship_endpoint_roles_registered",
+        "passed": true,
+        "source_hash": "7580f3a09b8a02bdfc6520235e92f6c8318dd3b52002b7eb8a430abc2c007dea",
+        "target_hash": "6aacc6b93785fbbefb186285e5f9c9ce49a6ccc7c2af664fc2f2a21416001ea0",
+        "relationship_type": "stemmed_from"
+      },
+      {
+        "rule": "relationship_endpoint_roles_registered",
+        "passed": true,
+        "source_hash": "6aacc6b93785fbbefb186285e5f9c9ce49a6ccc7c2af664fc2f2a21416001ea0",
+        "target_hash": "bc1dd3c26ef5f4d97fbb41e653e93a09c940b53c75229594d82c928727134ca0",
+        "relationship_type": "mixed_from"
+      },
+      {
+        "rule": "relationship_endpoint_roles_registered",
+        "passed": true,
+        "source_hash": "bc1dd3c26ef5f4d97fbb41e653e93a09c940b53c75229594d82c928727134ca0",
+        "target_hash": "746c90b6d8f6306ce93c347477103c16027d71a4072cf12d10a9f7246ce93d18",
+        "relationship_type": "mastered_from"
+      }
+    ],
+    "relationship_integrity": [
+      {
+        "rule": "technical.duration_seconds_matches_observed",
+        "passed": true,
+        "evidence_hash": "7580f3a09b8a02bdfc6520235e92f6c8318dd3b52002b7eb8a430abc2c007dea",
+        "declared": 0.5,
+        "observed": 0.5
+      },
+      {
+        "rule": "technical.sample_rate_hz_matches_observed",
+        "passed": true,
+        "evidence_hash": "7580f3a09b8a02bdfc6520235e92f6c8318dd3b52002b7eb8a430abc2c007dea",
+        "declared": 8000,
+        "observed": 8000
+      },
+      {
+        "rule": "technical.channels_matches_observed",
+        "passed": true,
+        "evidence_hash": "7580f3a09b8a02bdfc6520235e92f6c8318dd3b52002b7eb8a430abc2c007dea",
+        "declared": 1,
+        "observed": 1
+      },
+      {
+        "rule": "technical.bit_depth_matches_observed",
+        "passed": true,
+        "evidence_hash": "7580f3a09b8a02bdfc6520235e92f6c8318dd3b52002b7eb8a430abc2c007dea",
+        "declared": 16,
+        "observed": 16
+      },
+      {
+        "rule": "technical.duration_seconds_matches_observed",
+        "passed": true,
+        "evidence_hash": "6aacc6b93785fbbefb186285e5f9c9ce49a6ccc7c2af664fc2f2a21416001ea0",
+        "declared": 0.5,
+        "observed": 0.5
+      },
+      {
+        "rule": "technical.sample_rate_hz_matches_observed",
+        "passed": true,
+        "evidence_hash": "6aacc6b93785fbbefb186285e5f9c9ce49a6ccc7c2af664fc2f2a21416001ea0",
+        "declared": 8000,
+        "observed": 8000
+      },
+      {
+        "rule": "technical.channels_matches_observed",
+        "passed": true,
+        "evidence_hash": "6aacc6b93785fbbefb186285e5f9c9ce49a6ccc7c2af664fc2f2a21416001ea0",
+        "declared": 1,
+        "observed": 1
+      },
+      {
+        "rule": "technical.bit_depth_matches_observed",
+        "passed": true,
+        "evidence_hash": "6aacc6b93785fbbefb186285e5f9c9ce49a6ccc7c2af664fc2f2a21416001ea0",
+        "declared": 16,
+        "observed": 16
+      },
+      {
+        "rule": "technical.duration_seconds_matches_observed",
+        "passed": true,
+        "evidence_hash": "bc1dd3c26ef5f4d97fbb41e653e93a09c940b53c75229594d82c928727134ca0",
+        "declared": 0.5,
+        "observed": 0.5
+      },
+      {
+        "rule": "technical.sample_rate_hz_matches_observed",
+        "passed": true,
+        "evidence_hash": "bc1dd3c26ef5f4d97fbb41e653e93a09c940b53c75229594d82c928727134ca0",
+        "declared": 8000,
+        "observed": 8000
+      },
+      {
+        "rule": "technical.channels_matches_observed",
+        "passed": true,
+        "evidence_hash": "bc1dd3c26ef5f4d97fbb41e653e93a09c940b53c75229594d82c928727134ca0",
+        "declared": 1,
+        "observed": 1
+      },
+      {
+        "rule": "technical.bit_depth_matches_observed",
+        "passed": true,
+        "evidence_hash": "bc1dd3c26ef5f4d97fbb41e653e93a09c940b53c75229594d82c928727134ca0",
+        "declared": 16,
+        "observed": 16
+      },
+      {
+        "rule": "technical.duration_seconds_matches_observed",
+        "passed": true,
+        "evidence_hash": "746c90b6d8f6306ce93c347477103c16027d71a4072cf12d10a9f7246ce93d18",
+        "declared": 0.5,
+        "observed": 0.5
+      },
+      {
+        "rule": "technical.sample_rate_hz_matches_observed",
+        "passed": true,
+        "evidence_hash": "746c90b6d8f6306ce93c347477103c16027d71a4072cf12d10a9f7246ce93d18",
+        "declared": 8000,
+        "observed": 8000
+      },
+      {
+        "rule": "technical.channels_matches_observed",
+        "passed": true,
+        "evidence_hash": "746c90b6d8f6306ce93c347477103c16027d71a4072cf12d10a9f7246ce93d18",
+        "declared": 1,
+        "observed": 1
+      },
+      {
+        "rule": "technical.bit_depth_matches_observed",
+        "passed": true,
+        "evidence_hash": "746c90b6d8f6306ce93c347477103c16027d71a4072cf12d10a9f7246ce93d18",
+        "declared": 16,
+        "observed": 16
+      }
+    ],
+    "integrity_layers": [
+      {
+        "layer": "file_integrity",
+        "status": "matched",
+        "value": 1.0,
+        "contributes_to_integrity": true,
+        "check_count": 4,
+        "reason": "SHA-256 binding and parser readability of submitted files.",
+        "manual_review_reasons": []
+      },
+      {
+        "layer": "structural_validity",
+        "status": "matched",
+        "value": 1.0,
+        "contributes_to_integrity": false,
+        "check_count": 6,
+        "reason": "Graph, references, cycles, connectivity, and endpoint roles passed before assessment; this is not content proof.",
+        "manual_review_reasons": []
+      },
+      {
+        "layer": "declaration_consistency",
+        "status": "matched",
+        "value": 1.0,
+        "contributes_to_integrity": true,
+        "check_count": 16,
+        "reason": "Submitted technical and relationship parameters compared with bound media observations.",
+        "manual_review_reasons": []
+      },
+      {
+        "layer": "content_reconstruction",
+        "status": "unavailable",
+        "value": null,
+        "contributes_to_integrity": true,
+        "check_count": 3,
+        "reason": "Only submitter-declared ranges and gains are assessed. Missing parameters are unavailable, not adverse; Master continuity corroboration remains unscored.",
+        "manual_review_reasons": []
+      },
+      {
+        "layer": "cross_evidence_support",
+        "status": "unavailable",
+        "value": null,
+        "contributes_to_integrity": true,
+        "check_count": 0,
+        "reason": "Independent parser outputs compared with graph, declarations, and media.",
+        "manual_review_reasons": []
+      },
+      {
+        "layer": "cryptographic_attestation",
+        "status": "unavailable",
+        "value": null,
+        "contributes_to_integrity": false,
+        "check_count": 0,
+        "reason": "C2PA remains in the separate attestation-strength axis and never inflates integrity.",
+        "manual_review_reasons": []
+      }
+    ],
+    "assessment_status_semantics": [
+      {
+        "status": "matched",
+        "meaning": "An exact, explicitly scoped check passed on independent validation data.",
+        "numeric_treatment": "1.0 when the layer is eligible for integrity scoring."
+      },
+      {
+        "status": "corroborated",
+        "meaning": "Independent evidence supports the claim but does not prove exact derivation.",
+        "numeric_treatment": "Reported separately; never silently scored as an exact match."
+      },
+      {
+        "status": "contradicted",
+        "meaning": "An applicable assessed claim conflicts with observed evidence.",
+        "numeric_treatment": "0.0 in its eligible layer and emits a contradiction finding."
+      },
+      {
+        "status": "not_applicable",
+        "meaning": "The check exists but the submitted transformation or evidence is outside its reliable scope.",
+        "numeric_treatment": "Excluded from the denominator; may request manual review."
+      },
+      {
+        "status": "unavailable",
+        "meaning": "The claim may be present, but required evidence or declared parameters were absent or unreadable, so the check did not run.",
+        "numeric_treatment": "Excluded from the denominator and never treated as zero."
+      }
+    ],
+    "cross_evidence": [],
+    "edit_derivation": [],
+    "comp_derivation": [],
+    "stem_derivation": [
+      {
+        "rule": "audio_linear_stem_derivation",
+        "pass": "StemDerivationPass",
+        "target_hash": "6aacc6b93785fbbefb186285e5f9c9ce49a6ccc7c2af664fc2f2a21416001ea0",
+        "source_hashes": [
+          "7580f3a09b8a02bdfc6520235e92f6c8318dd3b52002b7eb8a430abc2c007dea"
+        ],
+        "status": "unavailable",
+        "claim_status": "declared_unverified",
+        "reason": "The relationship was declared, but the submitted parameters are insufficient for content reconstruction.",
+        "reason_code": "missing_derivation_parameters",
+        "missing_parameters": [
+          {
+            "source_hash": "7580f3a09b8a02bdfc6520235e92f6c8318dd3b52002b7eb8a430abc2c007dea",
+            "fields": [
+              "derivation_scope",
+              "source_start_seconds",
+              "source_end_seconds",
+              "target_start_seconds",
+              "target_end_seconds",
+              "gain"
+            ]
+          }
+        ],
+        "content_match_is_provenance": false
+      }
+    ],
+    "audio_derivation": [
+      {
+        "rule": "audio_linear_mix_derivation",
+        "pass": "AudioDerivationPass",
+        "target_hash": "bc1dd3c26ef5f4d97fbb41e653e93a09c940b53c75229594d82c928727134ca0",
+        "source_hashes": [
+          "6aacc6b93785fbbefb186285e5f9c9ce49a6ccc7c2af664fc2f2a21416001ea0"
+        ],
+        "status": "unavailable",
+        "claim_status": "declared_unverified",
+        "reason": "The relationship was declared, but the submitted parameters are insufficient for content reconstruction.",
+        "reason_code": "missing_derivation_parameters",
+        "missing_parameters": [
+          {
+            "source_hash": "6aacc6b93785fbbefb186285e5f9c9ce49a6ccc7c2af664fc2f2a21416001ea0",
+            "fields": [
+              "derivation_scope",
+              "source_start_seconds",
+              "source_end_seconds",
+              "target_start_seconds",
+              "target_end_seconds",
+              "gain"
+            ]
+          }
+        ],
+        "content_match_is_provenance": false
+      }
+    ],
+    "master_derivation": [
+      {
+        "rule": "audio_master_content_continuity",
+        "pass": "MasteringDerivationPass",
+        "target_hash": "746c90b6d8f6306ce93c347477103c16027d71a4072cf12d10a9f7246ce93d18",
+        "source_hashes": [
+          "bc1dd3c26ef5f4d97fbb41e653e93a09c940b53c75229594d82c928727134ca0"
+        ],
+        "status": "unavailable",
+        "claim_status": "declared_unverified",
+        "reason": "The mix-to-master relationship was declared, but no complete comparison ranges were supplied.",
+        "reason_code": "missing_derivation_parameters",
+        "missing_parameters": [
+          {
+            "source_hash": "bc1dd3c26ef5f4d97fbb41e653e93a09c940b53c75229594d82c928727134ca0",
+            "fields": [
+              "derivation_scope",
+              "source_start_seconds",
+              "source_end_seconds",
+              "target_start_seconds",
+              "target_end_seconds"
+            ]
+          }
+        ],
+        "content_match_is_provenance": false,
+        "legacy_pass": "MasterDerivationPass"
+      }
+    ],
+    "audio_alignment": [
+      {
+        "rule": "audio_content_alignment",
+        "pass": "AudioAlignmentPass",
+        "target_hash": "6aacc6b93785fbbefb186285e5f9c9ce49a6ccc7c2af664fc2f2a21416001ea0",
+        "source_hashes": [
+          "7580f3a09b8a02bdfc6520235e92f6c8318dd3b52002b7eb8a430abc2c007dea"
+        ],
+        "content_match_is_provenance": false,
+        "status": "corroborated",
+        "reason": "Signal landmarks support the estimated source/target alignment.",
+        "relationship_type": "stemmed_from",
+        "parameter_source": "signal_estimated_diagnostic",
+        "source_start_seconds": 0.0,
+        "target_start_seconds": 0.0,
+        "estimated_offset_seconds": 0.0,
+        "feature_similarity": 1.0,
+        "waveform_correlation": 1.0,
+        "ambiguity_margin": 1.0,
+        "ambiguous": false,
+        "competing_alignment_similarity": 0.0,
+        "compared_duration_seconds": 0.5
+      },
+      {
+        "rule": "audio_content_alignment",
+        "pass": "AudioAlignmentPass",
+        "target_hash": "bc1dd3c26ef5f4d97fbb41e653e93a09c940b53c75229594d82c928727134ca0",
+        "source_hashes": [
+          "6aacc6b93785fbbefb186285e5f9c9ce49a6ccc7c2af664fc2f2a21416001ea0"
+        ],
+        "content_match_is_provenance": false,
+        "status": "corroborated",
+        "reason": "Signal landmarks support the estimated source/target alignment.",
+        "relationship_type": "mixed_from",
+        "parameter_source": "signal_estimated_diagnostic",
+        "source_start_seconds": 0.0,
+        "target_start_seconds": 0.0,
+        "estimated_offset_seconds": 0.0,
+        "feature_similarity": 1.0,
+        "waveform_correlation": 1.0,
+        "ambiguity_margin": 1.0,
+        "ambiguous": false,
+        "competing_alignment_similarity": 0.0,
+        "compared_duration_seconds": 0.5
+      },
+      {
+        "rule": "audio_content_alignment",
+        "pass": "AudioAlignmentPass",
+        "target_hash": "746c90b6d8f6306ce93c347477103c16027d71a4072cf12d10a9f7246ce93d18",
+        "source_hashes": [
+          "bc1dd3c26ef5f4d97fbb41e653e93a09c940b53c75229594d82c928727134ca0"
+        ],
+        "content_match_is_provenance": false,
+        "status": "corroborated",
+        "reason": "Signal landmarks support the estimated source/target alignment.",
+        "relationship_type": "mastered_from",
+        "parameter_source": "signal_estimated_diagnostic",
+        "source_start_seconds": 0.0,
+        "target_start_seconds": 0.0,
+        "estimated_offset_seconds": 0.0,
+        "feature_similarity": 1.0,
+        "waveform_correlation": 1.0,
+        "ambiguity_margin": 1.0,
+        "ambiguous": false,
+        "competing_alignment_similarity": 0.0,
+        "compared_duration_seconds": 0.5
+      }
+    ],
+    "source_contribution": [
+      {
+        "rule": "audio_source_contribution",
+        "pass": "SourceContributionPass",
+        "target_hash": "6aacc6b93785fbbefb186285e5f9c9ce49a6ccc7c2af664fc2f2a21416001ea0",
+        "source_hashes": [
+          "7580f3a09b8a02bdfc6520235e92f6c8318dd3b52002b7eb8a430abc2c007dea"
+        ],
+        "content_match_is_provenance": false,
+        "status": "corroborated",
+        "reason": "Removing this source materially increases reconstruction residual.",
+        "source_hash": "7580f3a09b8a02bdfc6520235e92f6c8318dd3b52002b7eb8a430abc2c007dea",
+        "relationship_type": "stemmed_from",
+        "estimated_gain": 0.699839,
+        "gain_stability": 1.0,
+        "full_model_normalized_rmse": 0.000679,
+        "leave_one_out_normalized_rmse": 1.0,
+        "unique_residual_delta": 0.999321,
+        "parameter_source": "signal_estimated_diagnostic",
+        "estimated_parameters_are_diagnostic": true
+      },
+      {
+        "rule": "audio_source_contribution",
+        "pass": "SourceContributionPass",
+        "target_hash": "bc1dd3c26ef5f4d97fbb41e653e93a09c940b53c75229594d82c928727134ca0",
+        "source_hashes": [
+          "6aacc6b93785fbbefb186285e5f9c9ce49a6ccc7c2af664fc2f2a21416001ea0"
+        ],
+        "content_match_is_provenance": false,
+        "status": "corroborated",
+        "reason": "Removing this source materially increases reconstruction residual.",
+        "source_hash": "6aacc6b93785fbbefb186285e5f9c9ce49a6ccc7c2af664fc2f2a21416001ea0",
+        "relationship_type": "mixed_from",
+        "estimated_gain": 0.857369,
+        "gain_stability": 1.0,
+        "full_model_normalized_rmse": 0.000752,
+        "leave_one_out_normalized_rmse": 1.0,
+        "unique_residual_delta": 0.999248,
+        "parameter_source": "signal_estimated_diagnostic",
+        "estimated_parameters_are_diagnostic": true
+      }
+    ],
+    "comp_verification": [],
+    "processed_audio_match": [
+      {
+        "rule": "processed_audio_content_match",
+        "pass": "ProcessedAudioMatchPass",
+        "target_hash": "6aacc6b93785fbbefb186285e5f9c9ce49a6ccc7c2af664fc2f2a21416001ea0",
+        "source_hashes": [
+          "7580f3a09b8a02bdfc6520235e92f6c8318dd3b52002b7eb8a430abc2c007dea"
+        ],
+        "content_match_is_provenance": false,
+        "status": "corroborated",
+        "reason": "Gain-tolerant time-frequency features support content continuity.",
+        "relationship_type": "stemmed_from",
+        "declared_complex_processing": false,
+        "parameter_source": "signal_estimated_diagnostic",
+        "waveform_correlation": 1.0,
+        "landmark_similarity": 1.0,
+        "dtw_similarity": 0.999355,
+        "envelope_correlation": 0.0,
+        "robust_similarity": 0.799806
+      },
+      {
+        "rule": "processed_audio_content_match",
+        "pass": "ProcessedAudioMatchPass",
+        "target_hash": "bc1dd3c26ef5f4d97fbb41e653e93a09c940b53c75229594d82c928727134ca0",
+        "source_hashes": [
+          "6aacc6b93785fbbefb186285e5f9c9ce49a6ccc7c2af664fc2f2a21416001ea0"
+        ],
+        "content_match_is_provenance": false,
+        "status": "corroborated",
+        "reason": "Gain-tolerant time-frequency features support content continuity.",
+        "relationship_type": "mixed_from",
+        "declared_complex_processing": false,
+        "parameter_source": "signal_estimated_diagnostic",
+        "waveform_correlation": 1.0,
+        "landmark_similarity": 1.0,
+        "dtw_similarity": 0.9994,
+        "envelope_correlation": 0.0,
+        "robust_similarity": 0.79982
+      },
+      {
+        "rule": "processed_audio_content_match",
+        "pass": "ProcessedAudioMatchPass",
+        "target_hash": "746c90b6d8f6306ce93c347477103c16027d71a4072cf12d10a9f7246ce93d18",
+        "source_hashes": [
+          "bc1dd3c26ef5f4d97fbb41e653e93a09c940b53c75229594d82c928727134ca0"
+        ],
+        "content_match_is_provenance": false,
+        "status": "corroborated",
+        "reason": "Gain-tolerant time-frequency features support content continuity.",
+        "relationship_type": "mastered_from",
+        "declared_complex_processing": false,
+        "parameter_source": "signal_estimated_diagnostic",
+        "waveform_correlation": 1.0,
+        "landmark_similarity": 1.0,
+        "dtw_similarity": 0.999669,
+        "envelope_correlation": 0.0,
+        "robust_similarity": 0.799901
+      }
+    ],
+    "stem_mix_residual": [
+      {
+        "rule": "audio_stem_mix_residual",
+        "pass": "StemMixResidualPass",
+        "target_hash": "6aacc6b93785fbbefb186285e5f9c9ce49a6ccc7c2af664fc2f2a21416001ea0",
+        "source_hashes": [
+          "7580f3a09b8a02bdfc6520235e92f6c8318dd3b52002b7eb8a430abc2c007dea"
+        ],
+        "content_match_is_provenance": false,
+        "status": "matched",
+        "reason": "An estimated channel matrix reconstructs the target with low residual.",
+        "source_channel_labels": [
+          "7580f3a09b8a02bdfc6520235e92f6c8318dd3b52002b7eb8a430abc2c007dea:ch1"
+        ],
+        "estimated_channel_matrix": [
+          [
+            0.699952
+          ]
+        ],
+        "estimated_parameters_are_diagnostic": true,
+        "normalized_rmse": 0.000929,
+        "correlation": 1.0,
+        "clipping_fraction": 0.0,
+        "window_normalized_rmse": [
+          0.000929,
+          0.000929
+        ],
+        "analysis_sample_rate_hz": 1000
+      },
+      {
+        "rule": "audio_stem_mix_residual",
+        "pass": "StemMixResidualPass",
+        "target_hash": "bc1dd3c26ef5f4d97fbb41e653e93a09c940b53c75229594d82c928727134ca0",
+        "source_hashes": [
+          "6aacc6b93785fbbefb186285e5f9c9ce49a6ccc7c2af664fc2f2a21416001ea0"
+        ],
+        "content_match_is_provenance": false,
+        "status": "matched",
+        "reason": "An estimated channel matrix reconstructs the target with low residual.",
+        "source_channel_labels": [
+          "6aacc6b93785fbbefb186285e5f9c9ce49a6ccc7c2af664fc2f2a21416001ea0:ch1"
+        ],
+        "estimated_channel_matrix": [
+          [
+            0.857298
+          ]
+        ],
+        "estimated_parameters_are_diagnostic": true,
+        "normalized_rmse": 0.00089,
+        "correlation": 1.0,
+        "clipping_fraction": 0.0,
+        "window_normalized_rmse": [
+          0.00089,
+          0.00089
+        ],
+        "analysis_sample_rate_hz": 1000
+      }
+    ],
+    "mastering_derivation": [
+      {
+        "rule": "audio_master_content_continuity",
+        "pass": "MasteringDerivationPass",
+        "target_hash": "746c90b6d8f6306ce93c347477103c16027d71a4072cf12d10a9f7246ce93d18",
+        "source_hashes": [
+          "bc1dd3c26ef5f4d97fbb41e653e93a09c940b53c75229594d82c928727134ca0"
+        ],
+        "status": "unavailable",
+        "claim_status": "declared_unverified",
+        "reason": "The mix-to-master relationship was declared, but no complete comparison ranges were supplied.",
+        "reason_code": "missing_derivation_parameters",
+        "missing_parameters": [
+          {
+            "source_hash": "bc1dd3c26ef5f4d97fbb41e653e93a09c940b53c75229594d82c928727134ca0",
+            "fields": [
+              "derivation_scope",
+              "source_start_seconds",
+              "source_end_seconds",
+              "target_start_seconds",
+              "target_end_seconds"
+            ]
+          }
+        ],
+        "content_match_is_provenance": false,
+        "legacy_pass": "MasterDerivationPass"
+      }
+    ],
+    "excerpted_from": [],
+    "decoy_source": [
+      {
+        "rule": "audio_declared_source_decoy",
+        "pass": "DecoySourcePass",
+        "target_hash": "6aacc6b93785fbbefb186285e5f9c9ce49a6ccc7c2af664fc2f2a21416001ea0",
+        "source_hashes": [
+          "7580f3a09b8a02bdfc6520235e92f6c8318dd3b52002b7eb8a430abc2c007dea"
+        ],
+        "content_match_is_provenance": false,
+        "status": "clear",
+        "reason": "The declared source has measurable unique contribution.",
+        "source_hash": "7580f3a09b8a02bdfc6520235e92f6c8318dd3b52002b7eb8a430abc2c007dea",
+        "unique_residual_delta": 0.999321,
+        "estimated_gain": 0.699839
+      },
+      {
+        "rule": "audio_declared_source_decoy",
+        "pass": "DecoySourcePass",
+        "target_hash": "bc1dd3c26ef5f4d97fbb41e653e93a09c940b53c75229594d82c928727134ca0",
+        "source_hashes": [
+          "6aacc6b93785fbbefb186285e5f9c9ce49a6ccc7c2af664fc2f2a21416001ea0"
+        ],
+        "content_match_is_provenance": false,
+        "status": "clear",
+        "reason": "The declared source has measurable unique contribution.",
+        "source_hash": "6aacc6b93785fbbefb186285e5f9c9ce49a6ccc7c2af664fc2f2a21416001ea0",
+        "unique_residual_delta": 0.999248,
+        "estimated_gain": 0.857369
+      }
+    ]
+  }
+}

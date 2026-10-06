@@ -1,0 +1,114 @@
+{
+  "run_id": "842498bc-b128-4b49-a275-6ce319b4d67f",
+  "case_id": "LOCAL-INVALID-HASH",
+  "profile": "music-native-v0.1",
+  "options": {
+    "include_reasoning": true,
+    "offline_only": true,
+    "timeout_seconds": 60
+  },
+  "workflow": {
+    "workflow_id": "mastering_service_only",
+    "modifiers": [],
+    "description": "A supplied pre-master mix is mastered to the final WAV.",
+    "declarations": {
+      "submitter_confirmation": true,
+      "contributors": [
+        "Fixture Mastering Engineer"
+      ]
+    }
+  },
+  "chain": {
+    "schema_version": "0.0.3",
+    "hash_method": "sha256",
+    "final_artefact_hash": "746c90b6d8f6306ce93c347477103c16027d71a4072cf12d10a9f7246ce93d18",
+    "artefacts": [
+      {
+        "artefact_hash": "7580f3a09b8a02bdfc6520235e92f6c8318dd3b52002b7eb8a430abc2c007dea",
+        "artefact_type": "audio/raw-track",
+        "attributes": {
+          "creation_method": "synthesised",
+          "production": {},
+          "technical": {
+            "duration_seconds": 0.5,
+            "sample_rate_hz": 8000,
+            "channels": 1,
+            "bit_depth": 16
+          }
+        },
+        "evidence": []
+      },
+      {
+        "artefact_hash": "6aacc6b93785fbbefb186285e5f9c9ce49a6ccc7c2af664fc2f2a21416001ea0",
+        "artefact_type": "audio/stem",
+        "attributes": {
+          "creation_method": "synthesised",
+          "production": {},
+          "technical": {
+            "duration_seconds": 0.5,
+            "sample_rate_hz": 8000,
+            "channels": 1,
+            "bit_depth": 16
+          }
+        },
+        "evidence": [
+          {
+            "hash": "7580f3a09b8a02bdfc6520235e92f6c8318dd3b52002b7eb8a430abc2c007dea",
+            "relationship_type": "stemmed_from",
+            "attributes": {}
+          }
+        ]
+      },
+      {
+        "artefact_hash": "bc1dd3c26ef5f4d97fbb41e653e93a09c940b53c75229594d82c928727134ca0",
+        "artefact_type": "audio/mix",
+        "attributes": {
+          "creation_method": "synthesised",
+          "production": {
+            "role": "pre_master"
+          },
+          "technical": {
+            "duration_seconds": 0.5,
+            "sample_rate_hz": 8000,
+            "channels": 1,
+            "bit_depth": 16
+          }
+        },
+        "evidence": [
+          {
+            "hash": "6aacc6b93785fbbefb186285e5f9c9ce49a6ccc7c2af664fc2f2a21416001ea0",
+            "relationship_type": "mixed_from",
+            "attributes": {}
+          }
+        ]
+      },
+      {
+        "artefact_hash": "746c90b6d8f6306ce93c347477103c16027d71a4072cf12d10a9f7246ce93d18",
+        "artefact_type": "audio/master",
+        "attributes": {
+          "creation_method": "synthesised",
+          "production": {},
+          "technical": {
+            "duration_seconds": 0.5,
+            "sample_rate_hz": 8000,
+            "channels": 1,
+            "bit_depth": 16
+          }
+        },
+        "evidence": [
+          {
+            "hash": "bc1dd3c26ef5f4d97fbb41e653e93a09c940b53c75229594d82c928727134ca0",
+            "relationship_type": "mastered_from",
+            "attributes": {}
+          }
+        ]
+      }
+    ]
+  },
+  "objects": {
+    "7580f3a09b8a02bdfc6520235e92f6c8318dd3b52002b7eb8a430abc2c007dea": "objects/7580f3a09b8a02bdfc6520235e92f6c8318dd3b52002b7eb8a430abc2c007dea.wav",
+    "6aacc6b93785fbbefb186285e5f9c9ce49a6ccc7c2af664fc2f2a21416001ea0": "objects/6aacc6b93785fbbefb186285e5f9c9ce49a6ccc7c2af664fc2f2a21416001ea0.wav",
+    "bc1dd3c26ef5f4d97fbb41e653e93a09c940b53c75229594d82c928727134ca0": "objects/bc1dd3c26ef5f4d97fbb41e653e93a09c940b53c75229594d82c928727134ca0.wav",
+    "746c90b6d8f6306ce93c347477103c16027d71a4072cf12d10a9f7246ce93d18": "objects/746c90b6d8f6306ce93c347477103c16027d71a4072cf12d10a9f7246ce93d18.wav"
+  }
+}

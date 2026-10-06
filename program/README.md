@@ -4,8 +4,6 @@ This directory contains an implemented baseline for assessing evidence from musi
 
 The main approach is to reuse Ben's evidence graph and execution framework, connect the music parsers and checks, and expose a runnable interface for CSEC.
 
-The runnable evaluator is in [`program/`](program/). Unless stated otherwise, file locations and commands below are relative to that directory.
-
 ## Team responsibilities
 
 | Team | Core responsibility | Important current boundary |
@@ -16,10 +14,10 @@ The runnable evaluator is in [`program/`](program/). Unless stated otherwise, fi
 
 ## Recommended reading order
 
-1. [CSEC handoff](program/docs/03_CSEC_HANDOFF.md): integration instructions and supported boundaries.
-2. [Sheet formats](program/docs/SHEET_FORMATS.md): supported CompSheet and CueSheet formats.
-3. [Future work](program/docs/NEXT_TASKS.md): consolidated P0-P3 roadmap and unresolved legacy items.
-4. [Verification results](program/reports/verification.md): executed checks and remaining unverified areas.
+1. [CSEC handoff](docs/03_CSEC_HANDOFF.md): integration instructions and supported boundaries.
+2. [Sheet formats](docs/SHEET_FORMATS.md): supported CompSheet and CueSheet formats.
+3. [Future work](docs/NEXT_TASKS.md): consolidated P0-P3 roadmap and unresolved legacy items.
+4. [Verification results](reports/verification.md): executed checks and remaining unverified areas.
 
 ## Current implementation
 
@@ -28,7 +26,7 @@ The runnable evaluator is in [`program/`](program/). Unless stated otherwise, fi
 - Reuses the WAV parser with additional RIFF/PCM structural validation.
 - Provides a bounded MIDI parser; the RIN, ERN, and C2PA parsers are connected to the production execution path.
 - The MIDI parser extracts channel and meta events, notes, tempo, time signatures, controllers, and duration in seconds when it can be calculated.
-- CompSheet and CueSheet parsers support strict JSON, CSV, delimited text, and PDF text extraction. See [`program/docs/SHEET_FORMATS.md`](program/docs/SHEET_FORMATS.md).
+- CompSheet and CueSheet parsers support strict JSON, CSV, delimited text, and PDF text extraction. See [`docs/SHEET_FORMATS.md`](docs/SHEET_FORMATS.md).
 - Runs file, relationship, and cross-evidence analysis through the actual `EvidenceChain` and `Pipeline` implementations.
 - Includes scoped PCM content checks for `edited_from`, `comped_from`, `stemmed_from`, and `mixed_from`, plus conservative mix-to-master continuity corroboration. Exact checks use only submitter-declared ranges, placements, gains, and optional fades; no missing transformation parameter is estimated. Declared reconstruction is evaluated on alternating partitions and reports coverage, matched duration, source redundancy, identifiability, and repeated-segment ambiguity. Complex or undocumented processing is not automatically treated as a contradiction.
 - Adds eight bounded physical-audio diagnostics: `AudioAlignmentPass`, `SourceContributionPass`, `CompVerificationPass`, `ProcessedAudioMatchPass`, `StemMixResidualPass`, `MasteringDerivationPass`, `ExcerptedFromPass`, and `DecoySourcePass`. Signal-estimated offsets, gains, and channel matrices are labelled diagnostic, never written back into the evidence graph, and do not silently become provenance proof or exact integrity credit.
@@ -107,10 +105,9 @@ replacement range or fit a replacement gain.
 
 ## Run the native example
 
-From the repository root, enter the evaluator directory and use Python 3.11 or later:
+From this directory, use Python 3.11 or later:
 
 ```bash
-cd program
 python3 -m pip install -r requirements.txt
 # Install the optional dependency only when C2PA SDK verification is required:
 python3 -m pip install -r requirements-c2pa.txt
@@ -150,8 +147,6 @@ python3 -B check_public.py /path/to/public-bundles
 The second command writes results to `reports/`. Both commands operate locally and do not transmit data.
 
 ## Directory overview
-
-The locations below are relative to `program/`.
 
 | Location | Purpose |
 |---|---|

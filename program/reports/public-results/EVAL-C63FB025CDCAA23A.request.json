@@ -1,0 +1,26 @@
+{
+  "schema_version": "0.2-candidate",
+  "run_id": "9039916b-e89a-478b-b77a-179506418e60",
+  "case_id": "EVAL-C63FB025CDCAA23A",
+  "profile": "csec-public-bundle-v0.2-candidate",
+  "bundle": {
+    "case_id": "EVAL-C63FB025CDCAA23A",
+    "final-artefact": "77356ffea5b8af0ca673490e77cc87c2aaed8242c81dffee0d396d223a3f0df8",
+    "artefacts": [
+      {
+        "hash": "77356ffea5b8af0ca673490e77cc87c2aaed8242c81dffee0d396d223a3f0df8",
+        "hash-method": "sha256",
+        "type": "audio/wav",
+        "evidence": []
+      }
+    ]
+  },
+  "objects": {
+    "77356ffea5b8af0ca673490e77cc87c2aaed8242c81dffee0d396d223a3f0df8": "objects/77356ffea5b8af0ca673490e77cc87c2aaed8242c81dffee0d396d223a3f0df8.wav"
+  },
+  "options": {
+    "include_reasoning": true,
+    "offline_only": true,
+    "timeout_seconds": 60
+  }
+}

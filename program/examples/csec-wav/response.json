@@ -1,0 +1,279 @@
+{
+  "schema_version": "0.2-candidate",
+  "run_id": "842498bc-b128-4b49-a275-6ce319b4d681",
+  "case_id": "LOCAL-GENERATED-CSEC-WAV",
+  "asset_sha256": "746c90b6d8f6306ce93c347477103c16027d71a4072cf12d10a9f7246ce93d18",
+  "system": {
+    "name": "COMP3888-music-baseline",
+    "version": "0.5.0",
+    "source_revision": "sha256:0c270f8b8ae42032b35acca090a72747f9cac4252f094307297feccbb6a017b0"
+  },
+  "execution_status": "succeeded",
+  "axes": {
+    "completeness": {
+      "availability": "partial",
+      "value": 1.0,
+      "confidence": null,
+      "reasoning": "1/1 declared reachable objects were available and hash-matched. No workflow was selected, so workflow expectations were not applied."
+    },
+    "integrity": {
+      "availability": "partial",
+      "value": null,
+      "confidence": 0.2,
+      "reasoning": "Integrity has 1/4 score-eligible evidence layers; missing evidence reduces availability and confidence but is never treated as contradiction. A numeric value is withheld without content reconstruction or independent CrossEvidence unless a contradiction exists. Structural validity and cryptographic attestation are reported separately and do not raise integrity. 0 Master/content corroboration result(s) were not scored as exact matches."
+    },
+    "attestation_strength": {
+      "availability": "unavailable",
+      "value": null,
+      "confidence": null,
+      "reasoning": "C2PA SDK is unavailable, so no cryptographic attestation was assessed."
+    },
+    "ai_disclosure": {
+      "availability": "unavailable",
+      "value": null,
+      "confidence": null,
+      "reasoning": "Explicit creation_method declarations cover 0/1 audio artefacts; this is disclosure coverage, not AI detection."
+    }
+  },
+  "validation": {
+    "validation_state": null,
+    "signature_present": null,
+    "signature_valid": null,
+    "cryptographically_valid": null,
+    "credential_trusted": null,
+    "codes": [],
+    "reasons": []
+  },
+  "findings": [
+    {
+      "code": "WAV_OBSERVATION",
+      "severity": "info",
+      "message": "Measured WAV properties and extracted metadata.",
+      "evidence_hash": "746c90b6d8f6306ce93c347477103c16027d71a4072cf12d10a9f7246ce93d18",
+      "observed": {
+        "duration_seconds": 0.5,
+        "sample_rate_hz": 8000,
+        "channels": 1,
+        "bit_depth": 16,
+        "format": "WAV",
+        "codec_subtype": "PCM",
+        "file_size_bytes": 8044
+      },
+      "embedded_metadata": {
+        "core_format": {
+          "audio_format_code": 1,
+          "audio_format": "PCM",
+          "num_channels": 1,
+          "sample_rate_hz": 8000,
+          "byte_rate": 16000,
+          "block_align": 2,
+          "bits_per_sample": 16,
+          "data_size_bytes": 8000,
+          "duration_seconds": 0.5
+        },
+        "info": {},
+        "broadcast_extension": null,
+        "cue_points": [],
+        "sampler": null,
+        "fact": null,
+        "id3": null,
+        "other_chunks": [],
+        "warnings": []
+      },
+      "claim_mismatches": []
+    },
+    {
+      "code": "PARSER_OBSERVATION",
+      "severity": "info",
+      "message": "audio: parsed",
+      "parser": "wav",
+      "parser_status": "parsed",
+      "parser_result": {
+        "observed": {
+          "duration_seconds": 0.5,
+          "sample_rate_hz": 8000,
+          "channels": 1,
+          "bit_depth": 16,
+          "format": "WAV",
+          "codec_subtype": "PCM",
+          "file_size_bytes": 8044
+        },
+        "embedded_metadata": {
+          "core_format": {
+            "audio_format_code": 1,
+            "audio_format": "PCM",
+            "num_channels": 1,
+            "sample_rate_hz": 8000,
+            "byte_rate": 16000,
+            "block_align": 2,
+            "bits_per_sample": 16,
+            "data_size_bytes": 8000,
+            "duration_seconds": 0.5
+          },
+          "info": {},
+          "broadcast_extension": null,
+          "cue_points": [],
+          "sampler": null,
+          "fact": null,
+          "id3": null,
+          "other_chunks": [],
+          "warnings": []
+        },
+        "claim_mismatches": []
+      },
+      "evidence_hash": "746c90b6d8f6306ce93c347477103c16027d71a4072cf12d10a9f7246ce93d18"
+    },
+    {
+      "code": "C2PA_PARSER_UNAVAILABLE",
+      "severity": "low",
+      "message": "c2pa-python is not installed; C2PA attestation was not assessed."
+    },
+    {
+      "code": "AI_DISCLOSURE_MISSING",
+      "severity": "medium",
+      "message": "One or more audio artefacts lack creation_method disclosure."
+    },
+    {
+      "code": "WORKFLOW_POLICY_NOT_APPLIED",
+      "severity": "low",
+      "message": "No workflow was supplied; completeness is legacy declared-object availability only."
+    }
+  ],
+  "processing_ms": 166.72325000399724,
+  "resource_usage": {
+    "cpu_ms": 0.9019999999999861,
+    "peak_rss_kib": null
+  },
+  "error": null,
+  "coverage": {
+    "complete": true,
+    "submitted_artefacts": 1,
+    "evaluated_artefacts": 1,
+    "skipped_artefacts": 0,
+    "submitted_relationships": 0,
+    "evaluated_relationships": 0,
+    "skipped_relationships": 0
+  },
+  "unknown_inputs": [],
+  "assessment_checks": {
+    "bound_file_integrity": [
+      {
+        "rule": "object_hash_bound",
+        "passed": true,
+        "evidence_hash": "746c90b6d8f6306ce93c347477103c16027d71a4072cf12d10a9f7246ce93d18"
+      }
+    ],
+    "structural_validity": [
+      {
+        "rule": "graph_loaded_without_cycle",
+        "passed": true
+      },
+      {
+        "rule": "all_nodes_connected_to_final",
+        "passed": true
+      },
+      {
+        "rule": "declared_hash_references_resolve",
+        "passed": true
+      }
+    ],
+    "relationship_integrity": [],
+    "integrity_layers": [
+      {
+        "layer": "file_integrity",
+        "status": "matched",
+        "value": 1.0,
+        "contributes_to_integrity": true,
+        "check_count": 1,
+        "reason": "SHA-256 binding and parser readability of submitted files.",
+        "manual_review_reasons": []
+      },
+      {
+        "layer": "structural_validity",
+        "status": "matched",
+        "value": 1.0,
+        "contributes_to_integrity": false,
+        "check_count": 3,
+        "reason": "Graph, references, cycles, connectivity, and endpoint roles passed before assessment; this is not content proof.",
+        "manual_review_reasons": []
+      },
+      {
+        "layer": "declaration_consistency",
+        "status": "unavailable",
+        "value": null,
+        "contributes_to_integrity": true,
+        "check_count": 0,
+        "reason": "Submitted technical and relationship parameters compared with bound media observations.",
+        "manual_review_reasons": []
+      },
+      {
+        "layer": "content_reconstruction",
+        "status": "unavailable",
+        "value": null,
+        "contributes_to_integrity": true,
+        "check_count": 0,
+        "reason": "Only submitter-declared ranges and gains are assessed. Missing parameters are unavailable, not adverse; Master continuity corroboration remains unscored.",
+        "manual_review_reasons": []
+      },
+      {
+        "layer": "cross_evidence_support",
+        "status": "unavailable",
+        "value": null,
+        "contributes_to_integrity": true,
+        "check_count": 0,
+        "reason": "Independent parser outputs compared with graph, declarations, and media.",
+        "manual_review_reasons": []
+      },
+      {
+        "layer": "cryptographic_attestation",
+        "status": "unavailable",
+        "value": null,
+        "contributes_to_integrity": false,
+        "check_count": 0,
+        "reason": "C2PA remains in the separate attestation-strength axis and never inflates integrity.",
+        "manual_review_reasons": []
+      }
+    ],
+    "assessment_status_semantics": [
+      {
+        "status": "matched",
+        "meaning": "An exact, explicitly scoped check passed on independent validation data.",
+        "numeric_treatment": "1.0 when the layer is eligible for integrity scoring."
+      },
+      {
+        "status": "corroborated",
+        "meaning": "Independent evidence supports the claim but does not prove exact derivation.",
+        "numeric_treatment": "Reported separately; never silently scored as an exact match."
+      },
+      {
+        "status": "contradicted",
+        "meaning": "An applicable assessed claim conflicts with observed evidence.",
+        "numeric_treatment": "0.0 in its eligible layer and emits a contradiction finding."
+      },
+      {
+        "status": "not_applicable",
+        "meaning": "The check exists but the submitted transformation or evidence is outside its reliable scope.",
+        "numeric_treatment": "Excluded from the denominator; may request manual review."
+      },
+      {
+        "status": "unavailable",
+        "meaning": "The claim may be present, but required evidence or declared parameters were absent or unreadable, so the check did not run.",
+        "numeric_treatment": "Excluded from the denominator and never treated as zero."
+      }
+    ],
+    "cross_evidence": [],
+    "edit_derivation": [],
+    "comp_derivation": [],
+    "stem_derivation": [],
+    "audio_derivation": [],
+    "master_derivation": [],
+    "audio_alignment": [],
+    "source_contribution": [],
+    "comp_verification": [],
+    "processed_audio_match": [],
+    "stem_mix_residual": [],
+    "mastering_derivation": [],
+    "excerpted_from": [],
+    "decoy_source": []
+  }
+}
