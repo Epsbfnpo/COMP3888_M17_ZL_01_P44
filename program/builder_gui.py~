@@ -1,0 +1,667 @@
+#!/usr/bin/env python3
+"""GUI for building a music-evidence run request (manifest) JSON.
+
+Add artefact files, declare their types / final artefact, disclose the
+relationships between them, then save a JSON in the same shape as the
+generated run output (run_id, case_id, profile, options, workflow, chain,
+objects).
+
+Nothing is inferred: types, the final artefact and every relationship are
+whatever you declare. Hashes (SHA-256) and basic WAV technical data are read
+from the files themselves.
+
+Run:  python3 manifest_gui.py
+"""
+
+from __future__ import annotations
+
+import contextlib
+import hashlib
+import json
+import shutil
+import tkinter as tk
+import uuid
+import wave
+from pathlib import Path
+from tkinter import filedialog, messagebox, ttk
+
+SCHEMA_VERSION = "0.0.3"
+HASH_METHOD = "sha256"
+
+# Suggestions only - every combobox is editable, so values the repo adds later
+# can still be typed in.
+ARTEFACT_TYPES = [
+    "audio/raw-track", "audio/stem", "audio/mix", "audio/master",
+    "audio/sample", "metadata/ddex-rin", "metadata/ddex-ern", "provenance/c2pa",
+]
+RELATIONSHIP_TYPES = [
+    "stemmed_from", "mixed_from", "mastered_from", "excerpted_from",
+    "documented_by",
+]
+WORKFLOWS = ["mastering_service_only"]
+CREATION_METHODS = ["", "recorded", "synthesised", "generated", "sampled"]
+
+
+# --------------------------------------------------------------------------
+# Pure logic (no GUI)
+# --------------------------------------------------------------------------
+def sha256_file(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as handle:
+        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def wav_technical(path: Path) -> dict:
+    """Objective technical fields from a PCM WAV; empty dict if unreadable."""
+    try:
+        with contextlib.closing(wave.open(str(path), "rb")) as handle:
+            rate = handle.getframerate()
+            return {
+                "duration_seconds": round(handle.getnframes() / rate, 6),
+                "sample_rate_hz": rate,
+                "channels": handle.getnchannels(),
+                "bit_depth": handle.getsampwidth() * 8,
+            }
+    except (wave.Error, EOFError, OSError, ZeroDivisionError):
+        return {}
+
+
+def split_csv(text: str) -> list:
+    return [part.strip() for part in text.split(",") if part.strip()]
+
+
+def parse_json_object(text: str, label: str) -> dict:
+    text = text.strip()
+    if not text:
+        return {}
+    try:
+        value = json.loads(text)
+    except json.JSONDecodeError as exc:
+        raise ValueError(f"{label} is not valid JSON: {exc}") from None
+    if not isinstance(value, dict):
+        raise ValueError(f"{label} must be a JSON object")
+    return value
+
+
+def build_chain(files: list, rels: list) -> dict:
+    """Turn declared files + relationships into the 'chain' structure."""
+    if not files:
+        raise ValueError("add at least one file")
+    finals = [f for f in files if f["final"]]
+    if len(finals) != 1:
+        raise ValueError(f"exactly one file must be final; found {len(finals)}")
+    seen = {}
+    for f in files:
+        if not f["type"].strip():
+            raise ValueError(f"'{f['id']}' has no artefact type")
+        if f["hash"] in seen:
+            raise ValueError(
+                f"'{f['id']}' and '{seen[f['hash']]}' have identical content "
+                "(same hash)")
+        seen[f["hash"]] = f["id"]
+
+    by_id = {f["id"]: f for f in files}
+    incoming = {f["id"]: [] for f in files}  # target id -> [rel]
+    for rel in rels:
+        if rel["source"] not in by_id or rel["target"] not in by_id:
+            raise ValueError(f"relationship references a missing file: {rel}")
+        if rel["source"] == rel["target"]:
+            raise ValueError(f"'{rel['source']}' cannot be derived from itself")
+        if not rel["type"].strip():
+            raise ValueError("a relationship has no type")
+        incoming[rel["target"]].append(rel)
+
+    # Order sources before targets (stable); reject cycles.
+    order, done, visiting = [], set(), set()
+
+    def visit(fid: str) -> None:
+        if fid in done:
+            return
+        if fid in visiting:
+            raise ValueError(f"relationship cycle involving '{fid}'")
+        visiting.add(fid)
+        for rel in incoming[fid]:
+            visit(rel["source"])
+        visiting.discard(fid)
+        done.add(fid)
+        order.append(fid)
+
+    for f in files:
+        visit(f["id"])
+
+    artefacts = []
+    for fid in order:
+        f = by_id[fid]
+        attributes = {}
+        if f["creation_method"]:
+            attributes["creation_method"] = f["creation_method"]
+        attributes["production"] = f["production"]
+        if f["technical"]:
+            attributes["technical"] = f["technical"]
+        attributes.update(f["extra"])
+        artefacts.append({
+            "artefact_hash": f["hash"],
+            "artefact_type": f["type"],
+            "attributes": attributes,
+            "evidence": [
+                {
+                    "hash": by_id[rel["source"]]["hash"],
+                    "relationship_type": rel["type"],
+                    "attributes": rel["attrs"],
+                }
+                for rel in incoming[fid]
+            ],
+        })
+    return {
+        "schema_version": SCHEMA_VERSION,
+        "hash_method": HASH_METHOD,
+        "final_artefact_hash": finals[0]["hash"],
+        "artefacts": artefacts,
+    }
+
+
+def object_rel_path(f: dict) -> str:
+    suffix = Path(f["path"]).suffix.lower() if f["path"] else ""
+    return f"objects/{f['hash']}{suffix}"
+
+
+# --------------------------------------------------------------------------
+# Dialogs
+# --------------------------------------------------------------------------
+class Dialog(tk.Toplevel):
+    def __init__(self, parent, title):
+        super().__init__(parent)
+        self.title(title)
+        self.transient(parent)
+        self.result = None
+        self.body = ttk.Frame(self, padding=10)
+        self.body.pack(fill="both", expand=True)
+        self.body.columnconfigure(1, weight=1)
+        self._row = 0
+
+    def add_row(self, label, widget):
+        ttk.Label(self.body, text=label).grid(
+            row=self._row, column=0, sticky="nw", padx=(0, 8), pady=3)
+        widget.grid(row=self._row, column=1, sticky="ew", pady=3)
+        self._row += 1
+
+    def finish(self):
+        bar = ttk.Frame(self.body)
+        bar.grid(row=self._row, column=0, columnspan=2, sticky="e", pady=(10, 0))
+        ttk.Button(bar, text="Cancel", command=self.destroy).pack(side="right")
+        ttk.Button(bar, text="OK", command=self.on_ok).pack(side="right", padx=6)
+        self.grab_set()
+        self.wait_window(self)
+
+    def on_ok(self):  # overridden
+        raise NotImplementedError
+
+
+class FileDialog(Dialog):
+    def __init__(self, parent, entry: dict, other_ids: set):
+        super().__init__(parent, "Artefact details")
+        self.entry, self.other_ids = entry, other_ids
+        ttk.Label(self.body, text=Path(entry["path"]).name if entry["path"]
+                  else "(file not found on disk)",
+                  font=("TkDefaultFont", 10, "bold")).grid(
+            row=self._row, column=0, columnspan=2, sticky="w")
+        self._row += 1
+        ttk.Label(self.body, text=f"sha256 {entry['hash'][:16]}…").grid(
+            row=self._row, column=0, columnspan=2, sticky="w", pady=(0, 6))
+        self._row += 1
+
+        self.id_var = tk.StringVar(value=entry["id"])
+        self.add_row("ID (alias)", ttk.Entry(self.body, textvariable=self.id_var))
+        self.type_var = tk.StringVar(value=entry["type"])
+        self.add_row("Artefact type", ttk.Combobox(
+            self.body, textvariable=self.type_var, values=ARTEFACT_TYPES))
+        self.method_var = tk.StringVar(value=entry["creation_method"])
+        self.add_row("Creation method", ttk.Combobox(
+            self.body, textvariable=self.method_var, values=CREATION_METHODS))
+        self.final_var = tk.BooleanVar(value=entry["final"])
+        self.add_row("Final artefact", ttk.Checkbutton(
+            self.body, variable=self.final_var))
+        self.prod_text = tk.Text(self.body, width=48, height=5)
+        self.prod_text.insert("1.0", json.dumps(entry["production"], indent=2))
+        self.add_row("production (JSON)", self.prod_text)
+        self.extra_text = tk.Text(self.body, width=48, height=4)
+        self.extra_text.insert("1.0", json.dumps(entry["extra"], indent=2)
+                               if entry["extra"] else "")
+        self.add_row("other attributes\n(JSON, optional)", self.extra_text)
+        self.finish()
+
+    def on_ok(self):
+        try:
+            new_id = self.id_var.get().strip()
+            if not new_id:
+                raise ValueError("ID must not be empty")
+            if new_id in self.other_ids:
+                raise ValueError(f"ID '{new_id}' is already used")
+            production = parse_json_object(self.prod_text.get("1.0", "end"),
+                                           "production")
+            extra = parse_json_object(self.extra_text.get("1.0", "end"),
+                                      "other attributes")
+            clash = {"creation_method", "production", "technical"} & set(extra)
+            if clash:
+                raise ValueError(f"set {sorted(clash)} via their own fields")
+        except ValueError as exc:
+            messagebox.showerror("Invalid", str(exc), parent=self)
+            return
+        self.result = {
+            "id": new_id, "type": self.type_var.get().strip(),
+            "creation_method": self.method_var.get().strip(),
+            "final": self.final_var.get(),
+            "production": production, "extra": extra,
+        }
+        self.destroy()
+
+
+class RelDialog(Dialog):
+    def __init__(self, parent, ids: list, rel: dict | None = None):
+        super().__init__(parent, "Relationship")
+        rel = rel or {"target": "", "source": "", "type": "", "attrs": {}}
+        ttk.Label(self.body, text="“Target” is derived from “source” "
+                  "(e.g. master mastered_from mix).").grid(
+            row=self._row, column=0, columnspan=2, sticky="w", pady=(0, 6))
+        self._row += 1
+        self.target = tk.StringVar(value=rel["target"])
+        self.add_row("Target (derived)", ttk.Combobox(
+            self.body, textvariable=self.target, values=ids, state="readonly"))
+        self.type = tk.StringVar(value=rel["type"])
+        self.add_row("Relationship", ttk.Combobox(
+            self.body, textvariable=self.type, values=RELATIONSHIP_TYPES))
+        self.source = tk.StringVar(value=rel["source"])
+        self.add_row("Source (origin)", ttk.Combobox(
+            self.body, textvariable=self.source, values=ids, state="readonly"))
+        self.attrs = tk.Text(self.body, width=44, height=6)
+        self.attrs.insert("1.0", json.dumps(rel["attrs"], indent=2)
+                          if rel["attrs"] else "")
+        self.add_row("attributes (JSON)", self.attrs)
+        self.finish()
+
+    def on_ok(self):
+        try:
+            attrs = parse_json_object(self.attrs.get("1.0", "end"), "attributes")
+            if not (self.target.get() and self.source.get()
+                    and self.type.get().strip()):
+                raise ValueError("target, relationship and source are required")
+            if self.target.get() == self.source.get():
+                raise ValueError("target and source must differ")
+        except ValueError as exc:
+            messagebox.showerror("Invalid", str(exc), parent=self)
+            return
+        self.result = {"target": self.target.get(), "source": self.source.get(),
+                       "type": self.type.get().strip(), "attrs": attrs}
+        self.destroy()
+
+
+# --------------------------------------------------------------------------
+# Main window
+# --------------------------------------------------------------------------
+class App(tk.Tk):
+    def __init__(self):
+        super().__init__()
+        self.title("Evidence manifest builder")
+        self.geometry("920x620")
+        self.files: list = []
+        self.rels: list = []
+        self._counter = 0
+
+        notebook = ttk.Notebook(self)
+        notebook.pack(fill="both", expand=True, padx=8, pady=8)
+        self._case_tab(notebook)
+        self._files_tab(notebook)
+        self._rels_tab(notebook)
+
+        bar = ttk.Frame(self)
+        bar.pack(fill="x", padx=8, pady=(0, 8))
+        self.copy_var = tk.BooleanVar(value=True)
+        ttk.Checkbutton(bar, text="Copy files into objects/ next to the manifest",
+                        variable=self.copy_var).pack(side="left")
+        ttk.Button(bar, text="Save manifest…", command=self.save).pack(side="right")
+        ttk.Button(bar, text="Preview JSON", command=self.preview).pack(
+            side="right", padx=6)
+        ttk.Button(bar, text="Load manifest…", command=self.load).pack(side="right")
+
+    # ---- tabs ------------------------------------------------------------
+    def _case_tab(self, notebook):
+        tab = ttk.Frame(notebook, padding=12)
+        notebook.add(tab, text="Case & workflow")
+        tab.columnconfigure(1, weight=1)
+        self.v = {
+            "run_id": tk.StringVar(value=str(uuid.uuid4())),
+            "case_id": tk.StringVar(value="LOCAL-GENERATED-VALID"),
+            "profile": tk.StringVar(value="music-native-v0.1"),
+            "include_reasoning": tk.BooleanVar(value=True),
+            "offline_only": tk.BooleanVar(value=True),
+            "timeout": tk.StringVar(value="60"),
+            "workflow_id": tk.StringVar(value=WORKFLOWS[0]),
+            "modifiers": tk.StringVar(),
+            "confirm": tk.BooleanVar(value=True),
+            "contributors": tk.StringVar(),
+        }
+        rows = [
+            ("Run ID", ttk.Entry(tab, textvariable=self.v["run_id"])),
+            ("Case ID", ttk.Entry(tab, textvariable=self.v["case_id"])),
+            ("Profile", ttk.Entry(tab, textvariable=self.v["profile"])),
+            ("Include reasoning", ttk.Checkbutton(
+                tab, variable=self.v["include_reasoning"])),
+            ("Offline only", ttk.Checkbutton(tab, variable=self.v["offline_only"])),
+            ("Timeout (seconds)", ttk.Entry(tab, textvariable=self.v["timeout"])),
+            ("Workflow ID", ttk.Combobox(
+                tab, textvariable=self.v["workflow_id"], values=WORKFLOWS)),
+            ("Modifiers (comma-separated)",
+             ttk.Entry(tab, textvariable=self.v["modifiers"])),
+            ("Submitter confirmation", ttk.Checkbutton(
+                tab, variable=self.v["confirm"])),
+            ("Contributors (comma-separated)",
+             ttk.Entry(tab, textvariable=self.v["contributors"])),
+        ]
+        for i, (label, widget) in enumerate(rows):
+            ttk.Label(tab, text=label).grid(row=i, column=0, sticky="w",
+                                            padx=(0, 10), pady=4)
+            widget.grid(row=i, column=1, sticky="ew", pady=4)
+        ttk.Label(tab, text="Workflow description").grid(
+            row=len(rows), column=0, sticky="nw", pady=4)
+        self.desc = tk.Text(tab, height=4)
+        self.desc.grid(row=len(rows), column=1, sticky="ew", pady=4)
+
+    def _tree(self, tab, columns, widths):
+        tree = ttk.Treeview(tab, columns=columns, show="headings",
+                            selectmode="browse")
+        for col, width in zip(columns, widths):
+            tree.heading(col, text=col)
+            tree.column(col, width=width, anchor="w")
+        tree.pack(fill="both", expand=True)
+        return tree
+
+    def _files_tab(self, notebook):
+        tab = ttk.Frame(notebook, padding=8)
+        notebook.add(tab, text="Files")
+        bar = ttk.Frame(tab)
+        bar.pack(fill="x", pady=(0, 6))
+        for text, cmd in (("Add files…", self.add_files),
+                          ("Edit…", self.edit_file),
+                          ("Mark final", self.mark_final),
+                          ("Remove", self.remove_file)):
+            ttk.Button(bar, text=text, command=cmd).pack(side="left", padx=(0, 6))
+        self.file_tree = self._tree(
+            tab, ("id", "file", "type", "creation", "final", "hash"),
+            (130, 220, 130, 100, 50, 120))
+        self.file_tree.bind("<Double-1>", lambda _e: self.edit_file())
+
+    def _rels_tab(self, notebook):
+        tab = ttk.Frame(notebook, padding=8)
+        notebook.add(tab, text="Relationships")
+        bar = ttk.Frame(tab)
+        bar.pack(fill="x", pady=(0, 6))
+        for text, cmd in (("Add…", self.add_rel), ("Edit…", self.edit_rel),
+                          ("Remove", self.remove_rel)):
+            ttk.Button(bar, text=text, command=cmd).pack(side="left", padx=(0, 6))
+        self.rel_tree = self._tree(
+            tab, ("target (derived)", "relationship", "source (origin)",
+                  "attributes"), (180, 150, 180, 320))
+        self.rel_tree.bind("<Double-1>", lambda _e: self.edit_rel())
+
+    # ---- helpers ---------------------------------------------------------
+    def ids(self):
+        return [f["id"] for f in self.files]
+
+    def _selected_index(self, tree):
+        sel = tree.selection()
+        return int(sel[0]) if sel else None
+
+    def refresh(self):
+        self.file_tree.delete(*self.file_tree.get_children())
+        for i, f in enumerate(self.files):
+            self.file_tree.insert("", "end", iid=str(i), values=(
+                f["id"], Path(f["path"]).name if f["path"] else "(missing)",
+                f["type"], f["creation_method"], "✔" if f["final"] else "",
+                f["hash"][:12] + "…"))
+        self.rel_tree.delete(*self.rel_tree.get_children())
+        for i, r in enumerate(self.rels):
+            self.rel_tree.insert("", "end", iid=str(i), values=(
+                r["target"], r["type"], r["source"],
+                json.dumps(r["attrs"]) if r["attrs"] else ""))
+
+    # ---- files -----------------------------------------------------------
+    def add_files(self):
+        paths = filedialog.askopenfilenames(title="Select artefact files")
+        for raw in paths:
+            path = Path(raw)
+            try:
+                digest = sha256_file(path)
+            except OSError as exc:
+                messagebox.showerror("Error", f"Could not read {path}: {exc}")
+                continue
+            if any(f["hash"] == digest for f in self.files):
+                messagebox.showwarning(
+                    "Duplicate", f"{path.name} has identical content to a file "
+                    "already added; skipped.")
+                continue
+            self._counter += 1
+            is_wav = path.suffix.lower() in (".wav", ".wave")
+            entry = {
+                "id": f"file-{self._counter}", "path": str(path), "hash": digest,
+                "type": "", "creation_method": "", "final": False,
+                "production": {}, "extra": {},
+                "technical": wav_technical(path) if is_wav else {},
+            }
+            others = {f["id"] for f in self.files}
+            dialog = FileDialog(self, entry, others)
+            if dialog.result is None:
+                continue
+            self.files.append({**entry, **dialog.result})
+            if dialog.result["final"]:
+                self._only_final(len(self.files) - 1)
+        self.refresh()
+
+    def edit_file(self):
+        idx = self._selected_index(self.file_tree)
+        if idx is None:
+            return
+        entry = self.files[idx]
+        others = {f["id"] for i, f in enumerate(self.files) if i != idx}
+        dialog = FileDialog(self, entry, others)
+        if dialog.result is None:
+            return
+        old_id, new_id = entry["id"], dialog.result["id"]
+        entry.update(dialog.result)
+        for rel in self.rels:  # keep references in sync on rename
+            for key in ("target", "source"):
+                if rel[key] == old_id:
+                    rel[key] = new_id
+        if entry["final"]:
+            self._only_final(idx)
+        self.refresh()
+
+    def _only_final(self, keep: int):
+        for i, f in enumerate(self.files):
+            f["final"] = (i == keep)
+
+    def mark_final(self):
+        idx = self._selected_index(self.file_tree)
+        if idx is not None:
+            self._only_final(idx)
+            self.refresh()
+
+    def remove_file(self):
+        idx = self._selected_index(self.file_tree)
+        if idx is None:
+            return
+        gone = self.files.pop(idx)["id"]
+        self.rels = [r for r in self.rels if gone not in (r["source"], r["target"])]
+        self.refresh()
+
+    # ---- relationships ---------------------------------------------------
+    def add_rel(self):
+        if len(self.files) < 2:
+            messagebox.showinfo("Relationships", "Add at least two files first.")
+            return
+        dialog = RelDialog(self, self.ids())
+        if dialog.result:
+            self.rels.append(dialog.result)
+            self.refresh()
+
+    def edit_rel(self):
+        idx = self._selected_index(self.rel_tree)
+        if idx is None:
+            return
+        dialog = RelDialog(self, self.ids(), self.rels[idx])
+        if dialog.result:
+            self.rels[idx] = dialog.result
+            self.refresh()
+
+    def remove_rel(self):
+        idx = self._selected_index(self.rel_tree)
+        if idx is not None:
+            self.rels.pop(idx)
+            self.refresh()
+
+    # ---- build / save / load --------------------------------------------
+    def build_manifest(self) -> dict:
+        try:
+            timeout = int(self.v["timeout"].get())
+        except ValueError:
+            raise ValueError("timeout must be a whole number") from None
+        for key, label in (("run_id", "Run ID"), ("case_id", "Case ID"),
+                           ("profile", "Profile"),
+                           ("workflow_id", "Workflow ID")):
+            if not self.v[key].get().strip():
+                raise ValueError(f"{label} is required")
+        chain = build_chain(self.files, self.rels)
+        return {
+            "run_id": self.v["run_id"].get().strip(),
+            "case_id": self.v["case_id"].get().strip(),
+            "profile": self.v["profile"].get().strip(),
+            "options": {
+                "include_reasoning": self.v["include_reasoning"].get(),
+                "offline_only": self.v["offline_only"].get(),
+                "timeout_seconds": timeout,
+            },
+            "workflow": {
+                "workflow_id": self.v["workflow_id"].get().strip(),
+                "modifiers": split_csv(self.v["modifiers"].get()),
+                "description": self.desc.get("1.0", "end").strip(),
+                "declarations": {
+                    "submitter_confirmation": self.v["confirm"].get(),
+                    "contributors": split_csv(self.v["contributors"].get()),
+                },
+            },
+            "chain": chain,
+            "objects": {f["hash"]: object_rel_path(f)
+                        for f in self._ordered_files(chain)},
+        }
+
+    def _ordered_files(self, chain):
+        by_hash = {f["hash"]: f for f in self.files}
+        return [by_hash[a["artefact_hash"]] for a in chain["artefacts"]]
+
+    def preview(self):
+        try:
+            text = json.dumps(self.build_manifest(), indent=2, ensure_ascii=False)
+        except ValueError as exc:
+            messagebox.showerror("Cannot build manifest", str(exc))
+            return
+        win = tk.Toplevel(self)
+        win.title("Manifest preview")
+        box = tk.Text(win, width=100, height=36)
+        box.insert("1.0", text)
+        box.configure(state="disabled")
+        box.pack(fill="both", expand=True)
+
+    def save(self):
+        try:
+            manifest = self.build_manifest()
+        except ValueError as exc:
+            messagebox.showerror("Cannot build manifest", str(exc))
+            return
+        target = filedialog.asksaveasfilename(
+            title="Save manifest", defaultextension=".json",
+            initialfile="run_request.json", filetypes=[("JSON", "*.json")])
+        if not target:
+            return
+        target = Path(target)
+        try:
+            target.write_text(
+                json.dumps(manifest, indent=2, ensure_ascii=False) + "\n",
+                encoding="utf-8")
+            skipped = []
+            if self.copy_var.get():
+                for f in self.files:
+                    if not f["path"]:
+                        skipped.append(f["id"])
+                        continue
+                    dest = target.parent / object_rel_path(f)
+                    dest.parent.mkdir(parents=True, exist_ok=True)
+                    if dest.resolve() != Path(f["path"]).resolve():
+                        shutil.copy2(f["path"], dest)
+        except OSError as exc:
+            messagebox.showerror("Error", f"Could not save: {exc}")
+            return
+        note = f"\nNot copied (file missing): {', '.join(skipped)}" if skipped else ""
+        messagebox.showinfo("Saved", f"Wrote {target}{note}")
+
+    def load(self):
+        source = filedialog.askopenfilename(
+            title="Load manifest", filetypes=[("JSON", "*.json")])
+        if not source:
+            return
+        source = Path(source)
+        try:
+            data = json.loads(source.read_text(encoding="utf-8"))
+            chain, objects = data["chain"], data.get("objects", {})
+            files, alias = [], {}
+            for n, art in enumerate(chain["artefacts"], 1):
+                digest = art["artefact_hash"]
+                rel = objects.get(digest)
+                path = source.parent / rel if rel else None
+                attrs = dict(art.get("attributes", {}))
+                fid = f"{art['artefact_type'].split('/')[-1]}-{n}"
+                alias[digest] = fid
+                files.append({
+                    "id": fid, "hash": digest, "type": art["artefact_type"],
+                    "path": str(path) if path and path.is_file() else "",
+                    "creation_method": attrs.pop("creation_method", ""),
+                    "production": attrs.pop("production", {}),
+                    "technical": attrs.pop("technical", {}),
+                    "extra": attrs,
+                    "final": digest == chain["final_artefact_hash"],
+                })
+            rels = [
+                {"target": alias[art["artefact_hash"]], "source": alias[ev["hash"]],
+                 "type": ev["relationship_type"], "attrs": ev.get("attributes", {})}
+                for art in chain["artefacts"] for ev in art.get("evidence", [])
+            ]
+            options = data.get("options", {})
+            workflow = data.get("workflow", {})
+            decl = workflow.get("declarations", {})
+        except (OSError, KeyError, TypeError, json.JSONDecodeError) as exc:
+            messagebox.showerror("Error", f"Could not load manifest: {exc!r}")
+            return
+        self.files, self.rels, self._counter = files, rels, len(files)
+        self.v["run_id"].set(data.get("run_id", str(uuid.uuid4())))
+        self.v["case_id"].set(data.get("case_id", ""))
+        self.v["profile"].set(data.get("profile", ""))
+        self.v["include_reasoning"].set(options.get("include_reasoning", True))
+        self.v["offline_only"].set(options.get("offline_only", True))
+        self.v["timeout"].set(str(options.get("timeout_seconds", 60)))
+        self.v["workflow_id"].set(workflow.get("workflow_id", ""))
+        self.v["modifiers"].set(", ".join(workflow.get("modifiers", [])))
+        self.v["confirm"].set(decl.get("submitter_confirmation", False))
+        self.v["contributors"].set(", ".join(decl.get("contributors", [])))
+        self.desc.delete("1.0", "end")
+        self.desc.insert("1.0", workflow.get("description", ""))
+        self.refresh()
+        missing = [f["id"] for f in files if not f["path"]]
+        if missing:
+            messagebox.showwarning(
+                "Files not found",
+                "Loaded, but these object files were not found next to the "
+                f"manifest: {', '.join(missing)}")
+
+
+if __name__ == "__main__":
+    App().mainloop()

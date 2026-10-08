@@ -15,8 +15,8 @@ from music_target.assessment_passes import assess_axes, parse_bound_artefacts
 from music_target.wav_parser import parse_wav_file
 from music_target.workflow_policy import WorkflowCompletenessPass, load_workflow_policy
 
-MAX_FILE_BYTES = 32 * 1024 * 1024
-MAX_TOTAL_BYTES = 128 * 1024 * 1024
+MAX_FILE_BYTES = 64 * 1024 * 1024
+MAX_TOTAL_BYTES = 256 * 1024 * 1024
 
 
 class InputError(ValueError):

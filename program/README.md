@@ -113,6 +113,16 @@ python3 -B run.py --request examples/unsupported-png/request.json --root example
 
 The first command should return `error` for a hash mismatch. The second should return `unsupported`. A successfully returned JSON response uses process exit code 0; inspect `execution_status` in the JSON for the actual evaluation outcome.
 
+
+## Run the UI
+First, ensure `tkinter` is installed locally on your machine.
+
+``` bash
+python3 builder_gui.py
+```
+
+
+
 ## CSEC entry point
 
 ```bash
