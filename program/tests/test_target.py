@@ -16,6 +16,8 @@ import run
 from music_target.contract import validate
 from music_target.engine import strict_pcm_check, InputError
 from music_target.assessment_passes import ExpandedCrossEvidencePass
+from music_target.audio_derivation import MAX_SOURCE_CORRELATION
+from music_target.audio_derivation import _mono_resample, _resample_series
 from legacy_parsers.common.ddex_validation import REGISTRY, _schema
 from legacy_parsers.ern_parser import parse_ern_file
 from legacy_parsers.rin_parser import parse_rin_file
@@ -658,6 +660,61 @@ class TargetTests(unittest.TestCase):
                             item["source_hash"] == source_hashes[1]
                             for item in decoys))
 
+    def test_source_contribution_guard_rejects_highly_correlated_sources(self):
+        base = self._deterministic_samples(8000, 211)
+        # A pure scalar rescaling is perfectly correlated with its source
+        # (correlation is scale-invariant) but is still a distinct file.
+        scaled = [round(0.5 * value) for value in base]
+        mix = [round(0.5 * a + 0.3 * b) for a, b in zip(base, scaled)]
+        attrs = {"source_start_seconds": 0.0, "source_end_seconds": 1.0,
+                 "target_start_seconds": 0.0, "target_end_seconds": 1.0}
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            specs = [
+                {"type": "audio/stem", "data": self._pcm16(base)},
+                {"type": "audio/stem", "data": self._pcm16(scaled)},
+                {"type": "audio/mix", "data": self._pcm16(mix),
+                 "parents": [(0, "mixed_from", attrs),
+                             (1, "mixed_from", attrs)]},
+            ]
+            result = self.score(self._workflow_request(
+                root, "multitrack_recording_mix_master", specs), root)
+        contributions = result["assessment_checks"]["source_contribution"]
+        self.assertEqual(len(contributions), 2)
+        for item in contributions:
+            self.assertEqual(item["status"], "not_applicable")
+            self.assertGreaterEqual(item["max_source_correlation"], MAX_SOURCE_CORRELATION)
+            self.assertNotIn("estimated_gain", item)
+            self.assertNotIn("gain_stability", item)
+        # The guard applies before any per-source fit, so decoy detection --
+        # which only acts on "not_supported"/"corroborated" inputs -- must
+        # also decline rather than misreporting either source as a decoy.
+        decoys = result["assessment_checks"]["decoy_source"]
+        self.assertTrue(decoys)
+        for item in decoys:
+            self.assertEqual(item["status"], "not_applicable")
+
+    def test_stem_mix_residual_guard_rejects_highly_correlated_sources(self):
+        base = self._deterministic_samples(8000, 221)
+        scaled = [round(0.6 * value) for value in base]
+        target = [round(0.4 * a + 0.2 * b) for a, b in zip(base, scaled)]
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            specs = [
+                {"type": "audio/stem", "data": self._pcm16(base)},
+                {"type": "audio/stem", "data": self._pcm16(scaled)},
+                {"type": "audio/mix", "data": self._pcm16(target),
+                 "parents": [(0, "mixed_from"), (1, "mixed_from")]},
+            ]
+            result = self.score(self._workflow_request(
+                root, "multitrack_recording_mix_master", specs), root)
+        check = result["assessment_checks"]["stem_mix_residual"][0]
+        self.assertEqual(check["status"], "not_applicable")
+        self.assertGreaterEqual(check["max_source_correlation"], MAX_SOURCE_CORRELATION)
+        self.assertNotIn("estimated_channel_matrix", check)
+        self.assertNotIn("normalized_rmse", check)
+        self.assertTrue(check["estimated_parameters_are_diagnostic"])
+
     def test_processed_audio_match_corroborates_light_processing(self):
         source = self._deterministic_samples(12000, 121)
         processed, previous = [], 0
@@ -1178,6 +1235,87 @@ class RestoredXmlHelperTests(unittest.TestCase):
                     item["rule"].startswith("workflow_ai_")]
         self.assertTrue(selected)
         self.assertTrue(all(item["passed"] for item in selected))
+
+
+class AntiAliasedResamplingTests(unittest.TestCase):
+    """K1: _resample_series/_mono_resample must suppress aliasing from an
+    above-Nyquist signal while preserving below-Nyquist content, handle
+    short/edge-case inputs without error, and leave the no-downsampling
+    path exactly as it was."""
+
+    @staticmethod
+    def _tone(freq_hz, count, rate, amplitude=6000):
+        return [amplitude * math.sin(2 * math.pi * freq_hz * index / rate)
+                for index in range(count)]
+
+    @staticmethod
+    def _nearest_neighbor_resample(samples, rate, output_rate):
+        """The exact pre-K1 behaviour, reimplemented locally as the
+        baseline to compare against -- not calling removed code."""
+        count = int(len(samples) / rate * output_rate)
+        return [samples[min(len(samples) - 1, round(index * rate / output_rate))]
+                for index in range(count)]
+
+    @staticmethod
+    def _rms(samples):
+        return math.sqrt(sum(value * value for value in samples) / len(samples)) if samples else 0.0
+
+    def test_above_nyquist_tone_is_substantially_suppressed(self):
+        rate, output_rate = 8000, 200  # Nyquist at output_rate is 100 Hz
+        above = self._tone(150, 4000, rate)  # 150 Hz: above the 100 Hz target Nyquist
+        aliased = self._nearest_neighbor_resample(above, rate, output_rate)
+        filtered = _resample_series(above, rate, output_rate)
+        self.assertEqual(len(filtered), len(aliased))
+        aliased_rms, filtered_rms = self._rms(aliased), self._rms(filtered)
+        self.assertGreater(aliased_rms, 0.0)
+        # The old nearest-neighbour path aliases this tone's full energy
+        # straight through; the corrected path must suppress most of it.
+        self.assertLess(filtered_rms / aliased_rms, 0.5)
+
+    def test_below_nyquist_tone_is_preserved_in_amplitude_and_timing(self):
+        rate, output_rate = 8000, 200  # Nyquist at output_rate is 100 Hz
+        below = self._tone(20, 4000, rate)  # 20 Hz: comfortably below Nyquist
+        unfiltered = self._nearest_neighbor_resample(below, rate, output_rate)
+        filtered = _resample_series(below, rate, output_rate)
+        self.assertEqual(len(filtered), len(unfiltered))
+        unfiltered_rms, filtered_rms = self._rms(unfiltered), self._rms(filtered)
+        # Amplitude should survive filtering reasonably intact.
+        self.assertGreater(filtered_rms / unfiltered_rms, 0.6)
+        # Timing/phase should also survive: the filtered and unfiltered
+        # versions of the same slow tone must still correlate strongly.
+        count = len(filtered)
+        mean_f = sum(filtered) / count
+        mean_u = sum(unfiltered) / count
+        numerator = sum((f - mean_f) * (u - mean_u) for f, u in zip(filtered, unfiltered))
+        energy_f = sum((f - mean_f) ** 2 for f in filtered)
+        energy_u = sum((u - mean_u) ** 2 for u in unfiltered)
+        correlation = numerator / math.sqrt(energy_f * energy_u)
+        self.assertGreater(correlation, 0.9)
+
+    def test_no_downsampling_matches_original_nearest_index_behaviour(self):
+        # output_rate >= rate: no filtering should apply at all, and the
+        # result must match the original nearest-index formula exactly.
+        samples = [float(index % 17) for index in range(50)]
+        expected = self._nearest_neighbor_resample(samples, 100, 400)
+        actual = _resample_series(samples, 100, 400)
+        self.assertEqual(actual, expected)
+
+    def test_handles_empty_and_very_short_inputs_without_error(self):
+        self.assertEqual(_resample_series([], 8000, 200), [])
+        # Shorter than even one bounded decimation stage's minimum length:
+        # must fall back gracefully, not raise or return a wrong length.
+        short = [1.0, 2.0, 3.0]
+        result = _resample_series(short, 8000, 200)
+        self.assertEqual(len(result), int(len(short) / 8000 * 200))
+        # A single-sample clip must not divide by zero or crash.
+        self.assertEqual(len(_resample_series([5.0], 8000, 200)), 0)
+
+    def test_mono_resample_wraps_resample_series_consistently(self):
+        audio = {"sample_rate_hz": 8000, "channels": 2,
+                 "frames": [(float(index), float(index) + 1.0) for index in range(1600)]}
+        mono_samples = [sum(frame) / len(frame) for frame in audio["frames"]]
+        self.assertEqual(_mono_resample(audio, 200),
+                         _resample_series(mono_samples, 8000, 200))
 
 
 if __name__ == "__main__":

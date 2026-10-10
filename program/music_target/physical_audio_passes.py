@@ -12,12 +12,18 @@ import math
 from pathlib import Path
 
 from music_target.audio_derivation import (
+    MAX_SOURCE_CORRELATION,
+    MIN_SOURCE_IDENTIFIABILITY,
     COMPLEX_PROCESSING_WORDS,
     MasterDerivationPass,
     _correlation,
+    _max_source_correlation,
     _mono_resample,
     _read_pcm,
+    _resample_series,
     _rms,
+    _source_gram,
+    _source_identifiability,
 )
 
 
@@ -418,6 +424,34 @@ class SourceContributionPass:
                         edge.get("attributes") or {})
                     aligned.append(vector)
                     parameter_sources.append(parameter_source)
+                # Mirror audio_derivation.py's _linear_status guard: a least-squares
+                # fit over highly correlated or otherwise unidentifiable sources can
+                # reach a good reconstruction residual while attributing that residual
+                # to the wrong source, or arbitrarily among several. Decline to report
+                # a per-source fit at all when the declared sources, as a group, are
+                # not well enough separated to trust individual gains from -- rather
+                # than silently reporting an unreliable corroborated/not_supported
+                # conclusion for any of them.
+                gram = _source_gram(aligned, range(len(target_samples)))
+                max_source_correlation = _max_source_correlation(gram)
+                source_identifiability = _source_identifiability(gram)
+                if max_source_correlation >= MAX_SOURCE_CORRELATION:
+                    guard_reason = ("The declared sources are too highly correlated to "
+                                    "attribute unique contributions reliably.")
+                elif source_identifiability < MIN_SOURCE_IDENTIFIABILITY:
+                    guard_reason = ("The declared sources cannot be distinguished well "
+                                    "enough to attribute unique contributions reliably.")
+                else:
+                    guard_reason = None
+                if guard_reason is not None:
+                    for edge in edges:
+                        results.append({**base, "status": "not_applicable", "reason": guard_reason,
+                                        "source_hash": edge["hash"],
+                                        "relationship_type": edge["relationship_type"],
+                                        "max_source_correlation": round(max_source_correlation, 6),
+                                        "source_identifiability": round(source_identifiability, 8),
+                                        "estimated_parameters_are_diagnostic": True})
+                    continue
                 full = _fit_linear(target_samples, aligned)
                 if full is None:
                     raise ValueError("linear contribution model is singular or silent")
@@ -593,11 +627,12 @@ class ProcessedAudioMatchPass:
 
 
 def _channel_vectors(audio, output_rate):
+    # Reuses the same anti-aliased decimation audio_derivation.py's
+    # _mono_resample applies, one channel at a time (mixdown-then-filter
+    # and filter-then-mixdown are equivalent for a linear, per-sample-
+    # identical filter, so this is not a behavioural split from mono).
     rate = audio["sample_rate_hz"]
-    count = int(len(audio["frames"]) / rate * output_rate)
-    return [[audio["frames"][min(len(audio["frames"]) - 1,
-                                 round(index * rate / output_rate))][channel]
-             for index in range(count)]
+    return [_resample_series([frame[channel] for frame in audio["frames"]], rate, output_rate)
             for channel in range(audio["channels"])]
 
 
@@ -651,6 +686,30 @@ class StemMixResidualPass:
                         source_columns.append(_place_channel(
                             values, len(target_channels[0]), edge.get("attributes") or {}, offset))
                         labels.append(f"{edge['hash']}:ch{channel + 1}")
+                # Same guard as SourceContributionPass: a channel-matrix fit over
+                # highly correlated or unidentifiable source channels can reach a
+                # low residual while the estimated matrix itself is numerically
+                # fragile and not attributable to any particular source. Decline to
+                # report a matrix at all in that case, rather than an unreliable
+                # matched/corroborated/contradicted conclusion.
+                gram = _source_gram(source_columns, range(len(target_channels[0])))
+                max_source_correlation = _max_source_correlation(gram)
+                source_identifiability = _source_identifiability(gram)
+                if max_source_correlation >= MAX_SOURCE_CORRELATION:
+                    guard_reason = ("The declared sources are too highly correlated to "
+                                    "attribute a reliable channel matrix.")
+                elif source_identifiability < MIN_SOURCE_IDENTIFIABILITY:
+                    guard_reason = ("The declared sources cannot be distinguished well "
+                                    "enough to attribute a reliable channel matrix.")
+                else:
+                    guard_reason = None
+                if guard_reason is not None:
+                    results.append({**base, "status": "not_applicable", "reason": guard_reason,
+                                    "source_channel_labels": labels,
+                                    "max_source_correlation": round(max_source_correlation, 6),
+                                    "source_identifiability": round(source_identifiability, 8),
+                                    "estimated_parameters_are_diagnostic": True})
+                    continue
                 channel_results, matrix = [], []
                 for target_channel in target_channels:
                     fitted = _fit_linear(target_channel, source_columns)
