@@ -102,40 +102,92 @@ class WavMetadataPass(ArtefactPass):
         parsed = dataclasses.asdict(parse_wav_file(str(path)))
         parsed.pop("source_path", None)
         claim = artefact._attributes.get("technical", {})
-        mismatches = []
+        checks, mismatches = [], []
         for key, value in claim.items():
             if value is None:
                 continue
             measured = observed[key]
             same = (math.isclose(value, measured, rel_tol=0, abs_tol=0.002)
                     if key == "duration_seconds" else value == measured)
+            checks.append({"rule": f"technical.{key}_matches_observed",
+                           "passed": same,
+                           "evidence_hash": artefact.artefact_hash,
+                           "declared": value,
+                           "observed": measured,
+                           "source_pass": "WavMetadataPass"})
             if not same:
                 mismatches.append({"field": key, "declared": value, "observed": measured})
         return None, {"observed": observed, "embedded_metadata": parsed,
-                      "claim_mismatches": mismatches}, [
+                      "checks": checks, "claim_mismatches": mismatches}, [
             "PCM framing was checked; submission claims were compared with measured file properties.",
             "Embedded dates, credits and software tags are unauthenticated metadata.",
         ]
 
 
-class MusicRelationshipPass(EvidencePass):
+class RelationshipIntegrityPass(EvidencePass):
+    """Check declared edge parameters against cached endpoint observations."""
+
     @staticmethod
     def evaluate(evidence):
-        parent, child = evidence.get_evidence_artefact(), evidence.get_result_artefact()
+        source, target = evidence.get_evidence_artefact(), evidence.get_result_artefact()
         source_result = target_result = None
-        if parent.artefact_type.artefact_type_name.startswith("audio"):
-            _, source_result = parent.get_pass_result(WavMetadataPass)
-        if child.artefact_type.artefact_type_name.startswith("audio"):
-            _, target_result = child.get_pass_result(WavMetadataPass)
-        result = {"source_hash": parent.artefact_hash, "target_hash": child.artefact_hash,
+        if source.artefact_type.artefact_type_name.startswith("audio"):
+            _, source_result = source.get_pass_result(WavMetadataPass)
+        if target.artefact_type.artefact_type_name.startswith("audio"):
+            _, target_result = target.get_pass_result(WavMetadataPass)
+
+        source_observed = (source_result or {}).get("observed", {})
+        target_observed = (target_result or {}).get("observed", {})
+        attrs = evidence._attributes
+        checks = []
+
+        if (attrs.get("source_start_seconds") is not None and
+                attrs.get("source_end_seconds") is not None):
+            checks.append({"rule": "source_time_order_valid",
+                           "passed": attrs["source_end_seconds"] >= attrs["source_start_seconds"]})
+        if (attrs.get("source_end_seconds") is not None and
+                source_observed.get("duration_seconds") is not None):
+            checks.append({"rule": "source_time_within_duration",
+                           "passed": attrs["source_end_seconds"] <=
+                                     source_observed["duration_seconds"]})
+        if (attrs.get("target_end_seconds") is not None and
+                target_observed.get("duration_seconds") is not None):
+            checks.append({"rule": "target_time_within_duration",
+                           "passed": attrs["target_end_seconds"] <=
+                                     target_observed["duration_seconds"]})
+        for attr, observed, key in (
+                ("input_sample_rate_hz", source_observed, "sample_rate_hz"),
+                ("output_sample_rate_hz", target_observed, "sample_rate_hz"),
+                ("input_bit_depth", source_observed, "bit_depth"),
+                ("output_bit_depth", target_observed, "bit_depth")):
+            if attrs.get(attr) is not None and observed.get(key) is not None:
+                checks.append({"rule": f"{attr}_matches_file",
+                               "passed": attrs[attr] == observed[key],
+                               "declared": attrs[attr], "observed": observed[key]})
+
+        for check in checks:
+            check.update({"source_hash": source.artefact_hash,
+                          "target_hash": target.artefact_hash,
+                          "relationship_type":
+                              evidence.relationship_type.relationship_type_name,
+                          "source_pass": "RelationshipIntegrityPass"})
+
+        result = {"pass": "RelationshipIntegrityPass",
+                  "source_hash": source.artefact_hash,
+                  "target_hash": target.artefact_hash,
                   "relationship": evidence.relationship_type.relationship_type_name,
-                  "content_relationship_verified": None}
+                  "endpoint_roles_validated": True,
+                  "content_relationship_verified": None,
+                  "value": (sum(item["passed"] for item in checks) / len(checks)
+                            if checks else None),
+                  "checks": checks}
         if source_result and target_result:
             result["duration_delta_seconds"] = (
                 target_result["observed"]["duration_seconds"]
                 - source_result["observed"]["duration_seconds"])
         return None, result, [
-            "Endpoint roles were validated. Duration difference is diagnostic only.",
+            "Endpoint roles were validated before the Pass ran; declared edge parameters were compared with cached endpoint observations.",
+            "Duration difference is diagnostic only.",
             "Scoped edit, comp, stem and mix claims receive separate content checks; mastering receives continuity corroboration only.",
         ]
 
@@ -149,7 +201,7 @@ def collect_results(final_artefact):
         if artefact.artefact_type.artefact_type_name.startswith("audio"):
             _, observations[artefact.artefact_hash] = artefact.get_pass_result(WavMetadataPass)
         for edge in artefact.get_evidence():
-            _, result = edge.get_pass_result(MusicRelationshipPass)
+            _, result = edge.get_pass_result(RelationshipIntegrityPass)
             relationships.append(result)
     return observations, relationships
 
@@ -204,7 +256,7 @@ def evaluate_chain(native, objects, root, workflow=None, allow_disconnected=Fals
         raise InputError("The final artefact file is missing.")
 
     pipeline = Pipeline({AudioType: [WavMetadataPass]},
-                        {ALL_RELATIONSHIPS: [MusicRelationshipPass]}, collect_results)
+                        {ALL_RELATIONSHIPS: [RelationshipIntegrityPass]}, collect_results)
     observations, relationships = pipeline.eval_chain(chain)
     claim_mismatch = False
     for digest, observation in observations.items():
@@ -212,18 +264,15 @@ def evaluate_chain(native, objects, root, workflow=None, allow_disconnected=Fals
             claim_mismatch |= bool(observation["claim_mismatches"])
             findings.append({**finding("WAV_OBSERVATION", "Measured WAV properties and extracted metadata.", digest),
                              **observation})
-            if observation["claim_mismatches"]:
-                findings.append(finding("TECHNICAL_CLAIM_MISMATCH",
-                                        "Submitted technical attributes disagree with the actual file.", digest, "medium"))
     for result in relationships:
-        findings.append({**finding("RELATIONSHIP_OBSERVATION", "Relationship diagnostics; scoped edit, comp, stem and mix claims receive content analysis, while mastering receives continuity corroboration."),
+        findings.append({**finding("RELATIONSHIP_INTEGRITY_OBSERVATION", "Declared relationship parameters were checked by the cached EvidencePass; separate content analysis may corroborate or contradict the submitted transformation."),
                          **result})
     parser_observations, parser_findings = parse_bound_artefacts(
         native, chain, observations)
     findings.extend(parser_findings)
 
     integrity, attestation, ai_disclosure, validation, assessment_checks, assessment_findings = assess_axes(
-        native, chain, bound_hashes, observations, parser_observations, workflow)
+        native, chain, bound_hashes, observations, relationships, parser_observations, workflow)
     findings.extend(assessment_findings)
     axes = empty_axes()
     workflow_assessment = None

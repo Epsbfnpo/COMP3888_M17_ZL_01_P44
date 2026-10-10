@@ -28,6 +28,8 @@ The main approach is to reuse Ben's evidence graph and execution framework, conn
 - The MIDI parser extracts channel and meta events, notes, tempo, time signatures, controllers, and duration in seconds when it can be calculated.
 - CompSheet and CueSheet parsers support strict JSON, CSV, delimited text, and PDF text extraction. See [`docs/SHEET_FORMATS.md`](docs/SHEET_FORMATS.md).
 - Runs file, relationship, and cross-evidence analysis through the actual `EvidenceChain` and `Pipeline` implementations.
+- `WavMetadataPass` emits standardised technical checks once per audio artefact. `BoundFileIntegrityPass` consumes those cached checks instead of repeating the same comparisons.
+- `RelationshipIntegrityPass` is a registered libevchain `EvidencePass`. It compares only submitter-declared edge parameters with cached source and target observations and replaces the former diagnostic-only `MusicRelationshipPass`.
 - Includes scoped PCM content checks for `edited_from`, `comped_from`, `stemmed_from`, and `mixed_from`, plus conservative mix-to-master continuity corroboration. Exact checks use only submitter-declared ranges, placements, gains, and optional fades; no missing transformation parameter is estimated. Declared reconstruction is evaluated on alternating partitions and reports coverage, matched duration, source redundancy, identifiability, and repeated-segment ambiguity. Complex or undocumented processing is not automatically treated as a contradiction.
 - Adds eight bounded physical-audio diagnostics: `AudioAlignmentPass`, `SourceContributionPass`, `CompVerificationPass`, `ProcessedAudioMatchPass`, `StemMixResidualPass`, `MasteringDerivationPass`, `ExcerptedFromPass`, and `DecoySourcePass`. Signal-estimated offsets, gains, and channel matrices are labelled diagnostic, never written back into the evidence graph, and do not silently become provenance proof or exact integrity credit.
 - Master comparison uses only the submitted source and target ranges. A search for competing locations may reduce certainty by exposing ambiguity, but an alternative location is never substituted for the declared one.
@@ -114,7 +116,7 @@ python3 -m pip install -r requirements-c2pa.txt
 python3 -B run.py --native examples/valid-generated/submission.json --root examples/valid-generated
 ```
 
-The example processes four audio nodes in sequence: `raw-track -> stem -> mix -> master`. The expected result contains `execution_status: succeeded`, four WAV observations, and three relationship observations. Its legacy relationships intentionally omit detailed derivation parameters, so their content checks are `unavailable` rather than inferred. This is a software-generated teaching fixture, not verified evidence of human-recorded creation.
+The example processes four audio nodes in sequence: `raw-track -> stem -> mix -> master`. The expected result contains `execution_status: succeeded`, four WAV observations, and three `RELATIONSHIP_INTEGRITY_OBSERVATION` findings produced by the edge Pass. Its legacy relationships intentionally omit detailed derivation parameters, so their parameter-check lists are empty and their content checks are `unavailable` rather than inferred. This is a software-generated teaching fixture, not verified evidence of human-recorded creation.
 
 Exercise two failure boundaries:
 
@@ -153,9 +155,9 @@ The second command writes results to `reports/`. Both commands operate locally a
 | `vendor/libevchain/` | Local copy of Ben's source with three reviewable fixes |
 | `music_target/domain.py` | Music nodes, relationships, and permitted endpoint roles |
 | `music_target/wav_parser.py` | Local copy of the supplied WAV parser |
-| `music_target/engine.py` | File binding, library pipeline, and assessment-stage orchestration |
+| `music_target/engine.py` | File binding, `WavMetadataPass`, `RelationshipIntegrityPass`, library pipeline, and assessment-stage orchestration |
 | `music_target/workflow_policy.py` | Safe policy loading, condition evaluation, and per-expectation workflow completeness |
-| `music_target/assessment_passes.py` | File integrity, relationship integrity, CrossEvidence, C2PA, and AI disclosure passes |
+| `music_target/assessment_passes.py` | Cached file and relationship result aggregation, CrossEvidence, C2PA, and AI disclosure assessment logic |
 | `music_target/audio_derivation.py` | Edit, CompSheet, stem, mix, and master-content derivation checks |
 | `music_target/physical_audio_passes.py` | Bounded alignment, per-source contribution, processed-content, residual, excerpt, mastering, and decoy diagnostics |
 | `music_target/midi_parser.py` | Size- and structure-bounded Standard MIDI File parser |

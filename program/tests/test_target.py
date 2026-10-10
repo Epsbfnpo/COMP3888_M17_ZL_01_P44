@@ -14,7 +14,12 @@ BASE = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(BASE))
 import run
 from music_target.contract import validate
-from music_target.engine import strict_pcm_check, InputError
+from music_target.engine import (
+    InputError,
+    RelationshipIntegrityPass,
+    strict_pcm_check,
+)
+from libevchain.pipeline import EvidencePass
 from music_target.assessment_passes import ExpandedCrossEvidencePass
 from legacy_parsers.common.ddex_validation import REGISTRY, _schema
 from legacy_parsers.ern_parser import parse_ern_file
@@ -40,7 +45,13 @@ class TargetTests(unittest.TestCase):
         result = self.score()
         self.assertEqual(result["execution_status"], "succeeded", result["error"])
         self.assertEqual(sum(f["code"] == "WAV_OBSERVATION" for f in result["findings"]), 4)
-        self.assertEqual(sum(f["code"] == "RELATIONSHIP_OBSERVATION" for f in result["findings"]), 3)
+        relationship_findings = [
+            item for item in result["findings"]
+            if item["code"] == "RELATIONSHIP_INTEGRITY_OBSERVATION"]
+        self.assertEqual(len(relationship_findings), 3)
+        self.assertTrue(issubclass(RelationshipIntegrityPass, EvidencePass))
+        self.assertTrue(all(item["pass"] == "RelationshipIntegrityPass"
+                            for item in relationship_findings))
         self.assertEqual(result["axes"]["completeness"]["value"], 1.0)
         self.assertEqual(result["axes"]["completeness"]["availability"], "available")
         self.assertNotIn("decision", result)
@@ -245,6 +256,10 @@ class TargetTests(unittest.TestCase):
         self.assertEqual(check["coverage_ratio"], 1.0)
         self.assertGreater(check["matched_coverage_ratio"], 0.99)
         self.assertIn("validation_normalized_rmse", check)
+        relationship_checks = result["assessment_checks"]["relationship_integrity"]
+        self.assertEqual(len(relationship_checks), 6)
+        self.assertTrue(all(item["source_pass"] == "RelationshipIntegrityPass"
+                            and item["passed"] for item in relationship_checks))
 
     def test_audio_derivation_requires_sufficient_target_coverage(self):
         source = self._deterministic_samples(2000, 17)
@@ -935,6 +950,13 @@ class TargetTests(unittest.TestCase):
         observation = next(f for f in result["findings"] if f["code"] == "WAV_OBSERVATION"
                            and f["evidence_hash"] == request["chain"]["final_artefact_hash"])
         self.assertEqual(observation["observed"]["sample_rate_hz"], 8000)
+        failed_wav_checks = [item for item in observation["checks"] if not item["passed"]]
+        self.assertEqual([item["rule"] for item in failed_wav_checks],
+                         ["technical.sample_rate_hz_matches_observed"])
+        bound_checks = result["assessment_checks"]["bound_file_integrity"]
+        self.assertEqual(sum(item == failed_wav_checks[0] for item in bound_checks), 1)
+        self.assertFalse(any(item["rule"].startswith("technical.") for item in
+                             result["assessment_checks"]["relationship_integrity"]))
 
     def test_cycle_is_rejected_by_library(self):
         request = copy.deepcopy(self.template)
@@ -1063,7 +1085,8 @@ class TargetTests(unittest.TestCase):
         result = run.evaluate(request, self.folder, "csec")
         self.assertEqual(result["execution_status"], "succeeded", result["error"])
         self.assertEqual(result["axes"]["completeness"]["availability"], "partial")
-        self.assertFalse(any(f["code"] == "RELATIONSHIP_OBSERVATION" for f in result["findings"]))
+        self.assertFalse(any(f["code"] == "RELATIONSHIP_INTEGRITY_OBSERVATION"
+                             for f in result["findings"]))
 
     def test_csec_unknown_relationship_is_reported_while_wav_files_are_checked(self):
         source = self.template["chain"]["artefacts"][0]["artefact_hash"]

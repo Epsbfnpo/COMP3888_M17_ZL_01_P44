@@ -113,7 +113,7 @@ def parse_bound_artefacts(native, chain, wav_observations):
 
 
 class BoundFileIntegrityPass:
-    """Check physical file binding and parser readability, not declarations."""
+    """Aggregate file binding, cached WAV checks, and parser readability."""
 
     @staticmethod
     def evaluate(native, bound_hashes, wav_observations, parser_observations):
@@ -122,6 +122,9 @@ class BoundFileIntegrityPass:
             digest = node["artefact_hash"]
             checks.append({"rule": "object_hash_bound", "passed": digest in bound_hashes,
                            "evidence_hash": digest})
+            wav_result = wav_observations.get(digest)
+            if wav_result:
+                checks.extend(dict(item) for item in wav_result.get("checks", []))
             parser = parser_observations.get(digest)
             if parser and parser["status"] == "failed":
                 checks.append({"rule": "declared_type_parser_succeeds", "passed": False,
@@ -129,7 +132,10 @@ class BoundFileIntegrityPass:
         passed = sum(item["passed"] for item in checks)
         for item in checks:
             if not item["passed"]:
-                findings.append(_finding("FILE_INTEGRITY_CONTRADICTION", item["rule"],
+                code = ("TECHNICAL_CLAIM_MISMATCH"
+                        if item["rule"].startswith("technical.")
+                        else "FILE_INTEGRITY_CONTRADICTION")
+                findings.append(_finding(code, item["rule"],
                                          item["evidence_hash"], "medium"))
         value = passed / len(checks) if checks else None
         return value, checks, findings
@@ -157,65 +163,18 @@ class StructuralValidityPass:
         return checks
 
 
-class RelationshipIntegrityPass:
-    """Check submitted technical and relationship declarations against observations."""
-
-    @staticmethod
-    def evaluate(native, wav_observations):
-        nodes = {item["artefact_hash"]: item for item in native["artefacts"]}
-        checks, findings = [], []
-        for node in native["artefacts"]:
-            observed = wav_observations.get(node["artefact_hash"])
-            if not observed:
-                continue
-            for key, declared in (node.get("attributes") or {}).get("technical", {}).items():
-                if declared is None or key not in observed["observed"]:
-                    continue
-                actual = observed["observed"][key]
-                passed = (math.isclose(declared, actual, abs_tol=0.002, rel_tol=0)
-                          if key == "duration_seconds" else declared == actual)
-                checks.append({"rule": f"technical.{key}_matches_observed",
-                               "passed": passed, "evidence_hash": node["artefact_hash"],
-                               "declared": declared, "observed": actual})
-                if not passed:
-                    findings.append(_finding(
-                        "DECLARATION_CONSISTENCY_CONTRADICTION",
-                        f"technical.{key} does not match the bound file.",
-                        node["artefact_hash"], "medium"))
-        for target in native["artefacts"]:
-            for edge in target.get("evidence", []):
-                source = nodes[edge["hash"]]
-                attrs = edge.get("attributes") or {}
-                current = []
-                source_duration = (wav_observations.get(source["artefact_hash"]) or {}).get("observed", {}).get("duration_seconds")
-                target_duration = (wav_observations.get(target["artefact_hash"]) or {}).get("observed", {}).get("duration_seconds")
-                if attrs.get("source_start_seconds") is not None and attrs.get("source_end_seconds") is not None:
-                    current.append({"rule": "source_time_order_valid",
-                                    "passed": attrs["source_end_seconds"] >= attrs["source_start_seconds"]})
-                if attrs.get("source_end_seconds") is not None and source_duration is not None:
-                    current.append({"rule": "source_time_within_duration",
-                                    "passed": attrs["source_end_seconds"] <= source_duration})
-                if attrs.get("target_end_seconds") is not None and target_duration is not None:
-                    current.append({"rule": "target_time_within_duration",
-                                    "passed": attrs["target_end_seconds"] <= target_duration})
-                for attr, side, key in (("input_sample_rate_hz", source, "sample_rate_hz"),
-                                        ("output_sample_rate_hz", target, "sample_rate_hz"),
-                                        ("input_bit_depth", source, "bit_depth"),
-                                        ("output_bit_depth", target, "bit_depth")):
-                    observed = (wav_observations.get(side["artefact_hash"]) or {}).get("observed", {}).get(key)
-                    if attrs.get(attr) is not None and observed is not None:
-                        current.append({"rule": f"{attr}_matches_file", "passed": attrs[attr] == observed})
-                for item in current:
-                    item.update({"source_hash": source["artefact_hash"],
-                                 "target_hash": target["artefact_hash"],
-                                 "relationship_type": edge["relationship_type"]})
-                    if not item["passed"]:
-                        findings.append(_finding("RELATIONSHIP_INTEGRITY_CONTRADICTION",
-                                                 f"{edge['relationship_type']}: {item['rule']}",
-                                                 target["artefact_hash"], "medium"))
-                checks.extend(current)
-        value = sum(item["passed"] for item in checks) / len(checks) if checks else None
-        return value, checks, findings
+def _relationship_integrity_results(relationship_observations):
+    """Aggregate checks already produced by RelationshipIntegrityPass."""
+    checks = [dict(check) for result in relationship_observations
+              for check in result.get("checks", [])]
+    findings = [
+        _finding("RELATIONSHIP_INTEGRITY_CONTRADICTION",
+                 f"{item['relationship_type']}: {item['rule']}",
+                 item["target_hash"], "medium")
+        for item in checks if not item["passed"]
+    ]
+    value = sum(item["passed"] for item in checks) / len(checks) if checks else None
+    return value, checks, findings
 
 
 class CrossEvidencePass:
@@ -607,10 +566,12 @@ def _boolean_status(checks, successful_status="matched"):
     return (successful_status if value == 1.0 else "contradicted"), value
 
 
-def assess_axes(native, chain, bound_hashes, wav_observations, parser_observations, workflow_input):
+def assess_axes(native, chain, bound_hashes, wav_observations,
+                relationship_observations, parser_observations, workflow_input):
     file_value, file_checks, file_findings = BoundFileIntegrityPass.evaluate(
         native, bound_hashes, wav_observations, parser_observations)
-    rel_value, rel_checks, rel_findings = RelationshipIntegrityPass.evaluate(native, wav_observations)
+    rel_value, rel_checks, rel_findings = _relationship_integrity_results(
+        relationship_observations)
     cross_value, cross_checks, cross_findings = ExpandedCrossEvidencePass.evaluate(
         native, workflow_input, parser_observations, wav_observations)
     structural_checks = StructuralValidityPass.evaluate(native)
@@ -694,13 +655,14 @@ def assess_axes(native, chain, bound_hashes, wav_observations, parser_observatio
                       for reason in item.get("manual_review_reasons", [])]
     layers = [
         _layer("file_integrity", file_status, file_layer_value, True,
-               "SHA-256 binding and parser readability of submitted files.", len(file_checks)),
+               "SHA-256 binding, cached WAV technical checks, and parser readability of submitted files.",
+               len(file_checks)),
         _layer("structural_validity", "matched", 1.0, False,
                "Graph, references, cycles, connectivity, and endpoint roles passed before assessment; this is not content proof.",
                len(structural_checks)),
         _layer("declaration_consistency", declaration_status,
                declaration_layer_value, True,
-               "Submitted technical and relationship parameters compared with bound media observations.",
+               "Submitted relationship parameters compared with cached source and target media observations.",
                len(rel_checks)),
         _layer("content_reconstruction", content_status, content_layer_value,
                True,
