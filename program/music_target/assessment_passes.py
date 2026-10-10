@@ -26,6 +26,7 @@ from music_target.physical_audio_passes import (
     SourceContributionPass,
     StemMixResidualPass,
 )
+from music_target.scoring_profile import load_default_scoring_profile
 from music_target.sheet_parsers import parse_comp_sheet_file, parse_cue_sheet_file
 
 
@@ -607,7 +608,16 @@ def _boolean_status(checks, successful_status="matched"):
     return (successful_status if value == 1.0 else "contradicted"), value
 
 
-def assess_axes(native, chain, bound_hashes, wav_observations, parser_observations, workflow_input):
+def assess_axes(native, chain, bound_hashes, wav_observations, parser_observations, workflow_input,
+                scoring_profile=None):
+    # A caller-supplied profile lets integrity weighting/withholding/confidence
+    # be configured without touching this function; the default profile's
+    # values are defined to reproduce today's hardcoded behaviour exactly.
+    # An explicitly supplied but malformed profile must not be silently
+    # replaced by the default -- only the absence of a profile (None) falls
+    # back; load_scoring_profile() already raises on anything malformed.
+    if scoring_profile is None:
+        scoring_profile = load_default_scoring_profile()
     file_value, file_checks, file_findings = BoundFileIntegrityPass.evaluate(
         native, bound_hashes, wav_observations, parser_observations)
     rel_value, rel_checks, rel_findings = RelationshipIntegrityPass.evaluate(native, wav_observations)
@@ -715,23 +725,36 @@ def assess_axes(native, chain, bound_hashes, wav_observations, parser_observatio
                "C2PA remains in the separate attestation-strength axis and never inflates integrity.",
                1 if validation else 0),
     ]
-    components = [item["value"] for item in layers
-                  if item["contributes_to_integrity"] and item["value"] is not None]
+    scored_layers = [item for item in layers
+                     if item["contributes_to_integrity"] and item["value"] is not None]
+    components = [item["value"] for item in scored_layers]
     contradiction_present = any(
         item["contributes_to_integrity"] and item["status"] == "contradicted"
         for item in layers)
     substantive_support = (content_layer_value is not None or
                            cross_layer_value is not None)
+    integrity_profile = scoring_profile["integrity"]
+    layer_weights = integrity_profile["layer_weights"]
+    withholding_rule = integrity_profile["withholding_rule"]
+    confidence_formula = integrity_profile["confidence_formula"]
+    min_components = withholding_rule["min_components_for_substantive_mean"]
+    require_support = withholding_rule["require_substantive_support_or_contradiction"]
     if not components:
         integrity_availability, integrity_value, integrity_confidence = "unavailable", None, None
     else:
         integrity_availability = "available" if len(components) == 4 else "partial"
         # File/declaration consistency alone would create a misleading perfect-
         # looking score without content or independent cross-evidence support.
-        integrity_value = (sum(components) / len(components)
-                           if ((len(components) >= 2 and substantive_support) or
-                               contradiction_present) else None)
-        integrity_confidence = round(0.8 * len(components) / 4, 3)
+        threshold_met = (len(components) >= min_components and
+                         (substantive_support or not require_support))
+        if threshold_met or contradiction_present:
+            weighted_pairs = [(item["value"], layer_weights[item["layer"]]) for item in scored_layers]
+            weight_total = sum(weight for _, weight in weighted_pairs)
+            integrity_value = sum(value * weight for value, weight in weighted_pairs) / weight_total
+        else:
+            integrity_value = None
+        integrity_confidence = round(
+            confidence_formula["ceiling"] * len(components) / confidence_formula["denominator_layers"], 3)
     integrity = _axis(
         integrity_availability, integrity_value, integrity_confidence,
         (f"Integrity has {len(components)}/4 score-eligible evidence layers; missing evidence reduces availability and confidence but is never treated as contradiction. A numeric value is withheld "

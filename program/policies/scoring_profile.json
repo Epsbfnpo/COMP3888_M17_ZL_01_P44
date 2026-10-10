@@ -1,0 +1,27 @@
+{
+  "profile_id": "default-v1",
+  "profile_version": 1,
+  "description": "Reproduces pre-profile integrity scoring exactly. Every value here matches today's hardcoded constant bit-for-bit; changing a value is an explicit, reviewable decision, not a silent behaviour change.",
+  "integrity": {
+    "layer_weights": {
+      "file_integrity": 1.0,
+      "declaration_consistency": 1.0,
+      "content_reconstruction": 1.0,
+      "cross_evidence_support": 1.0
+    },
+    "layer_weight_rationale": {
+      "file_integrity": "Hash binding and parser success are the hardest evidence to fabricate convincingly; baseline weight.",
+      "declaration_consistency": "Requires matching declared fields to a file the submitter does not control; baseline weight.",
+      "content_reconstruction": "The strongest available 'did this transformation actually happen' signal when populated, since it requires a fully-parameterised declared derivation rather than a flat claim. A higher weight than the baseline is a defensible future choice on forge-cost grounds (a convincing fabricated derivation is harder to produce than a convincing flat claim), but is not applied by default: raising it is a deliberate, reviewed decision, not something this profile does silently.",
+      "cross_evidence_support": "Independent-source corroboration (DDEX/CompSheet/CueSheet/C2PA-ingredient); currently rare in real submissions; baseline weight."
+    },
+    "withholding_rule": {
+      "min_components_for_substantive_mean": 2,
+      "require_substantive_support_or_contradiction": true
+    },
+    "confidence_formula": {
+      "ceiling": 0.8,
+      "denominator_layers": 4
+    }
+  }
+}
