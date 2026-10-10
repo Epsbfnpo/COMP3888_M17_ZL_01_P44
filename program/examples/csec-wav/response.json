@@ -6,7 +6,7 @@
   "system": {
     "name": "COMP3888-music-baseline",
     "version": "0.5.0",
-    "source_revision": "sha256:0c270f8b8ae42032b35acca090a72747f9cac4252f094307297feccbb6a017b0"
+    "source_revision": "sha256:ee7a21254416cdc2fa834124aae8d12ba7d461199f0e9a145971e7790101e81e"
   },
   "execution_status": "succeeded",
   "axes": {
@@ -80,6 +80,7 @@
         "other_chunks": [],
         "warnings": []
       },
+      "checks": [],
       "claim_mismatches": []
     },
     {
@@ -119,6 +120,7 @@
           "other_chunks": [],
           "warnings": []
         },
+        "checks": [],
         "claim_mismatches": []
       },
       "evidence_hash": "746c90b6d8f6306ce93c347477103c16027d71a4072cf12d10a9f7246ce93d18"
@@ -139,9 +141,9 @@
       "message": "No workflow was supplied; completeness is legacy declared-object availability only."
     }
   ],
-  "processing_ms": 166.72325000399724,
+  "processing_ms": 167.52854199148715,
   "resource_usage": {
-    "cpu_ms": 0.9019999999999861,
+    "cpu_ms": 1.0909999999999809,
     "peak_rss_kib": null
   },
   "error": null,
@@ -185,7 +187,7 @@
         "value": 1.0,
         "contributes_to_integrity": true,
         "check_count": 1,
-        "reason": "SHA-256 binding and parser readability of submitted files.",
+        "reason": "SHA-256 binding, cached WAV technical checks, and parser readability of submitted files.",
         "manual_review_reasons": []
       },
       {
@@ -203,7 +205,7 @@
         "value": null,
         "contributes_to_integrity": true,
         "check_count": 0,
-        "reason": "Submitted technical and relationship parameters compared with bound media observations.",
+        "reason": "Submitted relationship parameters compared with cached source and target media observations.",
         "manual_review_reasons": []
       },
       {
