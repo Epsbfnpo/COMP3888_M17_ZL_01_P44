@@ -589,7 +589,7 @@ ASSESSMENT_STATUS_SEMANTICS = [
 
 
 def _layer(name, status, value, contributes, reason, check_count,
-           manual_review_reasons=None):
+           manual_review_reasons=None, weight=None):
     return {
         "layer": name,
         "status": status,
@@ -598,6 +598,15 @@ def _layer(name, status, value, contributes, reason, check_count,
         "check_count": check_count,
         "reason": reason,
         "manual_review_reasons": sorted(set(manual_review_reasons or [])),
+        # The configured weight this layer carries in the active scoring
+        # profile. Never set for a non-contributing layer (structural_
+        # validity, cryptographic_attestation) -- it has no scoring weight
+        # to report, since it is never part of the weighted calculation.
+        # Set for a contributing layer even when that layer is unavailable
+        # (value is None): the configured weight is still meaningful to
+        # show, even though an unavailable layer stays excluded from the
+        # weighted sum either way.
+        "weight": weight,
     }
 
 
@@ -702,23 +711,28 @@ def assess_axes(native, chain, bound_hashes, wav_observations, parser_observatio
 
     review_reasons = [reason for item in all_derivations
                       for reason in item.get("manual_review_reasons", [])]
+    integrity_profile = scoring_profile["integrity"]
+    layer_weights = integrity_profile["layer_weights"]
+    withholding_rule = integrity_profile["withholding_rule"]
+    confidence_formula = integrity_profile["confidence_formula"]
     layers = [
         _layer("file_integrity", file_status, file_layer_value, True,
-               "SHA-256 binding and parser readability of submitted files.", len(file_checks)),
+               "SHA-256 binding and parser readability of submitted files.", len(file_checks),
+               weight=layer_weights["file_integrity"]),
         _layer("structural_validity", "matched", 1.0, False,
                "Graph, references, cycles, connectivity, and endpoint roles passed before assessment; this is not content proof.",
                len(structural_checks)),
         _layer("declaration_consistency", declaration_status,
                declaration_layer_value, True,
                "Submitted technical and relationship parameters compared with bound media observations.",
-               len(rel_checks)),
+               len(rel_checks), weight=layer_weights["declaration_consistency"]),
         _layer("content_reconstruction", content_status, content_layer_value,
                True,
                "Only submitter-declared ranges and gains are assessed. Missing parameters are unavailable, not adverse; Master continuity corroboration remains unscored.",
-               len(all_derivations), review_reasons),
+               len(all_derivations), review_reasons, weight=layer_weights["content_reconstruction"]),
         _layer("cross_evidence_support", cross_status, cross_layer_value, True,
                "Independent parser outputs compared with graph, declarations, and media.",
-               len(cross_checks)),
+               len(cross_checks), weight=layer_weights["cross_evidence_support"]),
         _layer("cryptographic_attestation", cryptographic_status,
                (attestation.get("value")
                 if cryptographic_status in {"corroborated", "contradicted"} else None), False,
@@ -733,10 +747,6 @@ def assess_axes(native, chain, bound_hashes, wav_observations, parser_observatio
         for item in layers)
     substantive_support = (content_layer_value is not None or
                            cross_layer_value is not None)
-    integrity_profile = scoring_profile["integrity"]
-    layer_weights = integrity_profile["layer_weights"]
-    withholding_rule = integrity_profile["withholding_rule"]
-    confidence_formula = integrity_profile["confidence_formula"]
     min_components = withholding_rule["min_components_for_substantive_mean"]
     require_support = withholding_rule["require_substantive_support_or_contradiction"]
     if not components:
@@ -755,10 +765,30 @@ def assess_axes(native, chain, bound_hashes, wav_observations, parser_observatio
             integrity_value = None
         integrity_confidence = round(
             confidence_formula["ceiling"] * len(components) / confidence_formula["denominator_layers"], 3)
+    # Describe the withholding rule that actually ran, not a fixed assumption
+    # about it. At the shipped default (min_components=2, require_support=
+    # True) this reproduces the original fixed sentence verbatim, so a
+    # response scored under the default profile is unaffected. Under any
+    # other profile, state the configured rule and whether it permitted or
+    # withheld a value for *this* assessment -- never why it should have,
+    # since the score itself is computed above and unchanged by this text.
+    if min_components == 2 and require_support is True:
+        withholding_clause = ("A numeric value is withheld "
+            "without content reconstruction or independent CrossEvidence unless a contradiction exists. ")
+    else:
+        if require_support:
+            rule_description = (f"requires at least {min_components} populated contributing layer(s) "
+                                "including content reconstruction or independent CrossEvidence support")
+        else:
+            rule_description = f"requires at least {min_components} populated contributing layer(s)"
+        outcome = "permitted" if integrity_value is not None else "withheld"
+        withholding_clause = (
+            f"The active scoring profile's withholding rule {rule_description}, unless a contradiction "
+            f"exists; it {outcome} a numeric value for this assessment. ")
     integrity = _axis(
         integrity_availability, integrity_value, integrity_confidence,
-        (f"Integrity has {len(components)}/4 score-eligible evidence layers; missing evidence reduces availability and confidence but is never treated as contradiction. A numeric value is withheld "
-         "without content reconstruction or independent CrossEvidence unless a contradiction exists. "
+        (f"Integrity has {len(components)}/4 score-eligible evidence layers; missing evidence reduces availability and confidence but is never treated as contradiction. "
+         f"{withholding_clause}"
          "Structural validity and cryptographic attestation are reported separately and do not raise integrity. "
          f"{len(corroborated_derivations)} Master/content corroboration result(s) were not scored as exact matches."))
 
@@ -769,6 +799,11 @@ def assess_axes(native, chain, bound_hashes, wav_observations, parser_observatio
             "One or more content checks are ambiguous, insufficiently covered, or outside the supported model.",
             severity="low", review_reasons=sorted(set(review_reasons))))
     checks = {
+        # Identifies the scoring profile actually used for this assessment
+        # -- read from the profile object itself, never a hardcoded literal
+        # -- so a response can always be traced back to its configuration.
+        "scoring_profile": [{"profile_id": scoring_profile["profile_id"],
+                             "profile_version": scoring_profile["profile_version"]}],
         "bound_file_integrity": file_checks,
         "structural_validity": structural_checks,
         "relationship_integrity": rel_checks,

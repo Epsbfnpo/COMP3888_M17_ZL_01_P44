@@ -1,10 +1,11 @@
 # Dynamic Scoring Methodology
 
-Status: **M1 implemented**. M2 (explainability surfacing) and the
-contradiction-severity milestone are future work, described here for
-context but **not** built yet. This document covers the `integrity` axis
-only — the other three axes (`completeness`, `attestation_strength`,
-`ai_disclosure`) are untouched by M1 and are described only as background.
+Status: **M1 and M2 implemented**. The contradiction-severity milestone,
+workflow-specific weighting, and broader calibration remain future work,
+described here for context but **not** built yet. This document covers
+the `integrity` axis only — the other three axes (`completeness`,
+`attestation_strength`, `ai_disclosure`) are untouched by M1/M2 and are
+described only as background.
 
 ---
 
@@ -436,26 +437,124 @@ Verified, not assumed:
 
 ---
 
-## 7. Explainability (planned M2 — not implemented)
+## 7. Explainability (M2 — implemented)
 
-M1 changes how `integrity.value` is computed; it does **not** change what
-the response body reports about *why*. No response field currently states
-which profile was active or what weight each layer carried — a response
-scored under the default profile and one scored under a hypothetical
-alternative profile are indistinguishable from the output alone, other
-than the resulting `value` itself.
+M1 changed how `integrity.value` is computed but left the response body
+unable to say *why* — a response scored under the default profile and one
+scored under a hypothetical alternative profile were indistinguishable
+other than the resulting `value` itself. M2 closes that gap. All of it is
+additive to `assessment_checks` (an open, schema-permitted extension
+point) and to the `integrity` axis's existing `reasoning` string — no
+change to `scoring-response.schema.json`, and no change to any score,
+confidence, or availability value.
 
-The planned M2 addition, not built in this milestone: surface the active
-profile's identity and the weight actually applied to each layer inside
-the existing `assessment_checks` object (which already reports an
-`integrity_layers` array per response) — for example, an added
-`assessment_checks["scoring_profile"]` entry naming `profile_id`/
-`profile_version`, and a `"weight"` field added to each existing `
-integrity_layers` entry. Both would be purely additive to `assessment_
-checks`; neither requires any change to the public response schema, since
-`assessment_checks` is already an open, schema-permitted extension point.
-This is scoped as M2 specifically so that M1's behavioural change and
-M2's visibility change can be reviewed and landed separately.
+### The new `scoring_profile` output
+
+Every response now carries, inside `assessment_checks`:
+
+```json
+"scoring_profile": [{"profile_id": "default-v1", "profile_version": 1}]
+```
+
+taken directly from the `scoring_profile` dict `assess_axes()` actually
+used — never a hardcoded literal — so any response can be traced back to
+the exact configuration that produced it. This was confirmed on a real
+response: `assessment_checks["scoring_profile"]` reads
+`[{"profile_id": "default-v1", "profile_version": 1}]`, matching the
+shipped default profile exactly.
+
+### The new per-layer `weight` field
+
+Every entry in `assessment_checks["integrity_layers"]` now carries a
+`"weight"` field, read from the active profile's `integrity.layer_weights`
+at the moment each layer is built. Confirmed on a real response
+(`examples/valid-generated`, default profile):
+
+| layer | contributes_to_integrity | value | weight |
+|---|---|---|---|
+| `file_integrity` | `true` | `1.0` | `1.0` |
+| `structural_validity` | `false` | `1.0` | `null` |
+| `declaration_consistency` | `true` | `1.0` | `1.0` |
+| `content_reconstruction` | `true` | `null` | `1.0` |
+| `cross_evidence_support` | `true` | `null` | `1.0` |
+| `cryptographic_attestation` | `false` | `null` | `null` |
+
+Two rules, both directly visible in the table above:
+
+- **Non-contributing layers never carry a weight.** `structural_validity`
+  and `cryptographic_attestation` report `weight: null` unconditionally —
+  no scoring weight is invented for a layer that was never part of the
+  weighted mean in the first place.
+- **An unavailable contributing layer still shows its configured weight.**
+  `content_reconstruction` and `cross_evidence_support` are `unavailable`
+  in this example (`value: null`), but still report `weight: 1.0` — the
+  weight they *would* carry if populated. This is informational only: an
+  unavailable layer remains excluded from both the numerator and
+  denominator of the weighted mean exactly as before (§3) — showing its
+  weight does not give it influence it doesn't have.
+
+### Interpreting profile-specific withholding behaviour
+
+The `integrity.reasoning` string is now **context-sensitive** to the
+active profile's withholding rule, not a fixed sentence:
+
+- **At the shipped default** (`min_components_for_substantive_mean: 2`,
+  `require_substantive_support_or_contradiction: true`), the reasoning
+  text is reproduced **verbatim**, unchanged from before M2 — confirmed by
+  byte-for-byte comparison of all four example responses against their
+  pre-M1 baseline.
+- **Under any other profile**, the sentence is generated from the
+  *actual* configured rule and the *actual* outcome for that specific
+  assessment — never a generic description of what the rule usually does.
+  Two confirmed examples, both run against the same fixture (which
+  populates exactly 2 of 4 layers, both `matched`):
+
+  - Profile with `require_substantive_support_or_contradiction: false`:
+    > *"...The active scoring profile's withholding rule requires at
+    > least 2 populated contributing layer(s), unless a contradiction
+    > exists; it **permitted** a numeric value for this assessment..."*
+    (`integrity.value` became `1.0` — the relaxed rule allowed the two
+    populated layers to count on their own.)
+
+  - Profile with `min_components_for_substantive_mean: 3`:
+    > *"...The active scoring profile's withholding rule requires at
+    > least 3 populated contributing layer(s) including content
+    > reconstruction or independent CrossEvidence support, unless a
+    > contradiction exists; it **withheld** a numeric value for this
+    > assessment..."*
+    (`integrity.value` stayed `None` — only 2 layers populated, short of
+    the raised threshold.)
+
+  In both cases the sentence states the rule *that actually ran* and the
+  outcome *that actually happened* — it does not change the score, and it
+  does not describe a rule other than the one configured.
+
+### Tracing the weighted integrity calculation from the response alone
+
+With M2's fields, the weighted mean in §3 can be reconstructed entirely
+from a single response, without reading source code:
+
+1. Read `assessment_checks["scoring_profile"]` to know which profile
+   produced this response.
+2. For each entry in `assessment_checks["integrity_layers"]`, keep only
+   those where `contributes_to_integrity` is `true` **and** `value` is not
+   `null` — these are exactly the layers the weighted mean used.
+3. Compute `Σ(value × weight) / Σ(weight)` over that kept set. This
+   reproduces `axes.integrity.value` exactly (when the withholding rule
+   permitted a value at all — read the `reasoning` string, per above, to
+   see whether it did).
+
+### What remains future work (not built in M2)
+
+- Surfacing *why* a particular layer's `value` is what it is beyond its
+  existing `reason` string (e.g. a breakdown of which individual checks
+  passed/failed) is unchanged from before M2 — M2 adds profile/weight
+  visibility, not finer-grained per-check explainability.
+- Contradiction-severity caps, if later built (§8), will need their own
+  explainability surfacing (e.g. a `"severity_cap_applied"` flag) — not
+  part of M2, since the capping mechanism itself doesn't exist yet.
+- Workflow-specific profile selection and its explainability are
+  unaffected — still future work, per §8 and §9.
 
 ---
 
