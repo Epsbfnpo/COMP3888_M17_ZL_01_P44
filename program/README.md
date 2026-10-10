@@ -23,12 +23,13 @@ The main approach is to reuse Ben's evidence graph and execution framework, conn
 
 - Includes a pinned copy of the library source reviewed for this release, with fixes for audio attributes, binary-file binding, and dictionary attribute checks.
 - Registers music audio, MIDI, DAW, RIN, ERN, C2PA, and text evidence types, plus constrained relationship types.
-- Reuses the WAV parser with additional RIFF/PCM structural validation.
+- Reuses the WAV parser with additional RIFF/PCM structural validation, including integer-PCM `WAVE_FORMAT_EXTENSIBLE` files.
 - Provides a bounded MIDI parser; the RIN, ERN, and C2PA parsers are connected to the production execution path.
 - The MIDI parser extracts channel and meta events, notes, tempo, time signatures, controllers, and duration in seconds when it can be calculated.
 - CompSheet and CueSheet parsers support strict JSON, CSV, delimited text, and PDF text extraction. See [`docs/SHEET_FORMATS.md`](docs/SHEET_FORMATS.md).
 - Runs file, relationship, and cross-evidence analysis through the actual `EvidenceChain` and `Pipeline` implementations.
 - `WavMetadataPass` emits standardised technical checks once per audio artefact. `BoundFileIntegrityPass` consumes those cached checks instead of repeating the same comparisons.
+- A non-final WAV parser failure is isolated to that node: the program emits `WAV_PARSER_FAILED`, marks only dependent checks unavailable, and continues with independent evidence. An unsupported final WAV still returns `unsupported`.
 - `RelationshipIntegrityPass` is a registered libevchain `EvidencePass`. It compares only submitter-declared edge parameters with cached source and target observations and replaces the former diagnostic-only `MusicRelationshipPass`.
 - Includes scoped PCM content checks for `edited_from`, `comped_from`, `stemmed_from`, and `mixed_from`, plus conservative mix-to-master continuity corroboration. Exact checks use only submitter-declared ranges, placements, gains, and optional fades; no missing transformation parameter is estimated. Declared reconstruction is evaluated on alternating partitions and reports coverage, matched duration, source redundancy, identifiability, and repeated-segment ambiguity. Complex or undocumented processing is not automatically treated as a contradiction.
 - Adds eight bounded physical-audio diagnostics: `AudioAlignmentPass`, `SourceContributionPass`, `CompVerificationPass`, `ProcessedAudioMatchPass`, `StemMixResidualPass`, `MasteringDerivationPass`, `ExcerptedFromPass`, and `DecoySourcePass`. Signal-estimated offsets, gains, and channel matrices are labelled diagnostic, never written back into the evidence graph, and do not silently become provenance proof or exact integrity credit.
@@ -36,11 +37,13 @@ The main approach is to reuse Ben's evidence graph and execution framework, conn
 - Separates submitter-declared technical properties from measured file properties and reports inconsistencies.
 - Requires `workflow_id`, `modifiers`, and submitter declarations in `submission.json`, and loads policies for 16 workflow types.
 - `WorkflowCompletenessPass` reports the state of each required, conditional, and optional expectation.
-- Reports integrity, C2PA attestation, and AI disclosure independently. AI disclosure measures declaration coverage; it does not detect AI-generated content.
+- Reports integrity, C2PA attestation, and AI disclosure independently. The top-level C2PA axis is scoped to the final artefact; supporting-node manifests are reported separately and cannot raise the final score. AI disclosure measures declaration coverage; it does not detect AI-generated content.
 - Separates file integrity, structural validity, declaration consistency, content reconstruction, CrossEvidence, and cryptographic attestation. Structural endpoint validity and C2PA do not inflate the integrity value; C2PA remains in the separate attestation-strength axis.
 - Provides CSEC request conversion, a standard response contract, timeout control, and explicit `unsupported` and `error` states.
 - Applies XML size limits and rejects DTD/entity declarations. RIN 2.1 and ERN 4.3 are validated offline with pinned official XSD files, while XSD status remains separate from best-effort field extraction.
-- Binds available RIN `FileReference` and ERN `DeliveryFile` SHA-256 values to recordings/components. Cross-evidence checks cover MIDI, ERN, C2PA ingredients, and AI declaration consistency.
+- Binds available RIN `FileReference` and ERN `DeliveryFile` SHA-256 values to recordings/components. Cross-evidence checks cover MIDI, ERN, C2PA ingredients, and AI declaration consistency. Embedded and standalone C2PA manifests are normalised to asset-bound records before their ingredients are checked against the graph.
+- Invalid free-form comparison values, such as a textual BPM or non-string ISRC, make only that comparison unavailable; they do not turn the complete request into an execution error.
+- Each submitted object is hashed once before direct binding, and the source revision is cached once per process.
 - Includes successful, hash-error, and unsupported-type examples, and has been run against 11 public CSEC cases.
 
 The four dimensions respect separate evidence boundaries:
@@ -62,6 +65,13 @@ or map an unknown value. Every otherwise available axis is downgraded to
 node, malformed request, or unrelated supported node remains an `error`.
 A registered relationship whose endpoint roles are incompatible is isolated
 and reported without being applied to the retained graph.
+
+A known non-final WAV whose encoding is unsupported or malformed follows the
+same isolation principle at parser level. Its graph node and declaration remain
+visible, but WAV-dependent metadata and physical-audio checks are unavailable.
+Independent files and evidence continue to be assessed. The final artefact is
+strict: if its WAV cannot be parsed by the supported PCM implementation, the
+request returns `unsupported` or `error` as appropriate.
 
 The program does not infer relationships or fill in missing relationship
 parameters. It evaluates only graph edges and transformation parameters supplied
@@ -147,6 +157,9 @@ python3 -B check_public.py /path/to/public-bundles
 ```
 
 The second command writes results to `reports/`. Both commands operate locally and do not transmit data.
+The local regression suite contains 73 tests, including coverage for non-final
+WAV isolation, extensible PCM, field-level unavailability, final-scoped C2PA,
+standalone C2PA ingredient checks, and hash caching.
 
 ## Directory overview
 

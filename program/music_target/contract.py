@@ -5,6 +5,7 @@ import hashlib
 import json
 import re
 import uuid
+from functools import lru_cache
 from pathlib import Path
 
 from jsonschema import Draft202012Validator, FormatChecker
@@ -46,7 +47,9 @@ def validate(document, schema_name):
         raise InputError(f"Schema validation failed at {location} ({error.validator}).")
 
 
+@lru_cache(maxsize=1)
 def source_revision():
+    """Hash the installed source tree once per process."""
     digest = hashlib.sha256()
     files = [BASE / name for name in ["run.py", "make_examples.py", "check_public.py"]]
     files.extend(BASE.glob("requirements*.txt"))
@@ -88,12 +91,13 @@ def identity(request, mode):
         raise InputError("A valid run_id, case_id and final SHA-256 are needed to form a scoring response.") from None
 
 
-def response_shell(request, mode):
+def response_shell(request, mode, include_source_revision=True):
     run_id, case_id, digest = identity(request, mode)
     return {"schema_version": "0.2-candidate", "run_id": run_id, "case_id": case_id,
             "asset_sha256": digest,
             "system": {"name": "COMP3888-music-baseline", "version": VERSION,
-                       "source_revision": source_revision()},
+                       "source_revision": (source_revision()
+                                           if include_source_revision else None)},
             "execution_status": "error", "axes": empty_axes(),
             "validation": {"validation_state": None, "signature_present": None,
                            "signature_valid": None, "cryptographically_valid": None,

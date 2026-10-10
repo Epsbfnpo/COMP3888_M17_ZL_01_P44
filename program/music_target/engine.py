@@ -17,6 +17,9 @@ from music_target.workflow_policy import WorkflowCompletenessPass, load_workflow
 
 MAX_FILE_BYTES = 32 * 1024 * 1024
 MAX_TOTAL_BYTES = 128 * 1024 * 1024
+WAVE_FORMAT_PCM = 0x0001
+WAVE_FORMAT_EXTENSIBLE = 0xFFFE
+PCM_SUBFORMAT_GUID = bytes.fromhex("0100000000001000800000aa00389b71")
 
 
 class InputError(ValueError):
@@ -70,7 +73,27 @@ def strict_pcm_check(path):
         if name == b"fmt ":
             if size < 16:
                 raise InputError("Truncated WAV fmt chunk.")
-            fmt = struct.unpack_from("<HHIIHH", data, start)
+            code, channels, rate, byte_rate, align, bits = struct.unpack_from(
+                "<HHIIHH", data, start)
+            fmt = {"code": code, "channels": channels, "rate": rate,
+                   "byte_rate": byte_rate, "align": align, "bits": bits,
+                   "format_tag": "WAVE_FORMAT_PCM", "valid_bits": bits}
+            if code == WAVE_FORMAT_EXTENSIBLE:
+                if size < 40:
+                    raise InputError("Truncated WAVE_FORMAT_EXTENSIBLE fmt chunk.")
+                extension_size = struct.unpack_from("<H", data, start + 16)[0]
+                if extension_size < 22 or size < 18 + extension_size:
+                    raise InputError("Invalid WAVE_FORMAT_EXTENSIBLE extension size.")
+                valid_bits = struct.unpack_from("<H", data, start + 18)[0]
+                subformat = data[start + 24:start + 40]
+                if subformat != PCM_SUBFORMAT_GUID:
+                    raise Unsupported(
+                        "Only the integer PCM SubFormat of WAVE_FORMAT_EXTENSIBLE is supported.")
+                if not (1 <= valid_bits <= bits):
+                    raise InputError(
+                        "WAVE_FORMAT_EXTENSIBLE valid bits must fit the sample container.")
+                fmt.update({"format_tag": "WAVE_FORMAT_EXTENSIBLE",
+                            "valid_bits": valid_bits})
         elif name == b"data":
             if fmt is None:
                 raise InputError("The data chunk must follow fmt in this baseline.")
@@ -78,8 +101,10 @@ def strict_pcm_check(path):
         pos = end + size % 2
     if fmt is None or payload is None:
         raise InputError("A fmt chunk and a data chunk are required.")
-    code, channels, rate, byte_rate, align, bits = fmt
-    if code != 1 or bits not in (8, 16, 24, 32):
+    code = fmt["code"]
+    channels, rate = fmt["channels"], fmt["rate"]
+    byte_rate, align, bits = fmt["byte_rate"], fmt["align"], fmt["bits"]
+    if code not in (WAVE_FORMAT_PCM, WAVE_FORMAT_EXTENSIBLE) or bits not in (8, 16, 24, 32):
         raise Unsupported("Only uncompressed integer PCM WAV (8/16/24/32-bit) is supported.")
     if not (1 <= channels <= 32 and 1 <= rate <= 384000):
         raise Unsupported("Channel count or sample rate is outside the baseline limits.")
@@ -89,7 +114,9 @@ def strict_pcm_check(path):
         raise InputError("Empty or truncated PCM sample data.")
     return {"duration_seconds": payload / byte_rate, "sample_rate_hz": rate,
             "channels": channels, "bit_depth": bits, "format": "WAV",
-            "codec_subtype": "PCM", "file_size_bytes": len(data)}
+            "codec_subtype": "PCM", "file_size_bytes": len(data),
+            "wav_format_tag": fmt["format_tag"],
+            "valid_bits_per_sample": fmt["valid_bits"]}
 
 
 class WavMetadataPass(ArtefactPass):
@@ -98,9 +125,35 @@ class WavMetadataPass(ArtefactPass):
         if not artefact.has_file():
             return None, None, ["No verified file is bound to this artefact."]
         path = Path(artefact.get_file())
-        observed = strict_pcm_check(path)
-        parsed = dataclasses.asdict(parse_wav_file(str(path)))
-        parsed.pop("source_path", None)
+        try:
+            observed = strict_pcm_check(path)
+            parsed = dataclasses.asdict(parse_wav_file(str(path)))
+            parsed.pop("source_path", None)
+        except (InputError, OSError, ValueError, struct.error) as exc:
+            chain = getattr(artefact, "_evaluation_chain", None)
+            if chain is not None and artefact.artefact_hash == chain.final_artefact_hash:
+                raise
+            failure_type = "unsupported" if isinstance(exc, Unsupported) else "invalid"
+            artefact._wav_parser_failure = str(exc)
+            return None, {
+                "status": "parser_failed",
+                "failure_type": failure_type,
+                "error": str(exc),
+                "observed": {},
+                "embedded_metadata": None,
+                "checks": [{
+                    "rule": "wav_parser_available",
+                    "passed": None,
+                    "status": "unavailable",
+                    "evidence_hash": artefact.artefact_hash,
+                    "source_pass": "WavMetadataPass",
+                    "reason": str(exc),
+                }],
+                "claim_mismatches": [],
+            }, [
+                "This non-final WAV could not be decoded by the supported PCM parser; only checks that require this node are unavailable.",
+            ]
+        artefact._wav_parser_failure = None
         claim = artefact._attributes.get("technical", {})
         checks, mismatches = [], []
         for key, value in claim.items():
@@ -117,7 +170,8 @@ class WavMetadataPass(ArtefactPass):
                            "source_pass": "WavMetadataPass"})
             if not same:
                 mismatches.append({"field": key, "declared": value, "observed": measured})
-        return None, {"observed": observed, "embedded_metadata": parsed,
+        return None, {"status": "parsed", "observed": observed,
+                      "embedded_metadata": parsed,
                       "checks": checks, "claim_mismatches": mismatches}, [
             "PCM framing was checked; submission claims were compared with measured file properties.",
             "Embedded dates, credits and software tags are unauthenticated metadata.",
@@ -181,10 +235,11 @@ class RelationshipIntegrityPass(EvidencePass):
                   "value": (sum(item["passed"] for item in checks) / len(checks)
                             if checks else None),
                   "checks": checks}
-        if source_result and target_result:
+        if (source_observed.get("duration_seconds") is not None and
+                target_observed.get("duration_seconds") is not None):
             result["duration_delta_seconds"] = (
-                target_result["observed"]["duration_seconds"]
-                - source_result["observed"]["duration_seconds"])
+                target_observed["duration_seconds"]
+                - source_observed["duration_seconds"])
         return None, result, [
             "Endpoint roles were validated before the Pass ran; declared edge parameters were compared with cached endpoint observations.",
             "Duration difference is diagnostic only.",
@@ -249,7 +304,11 @@ def evaluate_chain(native, objects, root, workflow=None, allow_disconnected=Fals
             actual = hashlib.file_digest(handle, "sha256").hexdigest()
         if actual != digest:
             raise InputError(f"SHA-256 mismatch for declared object {digest}.")
-        chain.bind_file(str(path))
+        # The digest was just verified above. Bind the known artefact directly
+        # so libevchain does not hash the same file a second time.
+        artefact = chain.artefacts[digest]
+        artefact.bind_file(str(path))
+        artefact._verified_file_hash = actual
         bound += 1
         bound_hashes.add(digest)
     if not chain.artefacts[chain.final_artefact_hash].has_file():
@@ -261,9 +320,20 @@ def evaluate_chain(native, objects, root, workflow=None, allow_disconnected=Fals
     claim_mismatch = False
     for digest, observation in observations.items():
         if observation is not None:
-            claim_mismatch |= bool(observation["claim_mismatches"])
-            findings.append({**finding("WAV_OBSERVATION", "Measured WAV properties and extracted metadata.", digest),
-                             **observation})
+            claim_mismatch |= bool(observation.get("claim_mismatches", []))
+            if observation.get("status") == "parser_failed":
+                findings.append({
+                    **finding("WAV_PARSER_FAILED",
+                              "A non-final WAV could not be parsed; dependent checks are unavailable.",
+                              digest, "medium"),
+                    **observation,
+                })
+            else:
+                findings.append({
+                    **finding("WAV_OBSERVATION",
+                              "Measured WAV properties and extracted metadata.", digest),
+                    **observation,
+                })
     for result in relationships:
         findings.append({**finding("RELATIONSHIP_INTEGRITY_OBSERVATION", "Declared relationship parameters were checked by the cached EvidencePass; separate content analysis may corroborate or contradict the submitted transformation."),
                          **result})

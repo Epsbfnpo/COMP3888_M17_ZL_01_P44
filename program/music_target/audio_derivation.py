@@ -80,6 +80,17 @@ def _read_pcm(path: Path):
             "bit_depth": width * 8}
 
 
+def _read_bound_pcm(chain, digest):
+    """Read a bound PCM artefact unless its metadata Pass already failed."""
+    artefact = chain.artefacts[digest]
+    if not artefact.has_file():
+        raise ValueError("no verified file is bound to the audio artefact")
+    parser_failure = getattr(artefact, "_wav_parser_failure", None)
+    if parser_failure:
+        raise ValueError(f"WAV parser unavailable for this artefact: {parser_failure}")
+    return _read_pcm(Path(artefact.get_file()))
+
+
 def _source_gram(sources, indices):
     gram = [[0.0 for _ in sources] for _ in sources]
     for index in indices:
@@ -189,9 +200,8 @@ def _processing_is_complex(edges):
 
 
 def _read_target_and_sources(target, edges, chain):
-    target_audio = _read_pcm(Path(chain.artefacts[target["artefact_hash"]].get_file()))
-    sources = [_read_pcm(Path(chain.artefacts[edge["hash"]].get_file()))
-               for edge in edges]
+    target_audio = _read_bound_pcm(chain, target["artefact_hash"])
+    sources = [_read_bound_pcm(chain, edge["hash"]) for edge in edges]
     if any(item["sample_rate_hz"] != target_audio["sample_rate_hz"] or
            item["channels"] != target_audio["channels"] for item in sources):
         raise ValueError("source and target sample rates/channels must match")
@@ -587,14 +597,14 @@ class CompDerivationPass:
                                 "selection_count": len(selections)})
                 continue
             try:
-                target_audio = _read_pcm(Path(chain.artefacts[target["artefact_hash"]].get_file()))
+                target_audio = _read_bound_pcm(chain, target["artefact_hash"])
                 entries = []
                 alternative_locations = []
                 for selection in selections:
                     source_hash = selection["source_hash"]
                     if source_hash not in nodes:
                         raise ValueError("a CompSheet source hash is absent from the graph")
-                    source_audio = _read_pcm(Path(chain.artefacts[source_hash].get_file()))
+                    source_audio = _read_bound_pcm(chain, source_hash)
                     if (source_audio["sample_rate_hz"] != target_audio["sample_rate_hz"] or
                             source_audio["channels"] != target_audio["channels"]):
                         raise ValueError("source and target sample rates/channels must match")
@@ -826,8 +836,8 @@ class MasterDerivationPass:
                                 "reason": "A mastered_from scope must be master_similarity."})
                 continue
             try:
-                source = _read_pcm(Path(chain.artefacts[edges[0]["hash"]].get_file()))
-                master = _read_pcm(Path(chain.artefacts[target["artefact_hash"]].get_file()))
+                source = _read_bound_pcm(chain, edges[0]["hash"])
+                master = _read_bound_pcm(chain, target["artefact_hash"])
                 source_samples, master_samples, alignment = _declared_master_samples(
                     source, master, attrs)
             except (OSError, ValueError, TypeError) as exc:

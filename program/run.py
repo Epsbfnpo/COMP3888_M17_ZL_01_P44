@@ -13,7 +13,7 @@ sys.path.insert(0, str(BASE / "vendor"))
 
 from music_target.contract import (
     InputError, Unsupported, public_bundle_request, read_json,
-    response_shell, to_native, validate,
+    response_shell, source_revision, to_native, validate,
 )
 from music_target.engine import evaluate_chain, finding
 
@@ -66,7 +66,10 @@ def evaluate(request, root, mode):
 
 
 def run_isolated(request, root, mode, command=None):
-    response = response_shell(request, mode)
+    # A successful worker supplies its own source revision. Avoid hashing the
+    # full source tree in the parent unless a parent-generated failure response
+    # must be returned.
+    response = response_shell(request, mode, include_source_revision=False)
     options = request.get("options", {})
     requested = options.get("timeout_seconds", 60) if isinstance(options, dict) else 60
     timeout = min(requested, 60) if type(requested) is int and requested > 0 else 60
@@ -87,6 +90,8 @@ def run_isolated(request, root, mode, command=None):
         response["execution_status"] = "error"
         response["error"] = str(exc)
         response["findings"] = [finding("WORKER_ERROR", str(exc), severity="medium")]
+    if response["system"]["source_revision"] is None:
+        response["system"]["source_revision"] = source_revision()
     response["processing_ms"] = (time.perf_counter() - started) * 1000
     validate(response, "scoring-response.schema.json")
     return response
