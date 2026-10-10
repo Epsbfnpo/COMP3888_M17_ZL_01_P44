@@ -55,8 +55,11 @@ def parse_bound_artefacts(native, chain, wav_observations):
         path = Path(artefact.get_file())
         try:
             if kind.startswith("audio/") or kind == "audio":
-                parsed = {"parser": "wav", "status": "parsed",
-                          "data": wav_observations.get(digest)}
+                wav_result = wav_observations.get(digest)
+                wav_failed = ((wav_result or {}).get("status") == "parser_failed")
+                parsed = {"parser": "wav",
+                          "status": "failed" if wav_failed else "parsed",
+                          "data": wav_result}
                 # C2PA may be embedded in the media itself. Attempt once per
                 # audio file; absence never makes completeness fail.
                 c2pa = dataclasses.asdict(parse_c2pa_file(str(path)))
@@ -126,18 +129,20 @@ class BoundFileIntegrityPass:
             if wav_result:
                 checks.extend(dict(item) for item in wav_result.get("checks", []))
             parser = parser_observations.get(digest)
-            if parser and parser["status"] == "failed":
+            if (parser and parser["status"] == "failed" and
+                    not (wav_result and wav_result.get("status") == "parser_failed")):
                 checks.append({"rule": "declared_type_parser_succeeds", "passed": False,
                                "evidence_hash": digest})
-        passed = sum(item["passed"] for item in checks)
+        eligible = [item for item in checks if isinstance(item.get("passed"), bool)]
+        passed = sum(item["passed"] for item in eligible)
         for item in checks:
-            if not item["passed"]:
+            if item.get("passed") is False:
                 code = ("TECHNICAL_CLAIM_MISMATCH"
                         if item["rule"].startswith("technical.")
                         else "FILE_INTEGRITY_CONTRADICTION")
                 findings.append(_finding(code, item["rule"],
                                          item["evidence_hash"], "medium"))
-        value = passed / len(checks) if checks else None
+        value = passed / len(eligible) if eligible else None
         return value, checks, findings
 
 
@@ -240,6 +245,57 @@ class CrossEvidencePass:
         return value, checks, findings
 
 
+def _unavailable_check(rule, reason, **extra):
+    """Represent one failed comparison without failing unrelated checks."""
+    return {"rule": rule, "status": "unavailable", "passed": None,
+            "reason": reason, **extra}
+
+
+def _c2pa_records(native, parser_observations):
+    """Normalise embedded and standalone C2PA results with an asset binding."""
+    edges = [(edge["hash"], target["artefact_hash"], edge["relationship_type"])
+             for target in native["artefacts"] for edge in target.get("evidence", [])]
+    final_hash = native.get("final_artefact_hash")
+    records = []
+    for container_hash, parsed in parser_observations.items():
+        embedded = parsed.get("c2pa")
+        if isinstance(embedded, dict):
+            records.append({
+                "manifest_container_hash": container_hash,
+                "asset_hash": container_hash,
+                "source_kind": "embedded",
+                "binding_relationship": None,
+                "manifest": embedded,
+            })
+
+        if parsed.get("parser") != "c2pa" or not isinstance(parsed.get("data"), dict):
+            continue
+        manifest = parsed["data"]
+        outgoing = [(target, relation) for source, target, relation in edges
+                    if source == container_hash and target != container_hash]
+        incoming = [(source, relation) for source, target, relation in edges
+                    if target == container_hash and source != container_hash]
+        bindings = outgoing or incoming
+        if not bindings and container_hash == final_hash:
+            bindings = [(container_hash, None)]
+        if not bindings:
+            bindings = [(None, None)]
+        seen = set()
+        for asset_hash, relationship in bindings:
+            key = (asset_hash, relationship)
+            if key in seen:
+                continue
+            seen.add(key)
+            records.append({
+                "manifest_container_hash": container_hash,
+                "asset_hash": asset_hash,
+                "source_kind": "standalone",
+                "binding_relationship": relationship,
+                "manifest": manifest,
+            })
+    return records
+
+
 class ExpandedCrossEvidencePass:
     """Cross-check DDEX, MIDI, C2PA, AI and sheet claims against the graph."""
 
@@ -312,10 +368,20 @@ class ExpandedCrossEvidencePass:
                         metadata = (nodes[audio_hash].get("attributes") or {}).get(
                             "source_metadata") or {}
                         if metadata.get("isrc") and binding.get("isrc"):
-                            checks.append({"rule": "ern_isrc_matches_audio_declaration",
-                                           "passed": metadata["isrc"].replace("-", "").casefold() ==
-                                                     binding["isrc"].replace("-", "").casefold(),
-                                           "audio_hash": audio_hash})
+                            declared_isrc, observed_isrc = metadata["isrc"], binding["isrc"]
+                            if not isinstance(declared_isrc, str) or not isinstance(observed_isrc, str):
+                                checks.append(_unavailable_check(
+                                    "ern_isrc_matches_audio_declaration",
+                                    "ISRC comparison requires string values.",
+                                    audio_hash=audio_hash,
+                                    evidence_hash=owner_digest))
+                            else:
+                                checks.append({
+                                    "rule": "ern_isrc_matches_audio_declaration",
+                                    "passed": declared_isrc.replace("-", "").casefold() ==
+                                              observed_isrc.replace("-", "").casefold(),
+                                    "audio_hash": audio_hash,
+                                })
             elif parser == "midi" and data:
                 targets = [target for source, target, relation in edges
                            if source == owner_digest and relation == "rendered_from"]
@@ -338,10 +404,23 @@ class ExpandedCrossEvidencePass:
                 production = (nodes[owner_digest].get("attributes") or {}).get("production") or {}
                 tempos = data.get("tempo_events") or []
                 if production.get("tempo_bpm") is not None and tempos:
-                    checks.append({"rule": "midi_tempo_matches_declaration",
-                                   "passed": math.isclose(float(production["tempo_bpm"]),
-                                                          float(tempos[0]["bpm"]), abs_tol=0.01),
-                                   "evidence_hash": owner_digest})
+                    declared_tempo = production["tempo_bpm"]
+                    observed_tempo = tempos[0].get("bpm")
+                    numeric = (type(declared_tempo) in (int, float) and
+                               type(observed_tempo) in (int, float) and
+                               math.isfinite(declared_tempo) and math.isfinite(observed_tempo))
+                    if not numeric:
+                        checks.append(_unavailable_check(
+                            "midi_tempo_matches_declaration",
+                            "Tempo comparison requires finite numeric BPM values.",
+                            evidence_hash=owner_digest))
+                    else:
+                        checks.append({
+                            "rule": "midi_tempo_matches_declaration",
+                            "passed": math.isclose(declared_tempo, observed_tempo,
+                                                   abs_tol=0.01),
+                            "evidence_hash": owner_digest,
+                        })
                 signatures = data.get("time_signature_events") or []
                 if production.get("time_signature") and signatures:
                     observed = f"{signatures[0]['numerator']}/{signatures[0]['denominator']}"
@@ -383,41 +462,74 @@ class ExpandedCrossEvidencePass:
                                        "passed": cue["end_seconds"] <= duration,
                                        "cue_id": cue["cue_id"], "asset_hash": asset})
 
-            c2pa = parsed.get("c2pa") if isinstance(parsed.get("c2pa"), dict) else None
-            if c2pa and c2pa.get("present"):
-                compatible = {
-                    "parentof": {"derived_from", "edited_from", "mastered_from",
-                                 "rendered_from", "stemmed_from", "mixed_from", "comped_from"},
-                    "componentof": {"mixed_from", "comped_from", "stemmed_from", "input_to"},
-                    "inputto": {"input_to", "rendered_from"},
-                }
-                for ingredient in c2pa.get("ingredients", []):
-                    relationship = str(ingredient.get("relationship") or "").replace(
-                        "_", "").casefold()
-                    for source_hash in ingredient.get("referenced_hashes", []):
-                        exists = source_hash in graph_hashes
-                        checks.append({"rule": "c2pa_ingredient_hash_exists_in_graph",
-                                       "passed": exists, "evidence_hash": owner_digest,
-                                       "ingredient_hash": source_hash})
-                        if exists and relationship in compatible:
+        compatible = {
+            "parentof": {"derived_from", "edited_from", "mastered_from",
+                         "rendered_from", "stemmed_from", "mixed_from", "comped_from"},
+            "componentof": {"mixed_from", "comped_from", "stemmed_from", "input_to"},
+            "inputto": {"input_to", "rendered_from"},
+        }
+        for record in _c2pa_records(native, parser_observations):
+            c2pa = record["manifest"]
+            if not c2pa.get("present"):
+                continue
+            container_hash = record["manifest_container_hash"]
+            asset_hash = record["asset_hash"]
+            common = {
+                "evidence_hash": container_hash,
+                "manifest_container_hash": container_hash,
+                "asset_hash": asset_hash,
+                "c2pa_source_kind": record["source_kind"],
+            }
+            if record["source_kind"] == "standalone":
+                checks.append({
+                    "rule": "c2pa_standalone_manifest_bound_to_graph_asset",
+                    "passed": asset_hash in graph_hashes,
+                    "binding_relationship": record["binding_relationship"],
+                    **common,
+                })
+            for ingredient in c2pa.get("ingredients", []):
+                relationship = str(ingredient.get("relationship") or "").replace(
+                    "_", "").casefold()
+                for source_hash in ingredient.get("referenced_hashes", []):
+                    exists = source_hash in graph_hashes
+                    checks.append({
+                        "rule": "c2pa_ingredient_hash_exists_in_graph",
+                        "passed": exists,
+                        "ingredient_hash": source_hash,
+                        **common,
+                    })
+                    if exists and relationship in compatible:
+                        if asset_hash not in graph_hashes:
+                            checks.append(_unavailable_check(
+                                "c2pa_ingredient_relationship_matches_graph",
+                                "The C2PA manifest is not bound to a submitted asset.",
+                                ingredient_hash=source_hash,
+                                c2pa_relationship=ingredient.get("relationship"),
+                                **common))
+                        else:
                             relations = {relation for source, target, relation in edges
-                                         if source == source_hash and target == owner_digest}
-                            checks.append({"rule": "c2pa_ingredient_relationship_matches_graph",
-                                           "passed": bool(relations & compatible[relationship]),
-                                           "evidence_hash": owner_digest,
-                                           "ingredient_hash": source_hash,
-                                           "c2pa_relationship": ingredient.get("relationship"),
-                                           "graph_relationships": sorted(relations)})
-                source_types = [str(item) for item in c2pa.get("digital_source_types", [])]
-                ai_claimed = any("trainedalgorithmic" in item.casefold() for item in source_types)
-                creation = (nodes[owner_digest].get("attributes") or {}).get("creation_method")
+                                         if source == source_hash and target == asset_hash}
+                            checks.append({
+                                "rule": "c2pa_ingredient_relationship_matches_graph",
+                                "passed": bool(relations & compatible[relationship]),
+                                "ingredient_hash": source_hash,
+                                "c2pa_relationship": ingredient.get("relationship"),
+                                "graph_relationships": sorted(relations),
+                                **common,
+                            })
+            source_types = [str(item) for item in c2pa.get("digital_source_types", [])]
+            ai_claimed = any("trainedalgorithmic" in item.casefold() for item in source_types)
+            if asset_hash in nodes:
+                creation = (nodes[asset_hash].get("attributes") or {}).get("creation_method")
                 methods = {creation} if isinstance(creation, str) else set(creation or [])
                 if source_types and methods:
-                    checks.append({"rule": "c2pa_ai_source_type_matches_creation_method",
-                                   "passed": ("ai-generated" in methods) if ai_claimed else True,
-                                   "evidence_hash": owner_digest,
-                                   "digital_source_types": source_types,
-                                   "creation_method": sorted(methods)})
+                    checks.append({
+                        "rule": "c2pa_ai_source_type_matches_creation_method",
+                        "passed": ("ai-generated" in methods) if ai_claimed else True,
+                        "digital_source_types": source_types,
+                        "creation_method": sorted(methods),
+                        **common,
+                    })
 
         if "includes_ai_generated_audio" in set((workflow_input or {}).get("modifiers") or []):
             declared_ai = []
@@ -428,62 +540,112 @@ class ExpandedCrossEvidencePass:
                     declared_ai.append(digest)
             checks.append({"rule": "workflow_ai_modifier_matches_audio_declarations",
                            "passed": bool(declared_ai), "audio_hashes": declared_ai})
-        value = sum(item["passed"] for item in checks) / len(checks) if checks else None
+        eligible = [item for item in checks if isinstance(item.get("passed"), bool)]
+        value = (sum(item["passed"] for item in eligible) / len(eligible)
+                 if eligible else None)
         findings = [] if value in (None, 1.0) else [
             _finding("CROSS_EVIDENCE_CONTRADICTION",
                      "One or more parsed evidence claims conflict with the submitted graph, declarations, or media.",
                      severity="medium")]
+        unavailable = [item for item in checks if item.get("status") == "unavailable"]
+        if unavailable:
+            findings.append(_finding(
+                "CROSS_EVIDENCE_CHECK_UNAVAILABLE",
+                "One or more cross-evidence comparisons could not run because a field had an unsupported type or required binding was absent.",
+                severity="low", unavailable_checks=unavailable))
         return value, checks, findings
 
 
 class C2PAAttestationPass:
-    """Separate manifest presence, signature, SDK validation, and trust."""
+    """Assess only the final artefact while reporting every C2PA record."""
 
     @staticmethod
-    def evaluate(parser_observations):
-        records = []
-        for parsed in parser_observations.values():
-            if parsed.get("parser") == "c2pa" and parsed.get("data"):
-                records.append(parsed["data"])
-            if isinstance(parsed.get("c2pa"), dict):
-                records.append(parsed["c2pa"])
-        installed = any(item.get("sdk_available") for item in records)
-        reader_succeeded = any(item.get("reader_succeeded") for item in records)
-        manifests = [item for item in records if item.get("present")]
-        if not records or not installed:
-            return _axis(reasoning="C2PA SDK is unavailable, so no cryptographic attestation was assessed."), {}, []
+    def _collect_codes(value):
+        codes = []
+        if isinstance(value, dict):
+            for key, item in value.items():
+                if key == "code" and isinstance(item, str):
+                    codes.append(item)
+                else:
+                    codes.extend(C2PAAttestationPass._collect_codes(item))
+        elif isinstance(value, list):
+            for item in value:
+                codes.extend(C2PAAttestationPass._collect_codes(item))
+        return codes
+
+    @staticmethod
+    def _report(record, final_hash):
+        manifest = record["manifest"]
+        present = bool(manifest.get("present"))
+        state = manifest.get("validation_state")
+        if not manifest.get("sdk_available"):
+            reported_state = "sdk_unavailable"
+        elif not manifest.get("reader_succeeded"):
+            reported_state = "manifest_not_read"
+        elif not present:
+            reported_state = "manifest_absent"
+        else:
+            reported_state = state or "manifest_parsed"
+        return {
+            "scope": "final" if record["asset_hash"] == final_hash else "supporting",
+            "source_kind": record["source_kind"],
+            "manifest_container_hash": record["manifest_container_hash"],
+            "asset_hash": record["asset_hash"],
+            "binding_relationship": record["binding_relationship"],
+            "sdk_available": bool(manifest.get("sdk_available")),
+            "reader_succeeded": bool(manifest.get("reader_succeeded")),
+            "manifest_present": present,
+            "signature_present": bool(manifest.get("signature_info")) if present else False,
+            "validation_state": reported_state,
+            "validation_codes": sorted(set(
+                C2PAAttestationPass._collect_codes(
+                    manifest.get("validation_results")))),
+        }
+
+    @staticmethod
+    def evaluate(native, parser_observations):
+        records = _c2pa_records(native, parser_observations)
+        final_hash = native["final_artefact_hash"]
+        reports = [C2PAAttestationPass._report(record, final_hash)
+                   for record in records]
+        final_records = [record["manifest"] for record in records
+                         if record["asset_hash"] == final_hash]
+        if not final_records:
+            reason = "No C2PA parser record is bound to the final artefact. Supporting-node attestations do not raise the final attestation axis."
+            installed = any(record["manifest"].get("sdk_available") for record in records)
+            if not installed:
+                return _axis(reasoning=reason), {}, [], reports
+            return _axis("available", 0.0, 0.9, reason), {
+                "validation_state": "manifest_absent", "signature_present": False,
+                "signature_valid": None, "cryptographically_valid": None,
+                "credential_trusted": None, "codes": [], "reasons": [reason]}, [], reports
+
+        installed = any(item.get("sdk_available") for item in final_records)
+        reader_succeeded = any(item.get("reader_succeeded") for item in final_records)
+        manifests = [item for item in final_records if item.get("present")]
+        if not installed:
+            reason = "C2PA SDK is unavailable for the final artefact, so no cryptographic attestation was assessed."
+            return _axis(reasoning=reason), {}, [], reports
         if not reader_succeeded:
-            reason = "C2PA SDK was available, but it could not read the submitted media; absence and read failure cannot be conflated."
+            reason = "C2PA SDK was available, but it could not read the final artefact; absence and read failure cannot be conflated."
             return _axis("partial", None, 0.3, reason), {
                 "validation_state": "manifest_not_read", "signature_present": None,
                 "signature_valid": None, "cryptographically_valid": None,
                 "credential_trusted": None, "codes": [], "reasons": [reason]}, [
-                    _finding("C2PA_READ_FAILED", reason, severity="low")]
+                    _finding("C2PA_READ_FAILED", reason, final_hash, "low")], reports
         if not manifests:
-            return _axis("available", 0.0, 0.9, "C2PA SDK ran but found no active manifest."), {
+            reason = "C2PA SDK ran but found no active manifest associated with the final artefact."
+            return _axis("available", 0.0, 0.9, reason), {
                 "validation_state": "manifest_absent", "signature_present": False,
                 "signature_valid": None, "cryptographically_valid": None,
-                "credential_trusted": None, "codes": [], "reasons": ["No active manifest found."]}, []
+                "credential_trusted": None, "codes": [], "reasons": [reason]}, [], reports
         signature = any(item.get("signature_info") for item in manifests)
         states = [str(item.get("validation_state")) for item in manifests
                   if item.get("validation_state") is not None]
         normalized = {item.casefold() for item in states}
-
-        def collect_codes(value):
-            codes = []
-            if isinstance(value, dict):
-                for key, item in value.items():
-                    if key == "code" and isinstance(item, str):
-                        codes.append(item)
-                    else:
-                        codes.extend(collect_codes(item))
-            elif isinstance(value, list):
-                for item in value:
-                    codes.extend(collect_codes(item))
-            return codes
-
         codes = sorted(set(code for item in manifests
-                           for code in collect_codes(item.get("validation_results"))))
+                           for code in C2PAAttestationPass._collect_codes(
+                               item.get("validation_results"))))
         state = ("Invalid" if "invalid" in normalized else
                  "Trusted" if "trusted" in normalized else
                  "Valid" if "valid" in normalized else "manifest_parsed")
@@ -499,12 +661,12 @@ class C2PAAttestationPass:
         else:
             value, availability, confidence = (0.5 if signature else 0.25), "partial", 0.6
             crypto = trusted = None
-        reason = (f"Active C2PA manifest parsed; SDK validation state={state}. "
+        reason = (f"Active C2PA manifest for the final artefact parsed; SDK validation state={state}. "
                   "Manifest claims and ingredient relationships remain claims even when content binding is valid.")
         validation = {"validation_state": state, "signature_present": signature,
                       "signature_valid": crypto, "cryptographically_valid": crypto,
                       "credential_trusted": trusted, "codes": codes, "reasons": [reason]}
-        return _axis(availability, value, confidence, reason), validation, []
+        return _axis(availability, value, confidence, reason), validation, [], reports
 
 
 class AIDisclosurePass:
@@ -560,9 +722,10 @@ def _layer(name, status, value, contributes, reason, check_count,
 
 
 def _boolean_status(checks, successful_status="matched"):
-    if not checks:
+    eligible = [item for item in checks if isinstance(item.get("passed"), bool)]
+    if not eligible:
         return "unavailable", None
-    value = sum(item["passed"] for item in checks) / len(checks)
+    value = sum(item["passed"] for item in eligible) / len(eligible)
     return (successful_status if value == 1.0 else "contradicted"), value
 
 
@@ -623,7 +786,9 @@ def assess_axes(native, chain, bound_hashes, wav_observations,
                  item.get("target_hash"), "medium", decoy_source_result=item)
         for item in decoy_source_checks if item.get("status") == "suspected_decoy"
     )
-    attestation, validation, attestation_findings = C2PAAttestationPass.evaluate(parser_observations)
+    (attestation, validation, attestation_findings,
+     c2pa_attestation_records) = C2PAAttestationPass.evaluate(
+         native, parser_observations)
     ai, ai_findings = AIDisclosurePass.evaluate(native)
 
     file_status, file_layer_value = _boolean_status(file_checks)
@@ -714,6 +879,7 @@ def assess_axes(native, chain, bound_hashes, wav_observations,
         "integrity_layers": layers,
         "assessment_status_semantics": ASSESSMENT_STATUS_SEMANTICS,
         "cross_evidence": cross_checks,
+        "c2pa_attestation_records": c2pa_attestation_records,
         "edit_derivation": edit_derivations,
         "comp_derivation": comp_derivations,
         "stem_derivation": stem_derivations,

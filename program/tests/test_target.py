@@ -9,18 +9,19 @@ import tempfile
 import unittest
 import wave
 from pathlib import Path
+from unittest import mock
 
 BASE = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(BASE))
 import run
-from music_target.contract import validate
+from music_target.contract import source_revision, validate
 from music_target.engine import (
     InputError,
     RelationshipIntegrityPass,
     strict_pcm_check,
 )
 from libevchain.pipeline import EvidencePass
-from music_target.assessment_passes import ExpandedCrossEvidencePass
+from music_target.assessment_passes import C2PAAttestationPass, ExpandedCrossEvidencePass
 from legacy_parsers.common.ddex_validation import REGISTRY, _schema
 from legacy_parsers.ern_parser import parse_ern_file
 from legacy_parsers.rin_parser import parse_rin_file
@@ -214,6 +215,87 @@ class TargetTests(unittest.TestCase):
                 handle.writeframes(b"".join(struct.pack("<h", max(-32768, min(32767, value)))
                                             for value in samples))
             return Path(temp.name).read_bytes()
+
+    @staticmethod
+    def _wav_container(format_code, payload, *, rate=8000, channels=1,
+                       bits=32, extension=b""):
+        width = bits // 8
+        block_align = channels * width
+        fmt = (struct.pack("<HHIIHH", format_code, channels, rate,
+                           rate * block_align, block_align, bits) + extension)
+
+        def chunk(name, data):
+            return name + struct.pack("<I", len(data)) + data + (b"\0" if len(data) % 2 else b"")
+
+        body = b"WAVE" + chunk(b"fmt ", fmt) + chunk(b"data", payload)
+        return b"RIFF" + struct.pack("<I", len(body)) + body
+
+    @classmethod
+    def _float32_wav(cls):
+        payload = b"".join(struct.pack("<f", math.sin(index / 10))
+                           for index in range(800))
+        return cls._wav_container(0x0003, payload)
+
+    @classmethod
+    def _extensible_pcm_wav(cls):
+        pcm_guid = bytes.fromhex("0100000000001000800000aa00389b71")
+        extension = struct.pack("<HHI", 22, 16, 0) + pcm_guid
+        payload = b"".join(struct.pack("<h", int(2000 * math.sin(index / 10)))
+                           for index in range(800))
+        return cls._wav_container(0xFFFE, payload, bits=16, extension=extension)
+
+    def test_nonfinal_unsupported_wav_is_isolated_to_dependent_checks(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            request = self._workflow_request(root, "multitrack_recording_mix_master", [
+                {"type": "audio/stem", "data": self._float32_wav()},
+                {"type": "audio/mix", "data": self._pcm16([0] * 800),
+                 "parents": [(0, "mixed_from")]},
+            ])
+            result = self.score(request, root)
+        self.assertEqual(result["execution_status"], "succeeded", result["error"])
+        failed = [item for item in result["findings"]
+                  if item["code"] == "WAV_PARSER_FAILED"]
+        self.assertEqual(len(failed), 1)
+        self.assertEqual(failed[0]["failure_type"], "unsupported")
+        self.assertTrue(any(item["status"] == "unavailable"
+                            for item in result["assessment_checks"]["source_contribution"]))
+
+    def test_unsupported_final_wav_still_returns_unsupported(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            request = self._workflow_request(root, "mastering_service_only", [
+                {"type": "audio/master", "data": self._float32_wav()},
+            ])
+            result = self.score(request, root)
+        self.assertEqual(result["execution_status"], "unsupported")
+        self.assertIn("integer PCM", result["error"])
+
+    def test_extensible_pcm_subformat_is_recognised(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "extensible.wav"
+            path.write_bytes(self._extensible_pcm_wav())
+            observed = strict_pcm_check(path)
+        self.assertEqual(observed["codec_subtype"], "PCM")
+        self.assertEqual(observed["wav_format_tag"], "WAVE_FORMAT_EXTENSIBLE")
+        self.assertEqual(observed["valid_bits_per_sample"], 16)
+
+    def test_bound_files_are_hashed_once_before_direct_binding(self):
+        with mock.patch("music_target.engine.hashlib.file_digest",
+                        wraps=hashlib.file_digest) as digest:
+            result = self.score()
+        self.assertEqual(result["execution_status"], "succeeded")
+        self.assertEqual(digest.call_count, len(self.template["objects"]))
+
+    def test_source_revision_is_cached_per_process(self):
+        source_revision.cache_clear()
+        first = source_revision()
+        first_info = source_revision.cache_info()
+        second = source_revision()
+        second_info = source_revision.cache_info()
+        self.assertEqual(first, second)
+        self.assertEqual(first_info.misses, 1)
+        self.assertEqual(second_info.hits, 1)
 
     @staticmethod
     def _deterministic_samples(count, seed=1):
@@ -1201,6 +1283,101 @@ class RestoredXmlHelperTests(unittest.TestCase):
                     item["rule"].startswith("workflow_ai_")]
         self.assertTrue(selected)
         self.assertTrue(all(item["passed"] for item in selected))
+
+    def test_cross_evidence_bad_free_field_types_are_locally_unavailable(self):
+        midi_hash, audio_hash, ern_hash = "1" * 64, "2" * 64, "3" * 64
+        native = {"final_artefact_hash": audio_hash, "artefacts": [
+            {"artefact_hash": midi_hash, "artefact_type": "project/midi",
+             "attributes": {"production": {"tempo_bpm": "120 bpm"}}, "evidence": []},
+            {"artefact_hash": audio_hash, "artefact_type": "audio/mix",
+             "attributes": {"source_metadata": {"isrc": 12345}},
+             "evidence": [{"hash": midi_hash, "relationship_type": "rendered_from",
+                           "attributes": {}}]},
+            {"artefact_hash": ern_hash, "artefact_type": "metadata/ddex-ern",
+             "attributes": {}, "evidence": []},
+        ]}
+        observations = {
+            midi_hash: {"parser": "midi", "data": {
+                "note_on_count": 1, "duration_seconds": 0.5,
+                "tempo_events": [{"bpm": 120.0}], "time_signature_events": []}},
+            ern_hash: {"parser": "ern", "data": {
+                "xsd_validation": {"status": "not_assessed"}, "parties": [],
+                "audio_bindings": [{"sha256": audio_hash,
+                                    "isrc": "AUBBB2600001"}]}},
+        }
+        value, checks, findings = ExpandedCrossEvidencePass.evaluate(
+            native, {}, observations,
+            {audio_hash: {"observed": {"duration_seconds": 1.0}}})
+        unavailable = {item["rule"] for item in checks
+                       if item.get("status") == "unavailable"}
+        self.assertIn("midi_tempo_matches_declaration", unavailable)
+        self.assertIn("ern_isrc_matches_audio_declaration", unavailable)
+        self.assertTrue(any(item["rule"] == "midi_render_relationship_declared" and
+                            item["passed"] for item in checks))
+        self.assertIsNotNone(value)
+        self.assertTrue(any(item["code"] == "CROSS_EVIDENCE_CHECK_UNAVAILABLE"
+                            for item in findings))
+
+    def test_standalone_c2pa_ingredients_are_checked_against_bound_asset(self):
+        source_hash, c2pa_hash, final_hash = "1" * 64, "2" * 64, "3" * 64
+        native = {"final_artefact_hash": final_hash, "artefacts": [
+            {"artefact_hash": source_hash, "artefact_type": "audio/stem",
+             "attributes": {}, "evidence": []},
+            {"artefact_hash": c2pa_hash, "artefact_type": "provenance/c2pa",
+             "attributes": {}, "evidence": []},
+            {"artefact_hash": final_hash, "artefact_type": "audio/mix",
+             "attributes": {}, "evidence": [
+                 {"hash": source_hash, "relationship_type": "mixed_from",
+                  "attributes": {}},
+                 {"hash": c2pa_hash, "relationship_type": "input_to",
+                  "attributes": {}},
+             ]},
+        ]}
+        observations = {c2pa_hash: {"parser": "c2pa", "data": {
+            "sdk_available": True, "reader_succeeded": True, "present": True,
+            "ingredients": [{"relationship": "componentOf",
+                             "referenced_hashes": [source_hash]}],
+            "digital_source_types": [], "signature_info": {},
+            "validation_state": "Valid", "validation_results": {}}}}
+        _, checks, _ = ExpandedCrossEvidencePass.evaluate(
+            native, {}, observations, {})
+        selected = [item for item in checks
+                    if item["rule"].startswith("c2pa_")]
+        self.assertTrue(selected)
+        self.assertTrue(all(item.get("passed") is True for item in selected))
+        self.assertTrue(all(item["manifest_container_hash"] == c2pa_hash
+                            for item in selected))
+        self.assertTrue(all(item["asset_hash"] == final_hash for item in selected))
+
+    def test_attestation_axis_uses_final_artefact_not_strongest_supporting_node(self):
+        source_hash, final_hash = "1" * 64, "2" * 64
+        native = {"final_artefact_hash": final_hash, "artefacts": [
+            {"artefact_hash": source_hash, "artefact_type": "audio/raw-take",
+             "attributes": {}, "evidence": []},
+            {"artefact_hash": final_hash, "artefact_type": "audio/mix",
+             "attributes": {}, "evidence": [
+                 {"hash": source_hash, "relationship_type": "mixed_from",
+                  "attributes": {}}]},
+        ]}
+        trusted = {"sdk_available": True, "reader_succeeded": True,
+                   "present": True, "signature_info": {"issuer": "fixture"},
+                   "validation_state": "Trusted", "validation_results": {}}
+        absent = {"sdk_available": True, "reader_succeeded": True,
+                  "present": False, "signature_info": None,
+                  "validation_state": None, "validation_results": {}}
+        observations = {
+            source_hash: {"parser": "wav", "data": {}, "c2pa": trusted},
+            final_hash: {"parser": "wav", "data": {}, "c2pa": absent},
+        }
+        axis, validation, _, records = C2PAAttestationPass.evaluate(
+            native, observations)
+        self.assertEqual(axis["value"], 0.0)
+        self.assertEqual(validation["validation_state"], "manifest_absent")
+        by_asset = {item["asset_hash"]: item for item in records}
+        self.assertEqual(by_asset[source_hash]["scope"], "supporting")
+        self.assertEqual(by_asset[source_hash]["validation_state"], "Trusted")
+        self.assertEqual(by_asset[final_hash]["scope"], "final")
+        self.assertEqual(by_asset[final_hash]["validation_state"], "manifest_absent")
 
 
 if __name__ == "__main__":

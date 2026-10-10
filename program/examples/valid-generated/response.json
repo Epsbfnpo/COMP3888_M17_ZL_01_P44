@@ -6,7 +6,7 @@
   "system": {
     "name": "COMP3888-music-baseline",
     "version": "0.5.0",
-    "source_revision": "sha256:ee7a21254416cdc2fa834124aae8d12ba7d461199f0e9a145971e7790101e81e"
+    "source_revision": "sha256:500d8ba70dc7119a2fac132e578be1b548b33cfcadc3be876f7bbede223889e1"
   },
   "execution_status": "succeeded",
   "axes": {
@@ -23,10 +23,10 @@
       "reasoning": "Integrity has 1/4 score-eligible evidence layers; missing evidence reduces availability and confidence but is never treated as contradiction. A numeric value is withheld without content reconstruction or independent CrossEvidence unless a contradiction exists. Structural validity and cryptographic attestation are reported separately and do not raise integrity. 0 Master/content corroboration result(s) were not scored as exact matches."
     },
     "attestation_strength": {
-      "availability": "unavailable",
-      "value": null,
-      "confidence": null,
-      "reasoning": "C2PA SDK is unavailable, so no cryptographic attestation was assessed."
+      "availability": "available",
+      "value": 0.0,
+      "confidence": 0.9,
+      "reasoning": "C2PA SDK ran but found no active manifest associated with the final artefact."
     },
     "ai_disclosure": {
       "availability": "available",
@@ -36,13 +36,15 @@
     }
   },
   "validation": {
-    "validation_state": null,
-    "signature_present": null,
+    "validation_state": "manifest_absent",
+    "signature_present": false,
     "signature_valid": null,
     "cryptographically_valid": null,
     "credential_trusted": null,
     "codes": [],
-    "reasons": []
+    "reasons": [
+      "C2PA SDK ran but found no active manifest associated with the final artefact."
+    ]
   },
   "findings": [
     {
@@ -50,6 +52,7 @@
       "severity": "info",
       "message": "Measured WAV properties and extracted metadata.",
       "evidence_hash": "7580f3a09b8a02bdfc6520235e92f6c8318dd3b52002b7eb8a430abc2c007dea",
+      "status": "parsed",
       "observed": {
         "duration_seconds": 0.5,
         "sample_rate_hz": 8000,
@@ -57,7 +60,9 @@
         "bit_depth": 16,
         "format": "WAV",
         "codec_subtype": "PCM",
-        "file_size_bytes": 8044
+        "file_size_bytes": 8044,
+        "wav_format_tag": "WAVE_FORMAT_PCM",
+        "valid_bits_per_sample": 16
       },
       "embedded_metadata": {
         "core_format": {
@@ -121,6 +126,7 @@
       "severity": "info",
       "message": "Measured WAV properties and extracted metadata.",
       "evidence_hash": "6aacc6b93785fbbefb186285e5f9c9ce49a6ccc7c2af664fc2f2a21416001ea0",
+      "status": "parsed",
       "observed": {
         "duration_seconds": 0.5,
         "sample_rate_hz": 8000,
@@ -128,7 +134,9 @@
         "bit_depth": 16,
         "format": "WAV",
         "codec_subtype": "PCM",
-        "file_size_bytes": 8044
+        "file_size_bytes": 8044,
+        "wav_format_tag": "WAVE_FORMAT_PCM",
+        "valid_bits_per_sample": 16
       },
       "embedded_metadata": {
         "core_format": {
@@ -192,6 +200,7 @@
       "severity": "info",
       "message": "Measured WAV properties and extracted metadata.",
       "evidence_hash": "bc1dd3c26ef5f4d97fbb41e653e93a09c940b53c75229594d82c928727134ca0",
+      "status": "parsed",
       "observed": {
         "duration_seconds": 0.5,
         "sample_rate_hz": 8000,
@@ -199,7 +208,9 @@
         "bit_depth": 16,
         "format": "WAV",
         "codec_subtype": "PCM",
-        "file_size_bytes": 8044
+        "file_size_bytes": 8044,
+        "wav_format_tag": "WAVE_FORMAT_PCM",
+        "valid_bits_per_sample": 16
       },
       "embedded_metadata": {
         "core_format": {
@@ -263,6 +274,7 @@
       "severity": "info",
       "message": "Measured WAV properties and extracted metadata.",
       "evidence_hash": "746c90b6d8f6306ce93c347477103c16027d71a4072cf12d10a9f7246ce93d18",
+      "status": "parsed",
       "observed": {
         "duration_seconds": 0.5,
         "sample_rate_hz": 8000,
@@ -270,7 +282,9 @@
         "bit_depth": 16,
         "format": "WAV",
         "codec_subtype": "PCM",
-        "file_size_bytes": 8044
+        "file_size_bytes": 8044,
+        "wav_format_tag": "WAVE_FORMAT_PCM",
+        "valid_bits_per_sample": 16
       },
       "embedded_metadata": {
         "core_format": {
@@ -378,6 +392,7 @@
       "parser": "wav",
       "parser_status": "parsed",
       "parser_result": {
+        "status": "parsed",
         "observed": {
           "duration_seconds": 0.5,
           "sample_rate_hz": 8000,
@@ -385,7 +400,9 @@
           "bit_depth": 16,
           "format": "WAV",
           "codec_subtype": "PCM",
-          "file_size_bytes": 8044
+          "file_size_bytes": 8044,
+          "wav_format_tag": "WAVE_FORMAT_PCM",
+          "valid_bits_per_sample": 16
         },
         "embedded_metadata": {
           "core_format": {
@@ -453,6 +470,7 @@
       "parser": "wav",
       "parser_status": "parsed",
       "parser_result": {
+        "status": "parsed",
         "observed": {
           "duration_seconds": 0.5,
           "sample_rate_hz": 8000,
@@ -460,7 +478,9 @@
           "bit_depth": 16,
           "format": "WAV",
           "codec_subtype": "PCM",
-          "file_size_bytes": 8044
+          "file_size_bytes": 8044,
+          "wav_format_tag": "WAVE_FORMAT_PCM",
+          "valid_bits_per_sample": 16
         },
         "embedded_metadata": {
           "core_format": {
@@ -528,6 +548,7 @@
       "parser": "wav",
       "parser_status": "parsed",
       "parser_result": {
+        "status": "parsed",
         "observed": {
           "duration_seconds": 0.5,
           "sample_rate_hz": 8000,
@@ -535,7 +556,9 @@
           "bit_depth": 16,
           "format": "WAV",
           "codec_subtype": "PCM",
-          "file_size_bytes": 8044
+          "file_size_bytes": 8044,
+          "wav_format_tag": "WAVE_FORMAT_PCM",
+          "valid_bits_per_sample": 16
         },
         "embedded_metadata": {
           "core_format": {
@@ -603,6 +626,7 @@
       "parser": "wav",
       "parser_status": "parsed",
       "parser_result": {
+        "status": "parsed",
         "observed": {
           "duration_seconds": 0.5,
           "sample_rate_hz": 8000,
@@ -610,7 +634,9 @@
           "bit_depth": 16,
           "format": "WAV",
           "codec_subtype": "PCM",
-          "file_size_bytes": 8044
+          "file_size_bytes": 8044,
+          "wav_format_tag": "WAVE_FORMAT_PCM",
+          "valid_bits_per_sample": 16
         },
         "embedded_metadata": {
           "core_format": {
@@ -670,16 +696,11 @@
         "claim_mismatches": []
       },
       "evidence_hash": "746c90b6d8f6306ce93c347477103c16027d71a4072cf12d10a9f7246ce93d18"
-    },
-    {
-      "code": "C2PA_PARSER_UNAVAILABLE",
-      "severity": "low",
-      "message": "c2pa-python is not installed; C2PA attestation was not assessed."
     }
   ],
-  "processing_ms": 194.91654200828634,
+  "processing_ms": 219.7067090019118,
   "resource_usage": {
-    "cpu_ms": 32.858,
+    "cpu_ms": 41.99,
     "peak_rss_kib": null
   },
   "error": null,
@@ -1098,10 +1119,10 @@
       },
       {
         "layer": "cryptographic_attestation",
-        "status": "unavailable",
+        "status": "not_applicable",
         "value": null,
         "contributes_to_integrity": false,
-        "check_count": 0,
+        "check_count": 1,
         "reason": "C2PA remains in the separate attestation-strength axis and never inflates integrity.",
         "manual_review_reasons": []
       }
@@ -1134,6 +1155,60 @@
       }
     ],
     "cross_evidence": [],
+    "c2pa_attestation_records": [
+      {
+        "scope": "supporting",
+        "source_kind": "embedded",
+        "manifest_container_hash": "7580f3a09b8a02bdfc6520235e92f6c8318dd3b52002b7eb8a430abc2c007dea",
+        "asset_hash": "7580f3a09b8a02bdfc6520235e92f6c8318dd3b52002b7eb8a430abc2c007dea",
+        "binding_relationship": null,
+        "sdk_available": true,
+        "reader_succeeded": true,
+        "manifest_present": false,
+        "signature_present": false,
+        "validation_state": "manifest_absent",
+        "validation_codes": []
+      },
+      {
+        "scope": "supporting",
+        "source_kind": "embedded",
+        "manifest_container_hash": "6aacc6b93785fbbefb186285e5f9c9ce49a6ccc7c2af664fc2f2a21416001ea0",
+        "asset_hash": "6aacc6b93785fbbefb186285e5f9c9ce49a6ccc7c2af664fc2f2a21416001ea0",
+        "binding_relationship": null,
+        "sdk_available": true,
+        "reader_succeeded": true,
+        "manifest_present": false,
+        "signature_present": false,
+        "validation_state": "manifest_absent",
+        "validation_codes": []
+      },
+      {
+        "scope": "supporting",
+        "source_kind": "embedded",
+        "manifest_container_hash": "bc1dd3c26ef5f4d97fbb41e653e93a09c940b53c75229594d82c928727134ca0",
+        "asset_hash": "bc1dd3c26ef5f4d97fbb41e653e93a09c940b53c75229594d82c928727134ca0",
+        "binding_relationship": null,
+        "sdk_available": true,
+        "reader_succeeded": true,
+        "manifest_present": false,
+        "signature_present": false,
+        "validation_state": "manifest_absent",
+        "validation_codes": []
+      },
+      {
+        "scope": "final",
+        "source_kind": "embedded",
+        "manifest_container_hash": "746c90b6d8f6306ce93c347477103c16027d71a4072cf12d10a9f7246ce93d18",
+        "asset_hash": "746c90b6d8f6306ce93c347477103c16027d71a4072cf12d10a9f7246ce93d18",
+        "binding_relationship": null,
+        "sdk_available": true,
+        "reader_succeeded": true,
+        "manifest_present": false,
+        "signature_present": false,
+        "validation_state": "manifest_absent",
+        "validation_codes": []
+      }
+    ],
     "edit_derivation": [],
     "comp_derivation": [],
     "stem_derivation": [

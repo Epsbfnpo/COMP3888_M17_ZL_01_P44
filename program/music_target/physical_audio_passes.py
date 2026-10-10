@@ -9,14 +9,13 @@ downsampled and bounded so a request cannot trigger unbounded DSP work.
 from __future__ import annotations
 
 import math
-from pathlib import Path
 
 from music_target.audio_derivation import (
     COMPLEX_PROCESSING_WORDS,
     MasterDerivationPass,
     _correlation,
     _mono_resample,
-    _read_pcm,
+    _read_bound_pcm,
     _rms,
 )
 
@@ -68,10 +67,7 @@ def _audio_edges(native, relationships=AUDIO_RELATIONSHIPS):
 
 
 def _read(chain, digest):
-    artefact = chain.artefacts[digest]
-    if not artefact.has_file():
-        raise ValueError("no verified file is bound to the audio artefact")
-    return _read_pcm(Path(artefact.get_file()))
+    return _read_bound_pcm(chain, digest)
 
 
 def _standardize(rows):
