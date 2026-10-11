@@ -683,10 +683,12 @@ class TargetTests(unittest.TestCase):
         self.assertEqual(len(contributions), 2)
         for item in contributions:
             self.assertEqual(item["status"], "not_applicable")
+            self.assertGreaterEqual(item["source_span_correlation"], MAX_SOURCE_CORRELATION)
             self.assertGreaterEqual(item["max_source_correlation"], MAX_SOURCE_CORRELATION)
             self.assertNotIn("estimated_gain", item)
             self.assertNotIn("gain_stability", item)
-        # The guard applies before any per-source fit, so decoy detection --
+            self.assertNotIn("unique_residual_delta", item)
+        # Each source lies in the span of the other, so decoy detection --
         # which only acts on "not_supported"/"corroborated" inputs -- must
         # also decline rather than misreporting either source as a decoy.
         decoys = result["assessment_checks"]["decoy_source"]
@@ -694,26 +696,188 @@ class TargetTests(unittest.TestCase):
         for item in decoys:
             self.assertEqual(item["status"], "not_applicable")
 
-    def test_stem_mix_residual_guard_rejects_highly_correlated_sources(self):
+    def test_stem_mix_residual_withholds_matrix_for_highly_correlated_sources(self):
         base = self._deterministic_samples(8000, 221)
         scaled = [round(0.6 * value) for value in base]
         target = [round(0.4 * a + 0.2 * b) for a, b in zip(base, scaled)]
+        result = self._score_mix([
+            {"type": "audio/stem", "data": self._pcm16(base)},
+            {"type": "audio/stem", "data": self._pcm16(scaled)},
+            {"type": "audio/mix", "data": self._pcm16(target),
+             "parents": [(0, "mixed_from"), (1, "mixed_from")]},
+        ])
+        check = result["assessment_checks"]["stem_mix_residual"][0]
+        # The joint reconstruction is still assessed; only the individual
+        # gains, which are arbitrary between the two sources, are withheld.
+        self.assertEqual(check["status"], "matched")
+        self.assertLessEqual(check["normalized_rmse"], 0.05)
+        self._assert_matrix_withheld(check)
+        self.assertIn("no individual source is attributed", check["reason"])
+        self.assertTrue(check["estimated_parameters_are_diagnostic"])
+
+    @staticmethod
+    def _pcm16_stereo(left, right, rate=8000):
+        with tempfile.NamedTemporaryFile(suffix=".wav") as temp:
+            with wave.open(temp.name, "wb") as handle:
+                handle.setnchannels(2)
+                handle.setsampwidth(2)
+                handle.setframerate(rate)
+                handle.writeframes(b"".join(
+                    struct.pack("<hh", *(max(-32768, min(32767, value)) for value in frame))
+                    for frame in zip(left, right)))
+            return Path(temp.name).read_bytes()
+
+    _FULL_SECOND = {"source_start_seconds": 0.0, "source_end_seconds": 1.0,
+                    "target_start_seconds": 0.0, "target_end_seconds": 1.0}
+
+    def _score_mix(self, specs):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
-            specs = [
-                {"type": "audio/stem", "data": self._pcm16(base)},
-                {"type": "audio/stem", "data": self._pcm16(scaled)},
-                {"type": "audio/mix", "data": self._pcm16(target),
-                 "parents": [(0, "mixed_from"), (1, "mixed_from")]},
-            ]
-            result = self.score(self._workflow_request(
+            return self.score(self._workflow_request(
                 root, "multitrack_recording_mix_master", specs), root)
-        check = result["assessment_checks"]["stem_mix_residual"][0]
-        self.assertEqual(check["status"], "not_applicable")
-        self.assertGreaterEqual(check["max_source_correlation"], MAX_SOURCE_CORRELATION)
+
+    def _assert_matrix_withheld(self, check):
         self.assertNotIn("estimated_channel_matrix", check)
-        self.assertNotIn("normalized_rmse", check)
-        self.assertTrue(check["estimated_parameters_are_diagnostic"])
+        self.assertTrue(check["channel_matrix_withheld_reason"])
+        self.assertGreaterEqual(check["max_source_correlation"], MAX_SOURCE_CORRELATION)
+
+    @staticmethod
+    def _finding_codes(result):
+        return [item["code"] for item in result["findings"]]
+
+    def test_stem_mix_residual_matches_dual_mono_stereo_stem(self):
+        base = self._deterministic_samples(8000, 301)
+        stem = [round(0.5 * value) for value in base]
+        mix = [round(0.4 * value) for value in base]
+        result = self._score_mix([
+            {"type": "audio/stem", "data": self._pcm16_stereo(stem, stem)},
+            {"type": "audio/mix", "data": self._pcm16_stereo(mix, mix),
+             "parents": [(0, "mixed_from")]},
+        ])
+        check = result["assessment_checks"]["stem_mix_residual"][0]
+        self.assertEqual(check["status"], "matched")
+        self.assertLessEqual(check["normalized_rmse"], 0.05)
+        self._assert_matrix_withheld(check)
+        self.assertNotIn("PHYSICAL_AUDIO_CONTRADICTION", self._finding_codes(result))
+
+    def test_stem_mix_residual_matches_panned_stereo_stem(self):
+        base = self._deterministic_samples(8000, 301)
+        result = self._score_mix([
+            {"type": "audio/stem", "data": self._pcm16_stereo(
+                [round(0.8 * value) for value in base],
+                [round(0.3 * value) for value in base])},
+            {"type": "audio/mix", "data": self._pcm16_stereo(
+                [round(0.4 * value) for value in base],
+                [round(0.15 * value) for value in base]),
+             "parents": [(0, "mixed_from")]},
+        ])
+        check = result["assessment_checks"]["stem_mix_residual"][0]
+        self.assertEqual(check["status"], "matched")
+        self.assertLessEqual(check["normalized_rmse"], 0.05)
+        self._assert_matrix_withheld(check)
+
+    def test_stem_mix_residual_contradicts_dual_mono_stem_with_unrelated_target(self):
+        stem = [round(0.5 * value) for value in self._deterministic_samples(8000, 301)]
+        other = [round(0.5 * value) for value in self._deterministic_samples(8000, 304)]
+        result = self._score_mix([
+            {"type": "audio/stem", "data": self._pcm16_stereo(stem, stem)},
+            {"type": "audio/mix", "data": self._pcm16_stereo(other, other),
+             "parents": [(0, "mixed_from")]},
+        ])
+        check = result["assessment_checks"]["stem_mix_residual"][0]
+        self.assertEqual(check["status"], "contradicted")
+        self.assertGreaterEqual(check["normalized_rmse"], 0.65)
+        self._assert_matrix_withheld(check)
+        self.assertIn("PHYSICAL_AUDIO_CONTRADICTION", self._finding_codes(result))
+
+    def test_stem_mix_residual_contradicts_duplicate_stems_with_unrelated_target(self):
+        base = self._deterministic_samples(8000, 301)
+        duplicate = [round(0.5 * value) for value in base]
+        other = self._deterministic_samples(8000, 304)
+        result = self._score_mix([
+            {"type": "audio/stem", "data": self._pcm16(base)},
+            {"type": "audio/stem", "data": self._pcm16(duplicate)},
+            {"type": "audio/mix", "data": self._pcm16(other),
+             "parents": [(0, "mixed_from"), (1, "mixed_from")]},
+        ])
+        check = result["assessment_checks"]["stem_mix_residual"][0]
+        self.assertEqual(check["status"], "contradicted")
+        self._assert_matrix_withheld(check)
+        self.assertIn("PHYSICAL_AUDIO_CONTRADICTION", self._finding_codes(result))
+        # Neither duplicate is individually blamed for the mismatch.
+        contributions = result["assessment_checks"]["source_contribution"]
+        self.assertEqual([item["status"] for item in contributions],
+                         ["not_applicable", "not_applicable"])
+        self.assertNotIn("DECOY_SOURCE_SUSPECTED", self._finding_codes(result))
+
+    def _duplicates_plus_third_source(self, mix_from_third):
+        base = self._deterministic_samples(8000, 301)
+        duplicate = [round(0.5 * value) for value in base]
+        third = self._deterministic_samples(8000, 303)
+        if mix_from_third:
+            mix = [round(0.4 * a + 0.4 * c) for a, c in zip(base, third)]
+        else:
+            mix = [round(0.5 * a + 0.3 * b) for a, b in zip(base, duplicate)]
+        result = self._score_mix([
+            {"type": "audio/stem", "data": self._pcm16(base)},
+            {"type": "audio/stem", "data": self._pcm16(duplicate)},
+            {"type": "audio/stem", "data": self._pcm16(third)},
+            {"type": "audio/mix", "data": self._pcm16(mix),
+             "parents": [(index, "mixed_from", self._FULL_SECOND) for index in range(3)]},
+        ])
+        hashes = [hashlib.sha256(self._pcm16(item)).hexdigest()
+                  for item in (base, duplicate, third)]
+        contributions = {item["source_hash"]: item for item in
+                         result["assessment_checks"]["source_contribution"]}
+        decoys = {item["source_hash"]: item for item in
+                  result["assessment_checks"]["decoy_source"]}
+        for digest in hashes[:2]:
+            self.assertEqual(contributions[digest]["status"], "not_applicable")
+            self.assertNotIn("estimated_gain", contributions[digest])
+            self.assertNotIn("unique_residual_delta", contributions[digest])
+            self.assertEqual(decoys[digest]["status"], "not_applicable")
+        return result, contributions[hashes[2]], decoys[hashes[2]]
+
+    def test_source_contribution_flags_unrelated_decoy_beside_duplicate_sources(self):
+        result, contribution, decoy = self._duplicates_plus_third_source(False)
+        self.assertEqual(contribution["status"], "not_supported")
+        self.assertEqual(decoy["status"], "suspected_decoy")
+        codes = self._finding_codes(result)
+        self.assertEqual(codes.count("DECLARED_SOURCE_NOT_SUPPORTED"), 1)
+        self.assertEqual(codes.count("DECOY_SOURCE_SUSPECTED"), 1)
+
+    def test_source_contribution_corroborates_used_source_beside_duplicate_sources(self):
+        result, contribution, decoy = self._duplicates_plus_third_source(True)
+        self.assertEqual(contribution["status"], "corroborated")
+        self.assertAlmostEqual(contribution["estimated_gain"], 0.4, delta=0.02)
+        self.assertEqual(decoy["status"], "clear")
+        self.assertNotIn("DECOY_SOURCE_SUSPECTED", self._finding_codes(result))
+
+    def test_independent_sources_keep_gains_and_channel_matrix(self):
+        first = self._deterministic_samples(8000, 301)
+        second = self._deterministic_samples(8000, 302)
+        mix = [round(0.5 * a + 0.3 * b) for a, b in zip(first, second)]
+        result = self._score_mix([
+            {"type": "audio/stem", "data": self._pcm16(first)},
+            {"type": "audio/stem", "data": self._pcm16(second)},
+            {"type": "audio/mix", "data": self._pcm16(mix),
+             "parents": [(0, "mixed_from", self._FULL_SECOND),
+                         (1, "mixed_from", self._FULL_SECOND)]},
+        ])
+        check = result["assessment_checks"]["stem_mix_residual"][0]
+        self.assertEqual(check["status"], "matched")
+        self.assertNotIn("channel_matrix_withheld_reason", check)
+        self.assertAlmostEqual(check["estimated_channel_matrix"][0][0], 0.5, delta=0.02)
+        self.assertAlmostEqual(check["estimated_channel_matrix"][0][1], 0.3, delta=0.02)
+        contributions = result["assessment_checks"]["source_contribution"]
+        self.assertEqual([item["status"] for item in contributions],
+                         ["corroborated", "corroborated"])
+        self.assertAlmostEqual(contributions[0]["estimated_gain"], 0.5, delta=0.02)
+        self.assertAlmostEqual(contributions[1]["estimated_gain"], 0.3, delta=0.02)
+        for item in contributions:
+            self.assertNotIn("source_span_correlation", item)
+        self.assertEqual([item["status"] for item in
+                          result["assessment_checks"]["decoy_source"]], ["clear", "clear"])
 
     def test_processed_audio_match_corroborates_light_processing(self):
         source = self._deterministic_samples(12000, 121)
