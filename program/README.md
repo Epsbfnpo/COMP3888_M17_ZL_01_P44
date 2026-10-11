@@ -135,6 +135,38 @@ This example uses the supplied CSEC candidate request format. It contains one WA
 python3 -B run.py --bundle /path/to/EVAL-case/bundle.json --root /path/to/EVAL-case
 ```
 
+## Desktop manifest builder
+
+From this directory, run `python builder_gui.py` (Tkinter is required).
+Install `requirements.txt` to enable full assessment.
+
+- **Add files** reads and hashes files in the background before opening the
+  artefact-detail dialogs. Import, export and full assessment display progress
+  and offer cancellation; editing is disabled while an operation is active.
+- **Preflight check** predicts workflow completeness only. It does not run
+  content checks or cryptographic validation.
+- **Save manifest** stages object files and verifies their SHA-256 hashes before
+  publishing the manifest. Changed or missing source files block copied exports.
+  Existing objects are reused only if their hashes match and are never
+  overwritten. With copying disabled, every object must already exist at its
+  declared location beside the destination manifest and pass hash verification.
+  Failed or cancelled exports preserve the previous manifest and remove newly
+  created objects. Publication is manifest-last, not a whole-directory atomic
+  transaction or a guarantee against external file changes after verification.
+- **Full assessment → Run assessment** evaluates a verified temporary snapshot
+  using the production worker. It runs locally, without saving or overwriting
+  the user's bundle, and enforces the requested timeout up to 60 seconds.
+  Cancellation terminates the worker and cleans up temporary files.
+- Results show completeness, integrity, attestation strength and AI disclosure
+  separately, with availability, confidence, explanations and the complete
+  workflow/findings/checks response. `null` is shown as **Not assessed**, not zero.
+  Execution errors and unsupported inputs remain explicit. Results describe the
+  identified submission snapshot; subsequent edits do not update that snapshot.
+  **Save result JSON** exports the full response for later inspection.
+
+Content consistency is not proof of authorship, and AI disclosure is not AI
+detection. No overall score or acceptance decision is added.
+
 ## Verification
 
 ```bash

@@ -12,13 +12,16 @@ are exactly what you declare. Hashes and WAV technical data come from the files.
 from __future__ import annotations
 
 import json
-import shutil
+import copy
+import queue
+import threading
 import uuid
 from pathlib import Path
 import tkinter as tk
 from tkinter import filedialog, messagebox, ttk
 
 import manifest_logic as L
+import builder_operations as operations
 
 
 def parse_json_object(text: str, label: str) -> dict:
@@ -319,6 +322,10 @@ class App(tk.Tk):
         self.files, self.rels, self._counter = [], [], 0
         self.policy, self._forced = None, set()
         self.mod_vars, self.mod_buttons, self.flag_vars = {}, {}, {}
+        self._job = None
+        self._closing = False
+        self._response = None
+        self.protocol("WM_DELETE_WINDOW", self.close)
 
         notebook = ttk.Notebook(self)
         notebook.pack(fill="both", expand=True, padx=8, pady=8)
@@ -326,6 +333,7 @@ class App(tk.Tk):
         self._files_tab(notebook)
         self._rels_tab(notebook)
         self._check_tab(notebook)
+        self._assessment_tab(notebook)
 
         bar = ttk.Frame(self)
         bar.pack(fill="x", padx=8, pady=(0, 8))
@@ -335,6 +343,16 @@ class App(tk.Tk):
         ttk.Button(bar, text="Save manifest…", command=self.save).pack(side="right")
         ttk.Button(bar, text="Preview JSON", command=self.preview).pack(side="right", padx=6)
         ttk.Button(bar, text="Load manifest…", command=self.load).pack(side="right")
+
+        progress_bar = ttk.Frame(self)
+        progress_bar.pack(fill="x", padx=8, pady=(0, 8))
+        self.progress_label = ttk.Label(progress_bar, text="Ready")
+        self.progress_label.pack(side="left", fill="x", expand=True)
+        self.progress_spinner = ttk.Progressbar(progress_bar, mode="indeterminate", length=110)
+        self.progress_spinner.pack(side="left", padx=6)
+        self.cancel_button = ttk.Button(progress_bar, text="Cancel", command=self.cancel_job,
+                                        state="disabled")
+        self.cancel_button.pack(side="right")
 
         found = L.find_policy(Path(__file__).resolve().parent, Path.cwd())
         if found:
@@ -491,10 +509,10 @@ class App(tk.Tk):
 
     def _check_tab(self, notebook):
         tab = ttk.Frame(notebook, padding=8)
-        notebook.add(tab, text="Workflow check")
+        notebook.add(tab, text="Preflight check")
         bar = ttk.Frame(tab)
         bar.pack(fill="x", pady=(0, 6))
-        ttk.Button(bar, text="Run check", command=self.run_check).pack(side="left")
+        ttk.Button(bar, text="Run preflight", command=self.run_check).pack(side="left")
         self.check_label = ttk.Label(
             bar, text="  Predicts completeness; the real run is authoritative.")
         self.check_label.pack(side="left")
@@ -504,8 +522,153 @@ class App(tk.Tk):
         self.check_tree.tag_configure("missing", foreground="#cf222e")
         self.check_tree.tag_configure("not_applicable", foreground="gray")
 
+    def _assessment_tab(self, notebook):
+        tab = ttk.Frame(notebook, padding=8)
+        notebook.add(tab, text="Full assessment")
+        bar = ttk.Frame(tab)
+        bar.pack(fill="x", pady=(0, 6))
+        ttk.Button(bar, text="Run assessment", command=self.run_assessment).pack(side="left")
+        self.report_button = ttk.Button(bar, text="Save result JSON…", command=self.save_response,
+                                        state="disabled")
+        self.report_button.pack(side="left", padx=6)
+        self.assessment_label = ttk.Label(tab, text="No assessment run. Results describe a submission snapshot.")
+        self.assessment_label.pack(fill="x", pady=4)
+        self.axis_tree = ttk.Treeview(
+            tab, columns=("dimension", "availability", "value", "confidence"),
+            show="headings", height=4)
+        for name in ("dimension", "availability", "value", "confidence"):
+            self.axis_tree.heading(name, text=name)
+        self.axis_tree.pack(fill="x")
+        details = ttk.Frame(tab)
+        details.pack(fill="both", expand=True, pady=6)
+        self.assessment_text = tk.Text(details, wrap="word", state="disabled")
+        scroll = ttk.Scrollbar(details, command=self.assessment_text.yview)
+        self.assessment_text.configure(yscrollcommand=scroll.set)
+        scroll.pack(side="right", fill="y")
+        self.assessment_text.pack(fill="both", expand=True)
+
+    def _start_job(self, work, done):
+        if self._job is not None:
+            return
+        events, cancel = queue.Queue(), threading.Event()
+        states = []
+
+        def freeze(parent):
+            for widget in parent.winfo_children():
+                if widget is not self.cancel_button and isinstance(
+                        widget, (ttk.Button, ttk.Entry, ttk.Combobox, ttk.Checkbutton, tk.Text)):
+                    states.append((widget, widget.cget("state")))
+                    widget.configure(state="disabled")
+                freeze(widget)
+
+        freeze(self)
+        self.cancel_button.configure(state="normal")
+        self.progress_spinner.start()
+        self.progress_label.configure(text="Starting…")
+        self._job = (cancel, states)
+
+        def worker():
+            try:
+                result = work(lambda text: events.put(("progress", text)), cancel)
+                events.put(("done", result))
+            except operations.Cancelled as exc:
+                events.put(("cancelled", str(exc)))
+            except Exception as exc:
+                # Marshal worker failures to a visible main-thread notification.
+                events.put(("error", f"{type(exc).__name__}: {exc}"))
+
+        def poll():
+            try:
+                while True:
+                    kind, value = events.get_nowait()
+                    if kind == "progress":
+                        self.progress_label.configure(text=value)
+                        continue
+                    self._job = None
+                    for widget, state in states:
+                        widget.configure(state=state)
+                    self.cancel_button.configure(state="disabled")
+                    self.progress_spinner.stop()
+                    self.progress_label.configure(
+                        text="Completed" if kind == "done" else value)
+                    if self._closing:
+                        self.destroy()
+                    elif kind == "done":
+                        done(value)
+                    elif kind == "error":
+                        messagebox.showerror("Operation failed", value, parent=self)
+                    return
+            except queue.Empty:
+                self.after(75, poll)
+
+        threading.Thread(target=worker, daemon=True).start()
+        self.after(75, poll)
+
+    def cancel_job(self):
+        if self._job:
+            self._job[0].set()
+            self.cancel_button.configure(state="disabled")
+            self.progress_label.configure(text="Cancelling…")
+
+    def close(self):
+        if self._job:
+            self._closing = True
+            self.cancel_job()
+        else:
+            self.destroy()
+
+    def run_assessment(self):
+        try:
+            manifest = self.build_manifest()
+        except (ValueError, L.PolicyError) as exc:
+            messagebox.showerror("Cannot assess", str(exc), parent=self)
+            return
+        files = copy.deepcopy(self.files)
+        self._start_job(
+            lambda progress, cancel: operations.assess_manifest(manifest, files, progress, cancel),
+            self.show_response)
+
+    def show_response(self, response):
+        self._response = response
+        self.report_button.configure(state="normal")
+        self.assessment_label.configure(
+            text=f"Snapshot case {response['case_id']} | run {response['run_id']} | "
+                 f"status: {response['execution_status']}")
+        self.axis_tree.delete(*self.axis_tree.get_children())
+        explanation = ["Content consistency does not prove authorship. AI disclosure is not AI detection.\n"]
+        if response.get("error"):
+            explanation.append(f"ERROR: {response['error']}\n")
+        for name, axis in response["axes"].items():
+            self.axis_tree.insert("", "end", values=(
+                name, axis["availability"],
+                "Not assessed" if axis["value"] is None else f"{axis['value']:.3f}",
+                "Not assessed" if axis["confidence"] is None else f"{axis['confidence']:.3f}"))
+            explanation.append(f"{name}: {axis.get('reasoning') or 'Reasoning not supplied.'}\n")
+        explanation.append("\nFull result (workflow rules, findings and assessment checks):\n")
+        explanation.append(json.dumps(response, indent=2, ensure_ascii=False, allow_nan=False))
+        self.assessment_text.configure(state="normal")
+        self.assessment_text.delete("1.0", "end")
+        self.assessment_text.insert("1.0", "\n".join(explanation))
+        self.assessment_text.configure(state="disabled")
+
+    def save_response(self):
+        if self._response is None:
+            return
+        target = filedialog.asksaveasfilename(
+            title="Save assessment result", defaultextension=".json",
+            initialfile="assessment-result.json", filetypes=[("JSON", "*.json")])
+        if target:
+            try:
+                Path(target).write_text(
+                    json.dumps(self._response, indent=2, ensure_ascii=False, allow_nan=False) + "\n",
+                    encoding="utf-8")
+            except OSError as exc:
+                messagebox.showerror("Cannot save result", str(exc), parent=self)
+
     # ---- helpers ---------------------------------------------------------
     def selected(self, tree):
+        if self._job is not None:
+            return None
         sel = tree.selection()
         return int(sel[0]) if sel else None
 
@@ -527,23 +690,28 @@ class App(tk.Tk):
 
     # ---- files -----------------------------------------------------------
     def add_files(self):
-        for raw in filedialog.askopenfilenames(title="Select artefact files"):
-            path = Path(raw)
-            try:
-                digest = L.sha256_file(path)
-            except OSError as exc:
-                messagebox.showerror("Error", f"Could not read {path}: {exc}")
+        paths = list(filedialog.askopenfilenames(title="Select artefact files"))
+        if paths:
+            self._start_job(
+                lambda progress, cancel: operations.inspect_files(paths, progress, cancel),
+                self._add_inspected_files)
+
+    def _add_inspected_files(self, results):
+        for result in results:
+            path = Path(result["path"])
+            if "error" in result:
+                messagebox.showerror("Error", f"Could not read {path}: {result['error']}")
                 continue
+            digest = result["hash"]
             if any(f["hash"] == digest for f in self.files):
                 messagebox.showwarning("Duplicate",
                                        f"{path.name} duplicates a file already added.")
                 continue
             self._counter += 1
-            is_wav = path.suffix.lower() in (".wav", ".wave")
             entry = {"id": f"file-{self._counter}", "path": str(path), "hash": digest,
                      "type": "", "creation_method": "", "role": "", "final": False,
                      "production": {}, "extra": {},
-                     "technical": L.wav_technical(path) if is_wav else {}}
+                     "technical": result["technical"]}
             dialog = FileDialog(self, entry, {f["id"] for f in self.files}, self.roles())
             if dialog.result is None:
                 continue
@@ -732,24 +900,12 @@ class App(tk.Tk):
             initialfile="submission.json", filetypes=[("JSON", "*.json")])
         if not target:
             return
-        target, skipped = Path(target), []
-        try:
-            target.write_text(json.dumps(manifest, indent=2, ensure_ascii=False) + "\n",
-                              encoding="utf-8")
-            if self.copy_var.get():
-                for f in self.files:
-                    if not f["path"]:
-                        skipped.append(f["id"])
-                        continue
-                    dest = target.parent / L.object_rel_path(f)
-                    dest.parent.mkdir(parents=True, exist_ok=True)
-                    if dest.resolve() != Path(f["path"]).resolve():
-                        shutil.copy2(f["path"], dest)
-        except OSError as exc:
-            messagebox.showerror("Error", f"Could not save: {exc}")
-            return
-        extra = f"\nNot copied (file missing): {', '.join(skipped)}" if skipped else ""
-        messagebox.showinfo("Saved", f"Wrote {target}{extra}")
+        target = Path(target)
+        files, copy_files = copy.deepcopy(self.files), self.copy_var.get()
+        self._start_job(
+            lambda progress, cancel: operations.export_bundle(
+                manifest, files, target, copy_files, progress, cancel),
+            lambda _result: messagebox.showinfo("Saved", f"Wrote verified bundle: {target}"))
 
     # ---- load ------------------------------------------------------------
     def load(self):
