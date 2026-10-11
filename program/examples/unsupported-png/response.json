@@ -6,7 +6,7 @@
   "system": {
     "name": "COMP3888-music-baseline",
     "version": "0.5.0",
-    "source_revision": "sha256:0c270f8b8ae42032b35acca090a72747f9cac4252f094307297feccbb6a017b0"
+    "source_revision": "sha256:500d8ba70dc7119a2fac132e578be1b548b33cfcadc3be876f7bbede223889e1"
   },
   "execution_status": "unsupported",
   "axes": {
@@ -51,9 +51,9 @@
       "message": "The final artefact has unregistered type 'image/png'; no evaluation root can be formed."
     }
   ],
-  "processing_ms": 149.5497500000056,
+  "processing_ms": 142.23233397933654,
   "resource_usage": {
-    "cpu_ms": 0.5779999999999952,
+    "cpu_ms": 0.4149999999999987,
     "peak_rss_kib": null
   },
   "error": "The final artefact has unregistered type 'image/png'; no evaluation root can be formed."
