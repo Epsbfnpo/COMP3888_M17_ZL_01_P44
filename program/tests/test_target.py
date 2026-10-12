@@ -11,6 +11,8 @@ import wave
 from pathlib import Path
 from unittest import mock
 
+import numpy as np
+
 BASE = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(BASE))
 import run
@@ -22,8 +24,17 @@ from music_target.engine import (
 )
 from libevchain.pipeline import EvidencePass
 from music_target.assessment_passes import C2PAAttestationPass, ExpandedCrossEvidencePass
-from music_target.audio_derivation import MAX_SOURCE_CORRELATION
-from music_target.audio_derivation import _mono_resample, _resample_series
+from music_target.audio_derivation import (
+    MAX_SOURCE_CORRELATION,
+    ResourceBudgetExceeded,
+    _analysis_proxy,
+    _fir_lowpass,
+    _mono_resample,
+    _proxy_decimation_factor,
+    _read_bound_pcm,
+    _read_pcm,
+    _resample_series,
+)
 from legacy_parsers.common.ddex_validation import REGISTRY, _schema
 from legacy_parsers.ern_parser import parse_ern_file
 from legacy_parsers.rin_parser import parse_rin_file
@@ -404,6 +415,142 @@ class TargetTests(unittest.TestCase):
         self.assertTrue(any(item["code"] == "AUDIO_DERIVATION_CONTRADICTION"
                             for item in result["findings"]))
 
+    def test_audio_derivation_reports_sustained_local_tampering(self):
+        rate, duration = 1000, 20.0
+        source = self._deterministic_samples(round(rate * duration), 801)
+        target = source.copy()
+        replacement = self._deterministic_samples(round(rate * 0.5), 802)
+        target[10 * rate:10 * rate + len(replacement)] = replacement
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            specs = [
+                {"type": "audio/stem", "data": self._pcm16(source, rate=rate)},
+                {"type": "audio/mix", "data": self._pcm16(target, rate=rate),
+                 "parents": [(0, "mixed_from", self._linear_attributes(
+                     "linear_mix", duration, 1.0))]},
+            ]
+            result = self.score(self._workflow_request(
+                root, "multitrack_recording_mix_master", specs), root)
+        check = result["assessment_checks"]["audio_derivation"][0]
+        self.assertEqual(check["status"], "contradicted")
+        self.assertIn("sustained_local_mismatch", check["manual_review_reasons"])
+        self.assertLess(check["matched_coverage_ratio"], 1.0)
+        self.assertTrue(check["local_mismatch_regions"])
+        region = check["local_mismatch_regions"][0]
+        self.assertAlmostEqual(region["start_seconds"], 10.0, delta=0.1)
+        self.assertAlmostEqual(region["end_seconds"], 10.5, delta=0.1)
+
+    def test_declared_linear_range_longer_than_sixty_seconds_is_evaluated(self):
+        rate, duration = 1000, 70.0
+        source = self._deterministic_samples(round(rate * duration), 811)
+        target = source.copy()
+        target[-1] = max(-32768, min(32767, target[-1] + 1))
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            specs = [
+                {"type": "audio/stem", "data": self._pcm16(source, rate=rate)},
+                {"type": "audio/mix", "data": self._pcm16(target, rate=rate),
+                 "parents": [(0, "mixed_from", self._linear_attributes(
+                     "linear_mix", duration, 1.0))]},
+            ]
+            result = self.score(self._workflow_request(
+                root, "multitrack_recording_mix_master", specs), root)
+        check = result["assessment_checks"]["audio_derivation"][0]
+        self.assertEqual(check["status"], "matched", check)
+        self.assertEqual(check["target_duration_seconds"], duration)
+        self.assertEqual(check["coverage_ratio"], 1.0)
+
+    def test_pcm_reader_uses_ndarray_cached_windows_and_enforces_budget(self):
+        rate = 1000
+        samples = self._deterministic_samples(rate * 70, 821)
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "long.wav"
+            path.write_bytes(self._pcm16(samples, rate=rate))
+            window = _read_pcm(path, 65.0, 70.0, max_seconds=None)
+            self.assertIsInstance(window["frames"], np.ndarray)
+            self.assertEqual(window["frames"].dtype, np.float32)
+            self.assertEqual(window["frames"].shape, (5 * rate, 1))
+            self.assertEqual(len(window["frames"]), 5 * rate)
+            self.assertEqual(window["decoded_bytes"], 5 * rate * 4)
+            self.assertAlmostEqual(window["start_seconds"], 65.0)
+            with self.assertRaisesRegex(ValueError, "request budget"):
+                _read_pcm(path, 65.0, 70.0, max_seconds=None, byte_budget=100)
+
+            artefact = mock.Mock(_wav_parser_failure=None)
+            artefact.has_file.return_value = True
+            artefact.get_file.return_value = str(path)
+            class Chain:
+                pass
+            chain = Chain()
+            chain.artefacts = {"audio": artefact}
+            first = _read_bound_pcm(chain, "audio", 65.0, 70.0, max_seconds=None)
+            second = _read_bound_pcm(chain, "audio", 65.0, 70.0, max_seconds=None)
+            self.assertIs(first, second)
+            self.assertEqual(chain._pcm_cache_misses, 1)
+            self.assertEqual(chain._pcm_cache_hits, 1)
+
+    def test_pcm_reader_vectorizes_signed_24_bit_samples(self):
+        values = np.asarray([-8388608, -1, 0, 1, 8388607], dtype=np.int32)
+        encoded = bytearray()
+        for value in values:
+            encoded.extend((int(value) & 0xFFFFFF).to_bytes(3, "little"))
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "pcm24.wav"
+            with wave.open(str(path), "wb") as handle:
+                handle.setnchannels(1)
+                handle.setsampwidth(3)
+                handle.setframerate(8000)
+                handle.writeframes(bytes(encoded))
+            audio = _read_pcm(path)
+        self.assertEqual(audio["frames"].shape, (len(values), 1))
+        self.assertEqual(audio["frames"].dtype, np.float32)
+        np.testing.assert_allclose(
+            audio["frames"][:, 0], values.astype(np.float32) / 8388608.0,
+            rtol=0, atol=1e-7)
+
+    def test_analysis_proxy_is_full_length_phase_aligned_and_cached(self):
+        rate, seconds = 48_000, 11
+        timeline = np.arange(rate * seconds, dtype=np.float64) / rate
+        left = np.sin(2 * math.pi * 110 * timeline)
+        right = np.cos(2 * math.pi * 170 * timeline)
+        interleaved = np.column_stack((left, right))
+        pcm = np.rint(interleaved * 12_000).astype("<i2")
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "proxy.wav"
+            with wave.open(str(path), "wb") as handle:
+                handle.setnchannels(2)
+                handle.setsampwidth(2)
+                handle.setframerate(rate)
+                handle.writeframes(pcm.tobytes())
+            artefact = mock.Mock(_wav_parser_failure=None)
+            artefact.has_file.return_value = True
+            artefact.get_file.return_value = str(path)
+
+            class Chain:
+                pass
+
+            chain = Chain()
+            chain.artefacts = {"audio": artefact}
+            first = _analysis_proxy(chain, "audio")
+            second = _analysis_proxy(chain, "audio")
+        self.assertIs(first, second)
+        self.assertEqual(first["decimation_factor"], 24)
+        self.assertEqual(first["sample_rate_hz"], 2000)
+        self.assertEqual(first["frames"].shape, (seconds * 2000, 2))
+        self.assertEqual(first["frames"].dtype, np.float32)
+        self.assertEqual(first["analysis_ranges_seconds"], [[0.0, seconds]])
+        self.assertTrue(first["search_complete"])
+        self.assertEqual(chain._analysis_proxy_misses, 1)
+        self.assertEqual(chain._analysis_proxy_hits, 1)
+        taps = _fir_lowpass(rate, 2000 * 0.45)
+        decoded = pcm.astype(np.float32) / 32768.0
+        expected = np.column_stack([
+            np.convolve(decoded[:, channel], taps, mode="same")[::24]
+            for channel in range(2)
+        ]).astype(np.float32)
+        np.testing.assert_allclose(first["frames"], expected,
+                                   rtol=1e-5, atol=2e-6)
+
     def test_audio_derivation_pass_applies_declared_time_offset(self):
         source = [int(5000 * math.sin(index / 17)) for index in range(2000)]
         target = [0] * 100 + [round(0.7 * item) for item in source]
@@ -463,6 +610,14 @@ class TargetTests(unittest.TestCase):
         wrong_check = wrong_result["assessment_checks"]["audio_derivation"][0]
         self.assertEqual(wrong_check["status"], "contradicted")
         self.assertEqual(wrong_check["declared_gains"], [0.9])
+        diagnostic = wrong_result["assessment_checks"]["stem_mix_residual"][0]
+        self.assertEqual(diagnostic["status"], "matched")
+        self.assertTrue(diagnostic["estimated_parameters_are_diagnostic"])
+        content_layer = next(
+            item for item in wrong_result["assessment_checks"]["integrity_layers"]
+            if item["layer"] == "content_reconstruction"
+        )
+        self.assertEqual(content_layer["status"], "contradicted")
 
     def test_edit_derivation_pass_matches_declared_crop_and_gain(self):
         source = [int(7000 * math.sin(index / 19)) for index in range(2400)]
@@ -634,6 +789,30 @@ class TargetTests(unittest.TestCase):
         self.assertTrue(check["content_continuity_corroborated"])
         self.assertFalse(check["alignment_ambiguous"])
         self.assertEqual(check["parameter_source"], "submitter_declared")
+
+    def test_master_duration_delta_uses_full_files_beyond_sixty_seconds(self):
+        rate, source_duration, master_duration = 1000, 70.0, 75.0
+        source = self._deterministic_samples(round(rate * source_duration), 831)
+        master = source + self._deterministic_samples(
+            round(rate * (master_duration - source_duration)), 832)
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            specs = [
+                {"type": "audio/mix", "data": self._pcm16(source, rate=rate)},
+                {"type": "audio/master", "data": self._pcm16(master, rate=rate),
+                 "parents": [(0, "mastered_from", {
+                     "derivation_scope": "master_similarity",
+                     "source_start_seconds": 0.0,
+                     "source_end_seconds": source_duration,
+                     "target_start_seconds": 0.0,
+                     "target_end_seconds": source_duration,
+                 })]},
+            ]
+            result = self.score(self._workflow_request(
+                root, "mastering_service_only", specs), root)
+        check = result["assessment_checks"]["master_derivation"][0]
+        self.assertEqual(check["duration_delta_seconds"], 5.0)
+        self.assertGreater(check["alignment_coverage_ratio"], 0.99)
 
     def test_master_derivation_does_not_infer_missing_alignment(self):
         source = [int(9000 * math.sin(2 * math.pi * index / 100))
@@ -1034,6 +1213,44 @@ class TargetTests(unittest.TestCase):
         self.assertIn(check["status"], {"matched", "corroborated"})
         self.assertAlmostEqual(check["estimated_source_start_seconds"], 0.6,
                                delta=0.08)
+
+    def test_excerpt_search_finds_audio_after_sixty_seconds(self):
+        rate = 1000
+        source = self._deterministic_samples(70 * rate, 1141)
+        sample = source[65 * rate:66 * rate]
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            specs = [
+                {"type": "audio/raw-track", "data": self._pcm16(source, rate=rate)},
+                {"type": "audio/sample", "data": self._pcm16(sample, rate=rate),
+                 "parents": [(0, "excerpted_from")]},
+            ]
+            result = self.score(self._workflow_request(
+                root, "custom_or_unknown_workflow", specs), root)
+        check = result["assessment_checks"]["excerpted_from"][0]
+        self.assertIn(check["status"], {"matched", "corroborated"}, check)
+        self.assertAlmostEqual(check["estimated_source_start_seconds"], 65.0,
+                               delta=0.08)
+        self.assertTrue(check["search_complete"])
+
+    def test_incomplete_budget_never_returns_search_contradiction(self):
+        source = self._deterministic_samples(8000, 1151)
+        sample = source[2000:4000]
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            specs = [
+                {"type": "audio/raw-track", "data": self._pcm16(source)},
+                {"type": "audio/sample", "data": self._pcm16(sample),
+                 "parents": [(0, "excerpted_from")]},
+            ]
+            with mock.patch(
+                    "music_target.audio_derivation.MAX_REQUEST_WORK_UNITS", 0.1):
+                result = self.score(self._workflow_request(
+                    root, "custom_or_unknown_workflow", specs), root)
+        check = result["assessment_checks"]["excerpted_from"][0]
+        self.assertEqual(check["status"], "unavailable")
+        self.assertEqual(check["reason_code"], "resource_budget_exhausted")
+        self.assertFalse(check["search_complete"])
 
     def test_mastering_derivation_public_pass_name_is_exposed(self):
         source = self._deterministic_samples(8000, 151)
@@ -1622,7 +1839,7 @@ class AntiAliasedResamplingTests(unittest.TestCase):
 
     @staticmethod
     def _rms(samples):
-        return math.sqrt(sum(value * value for value in samples) / len(samples)) if samples else 0.0
+        return math.sqrt(sum(value * value for value in samples) / len(samples)) if len(samples) else 0.0
 
     def test_above_nyquist_tone_is_substantially_suppressed(self):
         rate, output_rate = 8000, 200  # Nyquist at output_rate is 100 Hz
@@ -1656,16 +1873,30 @@ class AntiAliasedResamplingTests(unittest.TestCase):
         correlation = numerator / math.sqrt(energy_f * energy_u)
         self.assertGreater(correlation, 0.9)
 
-    def test_no_downsampling_matches_original_nearest_index_behaviour(self):
-        # output_rate >= rate: no filtering should apply at all, and the
-        # result must match the original nearest-index formula exactly.
+    def test_non_integer_2100_to_400_resample_filters_before_interpolation(self):
+        rate, output_rate = 2100, 400
+        above = self._tone(600, rate * 2, rate, amplitude=1.0)
+        unfiltered_times = np.arange(int(len(above) / rate * output_rate)) / output_rate
+        aliased = np.interp(unfiltered_times, np.arange(len(above)) / rate, above)
+        filtered = _resample_series(above, rate, output_rate)
+        self.assertEqual(len(filtered), len(aliased))
+        self.assertLess(self._rms(filtered) / self._rms(aliased), 0.2)
+
+    def test_common_proxy_rates_use_expected_integer_phase_factors(self):
+        self.assertEqual(_proxy_decimation_factor(48_000), 24)
+        self.assertEqual(48_000 / _proxy_decimation_factor(48_000), 2000)
+        self.assertEqual(_proxy_decimation_factor(44_100), 21)
+        self.assertEqual(44_100 / _proxy_decimation_factor(44_100), 2100)
+
+    def test_upsampling_uses_linear_interpolation_without_filtering(self):
         samples = [float(index % 17) for index in range(50)]
-        expected = self._nearest_neighbor_resample(samples, 100, 400)
         actual = _resample_series(samples, 100, 400)
-        self.assertEqual(actual, expected)
+        expected = np.interp(np.arange(len(actual)) / 400,
+                             np.arange(len(samples)) / 100, samples)
+        np.testing.assert_allclose(actual, expected, rtol=0, atol=1e-6)
 
     def test_handles_empty_and_very_short_inputs_without_error(self):
-        self.assertEqual(_resample_series([], 8000, 200), [])
+        self.assertEqual(_resample_series([], 8000, 200).size, 0)
         # Shorter than even one bounded decimation stage's minimum length:
         # must fall back gracefully, not raise or return a wrong length.
         short = [1.0, 2.0, 3.0]
@@ -1676,10 +1907,13 @@ class AntiAliasedResamplingTests(unittest.TestCase):
 
     def test_mono_resample_wraps_resample_series_consistently(self):
         audio = {"sample_rate_hz": 8000, "channels": 2,
-                 "frames": [(float(index), float(index) + 1.0) for index in range(1600)]}
-        mono_samples = [sum(frame) / len(frame) for frame in audio["frames"]]
-        self.assertEqual(_mono_resample(audio, 200),
-                         _resample_series(mono_samples, 8000, 200))
+                 "frames": np.asarray(
+                     [(float(index), float(index) + 1.0) for index in range(1600)],
+                     dtype=np.float32)}
+        mono_samples = np.mean(audio["frames"], axis=1)
+        np.testing.assert_allclose(_mono_resample(audio, 200),
+                                   _resample_series(mono_samples, 8000, 200),
+                                   rtol=0, atol=1e-6)
 
 
 if __name__ == "__main__":

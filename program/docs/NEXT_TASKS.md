@@ -1,6 +1,6 @@
 # Future Work
 
-Updated: 2026-10-03
+Updated: 2026-10-11
 
 This file is the current consolidated roadmap for `v3/program`. It replaces the
 shorter v0.4 task list and incorporates unresolved work from the legacy v3
@@ -40,9 +40,9 @@ calibration against licensed real production material.
    audio. Checks now require submitter-declared ranges and gains and never fit
    missing transformation parameters. Partitioned validation, coverage
    reporting, correlated-source detection, source-identifiability checks,
-   repeated-segment ambiguity, and provenance disclaimers are implemented;
-   their thresholds still require real-world false-positive/false-negative
-   measurement.
+   repeated-segment ambiguity, timed sustained-local-mismatch reporting, and
+   provenance disclaimers are implemented; their thresholds still require
+   real-world false-positive/false-negative measurement.
 
 4. Calibrate the hardened Master continuity assessment with real mastered
    material. Master assessment now uses declared source/target ranges; competing
@@ -133,10 +133,13 @@ calibration against licensed real production material.
     validation, dependency vulnerability checks, linting, and release artefact
     generation. Test supported Python versions and target platforms.
 
-20. Add performance and resource tests for long audio, large bundles, many
-    relationships, high channel counts, and worst-case alignment inputs. Review
-    the current 60-second analysis cap, 16-source limit, and file-size limits
-    using measured runtime and memory data.
+20. Expand performance and resource tests for large bundles, many
+    relationships, high channel counts, and worst-case FFT alignment inputs.
+    Full-file exploratory search now uses cached low-rate NumPy proxies and
+    exact checks stream original-rate windows, so there is no audio-duration
+    cap. Calibrate the weighted work limit, 128 MiB active-window limit,
+    256 MiB proxy-cache limit, 16-source limit and file-size limits against the
+    CSEC 60-second wall-clock deadline on every supported platform.
 
 21. Expand malicious-input tests for WAV chunk abuse, XML bombs, hostile PDFs,
     malformed MIDI, symlink/path attacks, oversized JSON, hash collisions in

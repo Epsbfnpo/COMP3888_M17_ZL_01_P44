@@ -6,7 +6,7 @@
   "system": {
     "name": "COMP3888-music-baseline",
     "version": "0.5.0",
-    "source_revision": "sha256:500d8ba70dc7119a2fac132e578be1b548b33cfcadc3be876f7bbede223889e1"
+    "source_revision": "sha256:7661a11d28785aa0a9e4d9884a54484d3481d6a11e05ed2a56cd12a58255dc26"
   },
   "execution_status": "succeeded",
   "axes": {
@@ -23,10 +23,10 @@
       "reasoning": "Integrity has 1/4 score-eligible evidence layers; missing evidence reduces availability and confidence but is never treated as contradiction. A numeric value is withheld without content reconstruction or independent CrossEvidence unless a contradiction exists. Structural validity and cryptographic attestation are reported separately and do not raise integrity. 0 Master/content corroboration result(s) were not scored as exact matches."
     },
     "attestation_strength": {
-      "availability": "available",
-      "value": 0.0,
-      "confidence": 0.9,
-      "reasoning": "C2PA SDK ran but found no active manifest associated with the final artefact."
+      "availability": "unavailable",
+      "value": null,
+      "confidence": null,
+      "reasoning": "C2PA SDK is unavailable for the final artefact, so no cryptographic attestation was assessed."
     },
     "ai_disclosure": {
       "availability": "available",
@@ -36,15 +36,13 @@
     }
   },
   "validation": {
-    "validation_state": "manifest_absent",
-    "signature_present": false,
+    "validation_state": null,
+    "signature_present": null,
     "signature_valid": null,
     "cryptographically_valid": null,
     "credential_trusted": null,
     "codes": [],
-    "reasons": [
-      "C2PA SDK ran but found no active manifest associated with the final artefact."
-    ]
+    "reasons": []
   },
   "findings": [
     {
@@ -696,11 +694,16 @@
         "claim_mismatches": []
       },
       "evidence_hash": "746c90b6d8f6306ce93c347477103c16027d71a4072cf12d10a9f7246ce93d18"
+    },
+    {
+      "code": "C2PA_PARSER_UNAVAILABLE",
+      "severity": "low",
+      "message": "c2pa-python is not installed; C2PA attestation was not assessed."
     }
   ],
-  "processing_ms": 219.7067090019118,
+  "processing_ms": 205.4774999851361,
   "resource_usage": {
-    "cpu_ms": 41.99,
+    "cpu_ms": 10.615000000000013,
     "peak_rss_kib": null
   },
   "error": null,
@@ -1119,10 +1122,10 @@
       },
       {
         "layer": "cryptographic_attestation",
-        "status": "not_applicable",
+        "status": "unavailable",
         "value": null,
         "contributes_to_integrity": false,
-        "check_count": 1,
+        "check_count": 0,
         "reason": "C2PA remains in the separate attestation-strength axis and never inflates integrity.",
         "manual_review_reasons": []
       }
@@ -1162,11 +1165,11 @@
         "manifest_container_hash": "7580f3a09b8a02bdfc6520235e92f6c8318dd3b52002b7eb8a430abc2c007dea",
         "asset_hash": "7580f3a09b8a02bdfc6520235e92f6c8318dd3b52002b7eb8a430abc2c007dea",
         "binding_relationship": null,
-        "sdk_available": true,
-        "reader_succeeded": true,
+        "sdk_available": false,
+        "reader_succeeded": false,
         "manifest_present": false,
         "signature_present": false,
-        "validation_state": "manifest_absent",
+        "validation_state": "sdk_unavailable",
         "validation_codes": []
       },
       {
@@ -1175,11 +1178,11 @@
         "manifest_container_hash": "6aacc6b93785fbbefb186285e5f9c9ce49a6ccc7c2af664fc2f2a21416001ea0",
         "asset_hash": "6aacc6b93785fbbefb186285e5f9c9ce49a6ccc7c2af664fc2f2a21416001ea0",
         "binding_relationship": null,
-        "sdk_available": true,
-        "reader_succeeded": true,
+        "sdk_available": false,
+        "reader_succeeded": false,
         "manifest_present": false,
         "signature_present": false,
-        "validation_state": "manifest_absent",
+        "validation_state": "sdk_unavailable",
         "validation_codes": []
       },
       {
@@ -1188,11 +1191,11 @@
         "manifest_container_hash": "bc1dd3c26ef5f4d97fbb41e653e93a09c940b53c75229594d82c928727134ca0",
         "asset_hash": "bc1dd3c26ef5f4d97fbb41e653e93a09c940b53c75229594d82c928727134ca0",
         "binding_relationship": null,
-        "sdk_available": true,
-        "reader_succeeded": true,
+        "sdk_available": false,
+        "reader_succeeded": false,
         "manifest_present": false,
         "signature_present": false,
-        "validation_state": "manifest_absent",
+        "validation_state": "sdk_unavailable",
         "validation_codes": []
       },
       {
@@ -1201,11 +1204,11 @@
         "manifest_container_hash": "746c90b6d8f6306ce93c347477103c16027d71a4072cf12d10a9f7246ce93d18",
         "asset_hash": "746c90b6d8f6306ce93c347477103c16027d71a4072cf12d10a9f7246ce93d18",
         "binding_relationship": null,
-        "sdk_available": true,
-        "reader_succeeded": true,
+        "sdk_available": false,
+        "reader_succeeded": false,
         "manifest_present": false,
         "signature_present": false,
-        "validation_state": "manifest_absent",
+        "validation_state": "sdk_unavailable",
         "validation_codes": []
       }
     ],
@@ -1311,12 +1314,22 @@
         "source_start_seconds": 0.0,
         "target_start_seconds": 0.0,
         "estimated_offset_seconds": 0.0,
-        "feature_similarity": 1.0,
-        "waveform_correlation": 1.0,
-        "ambiguity_margin": 1.0,
+        "feature_similarity": 0.863829,
+        "waveform_correlation": 0.999995,
+        "ambiguity_margin": 0.863829,
         "ambiguous": false,
         "competing_alignment_similarity": 0.0,
-        "compared_duration_seconds": 0.5
+        "compared_duration_seconds": 0.5,
+        "search_complete": true,
+        "searched_source_range_seconds": [
+          0.0,
+          0.5
+        ],
+        "searched_target_range_seconds": [
+          0.0,
+          0.5
+        ],
+        "analysis_proxy_sample_rate_hz": 2000.0
       },
       {
         "rule": "audio_content_alignment",
@@ -1333,12 +1346,22 @@
         "source_start_seconds": 0.0,
         "target_start_seconds": 0.0,
         "estimated_offset_seconds": 0.0,
-        "feature_similarity": 1.0,
-        "waveform_correlation": 1.0,
-        "ambiguity_margin": 1.0,
+        "feature_similarity": 0.861462,
+        "waveform_correlation": 0.999988,
+        "ambiguity_margin": 0.861462,
         "ambiguous": false,
         "competing_alignment_similarity": 0.0,
-        "compared_duration_seconds": 0.5
+        "compared_duration_seconds": 0.5,
+        "search_complete": true,
+        "searched_source_range_seconds": [
+          0.0,
+          0.5
+        ],
+        "searched_target_range_seconds": [
+          0.0,
+          0.5
+        ],
+        "analysis_proxy_sample_rate_hz": 2000.0
       },
       {
         "rule": "audio_content_alignment",
@@ -1355,12 +1378,22 @@
         "source_start_seconds": 0.0,
         "target_start_seconds": 0.0,
         "estimated_offset_seconds": 0.0,
-        "feature_similarity": 1.0,
-        "waveform_correlation": 1.0,
-        "ambiguity_margin": 1.0,
+        "feature_similarity": 0.861774,
+        "waveform_correlation": 0.999971,
+        "ambiguity_margin": 0.861774,
         "ambiguous": false,
         "competing_alignment_similarity": 0.0,
-        "compared_duration_seconds": 0.5
+        "compared_duration_seconds": 0.5,
+        "search_complete": true,
+        "searched_source_range_seconds": [
+          0.0,
+          0.5
+        ],
+        "searched_target_range_seconds": [
+          0.0,
+          0.5
+        ],
+        "analysis_proxy_sample_rate_hz": 2000.0
       }
     ],
     "source_contribution": [
@@ -1376,12 +1409,24 @@
         "reason": "Removing this source materially increases reconstruction residual.",
         "source_hash": "7580f3a09b8a02bdfc6520235e92f6c8318dd3b52002b7eb8a430abc2c007dea",
         "relationship_type": "stemmed_from",
-        "estimated_gain": 0.699839,
-        "gain_stability": 1.0,
-        "full_model_normalized_rmse": 0.000679,
+        "estimated_gain": 0.699861,
+        "gain_stability": 0.999243,
+        "full_model_normalized_rmse": 0.001914,
         "leave_one_out_normalized_rmse": 1.0,
-        "unique_residual_delta": 0.999321,
+        "unique_residual_delta": 0.998086,
         "parameter_source": "signal_estimated_diagnostic",
+        "analysis_proxy_sample_rate_hz": 2000.0,
+        "searched_ranges_seconds": [
+          [
+            0.0,
+            0.5
+          ],
+          [
+            0.0,
+            0.5
+          ]
+        ],
+        "search_complete": true,
         "estimated_parameters_are_diagnostic": true
       },
       {
@@ -1396,12 +1441,24 @@
         "reason": "Removing this source materially increases reconstruction residual.",
         "source_hash": "6aacc6b93785fbbefb186285e5f9c9ce49a6ccc7c2af664fc2f2a21416001ea0",
         "relationship_type": "mixed_from",
-        "estimated_gain": 0.857369,
-        "gain_stability": 1.0,
-        "full_model_normalized_rmse": 0.000752,
+        "estimated_gain": 0.857264,
+        "gain_stability": 0.998827,
+        "full_model_normalized_rmse": 0.00293,
         "leave_one_out_normalized_rmse": 1.0,
-        "unique_residual_delta": 0.999248,
+        "unique_residual_delta": 0.99707,
         "parameter_source": "signal_estimated_diagnostic",
+        "analysis_proxy_sample_rate_hz": 2000.0,
+        "searched_ranges_seconds": [
+          [
+            0.0,
+            0.5
+          ],
+          [
+            0.0,
+            0.5
+          ]
+        ],
+        "search_complete": true,
         "estimated_parameters_are_diagnostic": true
       }
     ],
@@ -1415,16 +1472,28 @@
           "7580f3a09b8a02bdfc6520235e92f6c8318dd3b52002b7eb8a430abc2c007dea"
         ],
         "content_match_is_provenance": false,
-        "status": "corroborated",
-        "reason": "Gain-tolerant time-frequency features support content continuity.",
+        "status": "not_applicable",
+        "reason": "Processing, source masking, or overlap makes the pairwise content comparison inconclusive.",
         "relationship_type": "stemmed_from",
         "declared_complex_processing": false,
         "parameter_source": "signal_estimated_diagnostic",
-        "waveform_correlation": 1.0,
-        "landmark_similarity": 1.0,
-        "dtw_similarity": 0.999355,
+        "waveform_correlation": 0.999995,
+        "landmark_similarity": 0.790509,
+        "dtw_similarity": 0.523214,
         "envelope_correlation": 0.0,
-        "robust_similarity": 0.799806
+        "analysis_proxy_sample_rate_hz": 2000.0,
+        "searched_ranges_seconds": [
+          [
+            0.0,
+            0.5
+          ],
+          [
+            0.0,
+            0.5
+          ]
+        ],
+        "search_complete": true,
+        "robust_similarity": 0.594116
       },
       {
         "rule": "processed_audio_content_match",
@@ -1434,16 +1503,28 @@
           "6aacc6b93785fbbefb186285e5f9c9ce49a6ccc7c2af664fc2f2a21416001ea0"
         ],
         "content_match_is_provenance": false,
-        "status": "corroborated",
-        "reason": "Gain-tolerant time-frequency features support content continuity.",
+        "status": "not_applicable",
+        "reason": "Processing, source masking, or overlap makes the pairwise content comparison inconclusive.",
         "relationship_type": "mixed_from",
         "declared_complex_processing": false,
         "parameter_source": "signal_estimated_diagnostic",
-        "waveform_correlation": 1.0,
-        "landmark_similarity": 1.0,
-        "dtw_similarity": 0.9994,
+        "waveform_correlation": 0.999988,
+        "landmark_similarity": 0.786872,
+        "dtw_similarity": 0.599051,
         "envelope_correlation": 0.0,
-        "robust_similarity": 0.79982
+        "analysis_proxy_sample_rate_hz": 2000.0,
+        "searched_ranges_seconds": [
+          [
+            0.0,
+            0.5
+          ],
+          [
+            0.0,
+            0.5
+          ]
+        ],
+        "search_complete": true,
+        "robust_similarity": 0.615774
       },
       {
         "rule": "processed_audio_content_match",
@@ -1453,16 +1534,28 @@
           "bc1dd3c26ef5f4d97fbb41e653e93a09c940b53c75229594d82c928727134ca0"
         ],
         "content_match_is_provenance": false,
-        "status": "corroborated",
-        "reason": "Gain-tolerant time-frequency features support content continuity.",
+        "status": "not_applicable",
+        "reason": "Processing, source masking, or overlap makes the pairwise content comparison inconclusive.",
         "relationship_type": "mastered_from",
         "declared_complex_processing": false,
         "parameter_source": "signal_estimated_diagnostic",
-        "waveform_correlation": 1.0,
-        "landmark_similarity": 1.0,
-        "dtw_similarity": 0.999669,
+        "waveform_correlation": 0.999971,
+        "landmark_similarity": 0.78736,
+        "dtw_similarity": 0.615875,
         "envelope_correlation": 0.0,
-        "robust_similarity": 0.799901
+        "analysis_proxy_sample_rate_hz": 2000.0,
+        "searched_ranges_seconds": [
+          [
+            0.0,
+            0.5
+          ],
+          [
+            0.0,
+            0.5
+          ]
+        ],
+        "search_complete": true,
+        "robust_similarity": 0.620965
       }
     ],
     "stem_mix_residual": [
@@ -1481,17 +1574,29 @@
         ],
         "estimated_channel_matrix": [
           [
-            0.699952
+            0.700007
           ]
         ],
         "estimated_parameters_are_diagnostic": true,
-        "normalized_rmse": 0.000929,
+        "normalized_rmse": 0.000168,
         "correlation": 1.0,
         "clipping_fraction": 0.0,
         "window_normalized_rmse": [
-          0.000929,
-          0.000929
+          0.000168,
+          0.000168
         ],
+        "analysis_proxy_sample_rate_hz": 2000.0,
+        "searched_ranges_seconds": [
+          [
+            0.0,
+            0.5
+          ],
+          [
+            0.0,
+            0.5
+          ]
+        ],
+        "search_complete": true,
         "analysis_sample_rate_hz": 1000
       },
       {
@@ -1509,17 +1614,29 @@
         ],
         "estimated_channel_matrix": [
           [
-            0.857298
+            0.857063
           ]
         ],
         "estimated_parameters_are_diagnostic": true,
-        "normalized_rmse": 0.00089,
+        "normalized_rmse": 0.00026,
         "correlation": 1.0,
         "clipping_fraction": 0.0,
         "window_normalized_rmse": [
-          0.00089,
-          0.00089
+          0.00026,
+          0.00026
         ],
+        "analysis_proxy_sample_rate_hz": 2000.0,
+        "searched_ranges_seconds": [
+          [
+            0.0,
+            0.5
+          ],
+          [
+            0.0,
+            0.5
+          ]
+        ],
+        "search_complete": true,
         "analysis_sample_rate_hz": 1000
       }
     ],
@@ -1564,8 +1681,20 @@
         "status": "clear",
         "reason": "The declared source has measurable unique contribution.",
         "source_hash": "7580f3a09b8a02bdfc6520235e92f6c8318dd3b52002b7eb8a430abc2c007dea",
-        "unique_residual_delta": 0.999321,
-        "estimated_gain": 0.699839
+        "unique_residual_delta": 0.998086,
+        "estimated_gain": 0.699861,
+        "analysis_proxy_sample_rate_hz": 2000.0,
+        "searched_ranges_seconds": [
+          [
+            0.0,
+            0.5
+          ],
+          [
+            0.0,
+            0.5
+          ]
+        ],
+        "search_complete": true
       },
       {
         "rule": "audio_declared_source_decoy",
@@ -1578,8 +1707,20 @@
         "status": "clear",
         "reason": "The declared source has measurable unique contribution.",
         "source_hash": "6aacc6b93785fbbefb186285e5f9c9ce49a6ccc7c2af664fc2f2a21416001ea0",
-        "unique_residual_delta": 0.999248,
-        "estimated_gain": 0.857369
+        "unique_residual_delta": 0.99707,
+        "estimated_gain": 0.857264,
+        "analysis_proxy_sample_rate_hz": 2000.0,
+        "searched_ranges_seconds": [
+          [
+            0.0,
+            0.5
+          ],
+          [
+            0.0,
+            0.5
+          ]
+        ],
+        "search_complete": true
       }
     ]
   }

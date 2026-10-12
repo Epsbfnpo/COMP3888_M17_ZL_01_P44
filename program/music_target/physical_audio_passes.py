@@ -10,15 +10,19 @@ from __future__ import annotations
 
 import math
 
+import numpy as np
+
 from music_target.audio_derivation import (
     MAX_SOURCE_CORRELATION,
     MIN_SOURCE_IDENTIFIABILITY,
     COMPLEX_PROCESSING_WORDS,
     MasterDerivationPass,
+    ResourceBudgetExceeded,
+    _analysis_proxy,
     _correlation,
+    _fft_normalized_candidates,
     _max_source_correlation,
     _mono_resample,
-    _read_bound_pcm,
     _resample_series,
     _rms,
     _source_gram,
@@ -30,8 +34,6 @@ ALIGNMENT_RATE_HZ = 200
 FEATURE_RATE_HZ = 25
 CONTRIBUTION_RATE_HZ = 400
 RESIDUAL_RATE_HZ = 1000
-MAX_SEARCH_SECONDS = 60
-MAX_SEARCH_FRAMES = FEATURE_RATE_HZ * MAX_SEARCH_SECONDS
 MAX_CONTRIBUTION_SOURCES = 16
 RIDGE_FACTOR = 1e-8
 
@@ -50,6 +52,26 @@ def _base(rule, pass_name, target_hash, source_hashes):
         "source_hashes": sorted(set(source_hashes)),
         "content_match_is_provenance": False,
     }
+
+
+def _resource_fields(exc):
+    if isinstance(exc, ResourceBudgetExceeded):
+        return {"reason_code": exc.reason_code,
+                "analysis_complete": False,
+                "search_complete": False}
+    return {}
+
+
+def _proxy_fields(*audio_objects):
+    valid = [audio for audio in audio_objects if audio is not None]
+    return {
+        "analysis_proxy_sample_rate_hz": min(
+            audio.get("proxy_sample_rate_hz", audio["sample_rate_hz"])
+            for audio in valid),
+        "searched_ranges_seconds": [
+            [0.0, audio["duration_seconds"]] for audio in valid],
+        "search_complete": all(audio.get("search_complete", True) for audio in valid),
+    } if valid else {}
 
 
 def _is_audio(node):
@@ -73,46 +95,45 @@ def _audio_edges(native, relationships=AUDIO_RELATIONSHIPS):
 
 
 def _read(chain, digest):
-    return _read_bound_pcm(chain, digest)
+    return _analysis_proxy(chain, digest)
 
 
 def _standardize(rows):
-    if not rows:
-        return []
-    width = len(rows[0])
-    means = [sum(row[column] for row in rows) / len(rows)
-             for column in range(width)]
-    scales = []
-    for column in range(width):
-        variance = sum((row[column] - means[column]) ** 2 for row in rows) / len(rows)
-        scales.append(math.sqrt(variance) if variance > 1e-12 else 1.0)
-    return [tuple((row[column] - means[column]) / scales[column]
-                  for column in range(width)) for row in rows]
+    values = np.asarray(rows, dtype=np.float32)
+    if values.size == 0:
+        return np.empty((0, 0), dtype=np.float32)
+    means = np.mean(values, axis=0)
+    scales = np.std(values, axis=0)
+    scales = np.where(scales > 1e-6, scales, 1.0)
+    return ((values - means) / scales).astype(np.float32)
 
 
 def _features(samples, sample_rate=ALIGNMENT_RATE_HZ):
     """Return gain-tolerant short-time energy/shape landmarks."""
+    values = np.asarray(samples, dtype=np.float32).reshape(-1)
     frame_size = max(4, round(sample_rate / FEATURE_RATE_HZ))
-    rows = []
-    for start in range(0, len(samples) - frame_size + 1, frame_size):
-        frame = samples[start:start + frame_size]
-        energy = math.sqrt(sum(value * value for value in frame) / len(frame))
-        differences = [right - left for left, right in zip(frame, frame[1:])]
-        difference_rms = _rms(differences)
-        zero_crossings = sum((left < 0) != (right < 0)
-                             for left, right in zip(frame, frame[1:]))
-        peak = max(abs(value) for value in frame)
-        rows.append((math.log10(energy + 1e-9),
-                     difference_rms / max(energy, 1e-9),
-                     zero_crossings / max(len(frame) - 1, 1),
-                     peak / max(energy, 1e-9)))
-    return _standardize(rows[:MAX_SEARCH_FRAMES])
+    count = values.size // frame_size
+    if count < 1:
+        return np.empty((0, 4), dtype=np.float32)
+    frames = values[:count * frame_size].reshape(count, frame_size)
+    energy = np.sqrt(np.mean(frames * frames, axis=1))
+    differences = np.diff(frames, axis=1)
+    difference_rms = np.sqrt(np.mean(differences * differences, axis=1))
+    zero_crossings = np.mean((frames[:, :-1] < 0) != (frames[:, 1:] < 0), axis=1)
+    peak = np.max(np.abs(frames), axis=1)
+    floor = np.maximum(energy, 1e-9)
+    rows = np.column_stack((np.log10(energy + 1e-9),
+                            difference_rms / floor,
+                            zero_crossings,
+                            peak / floor))
+    return _standardize(rows)
 
 
 def _cosine(left, right):
-    numerator = sum(a * b for a, b in zip(left, right))
-    denominator = math.sqrt(sum(a * a for a in left) * sum(b * b for b in right))
-    return numerator / denominator if denominator > 1e-12 else 0.0
+    left = np.asarray(left, dtype=np.float64)
+    right = np.asarray(right, dtype=np.float64)
+    denominator = float(np.linalg.norm(left) * np.linalg.norm(right))
+    return float(np.sum(left * right) / denominator) if denominator > 1e-12 else 0.0
 
 
 def _short_correlation(left, right):
@@ -120,22 +141,26 @@ def _short_correlation(left, right):
     count = min(len(left), len(right))
     if count < 8:
         return 0.0
-    left, right = left[:count], right[:count]
-    left_mean, right_mean = sum(left) / count, sum(right) / count
-    numerator = sum((a - left_mean) * (b - right_mean)
-                    for a, b in zip(left, right))
-    left_energy = sum((value - left_mean) ** 2 for value in left)
-    right_energy = sum((value - right_mean) ** 2 for value in right)
-    denominator = math.sqrt(left_energy * right_energy)
-    return numerator / denominator if denominator > 1e-12 else 0.0
+    left_values = np.asarray(left[:count], dtype=np.float64)
+    right_values = np.asarray(right[:count], dtype=np.float64)
+    left_values -= np.mean(left_values)
+    right_values -= np.mean(right_values)
+    denominator = float(np.linalg.norm(left_values) * np.linalg.norm(right_values))
+    return float(left_values @ right_values / denominator) if denominator > 1e-12 else 0.0
 
 
 def _sequence_similarity(left, right):
     count = min(len(left), len(right))
     if count < 4:
         return 0.0
-    similarities = [_cosine(left[index], right[index]) for index in range(count)]
-    return max(0.0, min(1.0, (sum(similarities) / count + 1.0) / 2.0))
+    left_values = np.asarray(left[:count], dtype=np.float64)
+    right_values = np.asarray(right[:count], dtype=np.float64)
+    numerator = np.sum(left_values * right_values, axis=1)
+    denominator = (np.linalg.norm(left_values, axis=1) *
+                   np.linalg.norm(right_values, axis=1))
+    similarities = np.divide(numerator, denominator,
+                             out=np.zeros_like(numerator), where=denominator > 1e-12)
+    return float(np.clip((np.mean(similarities) + 1.0) / 2.0, 0.0, 1.0))
 
 
 def _dtw_similarity(left, right, band_ratio=0.12):
@@ -175,41 +200,35 @@ def _dtw_similarity(left, right, band_ratio=0.12):
 def _best_feature_alignment(source_audio, target_audio):
     source = _mono_resample(source_audio, ALIGNMENT_RATE_HZ)
     target = _mono_resample(target_audio, ALIGNMENT_RATE_HZ)
-    source_features, target_features = _features(source), _features(target)
-    if len(source_features) < 4 or len(target_features) < 4:
+    if min(len(source), len(target)) < ALIGNMENT_RATE_HZ // 4:
         return None
-    source_is_query = len(source_features) <= len(target_features)
-    query = source_features if source_is_query else target_features
-    haystack = target_features if source_is_query else source_features
-    candidates = []
-    candidate_count = len(haystack) - len(query) + 1
-    candidate_step = max(1, math.ceil(candidate_count / 600))
-    feature_step = max(1, math.ceil(len(query) / 250))
-
-    def score_at(start):
-        comparison = haystack[start:start + len(query)]
-        return _sequence_similarity(query[::feature_step], comparison[::feature_step])
-
-    for start in range(0, candidate_count, candidate_step):
-        candidates.append((score_at(start), start))
-    if not candidates:
+    source_is_query = len(source) <= len(target)
+    query = source if source_is_query else target
+    haystack = target if source_is_query else source
+    coarse = _fft_normalized_candidates(
+        query, haystack, top_k=12,
+        min_separation=max(ALIGNMENT_RATE_HZ // 4, len(query) // 8))
+    if not coarse:
         return None
-    candidates.sort(reverse=True)
-    coarse_start = candidates[0][1]
-    already_scored = {start for _, start in candidates}
-    for start in range(max(0, coarse_start - candidate_step),
-                       min(candidate_count, coarse_start + candidate_step + 1)):
-        if start not in already_scored:
-            candidates.append((score_at(start), start))
-    candidates.sort(reverse=True)
-    best_score, best_start = candidates[0]
-    separated = [item for item in candidates[1:]
+    query_features = _features(query)
+    haystack_features = _features(haystack)
+    refined = []
+    for waveform_score, sample_start in coarse:
+        feature_start = round(sample_start / ALIGNMENT_RATE_HZ * FEATURE_RATE_HZ)
+        comparison = haystack_features[feature_start:
+                                       feature_start + len(query_features)]
+        feature_score = _sequence_similarity(query_features, comparison)
+        combined = 0.65 * feature_score + 0.35 * max(0.0, waveform_score)
+        refined.append((combined, sample_start, waveform_score, feature_score))
+    refined.sort(reverse=True)
+    best_score, best_start, waveform, _ = refined[0]
+    separated = [item for item in refined[1:]
                  if abs(item[1] - best_start) >= max(2, FEATURE_RATE_HZ // 4)]
     second_score = separated[0][0] if separated else 0.0
     if source_is_query:
-        source_start, target_start = 0.0, best_start / FEATURE_RATE_HZ
+        source_start, target_start = 0.0, best_start / ALIGNMENT_RATE_HZ
     else:
-        source_start, target_start = best_start / FEATURE_RATE_HZ, 0.0
+        source_start, target_start = best_start / ALIGNMENT_RATE_HZ, 0.0
     duration = min(len(source) / ALIGNMENT_RATE_HZ - source_start,
                    len(target) / ALIGNMENT_RATE_HZ - target_start)
     count = max(0, round(duration * ALIGNMENT_RATE_HZ))
@@ -227,6 +246,12 @@ def _best_feature_alignment(source_audio, target_audio):
         "ambiguous": second_score >= 0.70 and best_score - second_score < 0.03,
         "competing_alignment_similarity": second_score,
         "compared_duration_seconds": max(0.0, duration),
+        "search_complete": True,
+        "searched_source_range_seconds": [0.0, source_audio["duration_seconds"]],
+        "searched_target_range_seconds": [0.0, target_audio["duration_seconds"]],
+        "analysis_proxy_sample_rate_hz": min(
+            source_audio.get("proxy_sample_rate_hz", source_audio["sample_rate_hz"]),
+            target_audio.get("proxy_sample_rate_hz", target_audio["sample_rate_hz"])),
     }
 
 
@@ -261,50 +286,31 @@ def _declared_or_aligned_segments(source_audio, target_audio, attrs, alignment=N
 
 
 def _solve(matrix, vector):
-    size = len(vector)
-    augmented = [list(matrix[row]) + [vector[row]] for row in range(size)]
-    for column in range(size):
-        pivot = max(range(column, size), key=lambda row: abs(augmented[row][column]))
-        if abs(augmented[pivot][column]) < 1e-12:
-            return None
-        augmented[column], augmented[pivot] = augmented[pivot], augmented[column]
-        divisor = augmented[column][column]
-        augmented[column] = [value / divisor for value in augmented[column]]
-        for row in range(size):
-            if row == column:
-                continue
-            factor = augmented[row][column]
-            augmented[row] = [current - factor * base
-                              for current, base in zip(augmented[row], augmented[column])]
-    return [augmented[row][-1] for row in range(size)]
+    try:
+        return np.linalg.solve(np.asarray(matrix, dtype=np.float64),
+                               np.asarray(vector, dtype=np.float64))
+    except np.linalg.LinAlgError:
+        return None
 
 
 def _fit_linear(target, sources):
-    if not target or not sources or any(len(source) != len(target) for source in sources):
+    target = np.asarray(target, dtype=np.float64).reshape(-1)
+    if target.size == 0 or not sources or any(len(source) != len(target) for source in sources):
         return None
-    gram = [[0.0 for _ in sources] for _ in sources]
-    projection = [0.0 for _ in sources]
-    for index, actual in enumerate(target):
-        values = [source[index] for source in sources]
-        for left, value in enumerate(values):
-            projection[left] += value * actual
-            for right in range(left, len(values)):
-                gram[left][right] += value * values[right]
-                gram[right][left] = gram[left][right]
-    ridge = max(sum(gram[index][index] for index in range(len(sources))) *
-                RIDGE_FACTOR, 1e-12)
-    for index in range(len(sources)):
-        gram[index][index] += ridge
+    design = np.stack([np.asarray(source, dtype=np.float64) for source in sources], axis=1)
+    gram = np.einsum("ni,nj->ij", design, design, optimize=True)
+    projection = np.einsum("ni,n->i", design, target, optimize=True)
+    ridge = max(float(np.trace(gram)) * RIDGE_FACTOR, 1e-12)
+    gram = gram + np.eye(len(sources)) * ridge
     gains = _solve(gram, projection)
     if gains is None:
         return None
-    predicted = [sum(gain * source[index] for gain, source in zip(gains, sources))
-                 for index in range(len(target))]
-    energy = sum(value * value for value in target)
+    predicted = np.einsum("ni,i->n", design, gains, optimize=True)
+    energy = float(np.sum(target * target, dtype=np.float64))
     if energy < 1e-12:
         return None
-    residual = sum((actual - estimate) ** 2
-                   for actual, estimate in zip(target, predicted))
+    difference = target - predicted
+    residual = float(np.sum(difference * difference, dtype=np.float64))
     return {
         "gains": gains,
         "normalized_rmse": math.sqrt(residual / energy),
@@ -317,7 +323,7 @@ def _aligned_source_vector(source_audio, target_audio, attrs, alignment=None,
                            rate=CONTRIBUTION_RATE_HZ):
     source = _mono_resample(source_audio, rate)
     target = _mono_resample(target_audio, rate)
-    output = [0.0] * len(target)
+    output = np.zeros(len(target), dtype=np.float32)
     declared = all(attrs.get(field) is not None for field in (
         "source_start_seconds", "source_end_seconds",
         "target_start_seconds", "target_end_seconds"))
@@ -344,13 +350,15 @@ def _aligned_source_vector(source_audio, target_audio, attrs, alignment=None,
 
 
 def _gain_stability(target, source, gain, windows=4):
+    target = np.asarray(target, dtype=np.float64)
+    source = np.asarray(source, dtype=np.float64)
     values = []
     size = max(1, len(target) // windows)
     for start in range(0, len(target), size):
         left, right = source[start:start + size], target[start:start + size]
-        denominator = sum(value * value for value in left)
+        denominator = float(np.sum(left * left, dtype=np.float64))
         if denominator > 1e-12:
-            values.append(sum(a * b for a, b in zip(left, right)) / denominator)
+            values.append(float(np.sum(left * right, dtype=np.float64)) / denominator)
     if len(values) < 2 or abs(gain) < 1e-9:
         return 0.0
     deviation = math.sqrt(sum((value - gain) ** 2 for value in values) / len(values))
@@ -371,7 +379,8 @@ class AudioAlignmentPass:
                     _read(chain, source["artefact_hash"]),
                     _read(chain, target["artefact_hash"]))
             except (OSError, ValueError, TypeError) as exc:
-                results.append({**base, "status": "unavailable", "reason": str(exc)})
+                results.append({**base, "status": "unavailable", "reason": str(exc),
+                                **_resource_fields(exc)})
                 continue
             if alignment is None:
                 results.append({**base, "status": "unavailable",
@@ -413,10 +422,12 @@ class SourceContributionPass:
             try:
                 target_audio = _read(chain, target["artefact_hash"])
                 target_samples = _mono_resample(target_audio, CONTRIBUTION_RATE_HZ)
-                aligned, parameter_sources = [], []
+                aligned, parameter_sources, source_audio_objects = [], [], []
                 for edge in edges:
+                    source_audio = _read(chain, edge["hash"])
+                    source_audio_objects.append(source_audio)
                     vector, parameter_source = _aligned_source_vector(
-                        _read(chain, edge["hash"]), target_audio,
+                        source_audio, target_audio,
                         edge.get("attributes") or {})
                     aligned.append(vector)
                     parameter_sources.append(parameter_source)
@@ -451,6 +462,8 @@ class SourceContributionPass:
                                         "source_span_correlation": round(span_correlation, 6),
                                         "max_source_correlation": round(max_source_correlation, 6),
                                         "source_identifiability": round(source_identifiability, 8),
+                                        **_proxy_fields(target_audio,
+                                                        *source_audio_objects),
                                         "estimated_parameters_are_diagnostic": True})
                         continue
                     reduced = (_fit_linear(target_samples, reduced_sources)
@@ -478,10 +491,13 @@ class SourceContributionPass:
                                     "leave_one_out_normalized_rmse": round(reduced_rmse, 6),
                                     "unique_residual_delta": round(delta, 6),
                                     "parameter_source": parameter_sources[index],
+                                    **_proxy_fields(target_audio,
+                                                    *source_audio_objects),
                                     "estimated_parameters_are_diagnostic": True})
             except (OSError, ValueError, TypeError) as exc:
                 results.append({**base, "status": "unavailable",
-                                "reason": f"Contribution analysis unavailable: {exc}"})
+                                "reason": f"Contribution analysis unavailable: {exc}",
+                                **_resource_fields(exc)})
         return results
 
 
@@ -508,7 +524,12 @@ class DecoySourcePass:
             results.append({**base, "status": status, "reason": reason,
                             "source_hash": contribution["source_hash"],
                             "unique_residual_delta": contribution.get("unique_residual_delta"),
-                            "estimated_gain": contribution.get("estimated_gain")})
+                            "estimated_gain": contribution.get("estimated_gain"),
+                            "analysis_proxy_sample_rate_hz": contribution.get(
+                                "analysis_proxy_sample_rate_hz"),
+                            "searched_ranges_seconds": contribution.get(
+                                "searched_ranges_seconds"),
+                            "search_complete": contribution.get("search_complete")})
         return results
 
 
@@ -540,8 +561,10 @@ class CompVerificationPass:
                         "target_start_seconds": selection["target_start_seconds"],
                         "target_end_seconds": selection["target_end_seconds"],
                     }
+                    source_audio = _read(chain, source_hash)
+                    target_audio = _read(chain, target_hash)
                     source, target, _ = _declared_or_aligned_segments(
-                        _read(chain, source_hash), _read(chain, target_hash), attrs)
+                        source_audio, target_audio, attrs)
                     waveform = abs(_short_correlation(source, target))
                     source_features, target_features = _features(source), _features(target)
                     landmarks = _sequence_similarity(source_features, target_features)
@@ -550,7 +573,8 @@ class CompVerificationPass:
                 except (KeyError, OSError, ValueError, TypeError) as exc:
                     results.append({**base, "status": "unavailable",
                                     "selection_id": selection.get("selection_id"),
-                                    "reason": f"Comp selection comparison unavailable: {exc}"})
+                                    "reason": f"Comp selection comparison unavailable: {exc}",
+                                    **_resource_fields(exc)})
                     continue
                 if waveform >= 0.98:
                     status, reason = "matched", "The declared take segment matches the edited target segment."
@@ -567,6 +591,7 @@ class CompVerificationPass:
                                 "landmark_similarity": round(landmarks, 6),
                                 "dtw_similarity": round(dtw, 6),
                                 "robust_similarity": round(robust, 6),
+                                **_proxy_fields(source_audio, target_audio),
                                 "verified_scope": "declared_comp_sheet_ranges"})
         return results
 
@@ -595,13 +620,14 @@ class ProcessedAudioMatchPass:
                 source_features, target_features = _features(source_samples), _features(target_samples)
                 landmarks = _sequence_similarity(source_features, target_features)
                 dtw = _dtw_similarity(source_features, target_features)
-                source_envelope = [row[0] for row in source_features]
-                target_envelope = [row[0] for row in target_features]
+                source_envelope = source_features[:, 0]
+                target_envelope = target_features[:, 0]
                 envelope = abs(_correlation(source_envelope, target_envelope))
                 robust = 0.20 * waveform + 0.30 * landmarks + 0.30 * dtw + 0.20 * envelope
             except (OSError, ValueError, TypeError) as exc:
                 results.append({**base, "status": "unavailable",
-                                "reason": f"Processed-audio comparison unavailable: {exc}"})
+                                "reason": f"Processed-audio comparison unavailable: {exc}",
+                                **_resource_fields(exc)})
                 continue
             if robust >= 0.72:
                 status, reason = "corroborated", "Gain-tolerant time-frequency features support content continuity."
@@ -618,6 +644,7 @@ class ProcessedAudioMatchPass:
                             "landmark_similarity": round(landmarks, 6),
                             "dtw_similarity": round(dtw, 6),
                             "envelope_correlation": round(envelope, 6),
+                            **_proxy_fields(source_audio, target_audio),
                             "robust_similarity": round(robust, 6)})
         return results
 
@@ -628,13 +655,15 @@ def _channel_vectors(audio, output_rate):
     # and filter-then-mixdown are equivalent for a linear, per-sample-
     # identical filter, so this is not a behavioural split from mono).
     rate = audio["sample_rate_hz"]
-    return [_resample_series([frame[channel] for frame in audio["frames"]], rate, output_rate)
+    frames = np.asarray(audio["frames"], dtype=np.float32)
+    return [_resample_series(frames[:, channel], rate, output_rate)
             for channel in range(audio["channels"])]
 
 
 def _place_channel(source, target_count, attrs, offset_seconds=0.0,
                    rate=RESIDUAL_RATE_HZ):
-    output = [0.0] * target_count
+    source = np.asarray(source, dtype=np.float32)
+    output = np.zeros(target_count, dtype=np.float32)
     declared = all(attrs.get(field) is not None for field in (
         "source_start_seconds", "source_end_seconds",
         "target_start_seconds", "target_end_seconds"))
@@ -672,9 +701,10 @@ class StemMixResidualPass:
             try:
                 target_audio = _read(chain, target["artefact_hash"])
                 target_channels = _channel_vectors(target_audio, RESIDUAL_RATE_HZ)
-                source_columns, labels = [], []
+                source_columns, labels, source_audio_objects = [], [], []
                 for edge in edges:
                     source_audio = _read(chain, edge["hash"])
+                    source_audio_objects.append(source_audio)
                     alignment = _best_feature_alignment(source_audio, target_audio)
                     offset = alignment["estimated_offset_seconds"] if alignment else 0.0
                     for channel, values in enumerate(_channel_vectors(source_audio,
@@ -711,8 +741,8 @@ class StemMixResidualPass:
                 rmse = sum(item["normalized_rmse"] for item in channel_results) / len(channel_results)
                 correlation = sum(item["correlation"] for item in channel_results) / len(channel_results)
                 clipping = (
-                    sum(abs(value) >= 0.999
-                        for channel in target_channels for value in channel) /
+                    sum(int(np.count_nonzero(np.abs(channel) >= 0.999))
+                        for channel in target_channels) /
                     max(1, sum(len(channel) for channel in target_channels))
                 )
                 window = max(1, RESIDUAL_RATE_HZ // 4)
@@ -720,15 +750,18 @@ class StemMixResidualPass:
                 for start in range(0, len(target_channels[0]), window):
                     residual, energy = 0.0, 0.0
                     for channel, fitted in zip(target_channels, channel_results):
-                        actual = channel[start:start + window]
-                        predicted = fitted["predicted"][start:start + window]
-                        residual += sum((a - b) ** 2 for a, b in zip(actual, predicted))
-                        energy += sum(value * value for value in actual)
+                        actual = np.asarray(channel[start:start + window], dtype=np.float64)
+                        predicted = np.asarray(
+                            fitted["predicted"][start:start + window], dtype=np.float64)
+                        difference = actual - predicted
+                        residual += float(difference @ difference)
+                        energy += float(actual @ actual)
                     if energy > 1e-12:
                         window_rmse.append(math.sqrt(residual / energy))
             except (OSError, ValueError, TypeError) as exc:
                 results.append({**base, "status": "unavailable",
-                                "reason": f"Stem/mix residual analysis unavailable: {exc}"})
+                                "reason": f"Stem/mix residual analysis unavailable: {exc}",
+                                **_resource_fields(exc)})
                 continue
             if rmse <= 0.05 and correlation >= 0.98:
                 status, reason = "matched", "An estimated channel matrix reconstructs the target with low residual."
@@ -761,6 +794,7 @@ class StemMixResidualPass:
                             "clipping_fraction": round(clipping, 6),
                             "window_normalized_rmse": [round(value, 6)
                                                        for value in window_rmse[:240]],
+                            **_proxy_fields(target_audio, *source_audio_objects),
                             "analysis_sample_rate_hz": RESIDUAL_RATE_HZ})
         return results
 
@@ -799,7 +833,8 @@ class ExcerptedFromPass:
                 robust = 0.40 * waveform + 0.30 * landmarks + 0.30 * dtw
             except (OSError, ValueError, TypeError) as exc:
                 results.append({**base, "status": "unavailable",
-                                "reason": f"Excerpt comparison unavailable: {exc}"})
+                                "reason": f"Excerpt comparison unavailable: {exc}",
+                                **_resource_fields(exc)})
                 continue
             if alignment["ambiguous"]:
                 status, reason = "not_applicable", "The excerpt appears at several similarly supported source locations."
@@ -823,5 +858,6 @@ class ExcerptedFromPass:
                             "waveform_correlation": round(waveform, 6),
                             "landmark_similarity": round(landmarks, 6),
                             "dtw_similarity": round(dtw, 6),
+                            **_proxy_fields(source_audio, target_audio),
                             "robust_similarity": round(robust, 6)})
         return results

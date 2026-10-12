@@ -5,3 +5,4 @@ referencing==0.36.2
 rpds-py==0.23.1
 pypdf==6.19.0
 xmlschema==4.3.2
+numpy==2.2.6
