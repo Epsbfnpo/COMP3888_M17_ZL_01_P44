@@ -11,12 +11,18 @@ from __future__ import annotations
 import math
 
 from music_target.audio_derivation import (
+    MAX_SOURCE_CORRELATION,
+    MIN_SOURCE_IDENTIFIABILITY,
     COMPLEX_PROCESSING_WORDS,
     MasterDerivationPass,
     _correlation,
+    _max_source_correlation,
     _mono_resample,
     _read_bound_pcm,
+    _resample_series,
     _rms,
+    _source_gram,
+    _source_identifiability,
 )
 
 
@@ -414,11 +420,39 @@ class SourceContributionPass:
                         edge.get("attributes") or {})
                     aligned.append(vector)
                     parameter_sources.append(parameter_source)
+                gram = _source_gram(aligned, range(len(target_samples)))
+                max_source_correlation = _max_source_correlation(gram)
+                source_identifiability = _source_identifiability(gram)
                 full = _fit_linear(target_samples, aligned)
                 if full is None:
                     raise ValueError("linear contribution model is singular or silent")
                 for index, edge in enumerate(edges):
                     reduced_sources = aligned[:index] + aligned[index + 1:]
+                    # A source lying in the span of the other declared sources has
+                    # no unique gain and a leave-one-out delta of zero whether or
+                    # not it was used, so neither corroborated nor not_supported
+                    # is a supportable conclusion for it. Its multiple correlation
+                    # with the remaining sources is measured with the same fit and
+                    # the same MAX_SOURCE_CORRELATION limit as audio_derivation.py's
+                    # _linear_status guard. Only that source is declined: a source
+                    # outside that span keeps a unique gain and a well-defined
+                    # delta however the others relate to each other.
+                    span = (_fit_linear(aligned[index], reduced_sources)
+                            if reduced_sources else None)
+                    span_correlation = (math.sqrt(max(
+                        0.0, 1.0 - span["normalized_rmse"] ** 2)) if span else 0.0)
+                    if span_correlation >= MAX_SOURCE_CORRELATION:
+                        results.append({**base, "status": "not_applicable",
+                                        "reason": ("This source cannot be distinguished from "
+                                                   "the other declared sources well enough to "
+                                                   "attribute a unique contribution to it."),
+                                        "source_hash": edge["hash"],
+                                        "relationship_type": edge["relationship_type"],
+                                        "source_span_correlation": round(span_correlation, 6),
+                                        "max_source_correlation": round(max_source_correlation, 6),
+                                        "source_identifiability": round(source_identifiability, 8),
+                                        "estimated_parameters_are_diagnostic": True})
+                        continue
                     reduced = (_fit_linear(target_samples, reduced_sources)
                                if reduced_sources else None)
                     reduced_rmse = reduced["normalized_rmse"] if reduced else 1.0
@@ -589,11 +623,12 @@ class ProcessedAudioMatchPass:
 
 
 def _channel_vectors(audio, output_rate):
+    # Reuses the same anti-aliased decimation audio_derivation.py's
+    # _mono_resample applies, one channel at a time (mixdown-then-filter
+    # and filter-then-mixdown are equivalent for a linear, per-sample-
+    # identical filter, so this is not a behavioural split from mono).
     rate = audio["sample_rate_hz"]
-    count = int(len(audio["frames"]) / rate * output_rate)
-    return [[audio["frames"][min(len(audio["frames"]) - 1,
-                                 round(index * rate / output_rate))][channel]
-             for index in range(count)]
+    return [_resample_series([frame[channel] for frame in audio["frames"]], rate, output_rate)
             for channel in range(audio["channels"])]
 
 
@@ -647,6 +682,25 @@ class StemMixResidualPass:
                         source_columns.append(_place_channel(
                             values, len(target_channels[0]), edge.get("attributes") or {}, offset))
                         labels.append(f"{edge['hash']}:ch{channel + 1}")
+                # Highly correlated or unidentifiable source channels (including
+                # the two channels of a dual-mono or panned stem) make the
+                # individual matrix entries arbitrary, so the matrix is withheld.
+                # The fitted reconstruction is the projection of the target onto
+                # the span of the columns, which stays unique, so the residual
+                # verdict below is still assessed.
+                gram = _source_gram(source_columns, range(len(target_channels[0])))
+                max_source_correlation = _max_source_correlation(gram)
+                source_identifiability = _source_identifiability(gram)
+                if max_source_correlation >= MAX_SOURCE_CORRELATION:
+                    matrix_withheld_reason = (
+                        "The declared source channels are too highly correlated to "
+                        "attribute reliable individual channel gains.")
+                elif source_identifiability < MIN_SOURCE_IDENTIFIABILITY:
+                    matrix_withheld_reason = (
+                        "The declared source channels cannot be distinguished well "
+                        "enough to attribute reliable individual channel gains.")
+                else:
+                    matrix_withheld_reason = None
                 channel_results, matrix = [], []
                 for target_channel in target_channels:
                     fitted = _fit_linear(target_channel, source_columns)
@@ -684,9 +738,23 @@ class StemMixResidualPass:
                 status, reason = "contradicted", "The submitted sources do not explain the target under the bounded matrix model."
             else:
                 status, reason = "not_applicable", "Residual evidence is inconclusive or reflects undocumented processing."
+            if matrix_withheld_reason is None:
+                matrix_fields = {"estimated_channel_matrix": matrix}
+            else:
+                # The verdict then describes the declared sources jointly only.
+                if status == "matched":
+                    reason = ("The declared source channels jointly reconstruct the target "
+                              "with low residual; no individual source is attributed.")
+                elif status == "corroborated":
+                    reason = ("The declared source channels jointly explain substantial "
+                              "target content; no individual source is attributed.")
+                matrix_fields = {
+                    "channel_matrix_withheld_reason": matrix_withheld_reason,
+                    "max_source_correlation": round(max_source_correlation, 6),
+                    "source_identifiability": round(source_identifiability, 8)}
             results.append({**base, "status": status, "reason": reason,
                             "source_channel_labels": labels,
-                            "estimated_channel_matrix": matrix,
+                            **matrix_fields,
                             "estimated_parameters_are_diagnostic": True,
                             "normalized_rmse": round(rmse, 6),
                             "correlation": round(correlation, 6),
