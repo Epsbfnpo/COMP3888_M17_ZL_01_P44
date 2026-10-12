@@ -22,6 +22,11 @@ from music_target.engine import (
 )
 from libevchain.pipeline import EvidencePass
 from music_target.assessment_passes import C2PAAttestationPass, ExpandedCrossEvidencePass
+from music_target.audio_derivation import (
+    PackedPCMFrames,
+    _read_bound_pcm,
+    _read_pcm,
+)
 from legacy_parsers.common.ddex_validation import REGISTRY, _schema
 from legacy_parsers.ern_parser import parse_ern_file
 from legacy_parsers.rin_parser import parse_rin_file
@@ -402,6 +407,78 @@ class TargetTests(unittest.TestCase):
         self.assertTrue(any(item["code"] == "AUDIO_DERIVATION_CONTRADICTION"
                             for item in result["findings"]))
 
+    def test_audio_derivation_reports_sustained_local_tampering(self):
+        rate, duration = 1000, 20.0
+        source = self._deterministic_samples(round(rate * duration), 801)
+        target = source.copy()
+        replacement = self._deterministic_samples(round(rate * 0.5), 802)
+        target[10 * rate:10 * rate + len(replacement)] = replacement
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            specs = [
+                {"type": "audio/stem", "data": self._pcm16(source, rate=rate)},
+                {"type": "audio/mix", "data": self._pcm16(target, rate=rate),
+                 "parents": [(0, "mixed_from", self._linear_attributes(
+                     "linear_mix", duration, 1.0))]},
+            ]
+            result = self.score(self._workflow_request(
+                root, "multitrack_recording_mix_master", specs), root)
+        check = result["assessment_checks"]["audio_derivation"][0]
+        self.assertEqual(check["status"], "contradicted")
+        self.assertIn("sustained_local_mismatch", check["manual_review_reasons"])
+        self.assertLess(check["matched_coverage_ratio"], 1.0)
+        self.assertTrue(check["local_mismatch_regions"])
+        region = check["local_mismatch_regions"][0]
+        self.assertAlmostEqual(region["start_seconds"], 10.0, delta=0.1)
+        self.assertAlmostEqual(region["end_seconds"], 10.5, delta=0.1)
+
+    def test_declared_linear_range_longer_than_sixty_seconds_is_evaluated(self):
+        rate, duration = 1000, 70.0
+        source = self._deterministic_samples(round(rate * duration), 811)
+        target = source.copy()
+        target[-1] = max(-32768, min(32767, target[-1] + 1))
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            specs = [
+                {"type": "audio/stem", "data": self._pcm16(source, rate=rate)},
+                {"type": "audio/mix", "data": self._pcm16(target, rate=rate),
+                 "parents": [(0, "mixed_from", self._linear_attributes(
+                     "linear_mix", duration, 1.0))]},
+            ]
+            result = self.score(self._workflow_request(
+                root, "multitrack_recording_mix_master", specs), root)
+        check = result["assessment_checks"]["audio_derivation"][0]
+        self.assertEqual(check["status"], "matched", check)
+        self.assertEqual(check["target_duration_seconds"], duration)
+        self.assertEqual(check["coverage_ratio"], 1.0)
+
+    def test_pcm_reader_uses_packed_cached_windows_and_enforces_budget(self):
+        rate = 1000
+        samples = self._deterministic_samples(rate * 70, 821)
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "long.wav"
+            path.write_bytes(self._pcm16(samples, rate=rate))
+            window = _read_pcm(path, 65.0, 70.0, max_seconds=None)
+            self.assertIsInstance(window["frames"], PackedPCMFrames)
+            self.assertEqual(len(window["frames"]), 5 * rate)
+            self.assertEqual(window["decoded_bytes"], 5 * rate * 4)
+            self.assertAlmostEqual(window["start_seconds"], 65.0)
+            with self.assertRaisesRegex(ValueError, "request budget"):
+                _read_pcm(path, 65.0, 70.0, max_seconds=None, byte_budget=100)
+
+            artefact = mock.Mock(_wav_parser_failure=None)
+            artefact.has_file.return_value = True
+            artefact.get_file.return_value = str(path)
+            class Chain:
+                pass
+            chain = Chain()
+            chain.artefacts = {"audio": artefact}
+            first = _read_bound_pcm(chain, "audio", 65.0, 70.0, max_seconds=None)
+            second = _read_bound_pcm(chain, "audio", 65.0, 70.0, max_seconds=None)
+            self.assertIs(first, second)
+            self.assertEqual(chain._pcm_cache_misses, 1)
+            self.assertEqual(chain._pcm_cache_hits, 1)
+
     def test_audio_derivation_pass_applies_declared_time_offset(self):
         source = [int(5000 * math.sin(index / 17)) for index in range(2000)]
         target = [0] * 100 + [round(0.7 * item) for item in source]
@@ -632,6 +709,30 @@ class TargetTests(unittest.TestCase):
         self.assertTrue(check["content_continuity_corroborated"])
         self.assertFalse(check["alignment_ambiguous"])
         self.assertEqual(check["parameter_source"], "submitter_declared")
+
+    def test_master_duration_delta_uses_full_files_beyond_sixty_seconds(self):
+        rate, source_duration, master_duration = 1000, 70.0, 75.0
+        source = self._deterministic_samples(round(rate * source_duration), 831)
+        master = source + self._deterministic_samples(
+            round(rate * (master_duration - source_duration)), 832)
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            specs = [
+                {"type": "audio/mix", "data": self._pcm16(source, rate=rate)},
+                {"type": "audio/master", "data": self._pcm16(master, rate=rate),
+                 "parents": [(0, "mastered_from", {
+                     "derivation_scope": "master_similarity",
+                     "source_start_seconds": 0.0,
+                     "source_end_seconds": source_duration,
+                     "target_start_seconds": 0.0,
+                     "target_end_seconds": source_duration,
+                 })]},
+            ]
+            result = self.score(self._workflow_request(
+                root, "mastering_service_only", specs), root)
+        check = result["assessment_checks"]["master_derivation"][0]
+        self.assertEqual(check["duration_delta_seconds"], 5.0)
+        self.assertGreater(check["alignment_coverage_ratio"], 0.99)
 
     def test_master_derivation_does_not_infer_missing_alignment(self):
         source = [int(9000 * math.sin(2 * math.pi * index / 100))

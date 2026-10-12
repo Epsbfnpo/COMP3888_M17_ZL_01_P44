@@ -9,18 +9,26 @@ from __future__ import annotations
 
 import math
 import struct
+import sys
 import wave
+from array import array
+from collections.abc import Sequence
 from pathlib import Path
 
 MAX_SOURCES = 16
 MAX_COMP_SELECTIONS = 64
 MAX_ANALYSIS_SECONDS = 60
 ANALYSIS_RATE_HZ = 2000
+PCM_READ_CHUNK_FRAMES = 65_536
+MAX_REQUEST_PCM_BYTES = 256 * 1024 * 1024
 MAX_OFFSET_SECONDS = 5.0
 MIN_TARGET_COVERAGE = 0.90
 MAX_SOURCE_CORRELATION = 0.995
 MIN_SOURCE_IDENTIFIABILITY = 1e-4
 HOLDOUT_BLOCK_SECONDS = 0.05
+LOCAL_MISMATCH_RMSE = 0.35
+LOCAL_MISMATCH_MIN_SECONDS = 0.20
+LOCAL_MISMATCH_MIN_RMS = 1e-4
 SEGMENT_SCAN_RATE_HZ = 100
 SEGMENT_AMBIGUITY_CORRELATION = 0.999
 MASTER_ALIGNMENT_MARGIN = 0.02
@@ -39,6 +47,37 @@ MASTER_DECLARATION_FIELDS = (
 )
 
 
+class PackedPCMFrames(Sequence):
+    """Frame-compatible view over contiguous interleaved float32 PCM samples."""
+
+    __slots__ = ("_samples", "channels")
+
+    def __init__(self, samples, channels):
+        self._samples = samples
+        self.channels = channels
+
+    def __len__(self):
+        return len(self._samples) // self.channels
+
+    def __getitem__(self, index):
+        if isinstance(index, slice):
+            return [self[position] for position in range(*index.indices(len(self)))]
+        if index < 0:
+            index += len(self)
+        if index < 0 or index >= len(self):
+            raise IndexError(index)
+        first = index * self.channels
+        return tuple(self._samples[first:first + self.channels])
+
+    @property
+    def nbytes(self):
+        return len(self._samples) * self._samples.itemsize
+
+    @property
+    def storage(self):
+        return self._samples
+
+
 def _pcm_value(raw: bytes, width: int) -> float:
     if width == 1:
         return (raw[0] - 128) / 128.0
@@ -54,7 +93,33 @@ def _pcm_value(raw: bytes, width: int) -> float:
     raise ValueError("Only 8/16/24/32-bit integer PCM WAV is supported.")
 
 
-def _read_pcm(path: Path):
+def _decode_pcm_chunk(raw, width, output):
+    """Append one frame-aligned PCM byte chunk to an array('f')."""
+    if width == 1:
+        output.extend((value - 128) / 128.0 for value in raw)
+        return
+    if width in (2, 4):
+        values = array("h" if width == 2 else "i")
+        values.frombytes(raw)
+        if sys.byteorder != "little":
+            values.byteswap()
+        scale = 32768.0 if width == 2 else 2147483648.0
+        output.extend(value / scale for value in values)
+        return
+    if width == 3:
+        for position in range(0, len(raw), 3):
+            output.append(_pcm_value(raw[position:position + 3], 3))
+        return
+    raise ValueError("Only 8/16/24/32-bit integer PCM WAV is supported.")
+
+
+def _read_pcm(path: Path, start_seconds=0.0, end_seconds=None,
+              max_seconds=MAX_ANALYSIS_SECONDS, byte_budget=MAX_REQUEST_PCM_BYTES):
+    """Read a bounded PCM window into contiguous float32 storage.
+
+    Explicit end_seconds requests are not clipped to MAX_ANALYSIS_SECONDS.  The
+    request-level decoded-byte budget remains the hard resource bound.
+    """
     try:
         with wave.open(str(path), "rb") as handle:
             if handle.getcomptype() != "NONE":
@@ -62,33 +127,106 @@ def _read_pcm(path: Path):
             channels = handle.getnchannels()
             width = handle.getsampwidth()
             rate = handle.getframerate()
-            frame_count = min(handle.getnframes(), rate * MAX_ANALYSIS_SECONDS)
-            raw = handle.readframes(frame_count)
+            total_frames = handle.getnframes()
+            if channels < 1 or rate < 1 or width not in (1, 2, 3, 4):
+                raise ValueError("unsupported PCM channel, rate, or sample width")
+            start_seconds = float(start_seconds or 0.0)
+            if not math.isfinite(start_seconds) or start_seconds < 0:
+                raise ValueError("PCM window start must be a finite non-negative number")
+            start_frame = math.floor(start_seconds * rate)
+            if start_frame > total_frames:
+                raise ValueError("PCM window starts beyond the submitted audio")
+            if end_seconds is None:
+                end_frame = total_frames
+                if max_seconds is not None:
+                    end_frame = min(end_frame, start_frame + round(max_seconds * rate))
+            else:
+                end_seconds = float(end_seconds)
+                if not math.isfinite(end_seconds) or end_seconds <= start_seconds:
+                    raise ValueError("PCM window end must be finite and after its start")
+                end_frame = math.ceil(end_seconds * rate)
+                if end_frame > total_frames + 1:
+                    raise ValueError("PCM window ends beyond the submitted audio")
+                end_frame = min(end_frame, total_frames)
+            frame_count = max(0, end_frame - start_frame)
+            decoded_bytes = frame_count * channels * array("f").itemsize
+            if decoded_bytes > byte_budget:
+                raise ValueError(
+                    f"decoded PCM window requires {decoded_bytes} bytes, exceeding the remaining request budget")
+            handle.setpos(start_frame)
+            samples = array("f")
+            remaining = frame_count
+            while remaining:
+                count = min(remaining, PCM_READ_CHUNK_FRAMES)
+                raw = handle.readframes(count)
+                expected = count * channels * width
+                if len(raw) != expected:
+                    raise ValueError("truncated PCM frame data")
+                _decode_pcm_chunk(raw, width, samples)
+                remaining -= count
     except wave.Error as exc:
         raise ValueError(f"invalid WAV: {exc}") from exc
-    if channels < 1 or rate < 1 or width not in (1, 2, 3, 4):
-        raise ValueError("unsupported PCM channel, rate, or sample width")
-    stride = channels * width
-    if len(raw) % stride:
-        raise ValueError("truncated PCM frame data")
-    frames = []
-    for position in range(0, len(raw), stride):
-        frames.append(tuple(_pcm_value(raw[position + channel * width:
-                                           position + (channel + 1) * width], width)
-                            for channel in range(channels)))
+    frames = PackedPCMFrames(samples, channels)
     return {"frames": frames, "sample_rate_hz": rate, "channels": channels,
-            "bit_depth": width * 8}
+            "bit_depth": width * 8, "total_frames": total_frames,
+            "duration_seconds": total_frames / rate,
+            "start_frame": start_frame, "end_frame": end_frame,
+            "start_seconds": start_frame / rate, "end_seconds": end_frame / rate,
+            "decoded_bytes": frames.nbytes}
 
 
-def _read_bound_pcm(chain, digest):
-    """Read a bound PCM artefact unless its metadata Pass already failed."""
+def _read_bound_pcm(chain, digest, start_seconds=0.0, end_seconds=None,
+                    max_seconds=MAX_ANALYSIS_SECONDS):
+    """Read and cache a bound PCM window unless metadata parsing failed."""
     artefact = chain.artefacts[digest]
     if not artefact.has_file():
         raise ValueError("no verified file is bound to the audio artefact")
     parser_failure = getattr(artefact, "_wav_parser_failure", None)
     if parser_failure:
         raise ValueError(f"WAV parser unavailable for this artefact: {parser_failure}")
-    return _read_pcm(Path(artefact.get_file()))
+    start_key = round(float(start_seconds or 0.0), 9)
+    end_key = round(float(end_seconds), 9) if end_seconds is not None else None
+    max_key = round(float(max_seconds), 9) if max_seconds is not None else None
+    key = (digest, start_key, end_key, max_key)
+    cache = getattr(chain, "_pcm_window_cache", None)
+    if cache is None:
+        cache = {}
+        chain._pcm_window_cache = cache
+        chain._pcm_cache_bytes = 0
+        chain._pcm_cache_hits = 0
+        chain._pcm_cache_misses = 0
+    if key in cache:
+        chain._pcm_cache_hits += 1
+        return cache[key]
+    remaining = MAX_REQUEST_PCM_BYTES - chain._pcm_cache_bytes
+    audio = _read_pcm(Path(artefact.get_file()), start_key, end_key, max_key, remaining)
+    cache[key] = audio
+    chain._pcm_cache_bytes += audio["decoded_bytes"]
+    chain._pcm_cache_misses += 1
+    return audio
+
+
+def _pcm_duration(chain, digest):
+    """Return full file duration from the WAV header without decoding samples."""
+    cache = getattr(chain, "_pcm_duration_cache", None)
+    if cache is None:
+        cache = {}
+        chain._pcm_duration_cache = cache
+    if digest in cache:
+        return cache[digest]
+    artefact = chain.artefacts[digest]
+    if not artefact.has_file():
+        raise ValueError("no verified file is bound to the audio artefact")
+    try:
+        with wave.open(str(artefact.get_file()), "rb") as handle:
+            rate = handle.getframerate()
+            if rate < 1:
+                raise ValueError("invalid WAV sample rate")
+            duration = handle.getnframes() / rate
+    except wave.Error as exc:
+        raise ValueError(f"invalid WAV: {exc}") from exc
+    cache[digest] = duration
+    return duration
 
 
 def _source_gram(sources, indices):
@@ -200,8 +338,18 @@ def _processing_is_complex(edges):
 
 
 def _read_target_and_sources(target, edges, chain):
-    target_audio = _read_bound_pcm(chain, target["artefact_hash"])
-    sources = [_read_bound_pcm(chain, edge["hash"]) for edge in edges]
+    target_start = min(float((edge.get("attributes") or {})["target_start_seconds"])
+                       for edge in edges)
+    target_end = max(float((edge.get("attributes") or {})["target_end_seconds"])
+                     for edge in edges)
+    target_audio = _read_bound_pcm(
+        chain, target["artefact_hash"], target_start, target_end, max_seconds=None)
+    sources = []
+    for edge in edges:
+        attrs = edge.get("attributes") or {}
+        sources.append(_read_bound_pcm(
+            chain, edge["hash"], float(attrs["source_start_seconds"]),
+            float(attrs["source_end_seconds"]), max_seconds=None))
     if any(item["sample_rate_hz"] != target_audio["sample_rate_hz"] or
            item["channels"] != target_audio["channels"] for item in sources):
         raise ValueError("source and target sample rates/channels must match")
@@ -234,10 +382,10 @@ def _linear_timeline_metrics(target_audio, edge_audio, group_keys=None):
             raise ValueError("declared source/target ranges must be positive and ordered")
         if abs((source_end - source_start) - (target_end - target_start)) > max(0.002, 2 / rate):
             raise ValueError("declared ranges imply time stretching")
-        if source_end > len(audio["frames"]) / rate + 2 / rate:
-            raise ValueError("declared source range exceeds the analysed audio")
-        if target_end > len(target_audio["frames"]) / rate + 2 / rate:
-            raise ValueError("declared target range exceeds the analysed audio")
+        if source_end > audio["duration_seconds"] + 2 / rate:
+            raise ValueError("declared source range exceeds the submitted audio")
+        if target_end > target_audio["duration_seconds"] + 2 / rate:
+            raise ValueError("declared target range exceeds the submitted audio")
         fade_in = float(attrs.get("fade_in_seconds") or 0)
         fade_out = float(attrs.get("fade_out_seconds") or 0)
         target_duration = target_end - target_start
@@ -248,11 +396,11 @@ def _linear_timeline_metrics(target_audio, edge_audio, group_keys=None):
         aligned = []
         silence = (0.0,) * channels
         for frame_position, target_index in enumerate(target_indices):
-            target_time = target_index / rate
+            target_time = target_audio["start_seconds"] + target_index / rate
             frame = silence
             if target_start <= target_time < target_end:
                 source_time = source_start + target_time - target_start
-                source_index = round(source_time * rate)
+                source_index = round(source_time * rate) - audio["start_frame"]
                 if 0 <= source_index < len(audio["frames"]):
                     covered_frames[frame_position] = True
                     envelope = 1.0
@@ -289,6 +437,7 @@ def _linear_timeline_metrics(target_audio, edge_audio, group_keys=None):
                  for index in range(len(target_samples))]
     block_frames = max(1, round(analysis_rate * HOLDOUT_BLOCK_SECONDS))
     matched_frames = 0
+    mismatch_blocks = []
     for frame_start in range(0, len(target_indices), block_frames):
         frame_end = min(len(target_indices), frame_start + block_frames)
         covered = sum(covered_frames[frame_start:frame_end])
@@ -300,12 +449,51 @@ def _linear_timeline_metrics(target_audio, edge_audio, group_keys=None):
         energy = sum(value * value for value in actual)
         residual = sum((value - comparison) ** 2
                        for value, comparison in zip(actual, estimate))
-        if ((energy < 1e-12 and residual < 1e-12) or
-                (energy >= 1e-12 and math.sqrt(residual / energy) <= 0.05)):
+        normalized_rmse = (math.sqrt(residual / energy)
+                           if energy >= 1e-12 else (0.0 if residual < 1e-12 else float("inf")))
+        block_rms = math.sqrt(energy / max(len(actual), 1))
+        if normalized_rmse <= 0.05:
             matched_frames += covered
+        elif (normalized_rmse >= LOCAL_MISMATCH_RMSE and
+              block_rms >= LOCAL_MISMATCH_MIN_RMS and
+              covered >= max(1, (frame_end - frame_start) // 2)):
+            mismatch_blocks.append({
+                "start_seconds": (target_audio["start_seconds"] +
+                                  frame_start / analysis_rate),
+                "end_seconds": (target_audio["start_seconds"] +
+                                frame_end / analysis_rate),
+                "normalized_rmse": normalized_rmse,
+                "signal_rms": block_rms,
+            })
+
+    mismatch_regions = []
+    for block in mismatch_blocks:
+        if (mismatch_regions and
+                block["start_seconds"] <= mismatch_regions[-1]["end_seconds"] +
+                1.5 / analysis_rate):
+            region = mismatch_regions[-1]
+            region["end_seconds"] = block["end_seconds"]
+            region["peak_normalized_rmse"] = max(
+                region["peak_normalized_rmse"], block["normalized_rmse"])
+            region["block_count"] += 1
+        else:
+            mismatch_regions.append({
+                "start_seconds": block["start_seconds"],
+                "end_seconds": block["end_seconds"],
+                "peak_normalized_rmse": block["normalized_rmse"],
+                "block_count": 1,
+            })
+    mismatch_regions = [
+        {**region,
+         "duration_seconds": region["end_seconds"] - region["start_seconds"]}
+        for region in mismatch_regions
+        if region["end_seconds"] - region["start_seconds"] + 1e-9 >=
+        LOCAL_MISMATCH_MIN_SECONDS
+    ]
 
     covered_count = sum(covered_frames)
-    target_duration = len(target_indices) / analysis_rate
+    target_duration = target_audio["duration_seconds"]
+    total_analysis_frames = max(1, math.ceil(target_audio["total_frames"] / step))
     return {
         "declared_gains": declared_gains,
         "offsets_seconds": offsets,
@@ -318,9 +506,12 @@ def _linear_timeline_metrics(target_audio, edge_audio, group_keys=None):
         "max_source_correlation": source_correlation,
         "target_duration_seconds": target_duration,
         "covered_duration_seconds": covered_count / analysis_rate,
-        "coverage_ratio": covered_count / len(target_indices),
+        "coverage_ratio": covered_count / total_analysis_frames,
         "matched_duration_seconds": matched_frames / analysis_rate,
-        "matched_coverage_ratio": matched_frames / len(target_indices),
+        "matched_coverage_ratio": matched_frames / total_analysis_frames,
+        "local_mismatch_regions": mismatch_regions,
+        "longest_local_mismatch_seconds": max(
+            (region["duration_seconds"] for region in mismatch_regions), default=0.0),
     }
 
 
@@ -328,6 +519,8 @@ def _linear_status(assessment, match_rmse, match_correlation,
                    contradiction_rmse=0.35, contradiction_correlation=0.5):
     if assessment["coverage_ratio"] < MIN_TARGET_COVERAGE:
         return "not_applicable", "insufficient_target_coverage"
+    if assessment["local_mismatch_regions"]:
+        return "contradicted", "sustained_local_mismatch"
     if assessment["max_source_correlation"] >= MAX_SOURCE_CORRELATION:
         return "not_applicable", "redundant_or_highly_correlated_sources"
     if assessment["source_identifiability"] < MIN_SOURCE_IDENTIFIABILITY:
@@ -348,8 +541,11 @@ def _segment_alternative_locations(audio, attrs):
     start = float(attrs["source_start_seconds"])
     end = float(attrs["source_end_seconds"])
     samples = _mono_resample(audio, SEGMENT_SCAN_RATE_HZ)
-    first = round(start * SEGMENT_SCAN_RATE_HZ)
-    last = round(end * SEGMENT_SCAN_RATE_HZ)
+    window_start = audio.get("start_seconds", 0.0)
+    first = round((start - window_start) * SEGMENT_SCAN_RATE_HZ)
+    last = round((end - window_start) * SEGMENT_SCAN_RATE_HZ)
+    if first < 0 or last > len(samples):
+        return []
     template = samples[first:last]
     if len(template) < 25 or len(samples) < len(template) + 25:
         return []
@@ -361,7 +557,7 @@ def _segment_alternative_locations(audio, attrs):
             continue
         comparison = samples[candidate:candidate + len(template)]
         if _correlation(template, comparison) >= SEGMENT_AMBIGUITY_CORRELATION:
-            alternatives.append(round(candidate / SEGMENT_SCAN_RATE_HZ, 3))
+            alternatives.append(round(window_start + candidate / SEGMENT_SCAN_RATE_HZ, 3))
             if len(alternatives) >= 5:
                 break
     return alternatives
@@ -415,7 +611,8 @@ def _linear_pass(native, chain, *, relationship, target_type, scopes, rule,
                                                 [edge["hash"] for edge in edges])
             alternative_locations = []
             if check_segment_ambiguity:
-                for edge, audio in zip(edges, sources):
+                for edge in edges:
+                    audio = _read_bound_pcm(chain, edge["hash"])
                     alternatives = _segment_alternative_locations(
                         audio, edge.get("attributes") or {})
                     if alternatives:
@@ -442,6 +639,8 @@ def _linear_pass(native, chain, *, relationship, target_type, scopes, rule,
             status, review_reason = "not_applicable", "ambiguous_source_segment_location"
         if status == "matched":
             reason = "Held-out target blocks are reconstructed by the declared aligned linear sources within tolerance."
+        elif status == "contradicted" and review_reason == "sustained_local_mismatch":
+            reason = "A sustained, non-silent target interval contradicts the declared aligned constant-gain model."
         elif status == "contradicted":
             reason = "Held-out target blocks contradict the explicitly declared aligned constant-gain model."
         elif review_reason == "insufficient_target_coverage":
@@ -484,6 +683,16 @@ def _linear_pass(native, chain, *, relationship, target_type, scopes, rule,
                             assessed["matched_duration_seconds"], 6),
                         "matched_coverage_ratio": round(
                             assessed["matched_coverage_ratio"], 6),
+                        "local_mismatch_regions": [{
+                            "start_seconds": round(region["start_seconds"], 6),
+                            "end_seconds": round(region["end_seconds"], 6),
+                            "duration_seconds": round(region["duration_seconds"], 6),
+                            "peak_normalized_rmse": round(
+                                region["peak_normalized_rmse"], 6),
+                            "block_count": region["block_count"],
+                        } for region in assessed["local_mismatch_regions"]],
+                        "longest_local_mismatch_seconds": round(
+                            assessed["longest_local_mismatch_seconds"], 6),
                         "alternative_source_locations": alternative_locations,
                         "manual_review_reasons": [review_reason] if review_reason else [],
                         "content_match_is_provenance": False,
@@ -597,14 +806,23 @@ class CompDerivationPass:
                                 "selection_count": len(selections)})
                 continue
             try:
-                target_audio = _read_bound_pcm(chain, target["artefact_hash"])
+                target_start = min(float(selection["target_start_seconds"])
+                                   for selection in selections)
+                target_end = max(float(selection["target_end_seconds"])
+                                 for selection in selections)
+                target_audio = _read_bound_pcm(
+                    chain, target["artefact_hash"], target_start, target_end,
+                    max_seconds=None)
                 entries = []
                 alternative_locations = []
                 for selection in selections:
                     source_hash = selection["source_hash"]
                     if source_hash not in nodes:
                         raise ValueError("a CompSheet source hash is absent from the graph")
-                    source_audio = _read_bound_pcm(chain, source_hash)
+                    source_audio = _read_bound_pcm(
+                        chain, source_hash,
+                        float(selection["source_start_seconds"]),
+                        float(selection["source_end_seconds"]), max_seconds=None)
                     if (source_audio["sample_rate_hz"] != target_audio["sample_rate_hz"] or
                             source_audio["channels"] != target_audio["channels"]):
                         raise ValueError("source and target sample rates/channels must match")
@@ -618,7 +836,8 @@ class CompDerivationPass:
                             "gain": selection["gain"],
                         },
                     }, source_audio))
-                    alternatives = _segment_alternative_locations(source_audio, {
+                    source_search_audio = _read_bound_pcm(chain, source_hash)
+                    alternatives = _segment_alternative_locations(source_search_audio, {
                         "source_start_seconds": selection["source_start_seconds"],
                         "source_end_seconds": selection["source_end_seconds"],
                     })
@@ -648,6 +867,8 @@ class CompDerivationPass:
                 status, review_reason = "not_applicable", "ambiguous_source_segment_location"
             if status == "matched":
                 reason = "Held-out target blocks are reconstructed from the declared CompSheet selections within tolerance."
+            elif status == "contradicted" and review_reason == "sustained_local_mismatch":
+                reason = "A sustained, non-silent interval conflicts with the declared CompSheet selection timeline."
             elif status == "contradicted":
                 reason = "Held-out target blocks conflict with the declared CompSheet selection timeline."
             elif review_reason == "ambiguous_source_segment_location":
@@ -692,6 +913,16 @@ class CompDerivationPass:
                                 assessed["matched_duration_seconds"], 6),
                             "matched_coverage_ratio": round(
                                 assessed["matched_coverage_ratio"], 6),
+                            "local_mismatch_regions": [{
+                                "start_seconds": round(region["start_seconds"], 6),
+                                "end_seconds": round(region["end_seconds"], 6),
+                                "duration_seconds": round(region["duration_seconds"], 6),
+                                "peak_normalized_rmse": round(
+                                    region["peak_normalized_rmse"], 6),
+                                "block_count": region["block_count"],
+                            } for region in assessed["local_mismatch_regions"]],
+                            "longest_local_mismatch_seconds": round(
+                                assessed["longest_local_mismatch_seconds"], 6),
                             "alternative_source_locations": alternative_locations,
                             "manual_review_reasons": [review_reason] if review_reason else [],
                             "content_match_is_provenance": False,
@@ -733,15 +964,17 @@ def _declared_master_samples(source, target, attrs, rate=400):
     target_end = float(attrs["target_end_seconds"])
     if min(source_start, target_start) < 0 or source_end <= source_start or target_end <= target_start:
         raise ValueError("declared master ranges must be positive and ordered")
-    if source_end > len(source_all) / rate + 2 / rate:
+    if source_end > source["duration_seconds"] + 2 / rate:
         raise ValueError("declared master source range exceeds the submitted mix")
-    if target_end > len(target_all) / rate + 2 / rate:
+    if target_end > target["duration_seconds"] + 2 / rate:
         raise ValueError("declared master target range exceeds the submitted master")
     if abs((source_end - source_start) - (target_end - target_start)) > 2 / rate:
         raise ValueError("declared master ranges must describe equal durations")
 
-    source_first, source_last = round(source_start * rate), round(source_end * rate)
-    target_first, target_last = round(target_start * rate), round(target_end * rate)
+    source_first = round((source_start - source["start_seconds"]) * rate)
+    source_last = round((source_end - source["start_seconds"]) * rate)
+    target_first = round((target_start - target["start_seconds"]) * rate)
+    target_last = round((target_end - target["start_seconds"]) * rate)
     source_selected = source_all[source_first:source_last]
     target_selected = target_all[target_first:target_last]
     count = min(len(source_selected), len(target_selected))
@@ -752,7 +985,8 @@ def _declared_master_samples(source, target, attrs, rate=400):
     # range ambiguous, but it is never substituted for the submitted range.
     coarse_source = source_selected[::4]
     coarse_target = target_all[::4]
-    declared_coarse_start = round(target_start * rate / 4)
+    declared_coarse_start = round(
+        (target_start - target["start_seconds"]) * rate / 4)
     radius = round(MAX_OFFSET_SECONDS * rate / 4)
     exclusion = round(MASTER_PEAK_EXCLUSION_SECONDS * rate / 4)
     first_candidate = max(0, declared_coarse_start - radius)
@@ -773,14 +1007,16 @@ def _declared_master_samples(source, target, attrs, rate=400):
     alignment_ambiguous = (
         declared_score >= 0.65 and alternative_score >= 0.65 and
         alignment_margin < MASTER_ALIGNMENT_MARGIN)
-    coverage = count / max(len(source_all), len(target_all), 1)
+    expected = max(1, round((source_end - source_start) * rate))
+    coverage = count / expected
     diagnostics = {
         "declared_offset_seconds": target_start - source_start,
         "declared_alignment_correlation": declared_score,
         "strongest_alternative_alignment_correlation": (
             alternative_score if math.isfinite(alternative_score) else None),
         "alternative_target_start_seconds": (
-            alternative_start * 4 / rate if math.isfinite(alternative_score) else None),
+            target["start_seconds"] + alternative_start * 4 / rate
+            if math.isfinite(alternative_score) else None),
         "alignment_margin": alignment_margin if math.isfinite(alignment_margin) else None,
         "alignment_ambiguous": alignment_ambiguous,
         "alignment_coverage_ratio": coverage,
@@ -836,8 +1072,19 @@ class MasterDerivationPass:
                                 "reason": "A mastered_from scope must be master_similarity."})
                 continue
             try:
-                source = _read_bound_pcm(chain, edges[0]["hash"])
-                master = _read_bound_pcm(chain, target["artefact_hash"])
+                source_start = float(attrs["source_start_seconds"])
+                source_end = float(attrs["source_end_seconds"])
+                target_start = float(attrs["target_start_seconds"])
+                target_end = float(attrs["target_end_seconds"])
+                source = _read_bound_pcm(
+                    chain, edges[0]["hash"], source_start, source_end,
+                    max_seconds=None)
+                master = _read_bound_pcm(
+                    chain, target["artefact_hash"],
+                    max(0.0, target_start - MAX_OFFSET_SECONDS),
+                    min(target_end + MAX_OFFSET_SECONDS,
+                        _pcm_duration(chain, target["artefact_hash"])),
+                    max_seconds=None)
                 source_samples, master_samples, alignment = _declared_master_samples(
                     source, master, attrs)
             except (OSError, ValueError, TypeError) as exc:
@@ -863,8 +1110,8 @@ class MasterDerivationPass:
             spectral_balance_delta = abs(math.log(max(master_brightness, 1e-12) /
                                                   max(source_brightness, 1e-12)))
             spectral_similarity = math.exp(-2 * spectral_balance_delta)
-            duration_source = len(source["frames"]) / source["sample_rate_hz"]
-            duration_master = len(master["frames"]) / master["sample_rate_hz"]
+            duration_source = source["duration_seconds"]
+            duration_master = master["duration_seconds"]
             duration_delta = duration_master - duration_source
             loudness_delta_db = 20 * math.log10(_rms(master_samples) / _rms(source_samples))
             manual_review_reasons = []

@@ -31,7 +31,9 @@ The main approach is to reuse Ben's evidence graph and execution framework, conn
 - `WavMetadataPass` emits standardised technical checks once per audio artefact. `BoundFileIntegrityPass` consumes those cached checks instead of repeating the same comparisons.
 - A non-final WAV parser failure is isolated to that node: the program emits `WAV_PARSER_FAILED`, marks only dependent checks unavailable, and continues with independent evidence. An unsupported final WAV still returns `unsupported`.
 - `RelationshipIntegrityPass` is a registered libevchain `EvidencePass`. It compares only submitter-declared edge parameters with cached source and target observations and replaces the former diagnostic-only `MusicRelationshipPass`.
-- Includes scoped PCM content checks for `edited_from`, `comped_from`, `stemmed_from`, and `mixed_from`, plus conservative mix-to-master continuity corroboration. Exact checks use only submitter-declared ranges, placements, gains, and optional fades; no missing transformation parameter is estimated. Declared reconstruction is evaluated on alternating partitions and reports coverage, matched duration, source redundancy, identifiability, and repeated-segment ambiguity. Complex or undocumented processing is not automatically treated as a contradiction.
+- Includes scoped PCM content checks for `edited_from`, `comped_from`, `stemmed_from`, and `mixed_from`, plus conservative mix-to-master continuity corroboration. Exact checks use only submitter-declared ranges, placements, gains, and optional fades; no missing transformation parameter is estimated. Declared reconstruction is evaluated on alternating partitions and reports coverage, matched duration, source redundancy, identifiability, and repeated-segment ambiguity. Consecutive high-energy local residuals lasting at least 0.20 seconds are reported as timed mismatch regions, so a short replacement cannot be hidden by a low whole-track average. Complex or undocumented processing is not automatically treated as a contradiction.
+- Exact declared-range checks seek directly to the requested source and target intervals and are not clipped by the 60-second exploratory-analysis bound. Master duration differences use complete WAV metadata rather than decoded-window length.
+- PCM samples are decoded in chunks into contiguous float32 storage and cached per request by artefact and time window. A 256 MiB decoded-PCM budget bounds aggregate cached data; repeated passes reuse the same window instead of decoding it again.
 - Adds eight bounded physical-audio diagnostics: `AudioAlignmentPass`, `SourceContributionPass`, `CompVerificationPass`, `ProcessedAudioMatchPass`, `StemMixResidualPass`, `MasteringDerivationPass`, `ExcerptedFromPass`, and `DecoySourcePass`. Signal-estimated offsets, gains, and channel matrices are labelled diagnostic, never written back into the evidence graph, and do not silently become provenance proof or exact integrity credit.
 - Master comparison uses only the submitted source and target ranges. A search for competing locations may reduce certainty by exposing ambiguity, but an alternative location is never substituted for the declared one.
 - Separates submitter-declared technical properties from measured file properties and reports inconsistencies.
@@ -157,9 +159,10 @@ python3 -B check_public.py /path/to/public-bundles
 ```
 
 The second command writes results to `reports/`. Both commands operate locally and do not transmit data.
-The local regression suite contains 73 tests, including coverage for non-final
+The local regression suite contains 77 tests, including coverage for non-final
 WAV isolation, extensible PCM, field-level unavailability, final-scoped C2PA,
-standalone C2PA ingredient checks, and hash caching.
+standalone C2PA ingredient checks, hash caching, sustained local tampering,
+declared ranges beyond 60 seconds, full master duration, and packed PCM caching.
 
 ## Directory overview
 

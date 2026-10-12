@@ -1,6 +1,6 @@
 # Future Work
 
-Updated: 2026-10-03
+Updated: 2026-10-11
 
 This file is the current consolidated roadmap for `v3/program`. It replaces the
 shorter v0.4 task list and incorporates unresolved work from the legacy v3
@@ -40,9 +40,9 @@ calibration against licensed real production material.
    audio. Checks now require submitter-declared ranges and gains and never fit
    missing transformation parameters. Partitioned validation, coverage
    reporting, correlated-source detection, source-identifiability checks,
-   repeated-segment ambiguity, and provenance disclaimers are implemented;
-   their thresholds still require real-world false-positive/false-negative
-   measurement.
+   repeated-segment ambiguity, timed sustained-local-mismatch reporting, and
+   provenance disclaimers are implemented; their thresholds still require
+   real-world false-positive/false-negative measurement.
 
 4. Calibrate the hardened Master continuity assessment with real mastered
    material. Master assessment now uses declared source/target ranges; competing
@@ -135,8 +135,10 @@ calibration against licensed real production material.
 
 20. Add performance and resource tests for long audio, large bundles, many
     relationships, high channel counts, and worst-case alignment inputs. Review
-    the current 60-second analysis cap, 16-source limit, and file-size limits
-    using measured runtime and memory data.
+    the 60-second cap retained for exploratory searches, the 16-source limit,
+    the 256 MiB request PCM cache budget, and file-size limits using measured
+    runtime and memory data. Exact declared-range checks now seek beyond 60
+    seconds and use packed, chunk-decoded PCM windows.
 
 21. Expand malicious-input tests for WAV chunk abuse, XML bombs, hostile PDFs,
     malformed MIDI, symlink/path attacks, oversized JSON, hash collisions in
