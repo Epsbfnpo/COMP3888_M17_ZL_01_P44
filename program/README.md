@@ -32,10 +32,13 @@ The main approach is to reuse Ben's evidence graph and execution framework, conn
 - A non-final WAV parser failure is isolated to that node: the program emits `WAV_PARSER_FAILED`, marks only dependent checks unavailable, and continues with independent evidence. An unsupported final WAV still returns `unsupported`.
 - `RelationshipIntegrityPass` is a registered libevchain `EvidencePass`. It compares only submitter-declared edge parameters with cached source and target observations and replaces the former diagnostic-only `MusicRelationshipPass`.
 - Includes scoped PCM content checks for `edited_from`, `comped_from`, `stemmed_from`, and `mixed_from`, plus conservative mix-to-master continuity corroboration. Exact checks use only submitter-declared ranges, placements, gains, and optional fades; no missing transformation parameter is estimated. Declared reconstruction is evaluated on alternating partitions and reports coverage, matched duration, source redundancy, identifiability, and repeated-segment ambiguity. Consecutive high-energy local residuals lasting at least 0.20 seconds are reported as timed mismatch regions, so a short replacement cannot be hidden by a low whole-track average. Complex or undocumented processing is not automatically treated as a contradiction.
-- Exact declared-range checks seek directly to the requested source and target intervals and are not clipped by the 60-second exploratory-analysis bound. Master duration differences use complete WAV metadata rather than decoded-window length.
-- PCM samples are decoded in chunks into contiguous float32 storage and cached per request by artefact and time window. A 256 MiB decoded-PCM budget bounds aggregate cached data; repeated passes reuse the same window instead of decoding it again.
-- Adds eight bounded physical-audio diagnostics: `AudioAlignmentPass`, `SourceContributionPass`, `CompVerificationPass`, `ProcessedAudioMatchPass`, `StemMixResidualPass`, `MasteringDerivationPass`, `ExcerptedFromPass`, and `DecoySourcePass`. Signal-estimated offsets, gains, and channel matrices are labelled diagnostic, never written back into the evidence graph, and do not silently become provenance proof or exact integrity credit.
-- Master comparison uses only the submitted source and target ranges. A search for competing locations may reduce certainty by exposing ambiguity, but an alternative location is never substituted for the declared one.
+- Exact declared-range checks stream the complete target timeline at the original sample rate in approximately ten-second blocks. They read only the corresponding source windows, retain cross-block holdout and local-mismatch state, and accumulate sufficient statistics rather than retaining complete decoded tracks.
+- PCM samples are decoded with NumPy into C-contiguous `(frames, channels)` `float32` arrays. The pinned `numpy==2.2.6` dependency supports the project's Python 3.11-3.13 range; no SciPy dependency is used. 8-, 16-, 24-, and 32-bit integer PCM decoding is vectorised.
+- Each audio file also has a request-cached, complete low-rate analysis proxy. Integer-factor Kaiser-windowed sinc filtering produces 2000 Hz for 48 kHz input and 2100 Hz for 44.1 kHz input; later integer and non-integer reductions are low-pass filtered before slicing or interpolation.
+- Adds eight physical-audio diagnostics: `AudioAlignmentPass`, `SourceContributionPass`, `CompVerificationPass`, `ProcessedAudioMatchPass`, `StemMixResidualPass`, `MasteringDerivationPass`, `ExcerptedFromPass`, and `DecoySourcePass`. Exploratory alignment and location checks use FFT-normalised cross-correlation across the complete proxy followed by detailed candidate comparison, rather than searching only the first 60 seconds. Signal-estimated offsets, gains, and channel matrices are labelled diagnostic, never written back into the evidence graph, and cannot cancel a contradiction from an exact submitter-declared check.
+- Master comparison uses the submitted ranges while searching the complete target proxy for competing locations. An alternative may reduce certainty by exposing ambiguity, but it is never substituted for the declaration.
+- Resource control combines a 128 MiB active PCM-window bound, a 256 MiB proxy-cache bound, a weighted request work limit, and the existing CSEC wall-clock timeout. A resource-limited check returns `unavailable` with `reason_code: resource_budget_exhausted`; an incomplete search cannot return `contradicted`.
+- Audio check output records the ranges actually analysed or searched, whether search/analysis completed, and the analysis-proxy rate used.
 - Separates submitter-declared technical properties from measured file properties and reports inconsistencies.
 - Requires `workflow_id`, `modifiers`, and submitter declarations in `submission.json`, and loads policies for 16 workflow types.
 - `WorkflowCompletenessPass` reports the state of each required, conditional, and optional expectation.
@@ -159,10 +162,12 @@ python3 -B check_public.py /path/to/public-bundles
 ```
 
 The second command writes results to `reports/`. Both commands operate locally and do not transmit data.
-The local regression suite contains 77 tests, including coverage for non-final
+The local regression suite contains 97 tests, including coverage for non-final
 WAV isolation, extensible PCM, field-level unavailability, final-scoped C2PA,
 standalone C2PA ingredient checks, hash caching, sustained local tampering,
-declared ranges beyond 60 seconds, full master duration, and packed PCM caching.
+declared ranges beyond 60 seconds, full master duration, ndarray PCM decoding,
+24-bit sign extension, full-file proxy caching, non-integer anti-aliasing,
+post-60-second FFT search, and resource-budget degradation without contradiction.
 
 ## Directory overview
 

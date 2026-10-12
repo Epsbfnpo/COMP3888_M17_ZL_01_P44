@@ -133,12 +133,13 @@ calibration against licensed real production material.
     validation, dependency vulnerability checks, linting, and release artefact
     generation. Test supported Python versions and target platforms.
 
-20. Add performance and resource tests for long audio, large bundles, many
-    relationships, high channel counts, and worst-case alignment inputs. Review
-    the 60-second cap retained for exploratory searches, the 16-source limit,
-    the 256 MiB request PCM cache budget, and file-size limits using measured
-    runtime and memory data. Exact declared-range checks now seek beyond 60
-    seconds and use packed, chunk-decoded PCM windows.
+20. Expand performance and resource tests for large bundles, many
+    relationships, high channel counts, and worst-case FFT alignment inputs.
+    Full-file exploratory search now uses cached low-rate NumPy proxies and
+    exact checks stream original-rate windows, so there is no audio-duration
+    cap. Calibrate the weighted work limit, 128 MiB active-window limit,
+    256 MiB proxy-cache limit, 16-source limit and file-size limits against the
+    CSEC 60-second wall-clock deadline on every supported platform.
 
 21. Expand malicious-input tests for WAV chunk abuse, XML bombs, hostile PDFs,
     malformed MIDI, symlink/path attacks, oversized JSON, hash collisions in

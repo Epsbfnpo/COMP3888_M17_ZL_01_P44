@@ -8,21 +8,19 @@ some undocumented or nonlinear production process.
 from __future__ import annotations
 
 import math
-import struct
-import sys
 import wave
-from array import array
-from collections.abc import Sequence
 from pathlib import Path
 
-MAX_DECIMATION_STAGE_FACTOR = 8
+import numpy as np
+
 MAX_SOURCES = 16
 MAX_COMP_SELECTIONS = 64
-MAX_ANALYSIS_SECONDS = 60
-ANALYSIS_RATE_HZ = 2000
-PCM_READ_CHUNK_FRAMES = 65_536
-MAX_REQUEST_PCM_BYTES = 256 * 1024 * 1024
-MAX_OFFSET_SECONDS = 5.0
+PCM_STREAM_CHUNK_SECONDS = 10.0
+PROXY_TARGET_RATE_HZ = 2000
+PROXY_FILTER_HALF_WIDTH = 8
+MAX_ACTIVE_PCM_BYTES = 128 * 1024 * 1024
+MAX_PROXY_CACHE_BYTES = 256 * 1024 * 1024
+MAX_REQUEST_WORK_UNITS = 20_000.0
 MIN_TARGET_COVERAGE = 0.90
 MAX_SOURCE_CORRELATION = 0.995
 MIN_SOURCE_IDENTIFIABILITY = 1e-4
@@ -48,78 +46,75 @@ MASTER_DECLARATION_FIELDS = (
 )
 
 
-class PackedPCMFrames(Sequence):
-    """Frame-compatible view over contiguous interleaved float32 PCM samples."""
+class ResourceBudgetExceeded(ValueError):
+    """The request is valid but cannot be assessed within configured bounds."""
 
-    __slots__ = ("_samples", "channels")
-
-    def __init__(self, samples, channels):
-        self._samples = samples
-        self.channels = channels
-
-    def __len__(self):
-        return len(self._samples) // self.channels
-
-    def __getitem__(self, index):
-        if isinstance(index, slice):
-            return [self[position] for position in range(*index.indices(len(self)))]
-        if index < 0:
-            index += len(self)
-        if index < 0 or index >= len(self):
-            raise IndexError(index)
-        first = index * self.channels
-        return tuple(self._samples[first:first + self.channels])
-
-    @property
-    def nbytes(self):
-        return len(self._samples) * self._samples.itemsize
-
-    @property
-    def storage(self):
-        return self._samples
+    reason_code = "resource_budget_exhausted"
 
 
-def _pcm_value(raw: bytes, width: int) -> float:
+def _consume_work(chain, units):
+    used = float(getattr(chain, "_audio_work_units", 0.0)) + float(units)
+    chain._audio_work_units = used
+    if used > MAX_REQUEST_WORK_UNITS:
+        raise ResourceBudgetExceeded(
+            f"audio analysis work budget exceeded ({used:.1f} > "
+            f"{MAX_REQUEST_WORK_UNITS:.1f} weighted channel-seconds)")
+
+
+def _decode_pcm_chunk(raw, width, channels):
+    """Decode a frame-aligned PCM byte block to ``(frames, channels)`` float32."""
+    frame_width = width * channels
+    if frame_width < 1 or len(raw) % frame_width:
+        raise ValueError("truncated PCM frame data")
     if width == 1:
-        return (raw[0] - 128) / 128.0
-    if width == 2:
-        return struct.unpack("<h", raw)[0] / 32768.0
-    if width == 3:
-        value = int.from_bytes(raw, "little", signed=False)
-        if value & 0x800000:
-            value -= 1 << 24
-        return value / 8388608.0
-    if width == 4:
-        return struct.unpack("<i", raw)[0] / 2147483648.0
-    raise ValueError("Only 8/16/24/32-bit integer PCM WAV is supported.")
+        values = np.frombuffer(raw, dtype=np.uint8).astype(np.float32)
+        values = (values - np.float32(128.0)) / np.float32(128.0)
+    elif width == 2:
+        values = np.frombuffer(raw, dtype="<i2").astype(np.float32)
+        values /= np.float32(32768.0)
+    elif width == 3:
+        octets = np.frombuffer(raw, dtype=np.uint8).reshape(-1, 3)
+        values = (octets[:, 0].astype(np.int32) |
+                  (octets[:, 1].astype(np.int32) << 8) |
+                  (octets[:, 2].astype(np.int32) << 16))
+        values = (values ^ 0x800000) - 0x800000
+        values = values.astype(np.float32) / np.float32(8388608.0)
+    elif width == 4:
+        values = np.frombuffer(raw, dtype="<i4").astype(np.float32)
+        values /= np.float32(2147483648.0)
+    else:
+        raise ValueError("Only 8/16/24/32-bit integer PCM WAV is supported.")
+    return np.ascontiguousarray(values.reshape(-1, channels), dtype=np.float32)
 
 
-def _decode_pcm_chunk(raw, width, output):
-    """Append one frame-aligned PCM byte chunk to an array('f')."""
-    if width == 1:
-        output.extend((value - 128) / 128.0 for value in raw)
-        return
-    if width in (2, 4):
-        values = array("h" if width == 2 else "i")
-        values.frombytes(raw)
-        if sys.byteorder != "little":
-            values.byteswap()
-        scale = 32768.0 if width == 2 else 2147483648.0
-        output.extend(value / scale for value in values)
-        return
-    if width == 3:
-        for position in range(0, len(raw), 3):
-            output.append(_pcm_value(raw[position:position + 3], 3))
-        return
-    raise ValueError("Only 8/16/24/32-bit integer PCM WAV is supported.")
+def _wave_metadata(path):
+    try:
+        with wave.open(str(path), "rb") as handle:
+            if handle.getcomptype() != "NONE":
+                raise ValueError("compressed WAV is not supported")
+            metadata = {
+                "sample_rate_hz": handle.getframerate(),
+                "channels": handle.getnchannels(),
+                "sample_width": handle.getsampwidth(),
+                "total_frames": handle.getnframes(),
+            }
+    except wave.Error as exc:
+        raise ValueError(f"invalid WAV: {exc}") from exc
+    if (metadata["channels"] < 1 or metadata["sample_rate_hz"] < 1 or
+            metadata["sample_width"] not in (1, 2, 3, 4)):
+        raise ValueError("unsupported PCM channel, rate, or sample width")
+    metadata["duration_seconds"] = (
+        metadata["total_frames"] / metadata["sample_rate_hz"])
+    return metadata
 
 
 def _read_pcm(path: Path, start_seconds=0.0, end_seconds=None,
-              max_seconds=MAX_ANALYSIS_SECONDS, byte_budget=MAX_REQUEST_PCM_BYTES):
-    """Read a bounded PCM window into contiguous float32 storage.
+              max_seconds=None, byte_budget=MAX_ACTIVE_PCM_BYTES):
+    """Read one PCM window as a C-contiguous float32 ndarray.
 
-    Explicit end_seconds requests are not clipped to MAX_ANALYSIS_SECONDS.  The
-    request-level decoded-byte budget remains the hard resource bound.
+    There is intentionally no default 60-second clipping. Long-running checks
+    either use the low-rate full-file proxy or call this function for bounded
+    streaming windows.
     """
     try:
         with wave.open(str(path), "rb") as handle:
@@ -150,34 +145,81 @@ def _read_pcm(path: Path, start_seconds=0.0, end_seconds=None,
                     raise ValueError("PCM window ends beyond the submitted audio")
                 end_frame = min(end_frame, total_frames)
             frame_count = max(0, end_frame - start_frame)
-            decoded_bytes = frame_count * channels * array("f").itemsize
+            decoded_bytes = frame_count * channels * np.dtype(np.float32).itemsize
             if decoded_bytes > byte_budget:
-                raise ValueError(
-                    f"decoded PCM window requires {decoded_bytes} bytes, exceeding the remaining request budget")
+                raise ResourceBudgetExceeded(
+                    f"decoded PCM window requires {decoded_bytes} bytes, exceeding the request budget")
             handle.setpos(start_frame)
-            samples = array("f")
+            chunks = []
             remaining = frame_count
+            chunk_frames = max(1, round(rate * PCM_STREAM_CHUNK_SECONDS))
             while remaining:
-                count = min(remaining, PCM_READ_CHUNK_FRAMES)
+                count = min(remaining, chunk_frames)
                 raw = handle.readframes(count)
                 expected = count * channels * width
                 if len(raw) != expected:
                     raise ValueError("truncated PCM frame data")
-                _decode_pcm_chunk(raw, width, samples)
+                chunks.append(_decode_pcm_chunk(raw, width, channels))
                 remaining -= count
     except wave.Error as exc:
         raise ValueError(f"invalid WAV: {exc}") from exc
-    frames = PackedPCMFrames(samples, channels)
+    frames = (np.concatenate(chunks, axis=0) if chunks else
+              np.empty((0, channels), dtype=np.float32))
     return {"frames": frames, "sample_rate_hz": rate, "channels": channels,
             "bit_depth": width * 8, "total_frames": total_frames,
             "duration_seconds": total_frames / rate,
             "start_frame": start_frame, "end_frame": end_frame,
             "start_seconds": start_frame / rate, "end_seconds": end_frame / rate,
-            "decoded_bytes": frames.nbytes}
+            "decoded_bytes": int(frames.nbytes)}
+
+
+def _read_pcm_frame_range(path, start_frame, end_frame, metadata=None,
+                          byte_budget=MAX_ACTIVE_PCM_BYTES):
+    """Read an exact integer frame range without seconds-to-frame rounding."""
+    metadata = metadata or _wave_metadata(path)
+    total_frames = metadata["total_frames"]
+    start_frame = int(start_frame)
+    end_frame = int(end_frame)
+    if start_frame < 0 or end_frame < start_frame or end_frame > total_frames:
+        raise ValueError("PCM frame range is outside the submitted audio")
+    channels = metadata["channels"]
+    width = metadata["sample_width"]
+    rate = metadata["sample_rate_hz"]
+    frame_count = end_frame - start_frame
+    decoded_bytes = frame_count * channels * np.dtype(np.float32).itemsize
+    if decoded_bytes > byte_budget:
+        raise ResourceBudgetExceeded(
+            f"active PCM window requires {decoded_bytes} bytes, exceeding "
+            f"the {byte_budget}-byte memory limit")
+    chunks = []
+    chunk_frames = max(1, round(rate * PCM_STREAM_CHUNK_SECONDS))
+    try:
+        with wave.open(str(path), "rb") as handle:
+            handle.setpos(start_frame)
+            remaining = frame_count
+            while remaining:
+                count = min(remaining, chunk_frames)
+                raw = handle.readframes(count)
+                if len(raw) != count * channels * width:
+                    raise ValueError("truncated PCM frame data")
+                chunks.append(_decode_pcm_chunk(raw, width, channels))
+                remaining -= count
+    except wave.Error as exc:
+        raise ValueError(f"invalid WAV: {exc}") from exc
+    frames = (np.concatenate(chunks, axis=0) if chunks else
+              np.empty((0, channels), dtype=np.float32))
+    return {
+        "frames": frames, "sample_rate_hz": rate, "channels": channels,
+        "bit_depth": width * 8, "total_frames": total_frames,
+        "duration_seconds": metadata["duration_seconds"],
+        "start_frame": start_frame, "end_frame": end_frame,
+        "start_seconds": start_frame / rate, "end_seconds": end_frame / rate,
+        "decoded_bytes": int(frames.nbytes),
+    }
 
 
 def _read_bound_pcm(chain, digest, start_seconds=0.0, end_seconds=None,
-                    max_seconds=MAX_ANALYSIS_SECONDS):
+                    max_seconds=None):
     """Read and cache a bound PCM window unless metadata parsing failed."""
     artefact = chain.artefacts[digest]
     if not artefact.has_file():
@@ -193,16 +235,16 @@ def _read_bound_pcm(chain, digest, start_seconds=0.0, end_seconds=None,
     if cache is None:
         cache = {}
         chain._pcm_window_cache = cache
-        chain._pcm_cache_bytes = 0
         chain._pcm_cache_hits = 0
         chain._pcm_cache_misses = 0
     if key in cache:
         chain._pcm_cache_hits += 1
         return cache[key]
-    remaining = MAX_REQUEST_PCM_BYTES - chain._pcm_cache_bytes
-    audio = _read_pcm(Path(artefact.get_file()), start_key, end_key, max_key, remaining)
-    cache[key] = audio
-    chain._pcm_cache_bytes += audio["decoded_bytes"]
+    audio = _read_pcm(Path(artefact.get_file()), start_key, end_key, max_key)
+    # Only small windows are retained. Exact derivation streams long ranges and
+    # proxies have their own bounded request cache.
+    if audio["decoded_bytes"] <= 16 * 1024 * 1024:
+        cache[key] = audio
     chain._pcm_cache_misses += 1
     return audio
 
@@ -218,91 +260,177 @@ def _pcm_duration(chain, digest):
     artefact = chain.artefacts[digest]
     if not artefact.has_file():
         raise ValueError("no verified file is bound to the audio artefact")
-    try:
-        with wave.open(str(artefact.get_file()), "rb") as handle:
-            rate = handle.getframerate()
-            if rate < 1:
-                raise ValueError("invalid WAV sample rate")
-            duration = handle.getnframes() / rate
-    except wave.Error as exc:
-        raise ValueError(f"invalid WAV: {exc}") from exc
+    duration = _wave_metadata(Path(artefact.get_file()))["duration_seconds"]
     cache[digest] = duration
     return duration
 
 
+def _fir_lowpass(rate, cutoff_hz, transition_scale=1.0):
+    """Return an odd, unity-DC Kaiser-windowed sinc low-pass filter."""
+    if cutoff_hz <= 0 or cutoff_hz >= rate / 2:
+        return np.ones(1, dtype=np.float32)
+    ratio = max(1.0, rate / (2.0 * cutoff_hz))
+    half = max(8, math.ceil(PROXY_FILTER_HALF_WIDTH * ratio * transition_scale))
+    positions = np.arange(-half, half + 1, dtype=np.float64)
+    normalized_cutoff = cutoff_hz / rate
+    taps = (2.0 * normalized_cutoff *
+            np.sinc(2.0 * normalized_cutoff * positions) *
+            np.kaiser(2 * half + 1, 8.6))
+    taps /= np.sum(taps)
+    return taps.astype(np.float32)
+
+
+def _proxy_decimation_factor(rate):
+    """Choose a compact integer phase factor, preferring an exact-Hz proxy."""
+    maximum = max(1, int(rate // PROXY_TARGET_RATE_HZ))
+    for factor in range(maximum, 0, -1):
+        if rate % factor == 0 and rate / factor <= PROXY_TARGET_RATE_HZ * 1.10:
+            return factor
+    return maximum
+
+
+def _analysis_proxy(chain, digest):
+    """Build and cache a full-file, anti-aliased low-rate analysis copy.
+
+    Input is processed in globally phase-aligned ten-second blocks. Each block
+    includes half a filter on both sides, so concatenating the retained centres
+    is equivalent to filtering the full signal once and then decimating it.
+    """
+    algorithm = "kaiser-sinc-proxy-v1"
+    cache = getattr(chain, "_analysis_proxy_cache", None)
+    if cache is None:
+        cache = {}
+        chain._analysis_proxy_cache = cache
+        chain._analysis_proxy_cache_bytes = 0
+        chain._analysis_proxy_hits = 0
+        chain._analysis_proxy_misses = 0
+    key = (digest, algorithm)
+    if key in cache:
+        chain._analysis_proxy_hits += 1
+        return cache[key]
+
+    artefact = chain.artefacts[digest]
+    if not artefact.has_file():
+        raise ValueError("no verified file is bound to the audio artefact")
+    parser_failure = getattr(artefact, "_wav_parser_failure", None)
+    if parser_failure:
+        raise ValueError(f"WAV parser unavailable for this artefact: {parser_failure}")
+    path = Path(artefact.get_file())
+    metadata = _wave_metadata(path)
+    rate = metadata["sample_rate_hz"]
+    channels = metadata["channels"]
+    total_frames = metadata["total_frames"]
+    factor = _proxy_decimation_factor(rate)
+    proxy_rate = rate / factor
+    output_frames = (total_frames + factor - 1) // factor
+    estimated_bytes = output_frames * channels * np.dtype(np.float32).itemsize
+    if (getattr(chain, "_analysis_proxy_cache_bytes", 0) + estimated_bytes >
+            MAX_PROXY_CACHE_BYTES):
+        raise ResourceBudgetExceeded(
+            "analysis proxy cache would exceed the request memory limit")
+    _consume_work(chain, metadata["duration_seconds"] * channels)
+
+    if factor == 1:
+        frames = _read_pcm(path, max_seconds=None)["frames"]
+        filter_length = 1
+    else:
+        # Leave a transition band below the proxy Nyquist.
+        taps = _fir_lowpass(rate, proxy_rate * 0.45)
+        half = len(taps) // 2
+        filter_length = len(taps)
+        chunk_frames = max(factor,
+                           (round(rate * PCM_STREAM_CHUNK_SECONDS) // factor) * factor)
+        frames = np.empty((output_frames, channels), dtype=np.float32)
+        output_position = 0
+        try:
+            with wave.open(str(path), "rb") as handle:
+                width = handle.getsampwidth()
+                for core_start in range(0, total_frames, chunk_frames):
+                    core_end = min(total_frames, core_start + chunk_frames)
+                    read_start = max(0, core_start - half)
+                    read_end = min(total_frames, core_end + half)
+                    handle.setpos(read_start)
+                    raw = handle.readframes(read_end - read_start)
+                    decoded = _decode_pcm_chunk(raw, width, channels)
+                    padded = np.zeros(
+                        (core_end - core_start + 2 * half, channels),
+                        dtype=np.float32)
+                    insert = read_start - (core_start - half)
+                    padded[insert:insert + len(decoded)] = decoded
+                    filtered = np.empty((core_end - core_start, channels),
+                                        dtype=np.float32)
+                    for channel in range(channels):
+                        filtered[:, channel] = np.convolve(
+                            padded[:, channel], taps, mode="valid")
+                    decimated = filtered[::factor]
+                    frames[output_position:output_position + len(decimated)] = decimated
+                    output_position += len(decimated)
+        except wave.Error as exc:
+            raise ValueError(f"invalid WAV: {exc}") from exc
+        frames = np.ascontiguousarray(frames[:output_position])
+
+    proxy = {
+        "frames": frames,
+        "sample_rate_hz": proxy_rate,
+        "proxy_sample_rate_hz": proxy_rate,
+        "source_sample_rate_hz": rate,
+        "decimation_factor": factor,
+        "channels": channels,
+        "bit_depth": metadata["sample_width"] * 8,
+        "total_frames": len(frames),
+        "source_total_frames": total_frames,
+        "duration_seconds": metadata["duration_seconds"],
+        "start_frame": 0,
+        "end_frame": len(frames),
+        "start_seconds": 0.0,
+        "end_seconds": metadata["duration_seconds"],
+        "decoded_bytes": int(frames.nbytes),
+        "analysis_proxy": True,
+        "analysis_algorithm": algorithm,
+        "filter_length": filter_length,
+        "analysis_ranges_seconds": [[0.0, metadata["duration_seconds"]]],
+        "search_complete": True,
+    }
+    cache[key] = proxy
+    chain._analysis_proxy_cache_bytes += int(frames.nbytes)
+    chain._analysis_proxy_misses += 1
+    return proxy
+
+
 def _source_gram(sources, indices):
-    gram = [[0.0 for _ in sources] for _ in sources]
-    for index in indices:
-        values = [source[index] for source in sources]
-        for left, value in enumerate(values):
-            for right in range(left, len(values)):
-                gram[left][right] += value * values[right]
-                gram[right][left] = gram[left][right]
-    return gram
+    if not sources:
+        return np.empty((0, 0), dtype=np.float64)
+    matrix = np.stack([np.asarray(source, dtype=np.float64) for source in sources], axis=1)
+    selected = matrix[np.asarray(indices, dtype=np.int64)]
+    return np.einsum("ni,nj->ij", selected, selected, optimize=True)
 
 
 def _source_identifiability(gram):
     """Return a scale-free pivot ratio for distinguishing source contributions."""
-    size = len(gram)
+    gram = np.asarray(gram, dtype=np.float64)
+    size = gram.shape[0] if gram.ndim == 2 else 0
     if not size:
         return 0.0
-    normalized = [[0.0 for _ in range(size)] for _ in range(size)]
-    for row in range(size):
-        for column in range(size):
-            denominator = math.sqrt(max(gram[row][row], 0.0) *
-                                    max(gram[column][column], 0.0))
-            normalized[row][column] = gram[row][column] / denominator if denominator > 1e-12 else 0.0
-    pivots = []
-    for column in range(size):
-        pivot = max(range(column, size), key=lambda row: abs(normalized[row][column]))
-        value = abs(normalized[pivot][column])
-        if value < 1e-12:
-            return 0.0
-        normalized[column], normalized[pivot] = normalized[pivot], normalized[column]
-        pivots.append(value)
-        for row in range(column + 1, size):
-            factor = normalized[row][column] / normalized[column][column]
-            for current in range(column, size):
-                normalized[row][current] -= factor * normalized[column][current]
-    return min(pivots) / max(pivots)
+    diagonal = np.maximum(np.diag(gram), 0.0)
+    denominator = np.sqrt(np.outer(diagonal, diagonal))
+    normalized = np.divide(gram, denominator, out=np.zeros_like(gram),
+                           where=denominator > 1e-12)
+    singular = np.linalg.svd(normalized, compute_uv=False)
+    if singular.size == 0 or singular[0] < 1e-12:
+        return 0.0
+    return float(singular[-1] / singular[0])
 
 
 def _max_source_correlation(gram):
-    highest = 0.0
-    for left in range(len(gram)):
-        for right in range(left + 1, len(gram)):
-            denominator = math.sqrt(max(gram[left][left], 0.0) *
-                                    max(gram[right][right], 0.0))
-            if denominator > 1e-12:
-                highest = max(highest, abs(gram[left][right] / denominator))
-    return highest
-
-
-def _evaluate_declared_reconstruction(target, sources, indices):
-    if not indices:
-        return None
-    actual = [target[index] for index in indices]
-    predicted = [sum(source[index] for source in sources) for index in indices]
-    target_energy = sum(value * value for value in actual)
-    if target_energy < 1e-12:
-        return None
-    residual_energy = sum((value - estimate) ** 2
-                          for value, estimate in zip(actual, predicted))
-    target_mean = sum(actual) / len(actual)
-    predicted_mean = sum(predicted) / len(predicted)
-    covariance = sum((value - target_mean) * (estimate - predicted_mean)
-                     for value, estimate in zip(actual, predicted))
-    target_variance = sum((value - target_mean) ** 2 for value in actual)
-    predicted_variance = sum((estimate - predicted_mean) ** 2 for estimate in predicted)
-    denominator = math.sqrt(target_variance * predicted_variance)
-    correlation = covariance / denominator if denominator > 1e-12 else 0.0
-    return math.sqrt(residual_energy / target_energy), correlation
-
-
-def _holdout_indices(count, block_size):
-    fit = [index for index in range(count) if (index // block_size) % 2 == 0]
-    validation = [index for index in range(count) if (index // block_size) % 2 == 1]
-    return fit, validation
+    gram = np.asarray(gram, dtype=np.float64)
+    if gram.ndim != 2 or gram.shape[0] < 2:
+        return 0.0
+    diagonal = np.maximum(np.diag(gram), 0.0)
+    denominator = np.sqrt(np.outer(diagonal, diagonal))
+    correlations = np.divide(np.abs(gram), denominator,
+                             out=np.zeros_like(gram), where=denominator > 1e-12)
+    np.fill_diagonal(correlations, 0.0)
+    return float(np.max(correlations))
 
 
 def _base(rule, pass_name, target, edges):
@@ -338,178 +466,277 @@ def _processing_is_complex(edges):
     return any(word in descriptions for word in COMPLEX_PROCESSING_WORDS)
 
 
-def _read_target_and_sources(target, edges, chain):
-    target_start = min(float((edge.get("attributes") or {})["target_start_seconds"])
-                       for edge in edges)
-    target_end = max(float((edge.get("attributes") or {})["target_end_seconds"])
-                     for edge in edges)
-    target_audio = _read_bound_pcm(
-        chain, target["artefact_hash"], target_start, target_end, max_seconds=None)
-    sources = []
-    for edge in edges:
-        attrs = edge.get("attributes") or {}
-        sources.append(_read_bound_pcm(
-            chain, edge["hash"], float(attrs["source_start_seconds"]),
-            float(attrs["source_end_seconds"]), max_seconds=None))
-    if any(item["sample_rate_hz"] != target_audio["sample_rate_hz"] or
-           item["channels"] != target_audio["channels"] for item in sources):
-        raise ValueError("source and target sample rates/channels must match")
-    return target_audio, sources
+def _bound_audio_path(chain, digest):
+    artefact = chain.artefacts[digest]
+    if not artefact.has_file():
+        raise ValueError("no verified file is bound to the audio artefact")
+    parser_failure = getattr(artefact, "_wav_parser_failure", None)
+    if parser_failure:
+        raise ValueError(f"WAV parser unavailable for this artefact: {parser_failure}")
+    path = Path(artefact.get_file())
+    return path, _wave_metadata(path)
 
 
-def _linear_timeline_metrics(target_audio, edge_audio, group_keys=None):
-    """Evaluate only submitter-declared ranges and gains on alternating blocks."""
-    rate = target_audio["sample_rate_hz"]
-    channels = target_audio["channels"]
-    step = max(1, rate // ANALYSIS_RATE_HZ)
-    analysis_rate = rate / step
-    target_indices = list(range(0, len(target_audio["frames"]), step))
-    target_samples = [sample for index in target_indices
-                      for sample in target_audio["frames"][index]]
-    grouped = {}
+def _update_partition(statistics, actual, predicted):
+    actual = np.asarray(actual, dtype=np.float64)
+    predicted = np.asarray(predicted, dtype=np.float64)
+    statistics["count"] += actual.size
+    statistics["actual_sum"] += float(np.sum(actual))
+    statistics["predicted_sum"] += float(np.sum(predicted))
+    statistics["actual_square"] += float(np.sum(actual * actual, dtype=np.float64))
+    statistics["predicted_square"] += float(np.sum(predicted * predicted, dtype=np.float64))
+    statistics["cross"] += float(np.sum(actual * predicted, dtype=np.float64))
+    difference = actual - predicted
+    statistics["residual_square"] += float(
+        np.sum(difference * difference, dtype=np.float64))
+
+
+def _partition_result(statistics):
+    count = statistics["count"]
+    energy = statistics["actual_square"]
+    if count < 1 or energy < 1e-12:
+        return None
+    actual_variance = energy - statistics["actual_sum"] ** 2 / count
+    predicted_variance = (statistics["predicted_square"] -
+                          statistics["predicted_sum"] ** 2 / count)
+    covariance = (statistics["cross"] -
+                  statistics["actual_sum"] * statistics["predicted_sum"] / count)
+    denominator = math.sqrt(max(actual_variance, 0.0) *
+                            max(predicted_variance, 0.0))
+    return (math.sqrt(statistics["residual_square"] / energy),
+            covariance / denominator if denominator > 1e-12 else 0.0)
+
+
+def _linear_timeline_metrics(chain, target_digest, edges, group_keys=None):
+    """Stream declared exact reconstruction at original sample rate.
+
+    Only one target block and the corresponding source windows are resident at
+    a time. All sample placement, fades, residuals and Gram updates are ndarray
+    operations; holdout numbering and local-mismatch state remain global across
+    block boundaries.
+    """
+    target_path, target_meta = _bound_audio_path(chain, target_digest)
+    rate = target_meta["sample_rate_hz"]
+    channels = target_meta["channels"]
+    prepared = []
     offsets = []
     declared_gains = []
-    covered_frames = [False] * len(target_indices)
-    for position, (edge, audio) in enumerate(edge_audio):
+    keys = list(group_keys) if group_keys is not None else list(range(len(edges)))
+    unique_keys = list(dict.fromkeys(keys))
+    key_positions = {key: position for position, key in enumerate(unique_keys)}
+    for position, edge in enumerate(edges):
         attrs = edge.get("attributes") or {}
+        source_path, source_meta = _bound_audio_path(chain, edge["hash"])
+        if (source_meta["sample_rate_hz"] != rate or
+                source_meta["channels"] != channels):
+            raise ValueError("source and target sample rates/channels must match")
         source_start = float(attrs["source_start_seconds"])
-        target_start = float(attrs["target_start_seconds"])
         source_end = float(attrs["source_end_seconds"])
+        target_start = float(attrs["target_start_seconds"])
         target_end = float(attrs["target_end_seconds"])
         gain = float(attrs["gain"])
-        if not math.isfinite(gain):
-            raise ValueError("declared gain must be finite")
-        if min(source_start, target_start) < 0 or source_end <= source_start or target_end <= target_start:
+        fade_in = float(attrs.get("fade_in_seconds") or 0.0)
+        fade_out = float(attrs.get("fade_out_seconds") or 0.0)
+        if not all(math.isfinite(value) for value in (
+                source_start, source_end, target_start, target_end,
+                gain, fade_in, fade_out)):
+            raise ValueError("declared linear parameters must be finite")
+        if (min(source_start, target_start, fade_in, fade_out) < 0 or
+                source_end <= source_start or target_end <= target_start):
             raise ValueError("declared source/target ranges must be positive and ordered")
         if abs((source_end - source_start) - (target_end - target_start)) > max(0.002, 2 / rate):
             raise ValueError("declared ranges imply time stretching")
-        if source_end > audio["duration_seconds"] + 2 / rate:
+        if source_end > source_meta["duration_seconds"] + 2 / rate:
             raise ValueError("declared source range exceeds the submitted audio")
-        if target_end > target_audio["duration_seconds"] + 2 / rate:
+        if target_end > target_meta["duration_seconds"] + 2 / rate:
             raise ValueError("declared target range exceeds the submitted audio")
-        fade_in = float(attrs.get("fade_in_seconds") or 0)
-        fade_out = float(attrs.get("fade_out_seconds") or 0)
-        target_duration = target_end - target_start
-        if min(fade_in, fade_out) < 0 or fade_in + fade_out > target_duration + 2 / rate:
+        if fade_in + fade_out > target_end - target_start + 2 / rate:
             raise ValueError("declared fades must fit within the target range")
         offsets.append(target_start - source_start)
         declared_gains.append(gain)
-        aligned = []
-        silence = (0.0,) * channels
-        for frame_position, target_index in enumerate(target_indices):
-            target_time = target_audio["start_seconds"] + target_index / rate
-            frame = silence
-            if target_start <= target_time < target_end:
-                source_time = source_start + target_time - target_start
-                source_index = round(source_time * rate) - audio["start_frame"]
-                if 0 <= source_index < len(audio["frames"]):
-                    covered_frames[frame_position] = True
-                    envelope = 1.0
-                    relative_time = target_time - target_start
-                    if fade_in:
-                        envelope = min(envelope, relative_time / fade_in)
-                    if fade_out:
-                        envelope = min(envelope, (target_end - target_time) / fade_out)
-                    frame = tuple(value * gain * max(0.0, min(1.0, envelope))
-                                  for value in audio["frames"][source_index])
-            aligned.extend(frame)
-        key = group_keys[position] if group_keys else position
-        if key in grouped:
-            grouped[key] = [left + right for left, right in zip(grouped[key], aligned)]
-        else:
-            grouped[key] = aligned
-    if len(target_indices) < 32 or not grouped:
+        prepared.append({
+            "path": source_path,
+            "source_start": source_start,
+            "source_end": source_end,
+            "target_start": target_start,
+            "target_end": target_end,
+            "gain": gain,
+            "fade_in": fade_in,
+            "fade_out": fade_out,
+            "group": key_positions[keys[position]],
+            "metadata": source_meta,
+            "source_start_frame": round(source_start * rate),
+            "source_end_frame": round(source_end * rate),
+            "target_start_frame": round(target_start * rate),
+            "target_end_frame": round(target_end * rate),
+        })
+
+    if target_meta["total_frames"] < 32 or not unique_keys:
         return None
-    sources = list(grouped.values())
-    block_size = max(32 * channels,
-                     round(analysis_rate * HOLDOUT_BLOCK_SECONDS) * channels)
-    fit_indices, validation_indices = _holdout_indices(len(target_samples), block_size)
-    gram = _source_gram(sources, fit_indices)
-    identifiability = _source_identifiability(gram)
-    source_correlation = _max_source_correlation(gram)
-    partition_metrics = _evaluate_declared_reconstruction(
-        target_samples, sources, fit_indices)
-    validation_metrics = _evaluate_declared_reconstruction(
-        target_samples, sources, validation_indices)
+    _consume_work(chain, target_meta["duration_seconds"] * channels *
+                  (1.0 + len(prepared)))
+    holdout_frames = max(1, round(rate * HOLDOUT_BLOCK_SECONDS))
+    desired_chunk = max(holdout_frames,
+                        round(rate * PCM_STREAM_CHUNK_SECONDS / holdout_frames) *
+                        holdout_frames)
+    bytes_per_frame = channels * np.dtype(np.float32).itemsize
+    memory_chunk = max(holdout_frames,
+                       (MAX_ACTIVE_PCM_BYTES //
+                        max(bytes_per_frame * (len(unique_keys) + 3), 1) //
+                        holdout_frames) * holdout_frames)
+    chunk_frames = min(desired_chunk, memory_chunk)
+    if chunk_frames < holdout_frames:
+        raise ResourceBudgetExceeded("one exact-analysis holdout block exceeds the memory limit")
+
+    empty_stat = lambda: {
+        "count": 0, "actual_sum": 0.0, "predicted_sum": 0.0,
+        "actual_square": 0.0, "predicted_square": 0.0,
+        "cross": 0.0, "residual_square": 0.0,
+    }
+    fit_stat, validation_stat = empty_stat(), empty_stat()
+    gram = np.zeros((len(unique_keys), len(unique_keys)), dtype=np.float64)
+    covered_count = 0
+    matched_frames = 0
+    mismatch_regions = []
+    pending_region = None
+
+    def close_pending():
+        nonlocal pending_region
+        if pending_region is not None:
+            duration = pending_region["end_seconds"] - pending_region["start_seconds"]
+            if duration + 1e-9 >= LOCAL_MISMATCH_MIN_SECONDS:
+                mismatch_regions.append({**pending_region,
+                                         "duration_seconds": duration})
+            pending_region = None
+
+    for block_start_frame in range(0, target_meta["total_frames"], chunk_frames):
+        block_end_frame = min(target_meta["total_frames"],
+                              block_start_frame + chunk_frames)
+        target_audio = _read_pcm_frame_range(
+            target_path, block_start_frame, block_end_frame, target_meta)
+        target_frames = target_audio["frames"][:block_end_frame - block_start_frame]
+        frame_count = len(target_frames)
+        grouped = np.zeros((len(unique_keys), frame_count, channels), dtype=np.float32)
+        covered = np.zeros(frame_count, dtype=bool)
+        for item in prepared:
+            overlap_start_frame = max(block_start_frame,
+                                      item["target_start_frame"])
+            overlap_end_frame = min(block_end_frame,
+                                    item["target_end_frame"])
+            if overlap_end_frame <= overlap_start_frame:
+                continue
+            target_first = overlap_start_frame - block_start_frame
+            target_last = overlap_end_frame - block_start_frame
+            if target_last <= target_first:
+                continue
+            source_first_frame = (item["source_start_frame"] +
+                                  overlap_start_frame -
+                                  item["target_start_frame"])
+            source_last_frame = source_first_frame + (target_last - target_first)
+            source_audio = _read_pcm_frame_range(
+                item["path"], source_first_frame, source_last_frame,
+                item["metadata"])
+            count = min(target_last - target_first, len(source_audio["frames"]))
+            if count <= 0:
+                continue
+            global_frames = block_start_frame + target_first + np.arange(count)
+            target_times = global_frames.astype(np.float64) / rate
+            envelope = np.ones(count, dtype=np.float32)
+            if item["fade_in"]:
+                envelope = np.minimum(
+                    envelope,
+                    ((target_times - item["target_start"]) /
+                     item["fade_in"]).astype(np.float32))
+            if item["fade_out"]:
+                envelope = np.minimum(
+                    envelope,
+                    ((item["target_end"] - target_times) /
+                     item["fade_out"]).astype(np.float32))
+            np.clip(envelope, 0.0, 1.0, out=envelope)
+            grouped[item["group"], target_first:target_first + count] += (
+                source_audio["frames"][:count] *
+                (np.float32(item["gain"]) * envelope[:, None]))
+            covered[target_first:target_first + count] = True
+
+        predicted_frames = np.sum(grouped, axis=0, dtype=np.float64)
+        target64 = target_frames.astype(np.float64, copy=False)
+        global_frame_numbers = block_start_frame + np.arange(frame_count)
+        fit_frame_mask = ((global_frame_numbers // holdout_frames) % 2) == 0
+        for mask, statistics in ((fit_frame_mask, fit_stat),
+                                 (~fit_frame_mask, validation_stat)):
+            sample_mask = np.repeat(mask, channels)
+            _update_partition(statistics, target64.reshape(-1)[sample_mask],
+                              predicted_frames.reshape(-1)[sample_mask])
+        fit_grouped = grouped[:, fit_frame_mask, :].reshape(len(unique_keys), -1)
+        fit_grouped64 = fit_grouped.astype(np.float64)
+        gram += np.einsum("in,jn->ij", fit_grouped64, fit_grouped64,
+                          optimize=True)
+        covered_count += int(np.count_nonzero(covered))
+
+        for local_start in range(0, frame_count, holdout_frames):
+            local_end = min(frame_count, local_start + holdout_frames)
+            covered_in_block = int(np.count_nonzero(covered[local_start:local_end]))
+            if covered_in_block == 0:
+                close_pending()
+                continue
+            actual = target64[local_start:local_end].reshape(-1)
+            estimate = predicted_frames[local_start:local_end].reshape(-1)
+            energy = float(np.sum(actual * actual, dtype=np.float64))
+            residual_vector = actual - estimate
+            residual = float(np.sum(residual_vector * residual_vector,
+                                    dtype=np.float64))
+            normalized_rmse = (math.sqrt(residual / energy) if energy >= 1e-12
+                               else (0.0 if residual < 1e-12 else float("inf")))
+            block_rms = math.sqrt(energy / max(actual.size, 1))
+            is_mismatch = (
+                normalized_rmse >= LOCAL_MISMATCH_RMSE and
+                block_rms >= LOCAL_MISMATCH_MIN_RMS and
+                covered_in_block >= max(1, (local_end - local_start) // 2))
+            if normalized_rmse <= 0.05:
+                matched_frames += covered_in_block
+            if is_mismatch:
+                start_seconds = (block_start_frame + local_start) / rate
+                end_seconds = (block_start_frame + local_end) / rate
+                if (pending_region is not None and
+                        start_seconds <= pending_region["end_seconds"] + 1.5 / rate):
+                    pending_region["end_seconds"] = end_seconds
+                    pending_region["peak_normalized_rmse"] = max(
+                        pending_region["peak_normalized_rmse"], normalized_rmse)
+                    pending_region["block_count"] += 1
+                else:
+                    close_pending()
+                    pending_region = {
+                        "start_seconds": start_seconds,
+                        "end_seconds": end_seconds,
+                        "peak_normalized_rmse": normalized_rmse,
+                        "block_count": 1,
+                    }
+            else:
+                close_pending()
+    close_pending()
+
+    partition_metrics = _partition_result(fit_stat)
+    validation_metrics = _partition_result(validation_stat)
     if partition_metrics is None or validation_metrics is None:
         return None
-
-    predicted = [sum(source[index] for source in sources)
-                 for index in range(len(target_samples))]
-    block_frames = max(1, round(analysis_rate * HOLDOUT_BLOCK_SECONDS))
-    matched_frames = 0
-    mismatch_blocks = []
-    for frame_start in range(0, len(target_indices), block_frames):
-        frame_end = min(len(target_indices), frame_start + block_frames)
-        covered = sum(covered_frames[frame_start:frame_end])
-        if covered == 0:
-            continue
-        sample_start, sample_end = frame_start * channels, frame_end * channels
-        actual = target_samples[sample_start:sample_end]
-        estimate = predicted[sample_start:sample_end]
-        energy = sum(value * value for value in actual)
-        residual = sum((value - comparison) ** 2
-                       for value, comparison in zip(actual, estimate))
-        normalized_rmse = (math.sqrt(residual / energy)
-                           if energy >= 1e-12 else (0.0 if residual < 1e-12 else float("inf")))
-        block_rms = math.sqrt(energy / max(len(actual), 1))
-        if normalized_rmse <= 0.05:
-            matched_frames += covered
-        elif (normalized_rmse >= LOCAL_MISMATCH_RMSE and
-              block_rms >= LOCAL_MISMATCH_MIN_RMS and
-              covered >= max(1, (frame_end - frame_start) // 2)):
-            mismatch_blocks.append({
-                "start_seconds": (target_audio["start_seconds"] +
-                                  frame_start / analysis_rate),
-                "end_seconds": (target_audio["start_seconds"] +
-                                frame_end / analysis_rate),
-                "normalized_rmse": normalized_rmse,
-                "signal_rms": block_rms,
-            })
-
-    mismatch_regions = []
-    for block in mismatch_blocks:
-        if (mismatch_regions and
-                block["start_seconds"] <= mismatch_regions[-1]["end_seconds"] +
-                1.5 / analysis_rate):
-            region = mismatch_regions[-1]
-            region["end_seconds"] = block["end_seconds"]
-            region["peak_normalized_rmse"] = max(
-                region["peak_normalized_rmse"], block["normalized_rmse"])
-            region["block_count"] += 1
-        else:
-            mismatch_regions.append({
-                "start_seconds": block["start_seconds"],
-                "end_seconds": block["end_seconds"],
-                "peak_normalized_rmse": block["normalized_rmse"],
-                "block_count": 1,
-            })
-    mismatch_regions = [
-        {**region,
-         "duration_seconds": region["end_seconds"] - region["start_seconds"]}
-        for region in mismatch_regions
-        if region["end_seconds"] - region["start_seconds"] + 1e-9 >=
-        LOCAL_MISMATCH_MIN_SECONDS
-    ]
-
-    covered_count = sum(covered_frames)
-    target_duration = target_audio["duration_seconds"]
-    total_analysis_frames = max(1, math.ceil(target_audio["total_frames"] / step))
+    total_frames = max(1, target_meta["total_frames"])
     return {
         "declared_gains": declared_gains,
         "offsets_seconds": offsets,
-        "analysis_sample_rate_hz": round(analysis_rate, 3),
+        "analysis_sample_rate_hz": rate,
+        "analysis_ranges_seconds": [[0.0, target_meta["duration_seconds"]]],
+        "analysis_complete": True,
         "declaration_partition_normalized_rmse": partition_metrics[0],
         "declaration_partition_correlation": partition_metrics[1],
         "validation_normalized_rmse": validation_metrics[0],
         "validation_correlation": validation_metrics[1],
-        "source_identifiability": identifiability,
-        "max_source_correlation": source_correlation,
-        "target_duration_seconds": target_duration,
-        "covered_duration_seconds": covered_count / analysis_rate,
-        "coverage_ratio": covered_count / total_analysis_frames,
-        "matched_duration_seconds": matched_frames / analysis_rate,
-        "matched_coverage_ratio": matched_frames / total_analysis_frames,
+        "source_identifiability": _source_identifiability(gram),
+        "max_source_correlation": _max_source_correlation(gram),
+        "target_duration_seconds": target_meta["duration_seconds"],
+        "covered_duration_seconds": covered_count / rate,
+        "coverage_ratio": covered_count / total_frames,
+        "matched_duration_seconds": matched_frames / rate,
+        "matched_coverage_ratio": matched_frames / total_frames,
         "local_mismatch_regions": mismatch_regions,
         "longest_local_mismatch_seconds": max(
             (region["duration_seconds"] for region in mismatch_regions), default=0.0),
@@ -536,7 +763,7 @@ def _linear_status(assessment, match_rmse, match_correlation,
 
 
 def _segment_alternative_locations(audio, attrs):
-    """Find near-identical alternative positions for an explicitly selected segment."""
+    """Find full-file alternative positions with FFT coarse search."""
     if attrs.get("source_start_seconds") is None or attrs.get("source_end_seconds") is None:
         return []
     start = float(attrs["source_start_seconds"])
@@ -550,14 +777,24 @@ def _segment_alternative_locations(audio, attrs):
     template = samples[first:last]
     if len(template) < 25 or len(samples) < len(template) + 25:
         return []
-    stride = max(1, round(0.05 * SEGMENT_SCAN_RATE_HZ))
-    exclusion = max(stride, round(0.1 * SEGMENT_SCAN_RATE_HZ))
+    exclusion = max(1, round(0.1 * SEGMENT_SCAN_RATE_HZ))
     alternatives = []
-    for candidate in range(0, len(samples) - len(template) + 1, stride):
+    for score, candidate in _fft_normalized_candidates(
+            template, samples, top_k=32,
+            min_separation=max(exclusion, len(template) // 2)):
         if abs(candidate - first) <= exclusion:
             continue
+        # Re-evaluate candidates in the time domain before reporting them.
         comparison = samples[candidate:candidate + len(template)]
-        if _correlation(template, comparison) >= SEGMENT_AMBIGUITY_CORRELATION:
+        # Discard only the small FIR boundary region for the precise check.
+        # Identical source material can otherwise differ at a cut because its
+        # neighbouring samples (or file-edge padding) are different.
+        trim = min(round(0.04 * SEGMENT_SCAN_RATE_HZ),
+                   max(0, (len(template) - 32) // 2))
+        precise_template = template[trim:len(template) - trim or None]
+        precise_comparison = comparison[trim:len(comparison) - trim or None]
+        if _correlation(precise_template, precise_comparison) >= \
+                SEGMENT_AMBIGUITY_CORRELATION:
             alternatives.append(round(window_start + candidate / SEGMENT_SCAN_RATE_HZ, 3))
             if len(alternatives) >= 5:
                 break
@@ -607,13 +844,13 @@ def _linear_pass(native, chain, *, relationship, target_type, scopes, rule,
                             "reason": f"More than {MAX_SOURCES} sources exceeds the bounded analysis limit."})
             continue
         try:
-            target_audio, sources = _read_target_and_sources(target, edges, chain)
-            assessed = _linear_timeline_metrics(target_audio, list(zip(edges, sources)),
-                                                [edge["hash"] for edge in edges])
+            assessed = _linear_timeline_metrics(
+                chain, target["artefact_hash"], edges,
+                [edge["hash"] for edge in edges])
             alternative_locations = []
             if check_segment_ambiguity:
                 for edge in edges:
-                    audio = _read_bound_pcm(chain, edge["hash"])
+                    audio = _analysis_proxy(chain, edge["hash"])
                     alternatives = _segment_alternative_locations(
                         audio, edge.get("attributes") or {})
                     if alternatives:
@@ -627,6 +864,9 @@ def _linear_pass(native, chain, *, relationship, target_type, scopes, rule,
             results.append({**base, "status": "unavailable",
                             "claim_status": "declared_unverified",
                             "reason": f"PCM analysis unavailable: {exc}",
+                            **({"reason_code": exc.reason_code,
+                               "analysis_complete": False}
+                              if isinstance(exc, ResourceBudgetExceeded) else {}),
                             "content_match_is_provenance": False})
             continue
         if assessed is None:
@@ -697,7 +937,10 @@ def _linear_pass(native, chain, *, relationship, target_type, scopes, rule,
                         "alternative_source_locations": alternative_locations,
                         "manual_review_reasons": [review_reason] if review_reason else [],
                         "content_match_is_provenance": False,
-                        "analysis_sample_rate_hz": assessed["analysis_sample_rate_hz"]})
+                        "analysis_sample_rate_hz": assessed["analysis_sample_rate_hz"],
+                        "analysis_ranges_seconds": assessed[
+                            "analysis_ranges_seconds"],
+                        "analysis_complete": assessed["analysis_complete"]})
     return results
 
 
@@ -807,27 +1050,13 @@ class CompDerivationPass:
                                 "selection_count": len(selections)})
                 continue
             try:
-                target_start = min(float(selection["target_start_seconds"])
-                                   for selection in selections)
-                target_end = max(float(selection["target_end_seconds"])
-                                 for selection in selections)
-                target_audio = _read_bound_pcm(
-                    chain, target["artefact_hash"], target_start, target_end,
-                    max_seconds=None)
                 entries = []
                 alternative_locations = []
                 for selection in selections:
                     source_hash = selection["source_hash"]
                     if source_hash not in nodes:
                         raise ValueError("a CompSheet source hash is absent from the graph")
-                    source_audio = _read_bound_pcm(
-                        chain, source_hash,
-                        float(selection["source_start_seconds"]),
-                        float(selection["source_end_seconds"]), max_seconds=None)
-                    if (source_audio["sample_rate_hz"] != target_audio["sample_rate_hz"] or
-                            source_audio["channels"] != target_audio["channels"]):
-                        raise ValueError("source and target sample rates/channels must match")
-                    entries.append(({
+                    entries.append({
                         "hash": source_hash,
                         "attributes": {
                             "source_start_seconds": selection["source_start_seconds"],
@@ -836,8 +1065,8 @@ class CompDerivationPass:
                             "target_end_seconds": selection["target_end_seconds"],
                             "gain": selection["gain"],
                         },
-                    }, source_audio))
-                    source_search_audio = _read_bound_pcm(chain, source_hash)
+                    })
+                    source_search_audio = _analysis_proxy(chain, source_hash)
                     alternatives = _segment_alternative_locations(source_search_audio, {
                         "source_start_seconds": selection["source_start_seconds"],
                         "source_end_seconds": selection["source_end_seconds"],
@@ -850,11 +1079,15 @@ class CompDerivationPass:
                             "alternative_start_seconds": alternatives,
                         })
                 assessed = _linear_timeline_metrics(
-                    target_audio, entries, [selection["source_hash"] for selection in selections])
+                    chain, target["artefact_hash"], entries,
+                    [selection["source_hash"] for selection in selections])
             except (OSError, ValueError, TypeError) as exc:
                 results.append({**base, "status": "unavailable",
                                 "claim_status": "declared_unverified",
                                 "reason": f"Comp audio analysis unavailable: {exc}",
+                                **({"reason_code": exc.reason_code,
+                                   "analysis_complete": False}
+                                  if isinstance(exc, ResourceBudgetExceeded) else {}),
                                 "content_match_is_provenance": False})
                 continue
             if assessed is None:
@@ -927,142 +1160,71 @@ class CompDerivationPass:
                             "alternative_source_locations": alternative_locations,
                             "manual_review_reasons": [review_reason] if review_reason else [],
                             "content_match_is_provenance": False,
-                            "analysis_sample_rate_hz": assessed["analysis_sample_rate_hz"]})
+                            "analysis_sample_rate_hz": assessed["analysis_sample_rate_hz"],
+                            "analysis_ranges_seconds": assessed[
+                                "analysis_ranges_seconds"],
+                            "analysis_complete": assessed["analysis_complete"]})
         return results
 
 
 def _moving_average(samples, window):
-    """Centred, length-preserving moving average, O(n) via an incremental
-    sliding window (one sample added and/or one removed per step, no
-    prefix-sum array and no per-element max()/min() call).
-
-    The window shrinks at the clip boundaries rather than wrapping or
-    zero-padding, so no spurious energy is introduced at the edges and
-    every analysis window stays within the actual recorded audio. This
-    computes exactly the same quantity, sum(samples[low:high]) / (high -
-    low) with the same low/high clamping, as a prefix-sum formulation
-    would -- verified numerically equivalent to ~1e-11 (floating-point
-    summation-order noise only, many orders of magnitude below any
-    threshold this module compares against) -- just without rebuilding a
-    full prefix array or calling max()/min() on every element; this is
-    the dominant cost in this module's profile (K1 performance review).
-    """
-    count = len(samples)
-    if window <= 1 or not count:
-        return list(samples)
+    """Centred, boundary-shrinking moving average without sample loops."""
+    values = np.asarray(samples, dtype=np.float32)
+    count = values.size
+    if window <= 1 or count == 0:
+        return values.copy()
     half = window // 2
-    current_high = min(count, window - half)
-    window_sum = 0.0
-    for index in range(current_high):
-        window_sum += samples[index]
-    current_low = 0
-    result = [0.0] * count
-    result[0] = window_sum / current_high
-    high_limit = window - half
-    for index in range(1, count):
-        new_low = index - half
-        if new_low > current_low:
-            window_sum -= samples[current_low]
-            current_low = new_low
-        new_high = index + high_limit
-        if new_high > count:
-            new_high = count
-        if new_high > current_high:
-            window_sum += samples[current_high]
-            current_high = new_high
-        result[index] = window_sum / (current_high - current_low)
-    return result
+    positions = np.arange(count)
+    low = np.maximum(0, positions - half)
+    high = np.minimum(count, positions + (window - half))
+    prefix = np.concatenate((np.zeros(1, dtype=np.float64),
+                             np.cumsum(values, dtype=np.float64)))
+    return ((prefix[high] - prefix[low]) / (high - low)).astype(np.float32)
 
 
 def _decimate_stage(samples, factor):
-    """One bounded integer-factor decimation stage: low-pass, then pick
-    every `factor`-th sample.
-
-    The low-pass is a moving average of width `factor`, applied twice in
-    cascade. This was chosen empirically (not just by the textbook "null
-    at the new Nyquist" design, which turned out to over-attenuate
-    legitimate below-Nyquist content for this codebase's short analysis
-    windows and repeated-content ambiguity checks -- see the comment on
-    MAX_DECIMATION_STAGE_FACTOR): it is the simplest cascade depth and
-    width that measurably suppresses genuine above-Nyquist aliasing while
-    keeping correlation between two identical, differently-positioned
-    below-Nyquist signals (what the repeated-segment ambiguity check and
-    the declared-derivation correlation checks both rely on) above their
-    existing thresholds. Large overall ratios are not handled by widening
-    this one stage -- see _antialias_filter, which chains several bounded
-    stages instead, keeping both the filter length and the work per stage
-    small regardless of the total ratio.
-    """
+    """Compatibility helper: low-pass first, then integer decimation."""
+    values = np.asarray(samples, dtype=np.float32)
     if factor <= 1:
-        return list(samples)
-    filtered = samples
-    for _ in range(2):
-        filtered = _moving_average(filtered, factor)
-    return filtered[::factor]
+        return values.copy()
+    taps = _fir_lowpass(1.0, 0.45 / factor)
+    return np.convolve(values, taps, mode="same")[::factor].astype(np.float32)
 
 
 def _antialias_filter(samples, rate, output_rate):
-    """Low-pass `samples` toward output_rate's Nyquist via cascaded,
-    bounded-factor decimation stages.
-
-    Each stage decimates by at most MAX_DECIMATION_STAGE_FACTOR and uses
-    `floor`, never `round`, when choosing its factor, so effective_rate
-    can never drop below output_rate -- overshooting would permanently
-    discard content the caller asked to keep. The signal also shrinks
-    after each stage, so total work across all stages is dominated by the
-    first and stays close to O(len(samples)) overall, independent of how
-    large the total ratio is.
-
-    Returns (filtered_samples, effective_rate): the filtered signal and
-    the rate it is actually at. effective_rate may end up slightly above
-    output_rate when the final residual ratio isn't an exact integer --
-    callers resolve that with an ordinary exact-rate pick from this
-    already band-limited result, the same way the original nearest-index
-    resample picked directly from the raw signal.
-    """
-    if output_rate >= rate or not samples:
-        return list(samples), rate
-    effective_rate = rate
-    # No defensive copy here: _moving_average/_decimate_stage only ever
-    # read their input and return a new list, never mutate in place, so
-    # `current` can safely start as the caller's own list and only gets
-    # rebound (not written through) once the first stage runs.
-    current = samples
-    while effective_rate > output_rate * (1 + 1e-9):
-        stage_ratio = effective_rate / output_rate
-        factor = min(MAX_DECIMATION_STAGE_FACTOR, math.floor(stage_ratio))
-        if factor < 2 or len(current) < factor * 4:
-            break  # no further whole-factor stage fits; the final pick handles the (small, bounded) remainder
-        current = _decimate_stage(current, factor)
-        effective_rate /= factor
-    return current, effective_rate
+    """Band-limit at the requested output Nyquist without changing rate."""
+    values = np.asarray(samples, dtype=np.float32)
+    if values.size == 0 or output_rate >= rate:
+        return values.copy(), rate
+    taps = _fir_lowpass(rate, output_rate * 0.45)
+    return np.convolve(values, taps, mode="same").astype(np.float32), rate
 
 
 def _resample_series(samples, rate, output_rate):
-    """Anti-aliased replacement for a plain nearest-index resample.
-
-    Low-passes toward the target Nyquist first (_antialias_filter), then
-    picks at the exact requested output_rate from that band-limited
-    signal. Output length and the final index formula match the original
-    nearest-index behaviour exactly whenever no filtering is needed
-    (output_rate >= rate), so upsampling/no-op callers are unaffected.
-    """
-    if not samples or not rate:
-        return []
-    count = int(len(samples) / rate * output_rate)
-    filtered, effective_rate = _antialias_filter(samples, rate, output_rate)
-    if not filtered:
-        return []
-    result = []
-    for index in range(count):
-        source_index = min(len(filtered) - 1, round(index * effective_rate / output_rate))
-        result.append(filtered[source_index])
-    return result
+    """Vectorized, bandwidth-safe resampling for analysis diagnostics."""
+    values = np.asarray(samples, dtype=np.float32).reshape(-1)
+    if values.size == 0 or not rate or not output_rate:
+        return np.empty(0, dtype=np.float32)
+    if math.isclose(rate, output_rate, rel_tol=0.0, abs_tol=1e-9):
+        return values.copy()
+    filtered, _ = _antialias_filter(values, rate, output_rate)
+    ratio = rate / output_rate
+    rounded_ratio = round(ratio)
+    count = int(values.size / rate * output_rate)
+    if count <= 0:
+        return np.empty(0, dtype=np.float32)
+    # Integer downsampling still follows the low-pass above; direct slicing is
+    # only the sample-pick stage, never an assertion that filtering is optional.
+    if output_rate < rate and math.isclose(ratio, rounded_ratio, abs_tol=1e-9):
+        return np.ascontiguousarray(filtered[::rounded_ratio][:count], dtype=np.float32)
+    source_times = np.arange(values.size, dtype=np.float64) / rate
+    output_times = np.arange(count, dtype=np.float64) / output_rate
+    return np.interp(output_times, source_times, filtered).astype(np.float32)
 
 
 def _mono_resample(audio, output_rate):
-    channels = audio["channels"]
-    samples = [sum(frame) / channels for frame in audio["frames"]]
+    samples = np.mean(np.asarray(audio["frames"], dtype=np.float32),
+                      axis=1, dtype=np.float32)
     return _resample_series(samples, audio["sample_rate_hz"], output_rate)
 
 
@@ -1070,13 +1232,53 @@ def _correlation(left, right):
     count = min(len(left), len(right))
     if count < 32:
         return 0.0
-    left, right = left[:count], right[:count]
-    left_mean, right_mean = sum(left) / count, sum(right) / count
-    numerator = sum((a - left_mean) * (b - right_mean) for a, b in zip(left, right))
-    left_energy = sum((a - left_mean) ** 2 for a in left)
-    right_energy = sum((b - right_mean) ** 2 for b in right)
-    denominator = math.sqrt(left_energy * right_energy)
+    left_values = np.asarray(left[:count], dtype=np.float64)
+    right_values = np.asarray(right[:count], dtype=np.float64)
+    left_values = left_values - np.mean(left_values)
+    right_values = right_values - np.mean(right_values)
+    denominator = float(np.linalg.norm(left_values) * np.linalg.norm(right_values))
+    numerator = float(np.sum(left_values * right_values, dtype=np.float64))
     return numerator / denominator if denominator > 1e-12 else 0.0
+
+
+def _fft_normalized_candidates(query, haystack, top_k=8, min_separation=1):
+    """Return top linear normalized cross-correlation locations via FFT."""
+    query = np.asarray(query, dtype=np.float64).reshape(-1)
+    haystack = np.asarray(haystack, dtype=np.float64).reshape(-1)
+    width = query.size
+    candidate_count = haystack.size - width + 1
+    if width < 8 or candidate_count < 1:
+        return []
+    centred = query - np.mean(query)
+    query_energy = float(np.sum(centred * centred, dtype=np.float64))
+    if query_energy < 1e-12:
+        return []
+    convolution_size = haystack.size + width - 1
+    fft_size = 1 << (convolution_size - 1).bit_length()
+    convolution = np.fft.irfft(
+        np.fft.rfft(haystack, fft_size) *
+        np.fft.rfft(centred[::-1], fft_size), fft_size)
+    numerator = convolution[width - 1:width - 1 + candidate_count]
+    prefix = np.concatenate(([0.0], np.cumsum(haystack, dtype=np.float64)))
+    square_prefix = np.concatenate(
+        ([0.0], np.cumsum(haystack * haystack, dtype=np.float64)))
+    local_sum = prefix[width:] - prefix[:-width]
+    local_square = square_prefix[width:] - square_prefix[:-width]
+    local_variance = np.maximum(local_square - local_sum * local_sum / width, 0.0)
+    denominator = np.sqrt(query_energy * local_variance)
+    scores = np.divide(numerator, denominator, out=np.zeros_like(numerator),
+                       where=denominator > 1e-12)
+    ranking = np.abs(scores).copy()
+    candidates = []
+    separation = max(1, int(min_separation))
+    for _ in range(min(top_k, candidate_count)):
+        index = int(np.argmax(ranking))
+        if not math.isfinite(ranking[index]) or ranking[index] < 0:
+            break
+        candidates.append((float(scores[index]), index))
+        ranking[max(0, index - separation):
+                min(candidate_count, index + separation + 1)] = -1.0
+    return candidates
 
 
 def _declared_master_samples(source, target, attrs, rate=400):
@@ -1106,24 +1308,16 @@ def _declared_master_samples(source, target, attrs, rate=400):
     source_selected, target_selected = source_selected[:count], target_selected[:count]
     declared_score = _correlation(source_selected, target_selected)
 
-    # Search only for competing locations. An alternative can make the declared
-    # range ambiguous, but it is never substituted for the submitted range.
-    coarse_source = source_selected[::4]
-    coarse_target = target_all[::4]
-    declared_coarse_start = round(
-        (target_start - target["start_seconds"]) * rate / 4)
-    radius = round(MAX_OFFSET_SECONDS * rate / 4)
-    exclusion = round(MASTER_PEAK_EXCLUSION_SECONDS * rate / 4)
-    first_candidate = max(0, declared_coarse_start - radius)
-    last_candidate = min(len(coarse_target) - len(coarse_source),
-                         declared_coarse_start + radius)
-    alternatives = []
-    if len(coarse_source) >= 32 and last_candidate >= first_candidate:
-        for candidate in range(first_candidate, last_candidate + 1):
-            if abs(candidate - declared_coarse_start) < exclusion:
-                continue
-            comparison = coarse_target[candidate:candidate + len(coarse_source)]
-            alternatives.append((_correlation(coarse_source, comparison), candidate))
+    # Search the complete master proxy. Competing locations can reduce
+    # certainty but never replace the submitter-declared range.
+    declared_coarse_start = round((target_start - target["start_seconds"]) * rate)
+    exclusion = round(MASTER_PEAK_EXCLUSION_SECONDS * rate)
+    alternatives = [
+        (score, candidate) for score, candidate in _fft_normalized_candidates(
+            source_selected, target_all, top_k=12,
+            min_separation=max(exclusion, len(source_selected) // 8))
+        if abs(candidate - declared_coarse_start) >= exclusion
+    ]
     alternative_score, alternative_start = (
         max(alternatives, key=lambda item: item[0])
         if alternatives else (float("-inf"), declared_coarse_start))
@@ -1140,24 +1334,35 @@ def _declared_master_samples(source, target, attrs, rate=400):
         "strongest_alternative_alignment_correlation": (
             alternative_score if math.isfinite(alternative_score) else None),
         "alternative_target_start_seconds": (
-            target["start_seconds"] + alternative_start * 4 / rate
+            target["start_seconds"] + alternative_start / rate
             if math.isfinite(alternative_score) else None),
         "alignment_margin": alignment_margin if math.isfinite(alignment_margin) else None,
         "alignment_ambiguous": alignment_ambiguous,
         "alignment_coverage_ratio": coverage,
+        "search_complete": True,
+        "searched_ranges_seconds": [[0.0, target["duration_seconds"]]],
+        "analysis_proxy_sample_rate_hz": target.get(
+            "proxy_sample_rate_hz", target["sample_rate_hz"]),
     }
     return source_selected, target_selected, diagnostics
 
 
 def _block_rms(samples, block_size):
-    return [math.sqrt(sum(value * value for value in samples[start:start + block_size]) /
-                      len(samples[start:start + block_size]))
-            for start in range(0, len(samples), block_size)
-            if len(samples[start:start + block_size]) >= block_size // 2]
+    values = np.asarray(samples, dtype=np.float32).reshape(-1)
+    if values.size == 0:
+        return np.empty(0, dtype=np.float32)
+    full = values.size // block_size
+    rows = values[:full * block_size].reshape(full, block_size)
+    result = np.sqrt(np.mean(rows * rows, axis=1)) if full else np.empty(0)
+    remainder = values[full * block_size:]
+    if remainder.size >= block_size // 2:
+        result = np.concatenate((result, [np.sqrt(np.mean(remainder * remainder))]))
+    return np.asarray(result, dtype=np.float32)
 
 
 def _rms(samples):
-    return math.sqrt(sum(value * value for value in samples) / len(samples)) if samples else 0.0
+    values = np.asarray(samples, dtype=np.float64).reshape(-1)
+    return float(np.sqrt(np.mean(values * values))) if values.size else 0.0
 
 
 class MasterDerivationPass:
@@ -1197,25 +1402,18 @@ class MasterDerivationPass:
                                 "reason": "A mastered_from scope must be master_similarity."})
                 continue
             try:
-                source_start = float(attrs["source_start_seconds"])
-                source_end = float(attrs["source_end_seconds"])
-                target_start = float(attrs["target_start_seconds"])
-                target_end = float(attrs["target_end_seconds"])
-                source = _read_bound_pcm(
-                    chain, edges[0]["hash"], source_start, source_end,
-                    max_seconds=None)
-                master = _read_bound_pcm(
-                    chain, target["artefact_hash"],
-                    max(0.0, target_start - MAX_OFFSET_SECONDS),
-                    min(target_end + MAX_OFFSET_SECONDS,
-                        _pcm_duration(chain, target["artefact_hash"])),
-                    max_seconds=None)
+                source = _analysis_proxy(chain, edges[0]["hash"])
+                master = _analysis_proxy(chain, target["artefact_hash"])
                 source_samples, master_samples, alignment = _declared_master_samples(
                     source, master, attrs)
             except (OSError, ValueError, TypeError) as exc:
                 results.append({**base, "status": "unavailable",
                                 "claim_status": "declared_unverified",
                                 "reason": f"Master comparison unavailable: {exc}",
+                                **({"reason_code": exc.reason_code,
+                                   "analysis_complete": False,
+                                   "search_complete": False}
+                                  if isinstance(exc, ResourceBudgetExceeded) else {}),
                                 "content_match_is_provenance": False})
                 continue
             if len(source_samples) < 128 or _rms(source_samples) < 1e-7 or _rms(master_samples) < 1e-7:
@@ -1228,8 +1426,8 @@ class MasterDerivationPass:
             source_envelope = _block_rms(source_samples, 100)
             master_envelope = _block_rms(master_samples, 100)
             envelope_correlation = _correlation(source_envelope, master_envelope)
-            source_delta = _rms([right - left for left, right in zip(source_samples, source_samples[1:])])
-            master_delta = _rms([right - left for left, right in zip(master_samples, master_samples[1:])])
+            source_delta = _rms(np.diff(source_samples))
+            master_delta = _rms(np.diff(master_samples))
             source_brightness = source_delta / max(_rms(source_samples), 1e-12)
             master_brightness = master_delta / max(_rms(master_samples), 1e-12)
             spectral_balance_delta = abs(math.log(max(master_brightness, 1e-12) /
@@ -1287,6 +1485,11 @@ class MasterDerivationPass:
                             "alignment_ambiguous": alignment["alignment_ambiguous"],
                             "alignment_coverage_ratio": round(
                                 alignment["alignment_coverage_ratio"], 6),
+                            "search_complete": alignment["search_complete"],
+                            "searched_ranges_seconds": alignment[
+                                "searched_ranges_seconds"],
+                            "analysis_proxy_sample_rate_hz": alignment[
+                                "analysis_proxy_sample_rate_hz"],
                             "duration_delta_seconds": round(duration_delta, 6),
                             "waveform_correlation": round(waveform_correlation, 6),
                             "envelope_correlation": round(envelope_correlation, 6),
