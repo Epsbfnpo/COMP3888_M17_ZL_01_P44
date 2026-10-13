@@ -83,12 +83,26 @@ def _node_index(native):
     return {item["artefact_hash"]: item for item in native["artefacts"]}
 
 
+def _flagged_edges(native):
+    """Edges whose declaration had input errors; their parameters are not used."""
+    return (native.get("_input_issues") or {}).get("declaration_edges") or {}
+
+
+def _input_error_result(base):
+    return {**base, "status": "unavailable", "reason_code": "input_error",
+            "reason": ("A relationship declaration for this target contains unrecognised "
+                       "fields; it was not corrected, so this diagnostic was not run.")}
+
+
 def _audio_edges(native, relationships=AUDIO_RELATIONSHIPS):
     nodes = _node_index(native)
+    flagged = _flagged_edges(native)
     for target in native["artefacts"]:
         if not _is_audio(target):
             continue
         for edge in target.get("evidence", []):
+            if (target["artefact_hash"], edge["hash"]) in flagged:
+                continue
             source = nodes.get(edge["hash"])
             if source and _is_audio(source) and edge["relationship_type"] in relationships:
                 yield source, target, edge
@@ -415,6 +429,10 @@ class SourceContributionPass:
                 continue
             base = _base("audio_source_contribution", "SourceContributionPass",
                          target["artefact_hash"], [edge["hash"] for edge in edges])
+            if any((target["artefact_hash"], edge["hash"]) in _flagged_edges(native)
+                   for edge in edges):
+                results.append(_input_error_result(base))
+                continue
             if len(edges) > MAX_CONTRIBUTION_SOURCES:
                 results.append({**base, "status": "not_applicable",
                                 "reason": "The bounded contribution analysis supports at most 16 sources."})
@@ -698,6 +716,10 @@ class StemMixResidualPass:
                 continue
             base = _base("audio_stem_mix_residual", "StemMixResidualPass",
                          target["artefact_hash"], [edge["hash"] for edge in edges])
+            if any((target["artefact_hash"], edge["hash"]) in _flagged_edges(native)
+                   for edge in edges):
+                results.append(_input_error_result(base))
+                continue
             try:
                 target_audio = _read(chain, target["artefact_hash"])
                 target_channels = _channel_vectors(target_audio, RESIDUAL_RATE_HZ)

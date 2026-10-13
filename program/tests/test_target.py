@@ -5,7 +5,9 @@ import json
 import math
 import struct
 import sys
+import shutil
 import tempfile
+import time
 import unittest
 import wave
 from pathlib import Path
@@ -16,6 +18,8 @@ import numpy as np
 BASE = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(BASE))
 import run
+import music_target.engine as engine_module
+import music_target.wav_io as wav_io_module
 from music_target.contract import source_revision, validate
 from music_target.engine import (
     InputError,
@@ -1737,6 +1741,23 @@ class TargetTests(unittest.TestCase):
         self.assertEqual(result["execution_status"], "timeout")
         self.assertLess(result["processing_ms"], 4000)
 
+    def test_requested_timeout_is_not_capped_at_sixty_seconds(self):
+        self.assertEqual(run.effective_timeout({"timeout_seconds": 120}), 120)
+        self.assertEqual(run.effective_timeout({"timeout_seconds": 5}), 5)
+        self.assertEqual(run.effective_timeout({}), run.DEFAULT_TIMEOUT_SECONDS)
+        self.assertEqual(run.effective_timeout({"timeout_seconds": 0}),
+                         run.DEFAULT_TIMEOUT_SECONDS)
+        self.assertEqual(run.effective_timeout({"timeout_seconds": 10 ** 12}),
+                         run.MAX_WAIT_SECONDS)
+        request = copy.deepcopy(self.template)
+        request["options"]["timeout_seconds"] = 90
+        with mock.patch.object(run.subprocess, "run",
+                               side_effect=run.subprocess.TimeoutExpired("worker", 90)) as worker:
+            result = run.run_isolated(request, self.folder, "native")
+        self.assertEqual(worker.call_args.kwargs["timeout"], 90)
+        self.assertEqual(result["execution_status"], "timeout")
+        self.assertIn("90-second", result["error"])
+
     def test_cli_worker_returns_contract_valid_result(self):
         result = run.run_isolated(self.template, self.folder, "native")
         self.assertEqual(result["execution_status"], "succeeded", result["error"])
@@ -2016,6 +2037,361 @@ class AntiAliasedResamplingTests(unittest.TestCase):
                                    _resample_series(mono_samples, 8000, 200),
                                    rtol=0, atol=1e-6)
 
+
+
+class InputValidationTests(unittest.TestCase):
+    """Isolate non-final input problems; stop when the final artefact is wrong."""
+
+    score = TargetTests.score
+    _workflow_request = TargetTests._workflow_request
+    _pcm16 = staticmethod(TargetTests._pcm16)
+
+    @classmethod
+    def setUpClass(cls):
+        cls.folder = BASE / "examples/valid-generated"
+        cls.template = json.loads((cls.folder / "request.json").read_text())
+
+    def _copy_example_objects(self, directory):
+        root = Path(directory)
+        shutil.copytree(self.folder / "objects", root / "objects")
+        return root
+
+    @staticmethod
+    def _flip_last_byte(path):
+        data = bytearray(path.read_bytes())
+        data[-1] ^= 1
+        path.write_bytes(bytes(data))
+
+    def _codes(self, result):
+        return [item["code"] for item in result["findings"]]
+
+    def test_nonfinal_hash_mismatch_isolates_only_that_object(self):
+        mix = self.template["chain"]["artefacts"][2]["artefact_hash"]
+        with tempfile.TemporaryDirectory() as directory:
+            root = self._copy_example_objects(directory)
+            self._flip_last_byte(root / self.template["objects"][mix])
+            result = self.score(folder=root)
+        self.assertEqual(result["execution_status"], "succeeded", result["error"])
+        mismatch = [item for item in result["findings"] if item["code"] == "OBJECT_HASH_MISMATCH"]
+        self.assertEqual(len(mismatch), 1)
+        self.assertEqual(mismatch[0]["evidence_hash"], mix)
+        self.assertEqual(mismatch[0]["severity"], "high")
+        self.assertIn("SCORE_AFFECTED_BY_INPUT_ERRORS", self._codes(result))
+        self.assertTrue(all(axis["availability"] != "available"
+                            for axis in result["axes"].values()))
+        rules = {item["rule_id"]: item["status"]
+                 for item in result["workflow_assessment"]["rule_results"]}
+        self.assertEqual(rules["mastering.pre_master"], "not_assessed")
+        self.assertEqual(result["axes"]["completeness"]["value"], 1.0)
+
+    def test_final_hash_mismatch_stops_and_reports_only_the_final(self):
+        request = copy.deepcopy(self.template)
+        stem = request["chain"]["artefacts"][1]["artefact_hash"]
+        upper = stem.upper()
+        request["chain"]["artefacts"][1]["artefact_hash"] = upper
+        request["chain"]["artefacts"][2]["evidence"][0]["hash"] = upper
+        request["objects"][upper] = request["objects"].pop(stem)
+        final = request["chain"]["final_artefact_hash"]
+        with tempfile.TemporaryDirectory() as directory:
+            root = self._copy_example_objects(directory)
+            self._flip_last_byte(root / request["objects"][final])
+            result = self.score(request, root)
+        self.assertEqual(result["execution_status"], "error")
+        self.assertIn("SHA-256 mismatch", result["error"])
+        self.assertEqual(self._codes(result), ["OBJECT_HASH_MISMATCH"])
+        self.assertEqual(result["findings"][0]["evidence_hash"], final)
+
+    def test_uppercase_nonfinal_hash_is_reported_not_corrected(self):
+        request = copy.deepcopy(self.template)
+        stem = request["chain"]["artefacts"][1]["artefact_hash"]
+        upper = stem.upper()
+        request["chain"]["artefacts"][1]["artefact_hash"] = upper
+        request["chain"]["artefacts"][2]["evidence"][0]["hash"] = upper
+        request["objects"][upper] = request["objects"].pop(stem)
+        result = self.score(request)
+        self.assertEqual(result["execution_status"], "succeeded", result["error"])
+        issue = next(item for item in result["findings"] if item["code"] == "INVALID_HASH_FORMAT")
+        self.assertEqual(issue["submitted_hash"], upper)
+        self.assertNotIn("evidence_hash", issue)
+        self.assertEqual(issue["location"], "chain/artefacts/1/artefact_hash")
+        self.assertNotIn("INVALID_OBJECT_PATH", self._codes(result))
+        self.assertFalse(any(item.get("evidence_hash") == stem for item in result["findings"]
+                             if item["code"] == "WAV_OBSERVATION"))
+
+    def test_final_object_key_case_or_extension_error_stops(self):
+        final = self.template["chain"]["final_artefact_hash"]
+        request = copy.deepcopy(self.template)
+        request["objects"][final.upper()] = request["objects"].pop(final)
+        result = self.score(request)
+        self.assertEqual(result["execution_status"], "error")
+        self.assertEqual(self._codes(result), ["INVALID_HASH_FORMAT"])
+        with tempfile.TemporaryDirectory() as directory:
+            root = self._copy_example_objects(directory)
+            request = copy.deepcopy(self.template)
+            (root / request["objects"][final]).rename(root / f"objects/{final}.WAV")
+            request["objects"][final] = f"objects/{final}.WAV"
+            result = self.score(request, root)
+        self.assertEqual(result["execution_status"], "error")
+        self.assertEqual(self._codes(result), ["INVALID_OBJECT_PATH"])
+        self.assertIn("'.wav'", result["findings"][0]["suggestion"])
+
+    def test_uppercase_nonfinal_extension_isolates_that_object(self):
+        raw = self.template["chain"]["artefacts"][0]["artefact_hash"]
+        with tempfile.TemporaryDirectory() as directory:
+            root = self._copy_example_objects(directory)
+            request = copy.deepcopy(self.template)
+            (root / request["objects"][raw]).rename(root / f"objects/{raw}.WAV")
+            request["objects"][raw] = f"objects/{raw}.WAV"
+            result = self.score(request, root)
+        self.assertEqual(result["execution_status"], "succeeded", result["error"])
+        issue = next(item for item in result["findings"] if item["code"] == "INVALID_OBJECT_PATH")
+        self.assertEqual(issue["evidence_hash"], raw)
+        self.assertIn("SCORE_AFFECTED_BY_INPUT_ERRORS", self._codes(result))
+
+    def test_unknown_fields_skip_only_dependent_checks_with_suggestions(self):
+        request = copy.deepcopy(self.template)
+        nodes = request["chain"]["artefacts"]
+        nodes[2]["evidence"][0]["attributes"]["fade_out_secs"] = 1.0
+        nodes[1]["attributes"]["creation_methd"] = nodes[1]["attributes"].pop("creation_method")
+        nodes[3]["attributes"]["technical"]["bitdepth"] = 16
+        result = self.score(request)
+        self.assertEqual(result["execution_status"], "succeeded", result["error"])
+        unknown = {item["location"]: item["suggestion"] for item in result["findings"]
+                   if item["code"] == "UNKNOWN_FIELD"}
+        self.assertEqual(unknown, {
+            "chain/artefacts/2/evidence/0/attributes/fade_out_secs": "Did you mean 'fade_out_seconds'?",
+            "chain/artefacts/1/attributes/creation_methd": "Did you mean 'creation_method'?",
+            "chain/artefacts/3/attributes/technical/bitdepth": "Did you mean 'bit_depth'?",
+        })
+        mix_check = result["assessment_checks"]["audio_derivation"][0]
+        self.assertEqual(mix_check["status"], "unavailable")
+        self.assertEqual(mix_check["reason_code"], "input_error")
+        relationship = next(item for item in result["findings"]
+                            if item["code"] == "RELATIONSHIP_INTEGRITY_OBSERVATION"
+                            and item["target_hash"] == nodes[2]["artefact_hash"])
+        self.assertEqual(relationship["status"], "unavailable")
+        self.assertEqual(result["axes"]["ai_disclosure"]["value"], 1.0)
+        rules = {item["rule_id"]: item["status"]
+                 for item in result["workflow_assessment"]["rule_results"]}
+        self.assertEqual(rules["common.creation_method_disclosure"], "not_assessed")
+
+    def test_misspelled_fade_is_not_turned_into_a_contradiction(self):
+        rng = np.random.default_rng(5)
+        rate, count = 8000, 8000
+        take = (np.sin(np.arange(count) * 0.07) * 9000 +
+                rng.normal(0, 2500, count)).astype(int)
+        fade = np.clip((count - np.arange(count)) / 4000.0, 0.0, 1.0)
+        edited = (take * np.where(np.arange(count) >= 4000, fade, 1.0)).astype(int)
+        attributes = {"derivation_scope": "linear_edit", "source_start_seconds": 0.0,
+                      "source_end_seconds": 1.0, "target_start_seconds": 0.0,
+                      "target_end_seconds": 1.0, "gain": 1.0}
+        statuses = {}
+        for name, field in (("correct", "fade_out_seconds"), ("typo", "fade_out_secs")):
+            with tempfile.TemporaryDirectory() as directory:
+                root = Path(directory)
+                request = self._workflow_request(root, "take_comping_and_editing", [
+                    {"type": "audio/raw-take", "data": self._pcm16(list(take), rate)},
+                    {"type": "audio/edited-take", "data": self._pcm16(list(edited), rate),
+                     "parents": [(0, "edited_from", {**attributes, field: 0.5})]},
+                ])
+                result = self.score(request, root)
+            self.assertEqual(result["execution_status"], "succeeded", result["error"])
+            statuses[name] = result["assessment_checks"]["edit_derivation"][0]["status"]
+        self.assertEqual(statuses["correct"], "matched")
+        self.assertEqual(statuses["typo"], "unavailable")
+
+    def test_unused_object_mapping_is_reported_not_fatal(self):
+        request = copy.deepcopy(self.template)
+        request["objects"]["e" * 64] = f"objects/{'e' * 64}.wav"
+        result = self.score(request)
+        self.assertEqual(result["execution_status"], "succeeded", result["error"])
+        self.assertIn("UNUSED_OBJECT_MAPPING", self._codes(result))
+        self.assertNotIn("SCORE_AFFECTED_BY_INPUT_ERRORS", self._codes(result))
+
+    def test_nonfinal_path_escape_is_isolated_without_opening_the_file(self):
+        raw = self.template["chain"]["artefacts"][0]["artefact_hash"]
+        with tempfile.TemporaryDirectory() as directory, tempfile.TemporaryDirectory() as outside:
+            root = self._copy_example_objects(directory)
+            target = Path(outside) / "outside.wav"
+            shutil.copy(root / self.template["objects"][raw], target)
+            (root / self.template["objects"][raw]).unlink()
+            (root / self.template["objects"][raw]).symlink_to(target)
+            result = self.score(folder=root)
+        self.assertEqual(result["execution_status"], "succeeded", result["error"])
+        issue = next(item for item in result["findings"] if item["code"] == "OBJECT_PATH_INVALID")
+        self.assertEqual(issue["evidence_hash"], raw)
+        self.assertEqual(issue["severity"], "high")
+
+    def test_size_limits_skip_nonfinal_objects_but_stop_on_the_final(self):
+        size = (self.folder / next(iter(self.template["objects"].values()))).stat().st_size
+        with mock.patch.object(engine_module, "MAX_TOTAL_BYTES", size * 2):
+            result = self.score()
+        self.assertEqual(result["execution_status"], "succeeded", result["error"])
+        self.assertEqual(self._codes(result).count("OBJECT_SKIPPED_SIZE_LIMIT"), 2)
+        with mock.patch.object(engine_module, "MAX_FILE_BYTES", size - 1):
+            result = self.score()
+        self.assertEqual(result["execution_status"], "unsupported")
+        self.assertEqual(self._codes(result), ["OBJECT_SIZE_LIMIT"])
+
+    def test_default_size_limits_are_512_mib_and_1_gib(self):
+        self.assertEqual(engine_module.MAX_FILE_BYTES, 512 * 1024 * 1024)
+        self.assertEqual(engine_module.MAX_TOTAL_BYTES, 1024 * 1024 * 1024)
+
+    def test_final_artefact_changed_during_evaluation_stops(self):
+        real = engine_module._file_identity
+        calls = {"count": 0}
+
+        def changed_on_recheck(path):
+            calls["count"] += 1
+            size, mtime, inode = real(path)
+            return (size, mtime, inode) if calls["count"] <= 4 else (size, mtime + 1, inode)
+
+        with mock.patch.object(engine_module, "_file_identity", side_effect=changed_on_recheck):
+            result = self.score()
+        self.assertEqual(result["execution_status"], "error")
+        self.assertEqual(self._codes(result), ["FINAL_ARTEFACT_CHANGED"])
+
+    def _change_on_calls(self, plan):
+        """Patch file identity so ``plan[path_name]`` call numbers report a change."""
+        real = engine_module._file_identity
+        calls = {}
+
+        def identity(path):
+            name = Path(path).name
+            calls[name] = calls.get(name, 0) + 1
+            size, mtime, inode = real(path)
+            if calls[name] in plan.get(name, ()):
+                return size, mtime + 1, inode
+            return size, mtime, inode
+
+        return mock.patch.object(engine_module, "_file_identity", side_effect=identity)
+
+    def test_nonfinal_change_during_evaluation_reevaluates_with_it_isolated(self):
+        stem = self.template["chain"]["artefacts"][1]["artefact_hash"]
+        stem_file = Path(self.template["objects"][stem]).name
+        with self._change_on_calls({stem_file: {2}}):   # bound, then changed at the end
+            result = self.score()
+        self.assertEqual(result["execution_status"], "succeeded", result["error"])
+        changed = [item for item in result["findings"]
+                   if item["code"] == "OBJECT_CHANGED_DURING_EVALUATION"]
+        self.assertEqual([item["evidence_hash"] for item in changed], [stem])
+        self.assertIn("SCORE_AFFECTED_BY_INPUT_ERRORS", self._codes(result))
+        observed = {item["evidence_hash"] for item in result["findings"]
+                    if item["code"] == "WAV_OBSERVATION"}
+        self.assertNotIn(stem, observed)
+        self.assertEqual(len(observed), 3)
+
+    def test_objects_changing_again_after_reevaluation_return_error(self):
+        nodes = self.template["chain"]["artefacts"]
+        stem_file = Path(self.template["objects"][nodes[1]["artefact_hash"]]).name
+        raw_file = Path(self.template["objects"][nodes[0]["artefact_hash"]]).name
+        # The stem changes in the first attempt, the raw track in the second.
+        with self._change_on_calls({stem_file: {2}, raw_file: {4}}):
+            result = self.score()
+        self.assertEqual(result["execution_status"], "error")
+        self.assertEqual(self._codes(result), ["OBJECT_CHANGED_DURING_EVALUATION"] * 2)
+
+    def test_expired_deadline_degrades_audio_checks_instead_of_timing_out(self):
+        result = run.evaluate(copy.deepcopy(self.template), self.folder, "native",
+                              deadline=time.time() - 1)
+        validate(result, "scoring-response.schema.json")
+        self.assertEqual(result["execution_status"], "succeeded", result["error"])
+        statuses = {(item["status"], item.get("reason_code"))
+                    for item in result["assessment_checks"]["audio_alignment"]}
+        self.assertEqual(statuses, {("unavailable", "resource_budget_exhausted")})
+        self.assertFalse(any("CONTRADICTION" in code for code in self._codes(result)))
+
+    def test_worker_receives_a_deadline_before_the_timeout(self):
+        request = copy.deepcopy(self.template)
+        request["options"]["timeout_seconds"] = 30
+        captured = {}
+
+        def fake_worker(command, input, **kwargs):
+            captured.update(json.loads(input))
+            raise run.subprocess.TimeoutExpired("worker", kwargs["timeout"])
+
+        started = time.time()
+        with mock.patch.object(run.subprocess, "run", side_effect=fake_worker):
+            run.run_isolated(request, self.folder, "native")
+        self.assertLess(captured["deadline"], started + 30)
+        self.assertGreater(captured["deadline"], started + 20)
+
+    def test_edge_hash_case_mismatch_explains_the_dangling_reference(self):
+        request = copy.deepcopy(self.template)
+        raw = request["chain"]["artefacts"][0]["artefact_hash"]
+        request["chain"]["artefacts"][1]["evidence"][0]["hash"] = raw.upper()
+        result = self.score(request)
+        self.assertEqual(result["execution_status"], "error")
+        self.assertIn("undeclared", result["error"])
+        self.assertIn("letter case", result["error"])
+
+    def test_other_audio_containers_are_unsupported_by_content(self):
+        cases = {"FLAC": b"fLaC" + bytes(60), "MP3": b"ID3" + bytes(61),
+                 "Ogg": b"OggS" + bytes(60),
+                 "AIFF": b"FORM" + (52).to_bytes(4, "big") + b"AIFF" + bytes(52)}
+        with tempfile.TemporaryDirectory() as directory:
+            for name, data in cases.items():
+                path = Path(directory) / f"{name}.wav"
+                path.write_bytes(data)
+                with self.subTest(name=name), self.assertRaises(wav_io_module.UnsupportedWav) as caught:
+                    inspect_wav(path)
+                self.assertEqual(caught.exception.reason_code, "unsupported_container")
+                self.assertIn(name, str(caught.exception))
+                self.assertIn(".wav", str(caught.exception))
+
+    def test_final_flac_named_wav_returns_unsupported(self):
+        final = self.template["chain"]["final_artefact_hash"]
+        data = b"fLaC" + bytes(200)
+        digest = hashlib.sha256(data).hexdigest()
+        request = copy.deepcopy(self.template)
+        request["chain"]["final_artefact_hash"] = digest
+        request["chain"]["artefacts"][3]["artefact_hash"] = digest
+        del request["chain"]["artefacts"][3]["attributes"]["technical"]
+        request["objects"].pop(final)
+        request["objects"][digest] = f"objects/{digest}.wav"
+        with tempfile.TemporaryDirectory() as directory:
+            root = self._copy_example_objects(directory)
+            (root / f"objects/{digest}.wav").write_bytes(data)
+            result = self.score(request, root)
+        self.assertEqual(result["execution_status"], "unsupported")
+        self.assertIn("FLAC", result["error"])
+
+    def test_empty_data_chunk_does_not_swallow_following_chunks(self):
+        fmt = struct.pack("<HHIIHH", 1, 1, 8000, 16000, 2, 16)
+        info = b"INFO" + b"INAM" + struct.pack("<I", 8) + b"My Song\0"
+        body = (b"WAVE" + b"fmt " + struct.pack("<I", len(fmt)) + fmt +
+                b"data" + struct.pack("<I", 0) +
+                b"LIST" + struct.pack("<I", len(info)) + info)
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "empty.wav"
+            path.write_bytes(b"RIFF" + struct.pack("<I", len(body)) + body)
+            with self.assertRaises(wav_io_module.WavError) as caught:
+                inspect_wav(path)
+        self.assertEqual(caught.exception.reason_code, "empty_audio_data")
+
+    def test_decode_blocks_are_capped_by_bytes(self):
+        samples = [int(1000 * math.sin(index / 7)) for index in range(4000)]
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "capped.wav"
+            path.write_bytes(self._pcm16(samples))
+            descriptor = inspect_wav(path)
+            whole = np.concatenate([block for _, block in read_frames(path, descriptor)])
+            with mock.patch.object(wav_io_module, "MAX_DECODE_BLOCK_BYTES", 1000):
+                blocks = list(read_frames(path, descriptor, block_frames=4000))
+        self.assertTrue(all(len(block) <= 500 for _, block in blocks))
+        np.testing.assert_array_equal(np.concatenate([block for _, block in blocks]), whole)
+
+    def test_reading_a_file_changed_after_inspection_fails(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "changing.wav"
+            path.write_bytes(self._pcm16([0] * 800))
+            descriptor = inspect_wav(path)
+            stat = path.stat()
+            import os
+            os.utime(path, ns=(stat.st_atime_ns, stat.st_mtime_ns + 1_000_000_000))
+            with self.assertRaises(wav_io_module.WavError) as caught:
+                list(read_frames(path, descriptor))
+        self.assertEqual(caught.exception.reason_code, "file_changed_after_inspection")
 
 if __name__ == "__main__":
     unittest.main()

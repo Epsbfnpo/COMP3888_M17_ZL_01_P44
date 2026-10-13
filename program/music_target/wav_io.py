@@ -25,6 +25,20 @@ UNFINALISED_SIZE = 0xFFFFFFFF
 MAX_CHUNKS = 1024
 MAX_METADATA_CHUNK_BYTES = 1 << 20
 MAX_FMT_CHUNK_BYTES = 4096
+# Upper bound on raw bytes decoded at once, whatever block length a caller asks
+# for, so high channel counts and sample rates cannot allocate huge blocks.
+MAX_DECODE_BLOCK_BYTES = 16 * 1024 * 1024
+
+# Leading bytes of common audio containers that are not RIFF/WAVE.  The file
+# content, not its extension, decides the format.
+_OTHER_CONTAINERS = (
+    (b"fLaC", "FLAC"),
+    (b"OggS", "Ogg"),
+    (b"ID3", "MP3"),
+    (b"\xff\xfb", "MP3"),
+    (b"\xff\xf3", "MP3"),
+    (b"\xff\xf2", "MP3"),
+)
 
 
 class WavError(ValueError):
@@ -68,6 +82,8 @@ class WavDescriptor:
     trailing_bytes: int = 0
     warnings: tuple[str, ...] = ()
     container_end: int = 0
+    mtime_ns: int = 0
+    inode: int = 0
 
 
 @dataclass(frozen=True)
@@ -84,9 +100,26 @@ def _read_exact(handle, size: int, reason_code: str, message: str) -> bytes:
     return data
 
 
-def _container_bounds(handle, file_size: int) -> tuple[int, list[str], int]:
-    header = _read_exact(handle, 12, "truncated_riff_header",
-                         "Truncated RIFF/WAVE header.")
+def _detected_container(header: bytes) -> str | None:
+    if header[:4] == b"FORM" and header[8:12] in {b"AIFF", b"AIFC"}:
+        return "AIFF"
+    for prefix, name in _OTHER_CONTAINERS:
+        if header.startswith(prefix):
+            return name
+    return None
+
+
+def _container_bounds(handle, file_size: int,
+                      suffix: str = "") -> tuple[int, list[str], int]:
+    header = handle.read(12)
+    detected = _detected_container(header)
+    if detected:
+        extension = f"extension '{suffix}'" if suffix else "no extension"
+        raise UnsupportedWav(
+            f"File content is {detected} audio ({extension}); {detected} is "
+            "not supported by this target.", "unsupported_container")
+    if len(header) != 12:
+        raise WavError("Truncated RIFF/WAVE header.", "truncated_riff_header")
     container_id = header[:4]
     if container_id in {b"RF64", b"BW64"}:
         raise UnsupportedWav(
@@ -193,9 +226,12 @@ def _parse_format(data: bytes) -> dict:
 def inspect_wav(path: str | os.PathLike[str]) -> WavDescriptor:
     """Inspect RIFF structure and return a descriptor without reading PCM data."""
     path = Path(path)
-    file_size = path.stat().st_size
+    stat = path.stat()
+    file_size = stat.st_size
     with path.open("rb") as handle:
-        container_end, warnings, trailing = _container_bounds(handle, file_size)
+        container_end, warnings, trailing = _container_bounds(
+            handle, file_size, path.suffix)
+        riff_unfinalised = "riff_size_unfinalised" in warnings
         position = 12
         fmt = None
         data_offset = None
@@ -220,7 +256,12 @@ def inspect_wav(path: str | os.PathLike[str]) -> WavDescriptor:
                     raise WavError("Duplicate mandatory WAV chunk.",
                                    "duplicate_chunk")
                 seen.add(chunk_id)
-            if declared_size in {0, UNFINALISED_SIZE} and chunk_id == b"data":
+            # A zero data size means "not finalised" only when the RIFF size
+            # is unfinalised too; otherwise the data chunk is genuinely empty
+            # and must not swallow the chunks that follow it.
+            if chunk_id == b"data" and (
+                    declared_size == UNFINALISED_SIZE or
+                    (declared_size == 0 and riff_unfinalised)):
                 size = max(0, container_end - start)
                 warnings.append("data_size_unfinalised")
                 unfinalised_data = True
@@ -276,6 +317,8 @@ def inspect_wav(path: str | os.PathLike[str]) -> WavDescriptor:
         trailing_bytes=trailing,
         warnings=tuple(warnings),
         container_end=container_end,
+        mtime_ns=stat.st_mtime_ns,
+        inode=stat.st_ino,
     )
 
 
@@ -365,8 +408,11 @@ def read_frames(path: str | os.PathLike[str], descriptor: WavDescriptor,
                 block_frames: int | None = None) -> Iterator[tuple[int, np.ndarray]]:
     """Yield decoded ``(first_frame, block)`` pairs for an exact frame range."""
     path = Path(path)
-    if path.stat().st_size != descriptor.file_size:
-        raise WavError("WAV size changed after inspection.",
+    stat = path.stat()
+    if (stat.st_size != descriptor.file_size or
+            (descriptor.mtime_ns and stat.st_mtime_ns != descriptor.mtime_ns) or
+            (descriptor.inode and stat.st_ino != descriptor.inode)):
+        raise WavError("WAV file changed after inspection.",
                        "file_changed_after_inspection")
     start_frame = int(start_frame)
     end_frame = descriptor.frame_count if end_frame is None else int(end_frame)
@@ -378,6 +424,8 @@ def read_frames(path: str | os.PathLike[str], descriptor: WavDescriptor,
     block_frames = int(block_frames)
     if block_frames < 1:
         raise ValueError("block_frames must be positive")
+    block_frames = min(
+        block_frames, max(1, MAX_DECODE_BLOCK_BYTES // descriptor.block_align))
     with path.open("rb") as handle:
         first = start_frame
         handle.seek(descriptor.data_offset + first * descriptor.block_align)

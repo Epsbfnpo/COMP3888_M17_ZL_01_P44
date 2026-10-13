@@ -40,7 +40,7 @@ The runnable evaluator is in [`program/`](program/). Unless stated otherwise, fi
 - Each audio file also has a request-cached, complete low-rate analysis proxy. Integer-factor Kaiser-windowed sinc filtering produces 2000 Hz for 48 kHz input and 2100 Hz for 44.1 kHz input; later integer and non-integer reductions are low-pass filtered before slicing or interpolation.
 - Adds eight physical-audio diagnostics: `AudioAlignmentPass`, `SourceContributionPass`, `CompVerificationPass`, `ProcessedAudioMatchPass`, `StemMixResidualPass`, `MasteringDerivationPass`, `ExcerptedFromPass`, and `DecoySourcePass`. Exploratory alignment and location checks use FFT-normalised cross-correlation across the complete proxy followed by detailed candidate comparison, rather than searching only the first 60 seconds. Signal-estimated offsets, gains, and channel matrices are labelled diagnostic, never written back into the evidence graph, and cannot cancel a contradiction from an exact submitter-declared check.
 - Master comparison uses the submitted ranges while searching the complete target proxy for competing locations. An alternative may reduce certainty by exposing ambiguity, but it is never substituted for the declaration.
-- Resource control combines a 128 MiB active PCM-window bound, a 256 MiB proxy-cache bound, a weighted request work limit, and the existing CSEC wall-clock timeout. A resource-limited check returns `unavailable` with `reason_code: resource_budget_exhausted`; an incomplete search cannot return `contradicted`.
+- Resource control combines a 128 MiB active PCM-window bound, a 256 MiB proxy-cache bound, a weighted request work limit, and the caller's requested wall-clock timeout (`options.timeout_seconds`; the evaluator adds no 60-second cap). Objects are limited to 512 MiB each and 1 GiB per request. Audio checks stop starting new work shortly before the caller's deadline, so a slow request still returns its other results. A resource-limited check returns `unavailable` with `reason_code: resource_budget_exhausted`; an incomplete search cannot return `contradicted`.
 - Audio check output records the ranges actually analysed or searched, whether search/analysis completed, and the analysis-proxy rate used.
 - Separates submitter-declared technical properties from measured file properties and reports inconsistencies.
 - Requires `workflow_id`, `modifiers`, and submitter declarations in `submission.json`, and loads policies for 16 workflow types.
@@ -80,6 +80,27 @@ visible, but WAV-dependent metadata and physical-audio checks are unavailable.
 Independent files and evidence continue to be assessed. The final artefact is
 strict: if its WAV cannot be parsed by the supported WAV implementation, the
 request returns `unsupported` or `error` as appropriate.
+
+Input errors are reported, never corrected. The final artefact is checked
+first: if its hash, objects mapping, path, size, or file content cannot be
+confirmed, the request stops and reports only the final artefact's problem
+(`error`; `unsupported` for the size limit or an unsupported audio container).
+A problem with a non-final artefact or a relationship isolates only what
+depends on it: an upper-case hash or extension (`INVALID_HASH_FORMAT`,
+`INVALID_OBJECT_PATH`), an unknown or misspelled field (`UNKNOWN_FIELD`, with a
+suggested spelling), a SHA-256 mismatch (`OBJECT_HASH_MISMATCH`), an object
+beyond the size limits (`OBJECT_SKIPPED_SIZE_LIMIT`), or a path outside the
+bundle (`OBJECT_PATH_INVALID`). Dependent checks become `unavailable`, workflow
+expectations that rely on the node become `not_assessed` rather than missing,
+and a closing `SCORE_AFFECTED_BY_INPUT_ERRORS` finding marks every otherwise
+available axis `partial`. A misspelled relationship field disables that
+relationship's content checks instead of being ignored, so a typo cannot turn
+an honest declaration into a contradiction. File content, not the extension,
+decides the audio format: AIFF, FLAC, Ogg or MP3 data in a `.wav` file is
+reported as that format. If a non-final file changes while it is being
+evaluated, the request is evaluated once more with that file isolated
+(`OBJECT_CHANGED_DURING_EVALUATION`); a second change, or a change to the final
+artefact, returns `error`.
 
 The program does not infer relationships or fill in missing relationship
 parameters. It evaluates only graph edges and transformation parameters supplied
@@ -166,8 +187,10 @@ python3 -B check_public.py /path/to/public-bundles
 ```
 
 The second command writes results to `reports/`. Both commands operate locally and do not transmit data.
-The local regression suite contains 103 tests, including coverage for non-final
-WAV isolation, integer/float extensible PCM, float32/64 decoding, non-finite
+The local regression suite contains 126 tests, including coverage for non-final
+input isolation and final-first stopping, unknown-field suggestions, audio
+container detection by content, byte-capped decoding, deadline degradation,
+non-final WAV isolation, integer/float extensible PCM, float32/64 decoding, non-finite
 sample rejection, RIFF warnings, field-level unavailability, final-scoped C2PA,
 standalone C2PA ingredient checks, hash caching, sustained local tampering,
 declared ranges beyond 60 seconds, full master duration, ndarray PCM decoding,

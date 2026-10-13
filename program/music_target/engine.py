@@ -15,14 +15,31 @@ from music_target.wav_io import UnsupportedWav, WavError, inspect_wav
 from music_target.wav_parser import parse_wav_file
 from music_target.workflow_policy import WorkflowCompletenessPass, load_workflow_policy
 
-MAX_FILE_BYTES = 32 * 1024 * 1024
-MAX_TOTAL_BYTES = 128 * 1024 * 1024
+MAX_FILE_BYTES = 512 * 1024 * 1024
+MAX_TOTAL_BYTES = 1024 * 1024 * 1024
+
+
 class InputError(ValueError):
-    pass
+    """A request-level failure; ``findings`` replaces the generic finding."""
+
+    def __init__(self, message, findings=None):
+        super().__init__(message)
+        self.findings = list(findings or [])
 
 
 class Unsupported(InputError):
     pass
+
+
+class ObjectsChangedDuringEvaluation(Exception):
+    """Non-final files changed while being evaluated; re-evaluate without them.
+
+    Deliberately not a ValueError, so no check can swallow it.
+    """
+
+    def __init__(self, changed):
+        super().__init__("Non-final objects changed during evaluation.")
+        self.changed = changed  # digest -> finding
 
 
 def finding(code, message, digest=None, severity="info"):
@@ -119,6 +136,14 @@ class WavMetadataPass(ArtefactPass):
         artefact._wav_parser_failure_reason_code = None
         artefact._wav_descriptor = descriptor
         claim = artefact._attributes.get("technical", {})
+        chain = getattr(artefact, "_evaluation_chain", None)
+        declaration_errors = (getattr(chain, "_declaration_error_nodes", {})
+                              if chain is not None else {})
+        skipped_claims = artefact.artefact_hash in declaration_errors
+        if skipped_claims:
+            # The declaration contains fields this evaluator does not know;
+            # it is not corrected, so its technical claims are not compared.
+            claim = {}
         checks, mismatches = [], []
         for key, value in claim.items():
             if value is None:
@@ -134,9 +159,12 @@ class WavMetadataPass(ArtefactPass):
                            "source_pass": "WavMetadataPass"})
             if not same:
                 mismatches.append({"field": key, "declared": value, "observed": measured})
-        return None, {"status": "parsed", "observed": observed,
-                      "embedded_metadata": parsed,
-                      "checks": checks, "claim_mismatches": mismatches}, [
+        result = {"status": "parsed", "observed": observed,
+                  "embedded_metadata": parsed,
+                  "checks": checks, "claim_mismatches": mismatches}
+        if skipped_claims:
+            result["technical_claims_skipped"] = "input_error"
+        return None, result, [
             "WAV framing was checked; submission claims were compared with measured file properties.",
             "Embedded dates, credits and software tags are unauthenticated metadata.",
         ]
@@ -148,6 +176,24 @@ class RelationshipIntegrityPass(EvidencePass):
     @staticmethod
     def evaluate(evidence):
         source, target = evidence.get_evidence_artefact(), evidence.get_result_artefact()
+        chain = getattr(target, "_evaluation_chain", None)
+        edge_errors = (getattr(chain, "_declaration_error_edges", {})
+                       if chain is not None else {})
+        if (target.artefact_hash, source.artefact_hash) in edge_errors:
+            return None, {
+                "pass": "RelationshipIntegrityPass",
+                "source_hash": source.artefact_hash,
+                "target_hash": target.artefact_hash,
+                "relationship": evidence.relationship_type.relationship_type_name,
+                "endpoint_roles_validated": True,
+                "content_relationship_verified": None,
+                "status": "unavailable",
+                "reason_code": "input_error",
+                "reason": "The relationship declaration contains unrecognised fields; "
+                          "its declared parameters were not checked.",
+                "value": None,
+                "checks": [],
+            }, ["Declared parameters were not compared because the declaration has input errors."]
         source_result = target_result = None
         if source.artefact_type.artefact_type_name.startswith("audio"):
             _, source_result = source.get_pass_result(WavMetadataPass)
@@ -225,7 +271,72 @@ def collect_results(final_artefact):
     return observations, relationships
 
 
-def evaluate_chain(native, objects, root, workflow=None, allow_disconnected=False):
+def _file_identity(path):
+    stat = path.stat()
+    return stat.st_size, stat.st_mtime_ns, stat.st_ino
+
+
+def _bind_verified(chain, digest, path):
+    # The digest was verified by _check_object. Bind the known artefact
+    # directly so libevchain does not hash the same file a second time.
+    artefact = chain.artefacts[digest]
+    artefact.bind_file(str(path))
+    artefact._verified_file_hash = digest
+
+
+def _check_object(root, relative, digest, *, final, total_before=0):
+    """Return ``(problem_finding_or_None, size, resolved_path)`` for one object."""
+    label = "final artefact" if final else "object"
+    if relative is None:
+        return (finding("MISSING_OBJECT", "The final artefact file is missing."
+                        if final else "No file mapping was supplied.", digest, "medium"),
+                0, None)
+    path = (root / relative).resolve()
+    if not path.is_relative_to(root):
+        return (finding("OBJECT_PATH_INVALID",
+                        f"Object path escapes the supplied bundle root ({label}); "
+                        "the file was not opened.", digest, "high"), 0, None)
+    if not path.exists():
+        return (finding("MISSING_OBJECT", "The final artefact file is missing."
+                        if final else "The declared object file is missing.",
+                        digest, "medium"), 0, None)
+    if not path.is_file():
+        return (finding("OBJECT_PATH_INVALID",
+                        f"An object path must refer to a regular file ({label}).",
+                        digest, "high"), 0, None)
+    size = path.stat().st_size
+    if size > MAX_FILE_BYTES or total_before + size > MAX_TOTAL_BYTES:
+        limits = (f"{MAX_FILE_BYTES // (1024 * 1024)} MiB per file and "
+                  f"{MAX_TOTAL_BYTES // (1024 * 1024)} MiB per request")
+        if final:
+            return (finding("OBJECT_SIZE_LIMIT",
+                            f"Object size exceeds the documented local evaluation limits ({limits}).",
+                            digest, "medium"), size, path)
+        return ({**finding("OBJECT_SKIPPED_SIZE_LIMIT",
+                           f"This non-final object exceeds the evaluation size limits ({limits}) "
+                           "and was not bound; checks that need it are unavailable.",
+                           digest, "medium"),
+                 "size_bytes": size, "affected_checks": "checks that use this file"},
+                size, path)
+    with path.open("rb") as handle:
+        actual = hashlib.file_digest(handle, "sha256").hexdigest()
+    if actual != digest:
+        if final:
+            return (finding("OBJECT_HASH_MISMATCH",
+                            f"SHA-256 mismatch for declared object {digest}.", digest, "high"),
+                    size, path)
+        return ({**finding("OBJECT_HASH_MISMATCH",
+                           f"SHA-256 mismatch for declared object {digest}: the file content "
+                           "differs from the manifest (for example it was re-tagged or re-exported "
+                           "after the manifest was made). It was not bound; checks that need it "
+                           "are unavailable.", digest, "high"),
+                 "observed_sha256": actual, "affected_checks": "checks that use this file"},
+                size, path)
+    return None, size, path
+
+
+def evaluate_chain(native, objects, root, workflow=None, allow_disconnected=False,
+                   deadline=None, changed_objects=None):
     chain = EvidenceChain.from_dict(native)
     for artefact in chain.artefacts.values():
         artefact._evaluation_chain = chain
@@ -246,37 +357,54 @@ def evaluate_chain(native, objects, root, workflow=None, allow_disconnected=Fals
         raise InputError("All declared artefacts must be connected to the final artefact.")
 
     root = Path(root).resolve(strict=True)
+    input_issues = native.get("_input_issues") or {}
+    chain._declaration_error_nodes = dict(input_issues.get("declaration_nodes") or {})
+    chain._declaration_error_edges = dict(input_issues.get("declaration_edges") or {})
+    chain._deadline = deadline
+    unbound_issues = dict(input_issues.get("unbound_nodes") or {})
+    final_hash = chain.final_artefact_hash
     bound, bound_hashes, findings, total = 0, set(), [], 0
+    # Files that changed during an earlier attempt are isolated from the start,
+    # so the result equals one where they were never bound.
+    for digest, problem in (changed_objects or {}).items():
+        unbound_issues[digest] = [problem["code"]]
+        findings.append(problem)
+    binding_stats = {}
+
+    # The final artefact is checked first. If its identity cannot be
+    # confirmed, the whole assessment stops and only its problem is reported.
+    problem, size, path = _check_object(root, objects.get(final_hash), final_hash,
+                                        final=True)
+    if problem is not None:
+        exception = Unsupported if problem["code"] == "OBJECT_SIZE_LIMIT" else InputError
+        raise exception(problem["message"], [problem])
+    total += size
+    _bind_verified(chain, final_hash, path)
+    binding_stats[final_hash] = _file_identity(path)
+    bound += 1
+    bound_hashes.add(final_hash)
+
     for digest in chain.artefacts:
+        if digest == final_hash or digest in unbound_issues:
+            continue
         relative = objects.get(digest)
         if relative is None:
             findings.append(finding("MISSING_OBJECT", "No file mapping was supplied.", digest, "medium"))
             continue
-        path = (root / relative).resolve()
-        if not path.is_relative_to(root):
-            raise InputError("Object path escapes the supplied bundle root.")
-        if not path.exists():
-            findings.append(finding("MISSING_OBJECT", "The declared object file is missing.", digest, "medium"))
+        problem, size, path = _check_object(root, relative, digest, final=False,
+                                            total_before=total)
+        if problem is not None:
+            findings.append(problem)
+            if problem["code"] != "MISSING_OBJECT":
+                unbound_issues[digest] = [problem["code"]]
             continue
-        if not path.is_file():
-            raise InputError("An object path must refer to a regular file.")
-        size = path.stat().st_size
         total += size
-        if size > MAX_FILE_BYTES or total > MAX_TOTAL_BYTES:
-            raise Unsupported("Object size exceeds the documented local evaluation limits.")
-        with path.open("rb") as handle:
-            actual = hashlib.file_digest(handle, "sha256").hexdigest()
-        if actual != digest:
-            raise InputError(f"SHA-256 mismatch for declared object {digest}.")
-        # The digest was just verified above. Bind the known artefact directly
-        # so libevchain does not hash the same file a second time.
-        artefact = chain.artefacts[digest]
-        artefact.bind_file(str(path))
-        artefact._verified_file_hash = actual
+        _bind_verified(chain, digest, path)
+        binding_stats[digest] = _file_identity(path)
         bound += 1
         bound_hashes.add(digest)
-    if not chain.artefacts[chain.final_artefact_hash].has_file():
-        raise InputError("The final artefact file is missing.")
+    chain._input_error_nodes = unbound_issues
+    input_error_hashes = set(unbound_issues)
 
     pipeline = Pipeline({AudioType: [WavMetadataPass]},
                         {ALL_RELATIONSHIPS: [RelationshipIntegrityPass]}, collect_results)
@@ -314,7 +442,7 @@ def evaluate_chain(native, objects, root, workflow=None, allow_disconnected=Fals
         policy_path = Path(__file__).resolve().parents[1] / "policies" / "workflow_evidence_policy.json"
         completeness_pass = WorkflowCompletenessPass(load_workflow_policy(policy_path))
         axes["completeness"], workflow_assessment, policy_findings = completeness_pass.evaluate(
-            native, workflow, bound_hashes, parser_observations)
+            native, workflow, bound_hashes, parser_observations, input_error_hashes)
         findings.extend(policy_findings)
     else:
         axes["completeness"] = axis(bound / len(chain.artefacts),
@@ -327,4 +455,28 @@ def evaluate_chain(native, objects, root, workflow=None, allow_disconnected=Fals
     axes["ai_disclosure"] = ai_disclosure
     if claim_mismatch:
         axes["integrity"]["reasoning"] += " Technical claim contradictions were found."
+
+    # A file replaced while it was being analysed makes every result that read
+    # it unreliable. For the final artefact the assessment stops; changed
+    # non-final files make the caller re-evaluate once with them isolated.
+    changed = {}
+    for digest, identity in binding_stats.items():
+        try:
+            unchanged = _file_identity(Path(chain.artefacts[digest].get_file())) == identity
+        except OSError:
+            unchanged = False
+        if unchanged:
+            continue
+        if digest == final_hash:
+            problem = finding("FINAL_ARTEFACT_CHANGED",
+                              "The final artefact file changed during evaluation; "
+                              "all results were discarded.", digest, "high")
+            raise InputError(problem["message"], [problem])
+        changed[digest] = {**finding(
+            "OBJECT_CHANGED_DURING_EVALUATION",
+            "This file changed during evaluation; the request was re-evaluated with it "
+            "isolated, so checks that need it are unavailable.", digest, "high"),
+            "affected_checks": "checks that use this file"}
+    if changed:
+        raise ObjectsChangedDuringEvaluation(changed)
     return axes, findings, workflow_assessment, validation, assessment_checks
