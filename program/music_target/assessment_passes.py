@@ -872,6 +872,19 @@ def assess_axes(native, chain, bound_hashes, wav_observations,
             "MANUAL_REVIEW_RECOMMENDED",
             "One or more content checks are ambiguous, insufficiently covered, or outside the supported model.",
             severity="low", review_reasons=sorted(set(review_reasons))))
+    sample_data_findings = []
+    for node in native["artefacts"]:
+        digest = node["artefact_hash"]
+        artefact = chain.artefacts[digest]
+        reason_code = getattr(
+            artefact, "_wav_parser_failure_reason_code", None)
+        if reason_code and (wav_observations.get(digest) or {}).get(
+                "status") != "parser_failed":
+            sample_data_findings.append(_finding(
+                "WAV_SAMPLE_DATA_INVALID",
+                "WAV sample data failed during bounded content decoding; only dependent audio checks are unavailable.",
+                digest, "medium", reason_code=reason_code,
+                error=getattr(artefact, "_wav_parser_failure", None)))
     checks = {
         "bound_file_integrity": file_checks,
         "structural_validity": structural_checks,
@@ -896,6 +909,6 @@ def assess_axes(native, chain, bound_hashes, wav_observations,
         "decoy_source": decoy_source_checks,
     }
     findings = (file_findings + rel_findings + cross_findings + derivation_findings +
-                physical_findings + review_findings +
+                physical_findings + review_findings + sample_data_findings +
                 attestation_findings + ai_findings)
     return integrity, attestation, ai, validation, checks, findings

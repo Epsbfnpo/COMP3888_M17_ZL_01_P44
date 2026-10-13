@@ -41,6 +41,7 @@ from legacy_parsers.rin_parser import parse_rin_file
 from music_target.workflow_policy import WorkflowCompletenessPass, load_workflow_policy
 from music_target.midi_parser import parse_midi_file
 from music_target.sheet_parsers import parse_comp_sheet_file, parse_cue_sheet_file
+from music_target.wav_io import NonFiniteSamples, inspect_wav, read_frames
 from make_examples import wav_bytes
 
 
@@ -250,6 +251,23 @@ class TargetTests(unittest.TestCase):
         return cls._wav_container(0x0003, payload)
 
     @classmethod
+    def _float_wav(cls, values, *, bits=32, rate=8000, channels=1,
+                   extensible=False):
+        payload = np.asarray(values, dtype=f"<f{bits // 8}").tobytes()
+        if not extensible:
+            return cls._wav_container(
+                0x0003, payload, rate=rate, channels=channels, bits=bits)
+        float_guid = bytes.fromhex("0300000000001000800000aa00389b71")
+        extension = struct.pack("<HHI", 22, bits, 0) + float_guid
+        return cls._wav_container(
+            0xFFFE, payload, rate=rate, channels=channels, bits=bits,
+            extension=extension)
+
+    @classmethod
+    def _alaw_wav(cls):
+        return cls._wav_container(0x0006, bytes(range(64)), bits=8)
+
+    @classmethod
     def _extensible_pcm_wav(cls):
         pcm_guid = bytes.fromhex("0100000000001000800000aa00389b71")
         extension = struct.pack("<HHI", 22, 16, 0) + pcm_guid
@@ -261,7 +279,7 @@ class TargetTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             request = self._workflow_request(root, "multitrack_recording_mix_master", [
-                {"type": "audio/stem", "data": self._float32_wav()},
+                {"type": "audio/stem", "data": self._alaw_wav()},
                 {"type": "audio/mix", "data": self._pcm16([0] * 800),
                  "parents": [(0, "mixed_from")]},
             ])
@@ -278,11 +296,94 @@ class TargetTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             request = self._workflow_request(root, "mastering_service_only", [
-                {"type": "audio/master", "data": self._float32_wav()},
+                {"type": "audio/master", "data": self._alaw_wav()},
             ])
             result = self.score(request, root)
         self.assertEqual(result["execution_status"], "unsupported")
-        self.assertIn("integer PCM", result["error"])
+        self.assertIn("not supported", result["error"])
+
+    def test_float32_and_float64_wav_are_stream_decoded_without_clipping(self):
+        values = np.asarray([-1.3, -0.25, 0.0, 1.17], dtype=np.float64)
+        for bits in (32, 64):
+            with self.subTest(bits=bits), tempfile.TemporaryDirectory() as directory:
+                path = Path(directory) / f"float-{bits}.wav"
+                path.write_bytes(self._float_wav(values, bits=bits))
+                observed = strict_pcm_check(path)
+                audio = _read_pcm(path)
+            self.assertEqual(observed["codec_subtype"], "IEEE_FLOAT")
+            self.assertEqual(observed["sample_format"], "float")
+            self.assertEqual(audio["frames"].dtype, np.float32)
+            np.testing.assert_allclose(
+                audio["frames"][:, 0], values.astype(np.float32),
+                rtol=0, atol=1e-6)
+
+    def test_extensible_float_subformat_is_stream_decoded(self):
+        values = np.asarray([-0.75, 0.25, 1.1], dtype=np.float32)
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "extensible-float.wav"
+            path.write_bytes(self._float_wav(
+                values, bits=32, extensible=True))
+            observed = strict_pcm_check(path)
+            audio = _read_pcm(path)
+        self.assertEqual(observed["wav_format_tag"], "WAVE_FORMAT_EXTENSIBLE")
+        self.assertEqual(observed["codec_subtype"], "IEEE_FLOAT")
+        np.testing.assert_allclose(audio["frames"][:, 0], values)
+
+    def test_nonfinite_float_samples_fail_when_content_is_read(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "nonfinite.wav"
+            path.write_bytes(self._float_wav([0.0, float("nan"), 1.0]))
+            descriptor = inspect_wav(path)
+            self.assertEqual(descriptor.format_kind, "float")
+            with self.assertRaises(NonFiniteSamples):
+                list(read_frames(path, descriptor))
+
+    def test_nonfinite_nonfinal_wav_only_disables_dependent_content_checks(self):
+        samples = [0.0] * 799 + [float("inf")]
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            request = self._workflow_request(
+                root, "multitrack_recording_mix_master", [
+                    {"type": "audio/stem", "data": self._float_wav(samples)},
+                    {"type": "audio/mix", "data": self._pcm16([0] * 800),
+                     "parents": [(0, "mixed_from")]},
+                ])
+            result = self.score(request, root)
+        self.assertEqual(result["execution_status"], "succeeded", result["error"])
+        failures = [item for item in result["findings"]
+                    if item["code"] == "WAV_SAMPLE_DATA_INVALID"]
+        self.assertEqual(len(failures), 1)
+        self.assertEqual(failures[0]["reason_code"], "non_finite_samples")
+        self.assertTrue(any(
+            item["status"] == "unavailable"
+            for item in result["assessment_checks"]["source_contribution"]))
+
+    def test_trailing_bytes_are_reported_as_nonfatal_riff_warning(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "trailing.wav"
+            path.write_bytes(self._float_wav([0.0, 0.5]) + b"TRAIL")
+            observed = strict_pcm_check(path)
+        self.assertEqual(observed["trailing_bytes"], 5)
+        self.assertIn("trailing_bytes:5", observed["wav_warnings"])
+
+    def test_unfinalised_sizes_partial_frame_and_byte_rate_are_warned(self):
+        data = bytearray(self._wav_container(0x0001, b"\x00\x00\xff", bits=16))
+        struct.pack_into("<I", data, 4, 0xFFFFFFFF)
+        struct.pack_into("<I", data, 28, 1)
+        data_chunk = data.index(b"data")
+        struct.pack_into("<I", data, data_chunk + 4, 0xFFFFFFFF)
+        data.pop()  # Simulate an interrupted writer with one incomplete frame.
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "unfinalised.wav"
+            path.write_bytes(data)
+            descriptor = inspect_wav(path)
+            decoded = list(read_frames(path, descriptor))
+        self.assertEqual(descriptor.frame_count, 1)
+        self.assertEqual(len(decoded), 1)
+        self.assertIn("riff_size_unfinalised", descriptor.warnings)
+        self.assertIn("data_size_unfinalised", descriptor.warnings)
+        self.assertIn("partial_final_frame_ignored:1", descriptor.warnings)
+        self.assertIn("byte_rate_mismatch", descriptor.warnings)
 
     def test_extensible_pcm_subformat_is_recognised(self):
         with tempfile.TemporaryDirectory() as directory:

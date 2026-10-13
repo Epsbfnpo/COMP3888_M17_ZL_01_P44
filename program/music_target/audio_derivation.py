@@ -8,10 +8,11 @@ some undocumented or nonlinear production process.
 from __future__ import annotations
 
 import math
-import wave
 from pathlib import Path
 
 import numpy as np
+
+from music_target.wav_io import WavDescriptor, WavError, inspect_wav, read_frames
 
 MAX_SOURCES = 16
 MAX_COMP_SELECTIONS = 64
@@ -61,112 +62,75 @@ def _consume_work(chain, units):
             f"{MAX_REQUEST_WORK_UNITS:.1f} weighted channel-seconds)")
 
 
-def _decode_pcm_chunk(raw, width, channels):
-    """Decode a frame-aligned PCM byte block to ``(frames, channels)`` float32."""
-    frame_width = width * channels
-    if frame_width < 1 or len(raw) % frame_width:
-        raise ValueError("truncated PCM frame data")
-    if width == 1:
-        values = np.frombuffer(raw, dtype=np.uint8).astype(np.float32)
-        values = (values - np.float32(128.0)) / np.float32(128.0)
-    elif width == 2:
-        values = np.frombuffer(raw, dtype="<i2").astype(np.float32)
-        values /= np.float32(32768.0)
-    elif width == 3:
-        octets = np.frombuffer(raw, dtype=np.uint8).reshape(-1, 3)
-        values = (octets[:, 0].astype(np.int32) |
-                  (octets[:, 1].astype(np.int32) << 8) |
-                  (octets[:, 2].astype(np.int32) << 16))
-        values = (values ^ 0x800000) - 0x800000
-        values = values.astype(np.float32) / np.float32(8388608.0)
-    elif width == 4:
-        values = np.frombuffer(raw, dtype="<i4").astype(np.float32)
-        values /= np.float32(2147483648.0)
-    else:
-        raise ValueError("Only 8/16/24/32-bit integer PCM WAV is supported.")
-    return np.ascontiguousarray(values.reshape(-1, channels), dtype=np.float32)
+def _wave_metadata(path, descriptor: WavDescriptor | None = None):
+    descriptor = descriptor or inspect_wav(path)
+    return {
+        "sample_rate_hz": descriptor.sample_rate,
+        "channels": descriptor.channels,
+        "sample_width": descriptor.container_bits // 8,
+        "bit_depth": descriptor.container_bits,
+        "valid_bits_per_sample": descriptor.valid_bits,
+        "sample_format": descriptor.format_kind,
+        "total_frames": descriptor.frame_count,
+        "duration_seconds": descriptor.duration_seconds,
+        "descriptor": descriptor,
+    }
 
 
-def _wave_metadata(path):
-    try:
-        with wave.open(str(path), "rb") as handle:
-            if handle.getcomptype() != "NONE":
-                raise ValueError("compressed WAV is not supported")
-            metadata = {
-                "sample_rate_hz": handle.getframerate(),
-                "channels": handle.getnchannels(),
-                "sample_width": handle.getsampwidth(),
-                "total_frames": handle.getnframes(),
-            }
-    except wave.Error as exc:
-        raise ValueError(f"invalid WAV: {exc}") from exc
-    if (metadata["channels"] < 1 or metadata["sample_rate_hz"] < 1 or
-            metadata["sample_width"] not in (1, 2, 3, 4)):
-        raise ValueError("unsupported PCM channel, rate, or sample width")
-    metadata["duration_seconds"] = (
-        metadata["total_frames"] / metadata["sample_rate_hz"])
-    return metadata
+def _read_frame_array(path, descriptor, start_frame, end_frame,
+                      block_frames=None):
+    result = np.empty(
+        (end_frame - start_frame, descriptor.channels), dtype=np.float32)
+    for first_frame, block in read_frames(
+            path, descriptor, start_frame, end_frame, block_frames):
+        offset = first_frame - start_frame
+        result[offset:offset + len(block)] = block
+    return result
 
 
 def _read_pcm(path: Path, start_seconds=0.0, end_seconds=None,
-              max_seconds=None, byte_budget=MAX_ACTIVE_PCM_BYTES):
+              max_seconds=None, byte_budget=MAX_ACTIVE_PCM_BYTES,
+              descriptor: WavDescriptor | None = None):
     """Read one PCM window as a C-contiguous float32 ndarray.
 
     There is intentionally no default 60-second clipping. Long-running checks
     either use the low-rate full-file proxy or call this function for bounded
     streaming windows.
     """
-    try:
-        with wave.open(str(path), "rb") as handle:
-            if handle.getcomptype() != "NONE":
-                raise ValueError("compressed WAV is not supported")
-            channels = handle.getnchannels()
-            width = handle.getsampwidth()
-            rate = handle.getframerate()
-            total_frames = handle.getnframes()
-            if channels < 1 or rate < 1 or width not in (1, 2, 3, 4):
-                raise ValueError("unsupported PCM channel, rate, or sample width")
-            start_seconds = float(start_seconds or 0.0)
-            if not math.isfinite(start_seconds) or start_seconds < 0:
-                raise ValueError("PCM window start must be a finite non-negative number")
-            start_frame = math.floor(start_seconds * rate)
-            if start_frame > total_frames:
-                raise ValueError("PCM window starts beyond the submitted audio")
-            if end_seconds is None:
-                end_frame = total_frames
-                if max_seconds is not None:
-                    end_frame = min(end_frame, start_frame + round(max_seconds * rate))
-            else:
-                end_seconds = float(end_seconds)
-                if not math.isfinite(end_seconds) or end_seconds <= start_seconds:
-                    raise ValueError("PCM window end must be finite and after its start")
-                end_frame = math.ceil(end_seconds * rate)
-                if end_frame > total_frames + 1:
-                    raise ValueError("PCM window ends beyond the submitted audio")
-                end_frame = min(end_frame, total_frames)
-            frame_count = max(0, end_frame - start_frame)
-            decoded_bytes = frame_count * channels * np.dtype(np.float32).itemsize
-            if decoded_bytes > byte_budget:
-                raise ResourceBudgetExceeded(
-                    f"decoded PCM window requires {decoded_bytes} bytes, exceeding the request budget")
-            handle.setpos(start_frame)
-            chunks = []
-            remaining = frame_count
-            chunk_frames = max(1, round(rate * PCM_STREAM_CHUNK_SECONDS))
-            while remaining:
-                count = min(remaining, chunk_frames)
-                raw = handle.readframes(count)
-                expected = count * channels * width
-                if len(raw) != expected:
-                    raise ValueError("truncated PCM frame data")
-                chunks.append(_decode_pcm_chunk(raw, width, channels))
-                remaining -= count
-    except wave.Error as exc:
-        raise ValueError(f"invalid WAV: {exc}") from exc
-    frames = (np.concatenate(chunks, axis=0) if chunks else
-              np.empty((0, channels), dtype=np.float32))
+    descriptor = descriptor or inspect_wav(path)
+    channels = descriptor.channels
+    rate = descriptor.sample_rate
+    total_frames = descriptor.frame_count
+    start_seconds = float(start_seconds or 0.0)
+    if not math.isfinite(start_seconds) or start_seconds < 0:
+        raise ValueError("PCM window start must be a finite non-negative number")
+    start_frame = math.floor(start_seconds * rate)
+    if start_frame > total_frames:
+        raise ValueError("PCM window starts beyond the submitted audio")
+    if end_seconds is None:
+        end_frame = total_frames
+        if max_seconds is not None:
+            end_frame = min(end_frame, start_frame + round(max_seconds * rate))
+    else:
+        end_seconds = float(end_seconds)
+        if not math.isfinite(end_seconds) or end_seconds <= start_seconds:
+            raise ValueError("PCM window end must be finite and after its start")
+        end_frame = math.ceil(end_seconds * rate)
+        if end_frame > total_frames + 1:
+            raise ValueError("PCM window ends beyond the submitted audio")
+        end_frame = min(end_frame, total_frames)
+    frame_count = max(0, end_frame - start_frame)
+    decoded_bytes = frame_count * channels * np.dtype(np.float32).itemsize
+    if decoded_bytes > byte_budget:
+        raise ResourceBudgetExceeded(
+            f"decoded PCM window requires {decoded_bytes} bytes, exceeding the request budget")
+    frames = _read_frame_array(
+        path, descriptor, start_frame, end_frame,
+        max(1, round(rate * PCM_STREAM_CHUNK_SECONDS)))
     return {"frames": frames, "sample_rate_hz": rate, "channels": channels,
-            "bit_depth": width * 8, "total_frames": total_frames,
+            "bit_depth": descriptor.container_bits,
+            "sample_format": descriptor.format_kind,
+            "total_frames": total_frames,
             "duration_seconds": total_frames / rate,
             "start_frame": start_frame, "end_frame": end_frame,
             "start_seconds": start_frame / rate, "end_seconds": end_frame / rate,
@@ -183,39 +147,35 @@ def _read_pcm_frame_range(path, start_frame, end_frame, metadata=None,
     if start_frame < 0 or end_frame < start_frame or end_frame > total_frames:
         raise ValueError("PCM frame range is outside the submitted audio")
     channels = metadata["channels"]
-    width = metadata["sample_width"]
     rate = metadata["sample_rate_hz"]
+    descriptor = metadata["descriptor"]
     frame_count = end_frame - start_frame
     decoded_bytes = frame_count * channels * np.dtype(np.float32).itemsize
     if decoded_bytes > byte_budget:
         raise ResourceBudgetExceeded(
             f"active PCM window requires {decoded_bytes} bytes, exceeding "
             f"the {byte_budget}-byte memory limit")
-    chunks = []
     chunk_frames = max(1, round(rate * PCM_STREAM_CHUNK_SECONDS))
-    try:
-        with wave.open(str(path), "rb") as handle:
-            handle.setpos(start_frame)
-            remaining = frame_count
-            while remaining:
-                count = min(remaining, chunk_frames)
-                raw = handle.readframes(count)
-                if len(raw) != count * channels * width:
-                    raise ValueError("truncated PCM frame data")
-                chunks.append(_decode_pcm_chunk(raw, width, channels))
-                remaining -= count
-    except wave.Error as exc:
-        raise ValueError(f"invalid WAV: {exc}") from exc
-    frames = (np.concatenate(chunks, axis=0) if chunks else
-              np.empty((0, channels), dtype=np.float32))
+    frames = _read_frame_array(
+        path, descriptor, start_frame, end_frame, chunk_frames)
     return {
         "frames": frames, "sample_rate_hz": rate, "channels": channels,
-        "bit_depth": width * 8, "total_frames": total_frames,
+        "bit_depth": descriptor.container_bits,
+        "sample_format": descriptor.format_kind,
+        "total_frames": total_frames,
         "duration_seconds": metadata["duration_seconds"],
         "start_frame": start_frame, "end_frame": end_frame,
         "start_seconds": start_frame / rate, "end_seconds": end_frame / rate,
         "decoded_bytes": int(frames.nbytes),
     }
+
+
+def _artefact_descriptor(artefact, path):
+    descriptor = getattr(artefact, "_wav_descriptor", None)
+    if not isinstance(descriptor, WavDescriptor):
+        descriptor = inspect_wav(path)
+        artefact._wav_descriptor = descriptor
+    return descriptor
 
 
 def _read_bound_pcm(chain, digest, start_seconds=0.0, end_seconds=None,
@@ -240,7 +200,15 @@ def _read_bound_pcm(chain, digest, start_seconds=0.0, end_seconds=None,
     if key in cache:
         chain._pcm_cache_hits += 1
         return cache[key]
-    audio = _read_pcm(Path(artefact.get_file()), start_key, end_key, max_key)
+    descriptor = _artefact_descriptor(artefact, artefact.get_file())
+    try:
+        audio = _read_pcm(
+            Path(artefact.get_file()), start_key, end_key, max_key,
+            descriptor=descriptor)
+    except WavError as exc:
+        artefact._wav_parser_failure = str(exc)
+        artefact._wav_parser_failure_reason_code = exc.reason_code
+        raise
     # Only small windows are retained. Exact derivation streams long ranges and
     # proxies have their own bounded request cache.
     if audio["decoded_bytes"] <= 16 * 1024 * 1024:
@@ -260,7 +228,8 @@ def _pcm_duration(chain, digest):
     artefact = chain.artefacts[digest]
     if not artefact.has_file():
         raise ValueError("no verified file is bound to the audio artefact")
-    duration = _wave_metadata(Path(artefact.get_file()))["duration_seconds"]
+    descriptor = _artefact_descriptor(artefact, artefact.get_file())
+    duration = descriptor.duration_seconds
     cache[digest] = duration
     return duration
 
@@ -316,7 +285,8 @@ def _analysis_proxy(chain, digest):
     if parser_failure:
         raise ValueError(f"WAV parser unavailable for this artefact: {parser_failure}")
     path = Path(artefact.get_file())
-    metadata = _wave_metadata(path)
+    descriptor = _artefact_descriptor(artefact, path)
+    metadata = _wave_metadata(path, descriptor)
     rate = metadata["sample_rate_hz"]
     channels = metadata["channels"]
     total_frames = metadata["total_frames"]
@@ -331,7 +301,13 @@ def _analysis_proxy(chain, digest):
     _consume_work(chain, metadata["duration_seconds"] * channels)
 
     if factor == 1:
-        frames = _read_pcm(path, max_seconds=None)["frames"]
+        try:
+            frames = _read_pcm(
+                path, max_seconds=None, descriptor=descriptor)["frames"]
+        except WavError as exc:
+            artefact._wav_parser_failure = str(exc)
+            artefact._wav_parser_failure_reason_code = exc.reason_code
+            raise
         filter_length = 1
     else:
         # Leave a transition band below the proxy Nyquist.
@@ -343,30 +319,30 @@ def _analysis_proxy(chain, digest):
         frames = np.empty((output_frames, channels), dtype=np.float32)
         output_position = 0
         try:
-            with wave.open(str(path), "rb") as handle:
-                width = handle.getsampwidth()
-                for core_start in range(0, total_frames, chunk_frames):
-                    core_end = min(total_frames, core_start + chunk_frames)
-                    read_start = max(0, core_start - half)
-                    read_end = min(total_frames, core_end + half)
-                    handle.setpos(read_start)
-                    raw = handle.readframes(read_end - read_start)
-                    decoded = _decode_pcm_chunk(raw, width, channels)
-                    padded = np.zeros(
-                        (core_end - core_start + 2 * half, channels),
-                        dtype=np.float32)
-                    insert = read_start - (core_start - half)
-                    padded[insert:insert + len(decoded)] = decoded
-                    filtered = np.empty((core_end - core_start, channels),
-                                        dtype=np.float32)
-                    for channel in range(channels):
-                        filtered[:, channel] = np.convolve(
-                            padded[:, channel], taps, mode="valid")
-                    decimated = filtered[::factor]
-                    frames[output_position:output_position + len(decimated)] = decimated
-                    output_position += len(decimated)
-        except wave.Error as exc:
-            raise ValueError(f"invalid WAV: {exc}") from exc
+            for core_start in range(0, total_frames, chunk_frames):
+                core_end = min(total_frames, core_start + chunk_frames)
+                read_start = max(0, core_start - half)
+                read_end = min(total_frames, core_end + half)
+                decoded = _read_frame_array(
+                    path, descriptor, read_start, read_end,
+                    max(1, read_end - read_start))
+                padded = np.zeros(
+                    (core_end - core_start + 2 * half, channels),
+                    dtype=np.float32)
+                insert = read_start - (core_start - half)
+                padded[insert:insert + len(decoded)] = decoded
+                filtered = np.empty((core_end - core_start, channels),
+                                    dtype=np.float32)
+                for channel in range(channels):
+                    filtered[:, channel] = np.convolve(
+                        padded[:, channel], taps, mode="valid")
+                decimated = filtered[::factor]
+                frames[output_position:output_position + len(decimated)] = decimated
+                output_position += len(decimated)
+        except WavError as exc:
+            artefact._wav_parser_failure = str(exc)
+            artefact._wav_parser_failure_reason_code = exc.reason_code
+            raise
         frames = np.ascontiguousarray(frames[:output_position])
 
     proxy = {
@@ -376,7 +352,8 @@ def _analysis_proxy(chain, digest):
         "source_sample_rate_hz": rate,
         "decimation_factor": factor,
         "channels": channels,
-        "bit_depth": metadata["sample_width"] * 8,
+        "bit_depth": metadata["bit_depth"],
+        "sample_format": metadata["sample_format"],
         "total_frames": len(frames),
         "source_total_frames": total_frames,
         "duration_seconds": metadata["duration_seconds"],
@@ -474,7 +451,8 @@ def _bound_audio_path(chain, digest):
     if parser_failure:
         raise ValueError(f"WAV parser unavailable for this artefact: {parser_failure}")
     path = Path(artefact.get_file())
-    return path, _wave_metadata(path)
+    descriptor = _artefact_descriptor(artefact, path)
+    return path, _wave_metadata(path, descriptor)
 
 
 def _update_partition(statistics, actual, predicted):
