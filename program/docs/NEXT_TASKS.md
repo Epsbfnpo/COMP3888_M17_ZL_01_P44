@@ -1,6 +1,6 @@
 # Future Work
 
-Updated: 2026-10-13
+Updated: 2026-10-14
 
 This file is the current consolidated roadmap for `v3/program`. It replaces the
 shorter v0.4 task list and incorporates unresolved work from the legacy v3
@@ -10,7 +10,10 @@ content path is now one `PhysicalSimilarityPass`: relationship types select a
 bounded comparison mode, while all relationships share a four-state output and
 endpoint-only scoring policy. Exact reconstruction passes are deprecated and no
 longer executed or reported. The retained signal measurements still need
-calibration against licensed real production material.
+calibration against licensed real production material. The implemented v1
+measurements and provisional endpoints are recorded in
+[`PHYSICAL_SIMILARITY.md`](PHYSICAL_SIMILARITY.md); that technical reference
+must be updated whenever a threshold policy changes.
 
 ## Scope principles
 

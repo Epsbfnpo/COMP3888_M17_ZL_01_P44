@@ -101,6 +101,11 @@ endpoints enter integrity; ambiguous and unavailable evidence remains visible
 without being treated as adverse. Estimated offsets, gains, or channel matrices
 are diagnostic only. Every result states `content_match_is_provenance: false`:
 signal consistency cannot prove historical direction, authorship, or ownership.
+The complete measurement definitions, current v1 endpoints, per-mode
+contradiction safeguards, output fields, target-normalised scoring, resource
+bounds, and calibration limitations are documented in
+[`PHYSICAL_SIMILARITY.md`](PHYSICAL_SIMILARITY.md). These thresholds are a
+reproducible implementation policy, not a customer acceptance rule.
 
 ## Included examples and outputs
 

@@ -15,9 +15,10 @@ The main approach is to reuse Ben's evidence graph and execution framework, conn
 ## Recommended reading order
 
 1. [CSEC handoff](docs/03_CSEC_HANDOFF.md): integration instructions and supported boundaries.
-2. [Sheet formats](docs/SHEET_FORMATS.md): supported CompSheet and CueSheet formats.
-3. [Future work](docs/NEXT_TASKS.md): consolidated P0-P3 roadmap and unresolved legacy items.
-4. [Verification results](reports/verification.md): executed checks and remaining unverified areas.
+2. [Physical similarity technical reference](docs/PHYSICAL_SIMILARITY.md): measurements, per-mode decisions, four-state normalisation, scoring, and limitations.
+3. [Sheet formats](docs/SHEET_FORMATS.md): supported CompSheet and CueSheet formats.
+4. [Future work](docs/NEXT_TASKS.md): consolidated P0-P3 roadmap and unresolved legacy items.
+5. [Verification results](reports/verification.md): executed checks and remaining unverified areas.
 
 ## Current implementation
 
@@ -32,6 +33,7 @@ The main approach is to reuse Ben's evidence graph and execution framework, conn
 - A non-final WAV parser failure is isolated to that node: the program emits `WAV_PARSER_FAILED`, marks only dependent checks unavailable, and continues with independent evidence. An unsupported final WAV still returns `unsupported`.
 - `RelationshipIntegrityPass` is a registered libevchain `EvidencePass`. It compares only submitter-declared edge parameters with cached source and target observations and replaces the former diagnostic-only `MusicRelationshipPass`.
 - Uses one `PhysicalSimilarityPass` for declared audio relationships. Each relationship selects a bounded comparison mode—pairwise continuity, excerpt search, CompSheet selection timeline, multi-source contribution, or master continuity—but every result has the same four states and report shape.
+- The measurements, v1 thresholds, contradiction safeguards, scoring rules, and known limits of those modes are specified in [`docs/PHYSICAL_SIMILARITY.md`](docs/PHYSICAL_SIMILARITY.md).
 - Exact reconstruction is no longer executed or scored. Legacy reconstruction code remains isolated for later removal, but its `matched`/`not_applicable` statuses and pass-specific report keys are not exposed by the assessment path.
 - WAV samples are decoded with NumPy into C-contiguous `(frames, channels)` `float32` arrays. The pinned `numpy==2.2.6` dependency supports the project's Python 3.11-3.13 range; no SciPy dependency is used. Integer PCM and IEEE-float decoding are vectorised; finite float values outside `[-1, 1]` are preserved rather than clipped.
 - RIFF size, data size, partial-frame, byte-rate, and trailing-byte anomalies are reported as stable warnings where safe. Unsupported codecs remain unsupported, while float NaN/Infinity causes only dependent content checks to become unavailable and produces `WAV_SAMPLE_DATA_INVALID`.
@@ -241,6 +243,7 @@ aggregation, and resource-budget degradation without contradiction.
 | `music_target/assessment_passes.py` | Cached file and relationship result aggregation, CrossEvidence, C2PA, and AI disclosure assessment logic |
 | `music_target/audio_derivation.py` | Shared audio utilities plus deprecated exact-reconstruction passes retained for later removal; they are not executed by assessment |
 | `music_target/physical_audio_passes.py` | Unified physical-similarity framework and its bounded comparison modes |
+| `docs/PHYSICAL_SIMILARITY.md` | Technical contract for physical measurements, mode-specific decisions, scoring, resource bounds, and limitations |
 | `music_target/midi_parser.py` | Size- and structure-bounded Standard MIDI File parser |
 | `music_target/sheet_parsers.py` | CompSheet/CueSheet JSON, CSV, TXT, and PDF parsers plus field normalisation |
 | `music_target/contract.py` | CSEC/native format adaptation, input validation, and version identification |
