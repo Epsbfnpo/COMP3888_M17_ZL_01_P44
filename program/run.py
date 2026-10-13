@@ -18,14 +18,17 @@ from music_target.contract import (
 from music_target.engine import evaluate_chain, finding
 
 
-def evaluate(request, root, mode):
+def evaluate(request, root, mode, allow_local_files=False):
     response = response_shell(request, mode)
     started, cpu = time.perf_counter(), time.process_time()
     try:
         native = to_native(request, mode)
         (response["axes"], response["findings"], workflow_assessment,
          validation, assessment_checks) = evaluate_chain(
-            native, request["objects"], root, request.get("workflow"))
+            native, request["objects"], root, request.get("workflow"),
+            allow_external_files=(
+                allow_local_files and mode == "native"
+                and request.get("options", {}).get("local_file_references") is True))
         if workflow_assessment is not None:
             response["workflow_assessment"] = workflow_assessment
         if assessment_checks:
@@ -51,12 +54,16 @@ def evaluate(request, root, mode):
     return response
 
 
-def run_isolated(request, root, mode, command=None):
+def run_isolated(request, root, mode, command=None, allow_local_files=False):
+    if allow_local_files and mode != "native":
+        raise InputError("External file access is only available for trusted native requests.")
     response = response_shell(request, mode)
     options = request.get("options", {})
     requested = options.get("timeout_seconds", 60) if isinstance(options, dict) else 60
     timeout = min(requested, 60) if type(requested) is int and requested > 0 else 60
     command = command or [sys.executable, "-B", str(BASE / "run.py"), "--worker"]
+    if allow_local_files and command[-1] != "--allow-local-files":
+        command = [*command, "--allow-local-files"]
     payload = json.dumps({"request": request, "root": str(root), "mode": mode}, allow_nan=False)
     started = time.perf_counter()
     try:
@@ -86,20 +93,29 @@ def main():
     inputs.add_argument("--native", type=Path, help="Music native-request JSON with a Ben-format chain")
     parser.add_argument("--root", type=Path, help="Directory containing the declared objects/ files")
     parser.add_argument("--output", type=Path, help="Save the response to this file instead of stdout")
+    parser.add_argument(
+        "--allow-local-files", action="store_true",
+        help="Authorize external paths in a native request marked local_file_references.")
     parser.add_argument("--worker", action="store_true", help=argparse.SUPPRESS)
     args = parser.parse_args()
     try:
         if args.worker:
             payload = json.load(sys.stdin)
-            response = evaluate(payload["request"], payload["root"], payload["mode"])
+            response = evaluate(
+                payload["request"], payload["root"], payload["mode"],
+                allow_local_files=args.allow_local_files)
         else:
+            if args.allow_local_files and not args.native:
+                parser.error("--allow-local-files can only be used with --native")
             selected = args.request or args.bundle or args.native
             if selected is None or args.root is None:
                 parser.error("one input option and --root are required")
             request = read_json(selected)
             if args.bundle:
                 request = public_bundle_request(request)
-            response = run_isolated(request, args.root, "native" if args.native else "csec")
+            response = run_isolated(
+                request, args.root, "native" if args.native else "csec",
+                allow_local_files=args.allow_local_files)
         serialized = json.dumps(response, indent=2, ensure_ascii=False, allow_nan=False) + "\n"
         if args.output:
             args.output.write_text(serialized)

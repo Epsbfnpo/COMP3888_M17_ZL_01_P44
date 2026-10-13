@@ -13,6 +13,7 @@ import contextlib
 import hashlib
 import json
 import math
+import os
 import re
 import wave
 from pathlib import Path
@@ -101,8 +102,60 @@ def wav_technical(path) -> dict:
 
 
 def object_rel_path(entry: dict) -> str:
-    suffix = Path(entry["path"]).suffix.lower() if entry.get("path") else ".wav"
-    return f"objects/{entry['hash']}{suffix}"
+    filename = Path(entry["path"]).name if entry.get("path") else f"{entry['hash']}.wav"
+    return f"objects/{filename}"
+
+
+def copied_object_paths(files: list[dict]) -> dict[str, str]:
+    """Map hashes to readable original filenames, resolving selected-file collisions."""
+    names = {}
+    for entry in files:
+        digest = entry["hash"]
+        if digest in names:
+            continue
+        names[digest] = (Path(entry["path"]).name if entry.get("path")
+                         else f"{digest}.wav")
+
+    counts = {}
+    for name in names.values():
+        counts[name.casefold()] = counts.get(name.casefold(), 0) + 1
+
+    reserved = {name.casefold() for name in names.values()}
+    used = set()
+    result = {}
+    for digest, original in sorted(names.items(), key=lambda item: (item[1].casefold(), item[0])):
+        path = Path(original)
+        stem, suffix = path.stem, path.suffix
+        candidate = original
+        if counts[original.casefold()] > 1 or candidate.casefold() in used:
+            for digits in range(8, 65, 4):
+                candidate = f"{stem} ({digest[:digits]}){suffix}"
+                if candidate.casefold() not in used and (
+                        candidate.casefold() not in reserved or candidate == original):
+                    break
+            else:
+                raise ValueError(f"Could not create a unique portable name for {original!r}.")
+        if Path(candidate).name != candidate or candidate in ("", ".", ".."):
+            raise ValueError(f"Unsafe original filename: {original!r}")
+        used.add(candidate.casefold())
+        result[digest] = f"objects/{candidate}"
+    return result
+
+
+def referenced_object_paths(files: list[dict], manifest_path=None) -> dict[str, str]:
+    """Reference the selected originals, preferring a manifest-relative path."""
+    base = Path(manifest_path).resolve().parent if manifest_path else None
+    result = {}
+    for entry in files:
+        path = Path(entry["path"]).resolve()
+        if entry["hash"] in result:
+            continue
+        try:
+            mapped = os.path.relpath(path, base) if base else str(path)
+        except ValueError:
+            mapped = str(path)
+        result[entry["hash"]] = mapped
+    return result
 
 
 # --------------------------------------------------------------------------

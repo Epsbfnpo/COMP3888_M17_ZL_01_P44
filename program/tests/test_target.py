@@ -850,7 +850,8 @@ class TargetTests(unittest.TestCase):
         request = copy.deepcopy(self.template)
         digest = request["chain"]["final_artefact_hash"]
         request["objects"][digest] = "../outside.wav"
-        self.assertIn("Schema validation", self.score(request)["error"])
+        self.assertIn("Object path escapes the supplied bundle root",
+                      self.score(request)["error"])
 
     def test_symlink_escape_rejected_even_with_valid_filename(self):
         with tempfile.TemporaryDirectory() as directory:

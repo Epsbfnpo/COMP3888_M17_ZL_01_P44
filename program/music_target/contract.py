@@ -148,6 +148,6 @@ def to_native(request, mode):
     for digest, relative in request["objects"].items():
         if digest not in hashes:
             raise InputError("Object mappings may only name declared artefacts.")
-        if Path(relative).stem != digest:
-            raise InputError("Content-addressed object filename does not match its map key.")
+        if not relative or "\x00" in relative:
+            raise InputError("Object paths must be non-empty valid local paths.")
     return chain

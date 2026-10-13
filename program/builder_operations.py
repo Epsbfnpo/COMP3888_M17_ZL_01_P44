@@ -62,50 +62,112 @@ def inspect_files(paths: list[str], progress: Progress, cancel: Event) -> list[d
 
 def export_bundle(manifest: dict, files: list[dict], target: Path, copy_files: bool,
                   progress: Progress, cancel: Event) -> None:
-    """Publish the manifest last; never overwrite existing object content."""
+    """Publish a verified reference manifest or a portable copied bundle."""
     target = Path(target)
+    target_root = target.parent.resolve(strict=True)
+    published_manifest = json.loads(json.dumps(manifest, ensure_ascii=False))
+    published_manifest["objects"] = dict(manifest["objects"])
     created = []
     published = False
-    with tempfile.TemporaryDirectory(prefix=".manifest-stage-", dir=target.parent) as staging:
+    with tempfile.TemporaryDirectory(prefix=".manifest-stage-", dir=target_root) as staging:
         stage = Path(staging)
         try:
+            seen = set()
+            staged_objects = []
+            reserved = set()
             for n, entry in enumerate(files, 1):
                 check_cancel(cancel)
-                relative = manifest["objects"][entry["hash"]]
-                dest = target.parent / relative
-                staged = stage / relative
-                progress(f"Verifying file {n}/{len(files)}: {entry['id']}")
-                if copy_files:
-                    if not entry["path"]:
-                        raise ValueError(f"{entry['id']}: source file is missing; remove and add it again.")
-                    staged.parent.mkdir(parents=True, exist_ok=True)
-                    digest = verified_hash(Path(entry["path"]), cancel, staged)
-                    if digest != entry["hash"]:
-                        raise ValueError(f"{entry['id']}: file changed since import. Remove and add it again.")
-                if dest.exists() or not copy_files:
-                    if verified_hash(dest, cancel) != entry["hash"]:
-                        raise ValueError(f"{entry['id']}: existing bundle object has an incorrect hash.")
+                digest = entry["hash"]
+                if digest in seen:
+                    continue
+                seen.add(digest)
+                progress(f"Verifying file {n}/{len(files)}: {Path(entry['path']).name}")
+                if not entry.get("path"):
+                    raise ValueError(
+                        f"{entry['id']}: original file is missing. Use Locate/replace to find "
+                        "the original file with the declared SHA-256.")
+                try:
+                    source = Path(entry["path"]).resolve(strict=True)
+                except OSError as exc:
+                    raise ValueError(
+                        f"{entry['id']}: original file is missing or moved. Use Locate/replace "
+                        f"to find the original file. ({exc})") from None
+                if not source.is_file():
+                    raise ValueError(f"{entry['id']}: selected original is not a regular file.")
+                actual = verified_hash(source, cancel)
+                if actual != digest:
+                    raise ValueError(
+                        f"{entry['id']} ({source.name}): file content no longer matches its "
+                        "declared SHA-256. Use Locate/replace to select the original file; "
+                        "the declared identity was not changed.")
+
+                requested = published_manifest["objects"].get(digest)
+                if requested is None:
+                    raise ValueError(f"{entry['id']}: no object path was declared.")
+                if not copy_files:
+                    mapped = Path(requested)
+                    mapped_source = (mapped if mapped.is_absolute()
+                                     else target_root / mapped).resolve()
+                    if mapped_source != source:
+                        raise ValueError(
+                            f"{entry['id']}: the saved reference does not resolve to the "
+                            "selected original file.")
+                    if not published_manifest.get("options", {}).get(
+                            "local_file_references", False):
+                        raise ValueError(
+                            "Referenced-file submissions must enable local_file_references.")
+                    continue
+
+                relative = Path(requested)
+                if (relative.is_absolute() or ".." in relative.parts
+                        or not relative.parts or relative.parts[0].casefold() != "objects"):
+                    raise ValueError("Copied object paths must stay inside the objects folder.")
+                candidate = Path(*relative.parts)
+                destination = (target_root / candidate).resolve()
+                if not destination.is_relative_to(target_root):
+                    raise ValueError("Copied object path escapes the submission folder.")
+                name_key = str(candidate).casefold()
+                if name_key in reserved:
+                    candidate = _suffixed_object_path(candidate, digest, target_root, cancel)
+                    name_key = str(candidate).casefold()
+                reserved.add(name_key)
+                destination = (target_root / candidate).resolve()
+                if destination.exists() and verified_hash(destination, cancel) != digest:
+                    candidate = _suffixed_object_path(candidate, digest, target_root, cancel)
+                    destination = (target_root / candidate).resolve()
+                published_manifest["objects"][digest] = candidate.as_posix()
+                if destination.exists():
+                    continue
+                staged = stage / candidate
+                staged.parent.mkdir(parents=True, exist_ok=True)
+                staged_hash = verified_hash(source, cancel, staged)
+                if staged_hash != digest:
+                    raise ValueError(
+                        f"{entry['id']}: source changed while it was being copied.")
+                staged_objects.append((candidate, staged, digest, entry["id"]))
+
+            if copy_files and "options" in published_manifest:
+                published_manifest["options"]["local_file_references"] = False
             staged_manifest = stage / "submission.json"
             staged_manifest.write_text(
-                json.dumps(manifest, indent=2, ensure_ascii=False, allow_nan=False) + "\n",
+                json.dumps(published_manifest, indent=2, ensure_ascii=False, allow_nan=False) + "\n",
                 encoding="utf-8")
             check_cancel(cancel)
             progress("Publishing verified bundle...")
-            if copy_files:
-                for entry in files:
-                    relative = manifest["objects"][entry["hash"]]
-                    dest = target.parent / relative
-                    dest.parent.mkdir(parents=True, exist_ok=True)
-                    # Exclusive creation avoids replacing an existing bundle object.
-                    try:
-                        with dest.open("xb") as output, (stage / relative).open("rb") as source:
-                            created.append(dest)
-                            while chunk := source.read(1024 * 1024):
-                                check_cancel(cancel)
-                                output.write(chunk)
-                    except FileExistsError:
-                        if verified_hash(dest, cancel) != entry["hash"]:
-                            raise ValueError(f"{entry['id']}: bundle object changed during export.")
+            for relative, staged, digest, entry_id in staged_objects:
+                dest = (target_root / relative).resolve()
+                dest.parent.mkdir(parents=True, exist_ok=True)
+                try:
+                    with dest.open("xb") as output, staged.open("rb") as source:
+                        created.append(dest)
+                        while chunk := source.read(1024 * 1024):
+                            check_cancel(cancel)
+                            output.write(chunk)
+                except FileExistsError:
+                    if verified_hash(dest, cancel) != digest:
+                        raise ValueError(
+                            f"{entry_id}: object destination changed during export; "
+                            "no existing file was overwritten.")
             check_cancel(cancel)
             os.replace(staged_manifest, target)
             published = True
@@ -115,6 +177,19 @@ def export_bundle(manifest: dict, files: list[dict], target: Path, copy_files: b
                     path.unlink()
 
 
+def _suffixed_object_path(relative: Path, digest: str, target_root: Path,
+                          cancel: Event) -> Path:
+    for digits in range(8, 65, 4):
+        candidate = relative.with_name(
+            f"{relative.stem} ({digest[:digits]}){relative.suffix}")
+        if candidate == relative:
+            continue
+        destination = (target_root / candidate).resolve()
+        if not destination.exists() or verified_hash(destination, cancel) == digest:
+            return candidate
+    raise ValueError(f"Could not create a unique object name for {relative.name!r}.")
+
+
 def assess_manifest(manifest: dict, files: list[dict], progress: Progress,
                     cancel: Event) -> dict:
     # Import the production entry point to use its dependency setup and contract.
@@ -122,12 +197,17 @@ def assess_manifest(manifest: dict, files: list[dict], progress: Progress,
 
     with tempfile.TemporaryDirectory(prefix="music-assessment-") as staging:
         root = Path(staging)
-        export_bundle(manifest, files, root / "submission.json", True, progress, cancel)
+        staged_manifest = json.loads(json.dumps(manifest))
+        staged_manifest["objects"] = L.copied_object_paths(files)
+        if "options" in staged_manifest:
+            staged_manifest["options"]["local_file_references"] = False
+        export_bundle(staged_manifest, files, root / "submission.json", True, progress, cancel)
         check_cancel(cancel)
         progress("Running full assessment...")
         timeout = min(manifest["options"]["timeout_seconds"], 60)
-        payload = json.dumps({"request": manifest, "root": str(root), "mode": "native"},
-                             allow_nan=False)
+        payload = json.dumps(
+            {"request": staged_manifest, "root": str(root), "mode": "native"},
+            allow_nan=False)
         command = [sys.executable, "-B", str(Path(__file__).with_name("run.py")), "--worker"]
         process = subprocess.Popen(
             command, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE,

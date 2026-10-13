@@ -22,6 +22,7 @@ from tkinter import filedialog, messagebox, ttk
 
 import manifest_logic as L
 import builder_operations as operations
+from builder_results import attention_items, attention_workflow_results
 
 
 def parse_json_object(text: str, label: str) -> dict:
@@ -337,9 +338,13 @@ class App(tk.Tk):
 
         bar = ttk.Frame(self)
         bar.pack(fill="x", padx=8, pady=(0, 8))
-        self.copy_var = tk.BooleanVar(value=True)
-        ttk.Checkbutton(bar, text="Copy files into objects/ next to the manifest",
+        self.copy_var = tk.BooleanVar(value=False)
+        ttk.Checkbutton(bar, text="Copy files into a portable submission folder",
                         variable=self.copy_var).pack(side="left")
+        self.storage_hint = ttk.Label(
+            bar, text="References originals; keep them available at their current paths.")
+        self.storage_hint.pack(side="left", padx=8)
+        self.copy_var.trace_add("write", self._update_storage_hint)
         ttk.Button(bar, text="Save manifest…", command=self.save).pack(side="right")
         ttk.Button(bar, text="Preview JSON", command=self.preview).pack(side="right", padx=6)
         ttk.Button(bar, text="Load manifest…", command=self.load).pack(side="right")
@@ -486,7 +491,8 @@ class App(tk.Tk):
         notebook.add(tab, text="Files")
         bar = ttk.Frame(tab)
         bar.pack(fill="x", pady=(0, 6))
-        for text, cmd in (("Add files…", self.add_files), ("Edit…", self.edit_file),
+        for text, cmd in (("Add files…", self.add_files), ("Locate/replace…", self.locate_file),
+                          ("Edit…", self.edit_file),
                           ("Mark final", self.mark_final), ("Remove", self.remove_file)):
             ttk.Button(bar, text=text, command=cmd).pack(side="left", padx=(0, 6))
         self.file_tree = self._tree(
@@ -635,7 +641,8 @@ class App(tk.Tk):
             text=f"Snapshot case {response['case_id']} | run {response['run_id']} | "
                  f"status: {response['execution_status']}")
         self.axis_tree.delete(*self.axis_tree.get_children())
-        explanation = ["Content consistency does not prove authorship. AI disclosure is not AI detection.\n"]
+        explanation = [
+            "Content consistency does not prove authorship. AI disclosure is not AI detection.\n"]
         if response.get("error"):
             explanation.append(f"ERROR: {response['error']}\n")
         for name, axis in response["axes"].items():
@@ -644,8 +651,24 @@ class App(tk.Tk):
                 "Not assessed" if axis["value"] is None else f"{axis['value']:.3f}",
                 "Not assessed" if axis["confidence"] is None else f"{axis['confidence']:.3f}"))
             explanation.append(f"{name}: {axis.get('reasoning') or 'Reasoning not supplied.'}\n")
-        explanation.append("\nFull result (workflow rules, findings and assessment checks):\n")
-        explanation.append(json.dumps(response, indent=2, ensure_ascii=False, allow_nan=False))
+        file_names = {item["hash"]: Path(item["path"]).name
+                      for item in self.files if item.get("path")}
+        issues = attention_items(response, file_names, self.policy)
+        explanation.append("\nIssues requiring attention:\n")
+        if not issues:
+            explanation.append(
+                "No issues requiring attention were found in the assessed checks.\n"
+                "Checks or dimensions marked not assessed remain unassessed; they have not "
+                "been treated as passes.\n")
+        else:
+            for index, issue in enumerate(issues, 1):
+                explanation.append(
+                    f"\n{index}. {issue['status']} — {issue['affected']}\n"
+                    f"   {issue['explanation']}\n"
+                    f"   Suggested action: {issue['suggestion']}\n")
+        explanation.append(
+            "\nThe complete machine-readable response, including passed checks, is preserved "
+            "and available with Save result JSON…")
         self.assessment_text.configure(state="normal")
         self.assessment_text.delete("1.0", "end")
         self.assessment_text.insert("1.0", "\n".join(explanation))
@@ -672,11 +695,23 @@ class App(tk.Tk):
         sel = tree.selection()
         return int(sel[0]) if sel else None
 
+    def _update_storage_hint(self, *_args):
+        if not hasattr(self, "storage_hint"):
+            return
+        text = ("Copies verified originals into a portable objects/ folder."
+                if self.copy_var.get()
+                else "References originals; keep them available at their current paths.")
+        self.storage_hint.configure(text=text)
+
     def refresh(self):
         self.file_tree.delete(*self.file_tree.get_children())
         for i, f in enumerate(self.files):
+            available = bool(f["path"] and Path(f["path"]).is_file())
+            filename = Path(f["path"]).name if f["path"] else "(path not set)"
+            if not available:
+                filename = f"(missing: {filename})"
             self.file_tree.insert("", "end", iid=str(i), values=(
-                f["id"], Path(f["path"]).name if f["path"] else "(missing)", f["type"],
+                f["id"], filename, f["type"],
                 f["role"], f["creation_method"], "✔" if f["final"] else "",
                 f["hash"][:12] + "…"))
         self.rel_tree.delete(*self.rel_tree.get_children())
@@ -695,6 +730,28 @@ class App(tk.Tk):
             self._start_job(
                 lambda progress, cancel: operations.inspect_files(paths, progress, cancel),
                 self._add_inspected_files)
+
+    def locate_file(self):
+        idx = self.selected(self.file_tree)
+        if idx is None:
+            messagebox.showinfo("Locate file", "Select a file row first.", parent=self)
+            return
+        entry = self.files[idx]
+        selected = filedialog.askopenfilename(
+            title=f"Locate original for {Path(entry['path']).name if entry['path'] else entry['id']}")
+        if not selected:
+            return
+        try:
+            actual = L.sha256_file(selected)
+            if actual != entry["hash"]:
+                raise ValueError(
+                    f"{Path(selected).name} does not match the declared SHA-256 for "
+                    f"{entry['id']}. The manifest identity was not changed.")
+            entry["path"] = str(Path(selected).resolve())
+            entry["technical"] = L.wav_technical(selected)
+            self.refresh()
+        except (OSError, ValueError) as exc:
+            messagebox.showerror("Cannot locate original", str(exc), parent=self)
 
     def _add_inspected_files(self, results):
         for result in results:
@@ -807,7 +864,7 @@ class App(tk.Tk):
         result.update({name: True for name, var in self.flag_vars.items() if var.get()})
         return result
 
-    def build_manifest(self) -> dict:
+    def build_manifest(self, manifest_path=None) -> dict:
         try:
             timeout = int(self.v["timeout"].get())
             if timeout < 1:
@@ -823,17 +880,20 @@ class App(tk.Tk):
                 raise ValueError(f"{label} is required")
         winput = self.workflow_input()
         chain = L.build_chain(self.files, self.rels)
-        by_hash = {f["hash"]: f for f in self.files}
+        objects = (L.copied_object_paths(self.files) if self.copy_var.get()
+                   else L.referenced_object_paths(
+                       self.files, manifest_path))
         return {
             "run_id": self.v["run_id"].get().strip(),
             "case_id": self.v["case_id"].get().strip(),
             "profile": self.v["profile"].get().strip(),
             "options": {"include_reasoning": self.v["include_reasoning"].get(),
                         "offline_only": self.v["offline_only"].get(),
-                        "timeout_seconds": timeout},
+                        "timeout_seconds": timeout,
+                        "local_file_references": not self.copy_var.get()},
             "workflow": winput,
             "chain": chain,
-            "objects": {a["artefact_hash"]: L.object_rel_path(by_hash[a["artefact_hash"]])
+            "objects": {a["artefact_hash"]: objects[a["artefact_hash"]]
                         for a in chain["artefacts"]},
         }
 
@@ -849,10 +909,18 @@ class App(tk.Tk):
             messagebox.showerror("Cannot check", str(exc))
             return
         self.check_tree.delete(*self.check_tree.get_children())
-        for r in result["results"]:
+        visible = attention_workflow_results(result["results"], self.policy)
+        if not visible:
+            self.check_tree.insert(
+                "", "end", values=(
+                    "-", "-", "-", "",
+                    "No issues requiring attention were found in the assessed checks."))
+        for r in visible:
             self.check_tree.insert("", "end", values=(
-                r["rule_id"], r["level"], r["status"],
-                "" if r["weight"] is None else r["weight"], r["reason"]), tags=(r["status"],))
+                r["rule_id"], r["level"], r["display_status"],
+                "" if r["weight"] is None else r["weight"],
+                f"{r['reason']} Suggested action: {r['suggestion']}"),
+                tags=(r["status"],))
         value = result["value"]
         shown = "n/a" if value is None else f"{value:.2f}"
         text = (f"  {result['workflow_title']}: {result['numerator']:g}/"
@@ -901,6 +969,11 @@ class App(tk.Tk):
         if not target:
             return
         target = Path(target)
+        try:
+            manifest = self.build_manifest(target)
+        except (ValueError, L.PolicyError) as exc:
+            messagebox.showerror("Cannot build manifest", str(exc))
+            return
         files, copy_files = copy.deepcopy(self.files), self.copy_var.get()
         self._start_job(
             lambda progress, cancel: operations.export_bundle(
@@ -921,17 +994,21 @@ class App(tk.Tk):
             for n, art in enumerate(chain["artefacts"], 1):
                 digest = art["artefact_hash"]
                 rel = objects.get(digest)
-                path = source.parent / rel if rel else None
+                mapped = Path(rel) if rel else None
+                path = (mapped if mapped and mapped.is_absolute()
+                        else source.parent / mapped if mapped else None)
                 attrs = dict(art.get("attributes", {}))
                 production = dict(attrs.pop("production", {}))
                 fid = f"{art['artefact_type'].split('/')[-1]}-{n}"
                 alias[digest] = fid
                 files.append({
                     "id": fid, "hash": digest, "type": art["artefact_type"],
-                    "path": str(path) if path and path.is_file() else "",
+                    "path": str(path.resolve()) if path else "",
                     "creation_method": attrs.pop("creation_method", ""),
                     "role": production.pop("role", ""), "production": production,
-                    "technical": attrs.pop("technical", {}), "extra": attrs,
+                    "technical": attrs.pop("technical", {}) or
+                                 (L.wav_technical(path) if path and path.is_file() else {}),
+                    "extra": attrs,
                     "final": digest == chain["final_artefact_hash"]})
             rels = [{"target": alias[a["artefact_hash"]], "source": alias[e["hash"]],
                      "type": e["relationship_type"], "attrs": e.get("attributes", {})}
@@ -942,6 +1019,7 @@ class App(tk.Tk):
             messagebox.showerror("Error", f"Could not load manifest: {exc!r}")
             return
         self.files, self.rels, self._counter = files, rels, len(files)
+        self.copy_var.set(not options.get("local_file_references", False))
         self.v["run_id"].set(data.get("run_id", str(uuid.uuid4())))
         self.v["case_id"].set(data.get("case_id", ""))
         self.v["profile"].set(data.get("profile", L.PROFILE))
@@ -960,11 +1038,14 @@ class App(tk.Tk):
         self.desc.delete("1.0", "end")
         self.desc.insert("1.0", workflow.get("description", ""))
         self.refresh()
-        missing = [f["id"] for f in files if not f["path"]]
+        missing = [f["path"] or f["id"] for f in files
+                   if not f["path"] or not Path(f["path"]).is_file()]
         if missing:
             messagebox.showwarning("Files not found",
-                                   "These object files were not found next to the manifest: "
-                                   + ", ".join(missing))
+                                   "Some original files are missing. Select each file row and "
+                                   "use Locate/replace… to choose the original file with the "
+                                   "same SHA-256. Declared hashes will not be changed:\n"
+                                   + "\n".join(missing))
 
 
 if __name__ == "__main__":

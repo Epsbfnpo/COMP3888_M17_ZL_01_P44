@@ -145,24 +145,53 @@ Install `requirements.txt` to enable full assessment.
   and offer cancellation; editing is disabled while an operation is active.
 - **Preflight check** predicts workflow completeness only. It does not run
   content checks or cryptographic validation.
-- **Save manifest** stages object files and verifies their SHA-256 hashes before
-  publishing the manifest. Changed or missing source files block copied exports.
-  Existing objects are reused only if their hashes match and are never
-  overwritten. With copying disabled, every object must already exist at its
-  declared location beside the destination manifest and pass hash verification.
-  Failed or cancelled exports preserve the previous manifest and remove newly
-  created objects. Publication is manifest-last, not a whole-directory atomic
-  transaction or a guarantee against external file changes after verification.
+- **Save manifest** defaults to referencing the selected original files; the
+  originals are not moved, renamed, or modified. The saved manifest uses a
+  relative path where possible and an absolute path across volumes. Referenced
+  submissions depend on the originals remaining available at those paths.
+  Every save rechecks each original against its declared SHA-256. If a file is
+  missing or changed, use **Locate/replace…** to select the original bytes; a
+  replacement with a different hash is rejected and the declared identity is
+  preserved.
+- Enable **Copy files into a portable submission folder** to copy verified files
+  into `objects/` using their original filenames. When selected files share a
+  filename, deterministic SHA-256 suffixes disambiguate them. Existing matching
+  content is reused; conflicting files receive a safe alternate name and are
+  never overwritten. Failed or cancelled exports preserve the previous
+  manifest and remove newly created objects. Publication is manifest-last, not
+  a whole-directory atomic transaction or a guarantee against external changes
+  after verification.
+- Native local-reference manifests explicitly set
+  `options.local_file_references`. The evaluator continues to confine all
+  CSEC/public bundle paths to the supplied bundle root. Direct evaluation of a
+  trusted native manifest containing external file references requires the
+  additional `--allow-local-files` command-line option:
+
+  ```bash
+  python3 -B run.py --native /path/to/submission.json --root /path/to/submission-folder --allow-local-files
+  ```
+
+  Both the manifest declaration and command-line authorization are required;
+  enabling the evaluator option alone does not authorize a manifest without
+  local-reference mode.
 - **Full assessment → Run assessment** evaluates a verified temporary snapshot
   using the production worker. It runs locally, without saving or overwriting
   the user's bundle, and enforces the requested timeout up to 60 seconds.
   Cancellation terminates the worker and cleans up temporary files.
 - Results show completeness, integrity, attestation strength and AI disclosure
-  separately, with availability, confidence, explanations and the complete
-  workflow/findings/checks response. `null` is shown as **Not assessed**, not zero.
-  Execution errors and unsupported inputs remain explicit. Results describe the
-  identified submission snapshot; subsequent edits do not update that snapshot.
-  **Save result JSON** exports the full response for later inspection.
+  separately, with availability and confidence. The artist-facing issue summary
+  hides explicitly successful and not-applicable checks, optional evidence that
+  is simply absent, and reports failures, contradictions, missing required
+  evidence, invalid evidence, and applicable checks that could not be assessed.
+  Missing or unassessed evidence is not labelled a failure. Each issue includes
+  the affected file or relationship, explanation, and suggested action. When
+  there are no attention items, the UI says: “No issues requiring attention
+  were found in the assessed checks.” Unassessed dimensions are not implied to
+  have passed. `null` is shown as **Not assessed**, not zero. Execution errors
+  and unsupported inputs remain explicit. Results describe the identified
+  submission snapshot; subsequent edits do not update that snapshot.
+  **Save result JSON** preserves and exports the full, unfiltered machine-readable
+  response, including successful checks.
 
 Content consistency is not proof of authorship, and AI disclosure is not AI
 detection. No overall score or acceptance decision is added.

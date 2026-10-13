@@ -43,7 +43,7 @@ class ExportTests(unittest.TestCase):
     def test_changed_source_preserves_old_manifest(self):
         self.target.write_text("old manifest")
         self.source.write_bytes(b"changed evidence")
-        with self.assertRaisesRegex(ValueError, "changed since import"):
+        with self.assertRaisesRegex(ValueError, "declared SHA-256"):
             self.export()
         self.assertEqual(self.target.read_text(), "old manifest")
         self.assertFalse((self.root / self.relative).exists())
@@ -51,28 +51,29 @@ class ExportTests(unittest.TestCase):
 
     def test_missing_source_does_not_publish(self):
         self.files[0]["path"] = ""
-        with self.assertRaisesRegex(ValueError, "source file is missing"):
+        with self.assertRaisesRegex(ValueError, "original file is missing"):
             self.export()
         self.assertFalse(self.target.exists())
 
-    def test_no_copy_requires_existing_verified_object(self):
-        with self.assertRaises(FileNotFoundError):
-            self.export(False)
-        self.assertFalse(self.target.exists())
-        dest = self.root / self.relative
-        dest.parent.mkdir()
-        dest.write_bytes(self.source.read_bytes())
+    def test_no_copy_references_verified_original_without_copying(self):
+        self.manifest["objects"][self.digest] = self.source.name
+        self.manifest["options"] = {"local_file_references": True}
         self.export(False)
         self.assertTrue(self.target.exists())
+        self.assertEqual(json.loads(self.target.read_text())["objects"][self.digest],
+                         self.source.name)
+        self.assertFalse((self.root / "objects").exists())
 
-    def test_existing_incorrect_object_is_not_overwritten(self):
+    def test_existing_incorrect_object_gets_collision_safe_name(self):
         dest = self.root / self.relative
         dest.parent.mkdir()
         dest.write_bytes(b"incorrect")
-        with self.assertRaisesRegex(ValueError, "incorrect hash"):
-            self.export()
+        self.export()
         self.assertEqual(dest.read_bytes(), b"incorrect")
-        self.assertFalse(self.target.exists())
+        saved = json.loads(self.target.read_text())
+        mapped = saved["objects"][self.digest]
+        self.assertNotEqual(mapped, self.relative)
+        self.assertEqual((self.root / mapped).read_bytes(), self.source.read_bytes())
 
     def test_existing_correct_object_is_reused(self):
         self.export()

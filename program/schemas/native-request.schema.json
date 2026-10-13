@@ -241,7 +241,7 @@
       }
     },
     "objects": {
-      "description": "SHA-256 to bundle-relative media URI map. Implementations must reject traversal outside the supplied bundle root.",
+      "description": "SHA-256 to media path map. Paths outside the bundle root require local_file_references and explicit evaluator authorization.",
       "type": "object",
       "minProperties": 1,
       "propertyNames": {
@@ -249,7 +249,7 @@
       },
       "additionalProperties": {
         "type": "string",
-        "pattern": "^objects/[0-9a-f]{64}\\.(?:png|mp4|wav|mid|midi|xml|json|c2pa|txt|csv|pdf|zip|als|logicx|ptx)$"
+        "minLength": 1
       }
     },
     "options": {
@@ -270,6 +270,10 @@
         "timeout_seconds": {
           "type": "integer",
           "minimum": 1
+        },
+        "local_file_references": {
+          "description": "Declares that this trusted local submission references original files outside its bundle. The evaluator still requires --allow-local-files.",
+          "type": "boolean"
         }
       }
     }

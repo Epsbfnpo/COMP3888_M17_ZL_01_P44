@@ -158,7 +158,7 @@ def collect_results(final_artefact):
     return observations, relationships
 
 
-def evaluate_chain(native, objects, root, workflow=None):
+def evaluate_chain(native, objects, root, workflow=None, allow_external_files=False):
     chain = EvidenceChain.from_dict(native)
     for edge in chain.get_evidence_relationships():
         if not edge.relationship_type.validate_types(
@@ -183,9 +183,13 @@ def evaluate_chain(native, objects, root, workflow=None):
         if relative is None:
             findings.append(finding("MISSING_OBJECT", "No file mapping was supplied.", digest, "medium"))
             continue
-        path = (root / relative).resolve()
-        if not path.is_relative_to(root):
-            raise InputError("Object path escapes the supplied bundle root.")
+        mapped_path = Path(relative)
+        path = (mapped_path if mapped_path.is_absolute() else root / mapped_path).resolve()
+        if not path.is_relative_to(root) and not allow_external_files:
+            raise InputError(
+                "Object path escapes the supplied bundle root. External paths require a native "
+                "request with local_file_references=true and the explicit --allow-local-files "
+                "evaluator option.")
         if not path.exists():
             findings.append(finding("MISSING_OBJECT", "The declared object file is missing.", digest, "medium"))
             continue
