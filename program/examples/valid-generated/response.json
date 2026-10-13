@@ -6,7 +6,7 @@
   "system": {
     "name": "COMP3888-music-baseline",
     "version": "0.5.0",
-    "source_revision": "sha256:7661a11d28785aa0a9e4d9884a54484d3481d6a11e05ed2a56cd12a58255dc26"
+    "source_revision": "sha256:83b6bee2b8104d7036749317c7e6900f8c8f904eede2d427097b075edc2f131c"
   },
   "execution_status": "succeeded",
   "axes": {
@@ -58,9 +58,13 @@
         "bit_depth": 16,
         "format": "WAV",
         "codec_subtype": "PCM",
+        "sample_format": "int",
         "file_size_bytes": 8044,
         "wav_format_tag": "WAVE_FORMAT_PCM",
-        "valid_bits_per_sample": 16
+        "valid_bits_per_sample": 16,
+        "channel_mask": null,
+        "trailing_bytes": 0,
+        "wav_warnings": []
       },
       "embedded_metadata": {
         "core_format": {
@@ -132,9 +136,13 @@
         "bit_depth": 16,
         "format": "WAV",
         "codec_subtype": "PCM",
+        "sample_format": "int",
         "file_size_bytes": 8044,
         "wav_format_tag": "WAVE_FORMAT_PCM",
-        "valid_bits_per_sample": 16
+        "valid_bits_per_sample": 16,
+        "channel_mask": null,
+        "trailing_bytes": 0,
+        "wav_warnings": []
       },
       "embedded_metadata": {
         "core_format": {
@@ -206,9 +214,13 @@
         "bit_depth": 16,
         "format": "WAV",
         "codec_subtype": "PCM",
+        "sample_format": "int",
         "file_size_bytes": 8044,
         "wav_format_tag": "WAVE_FORMAT_PCM",
-        "valid_bits_per_sample": 16
+        "valid_bits_per_sample": 16,
+        "channel_mask": null,
+        "trailing_bytes": 0,
+        "wav_warnings": []
       },
       "embedded_metadata": {
         "core_format": {
@@ -280,9 +292,13 @@
         "bit_depth": 16,
         "format": "WAV",
         "codec_subtype": "PCM",
+        "sample_format": "int",
         "file_size_bytes": 8044,
         "wav_format_tag": "WAVE_FORMAT_PCM",
-        "valid_bits_per_sample": 16
+        "valid_bits_per_sample": 16,
+        "channel_mask": null,
+        "trailing_bytes": 0,
+        "wav_warnings": []
       },
       "embedded_metadata": {
         "core_format": {
@@ -398,9 +414,13 @@
           "bit_depth": 16,
           "format": "WAV",
           "codec_subtype": "PCM",
+          "sample_format": "int",
           "file_size_bytes": 8044,
           "wav_format_tag": "WAVE_FORMAT_PCM",
-          "valid_bits_per_sample": 16
+          "valid_bits_per_sample": 16,
+          "channel_mask": null,
+          "trailing_bytes": 0,
+          "wav_warnings": []
         },
         "embedded_metadata": {
           "core_format": {
@@ -476,9 +496,13 @@
           "bit_depth": 16,
           "format": "WAV",
           "codec_subtype": "PCM",
+          "sample_format": "int",
           "file_size_bytes": 8044,
           "wav_format_tag": "WAVE_FORMAT_PCM",
-          "valid_bits_per_sample": 16
+          "valid_bits_per_sample": 16,
+          "channel_mask": null,
+          "trailing_bytes": 0,
+          "wav_warnings": []
         },
         "embedded_metadata": {
           "core_format": {
@@ -554,9 +578,13 @@
           "bit_depth": 16,
           "format": "WAV",
           "codec_subtype": "PCM",
+          "sample_format": "int",
           "file_size_bytes": 8044,
           "wav_format_tag": "WAVE_FORMAT_PCM",
-          "valid_bits_per_sample": 16
+          "valid_bits_per_sample": 16,
+          "channel_mask": null,
+          "trailing_bytes": 0,
+          "wav_warnings": []
         },
         "embedded_metadata": {
           "core_format": {
@@ -632,9 +660,13 @@
           "bit_depth": 16,
           "format": "WAV",
           "codec_subtype": "PCM",
+          "sample_format": "int",
           "file_size_bytes": 8044,
           "wav_format_tag": "WAVE_FORMAT_PCM",
-          "valid_bits_per_sample": 16
+          "valid_bits_per_sample": 16,
+          "channel_mask": null,
+          "trailing_bytes": 0,
+          "wav_warnings": []
         },
         "embedded_metadata": {
           "core_format": {
@@ -701,9 +733,9 @@
       "message": "c2pa-python is not installed; C2PA attestation was not assessed."
     }
   ],
-  "processing_ms": 205.4774999851361,
+  "processing_ms": 212.74124999763444,
   "resource_usage": {
-    "cpu_ms": 10.615000000000013,
+    "cpu_ms": 10.710999999999999,
     "peak_rss_kib": null
   },
   "error": null,
@@ -1581,6 +1613,7 @@
         "normalized_rmse": 0.000168,
         "correlation": 1.0,
         "clipping_fraction": 0.0,
+        "peak_amplitude": 0.021323,
         "window_normalized_rmse": [
           0.000168,
           0.000168
@@ -1621,6 +1654,7 @@
         "normalized_rmse": 0.00026,
         "correlation": 1.0,
         "clipping_fraction": 0.0,
+        "peak_amplitude": 0.018271,
         "window_normalized_rmse": [
           0.00026,
           0.00026

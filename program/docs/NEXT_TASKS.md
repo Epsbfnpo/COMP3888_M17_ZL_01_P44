@@ -145,9 +145,11 @@ calibration against licensed real production material.
     malformed MIDI, symlink/path attacks, oversized JSON, hash collisions in
     mappings, parser timeouts, and denial-of-service patterns.
 
-22. Prioritise FLAC, AIFF, BWF, RF64, floating-point WAV, and other formats from
-    actual client submissions. Define conversion and resampling rules without
-    hiding transformations from the report.
+22. Prioritise FLAC, AIFF, RF64/BW64, compressed WAV codecs, and other formats
+    from actual client submissions. Integer/float RIFF/WAVE and matching
+    EXTENSIBLE SubFormats now share a streaming decoder. Define future
+    conversion and resampling rules without hiding transformations from the
+    report.
 
 23. Expand CompSheet and CueSheet aliases, frame/timecode formats, validation,
     and crossfade fields. Add scanned-document OCR only if client data shows it
