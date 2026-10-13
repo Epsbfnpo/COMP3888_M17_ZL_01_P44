@@ -364,6 +364,10 @@ def evaluate_chain(native, objects, root, workflow=None, allow_disconnected=Fals
     unbound_issues = dict(input_issues.get("unbound_nodes") or {})
     final_hash = chain.final_artefact_hash
     bound, bound_hashes, findings, total = 0, set(), [], 0
+    # Keep absence separate from other input errors. A missing object supplies no
+    # bytes that could contradict its declared hash; it reduces evidence
+    # completeness instead of file integrity.
+    missing_hashes = set()
     # Files that changed during an earlier attempt are isolated from the start,
     # so the result equals one where they were never bound.
     for digest, problem in (changed_objects or {}).items():
@@ -389,13 +393,16 @@ def evaluate_chain(native, objects, root, workflow=None, allow_disconnected=Fals
             continue
         relative = objects.get(digest)
         if relative is None:
+            missing_hashes.add(digest)
             findings.append(finding("MISSING_OBJECT", "No file mapping was supplied.", digest, "medium"))
             continue
         problem, size, path = _check_object(root, relative, digest, final=False,
                                             total_before=total)
         if problem is not None:
             findings.append(problem)
-            if problem["code"] != "MISSING_OBJECT":
+            if problem["code"] == "MISSING_OBJECT":
+                missing_hashes.add(digest)
+            else:
                 unbound_issues[digest] = [problem["code"]]
             continue
         total += size
@@ -434,7 +441,8 @@ def evaluate_chain(native, objects, root, workflow=None, allow_disconnected=Fals
     findings.extend(parser_findings)
 
     integrity, attestation, ai_disclosure, validation, assessment_checks, assessment_findings = assess_axes(
-        native, chain, bound_hashes, observations, relationships, parser_observations, workflow)
+        native, chain, bound_hashes, missing_hashes, observations, relationships,
+        parser_observations, workflow)
     findings.extend(assessment_findings)
     axes = empty_axes()
     workflow_assessment = None

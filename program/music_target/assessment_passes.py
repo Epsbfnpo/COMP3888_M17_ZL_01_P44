@@ -119,12 +119,23 @@ class BoundFileIntegrityPass:
     """Aggregate file binding, cached WAV checks, and parser readability."""
 
     @staticmethod
-    def evaluate(native, bound_hashes, wav_observations, parser_observations):
+    def evaluate(native, bound_hashes, missing_hashes, wav_observations,
+                 parser_observations):
         checks, findings = [], []
         for node in native["artefacts"]:
             digest = node["artefact_hash"]
-            checks.append({"rule": "object_hash_bound", "passed": digest in bound_hashes,
-                           "evidence_hash": digest})
+            if digest in missing_hashes:
+                checks.append({
+                    "rule": "object_hash_bound",
+                    "passed": None,
+                    "status": "not_assessed",
+                    "reason_code": "MISSING_OBJECT",
+                    "evidence_hash": digest,
+                })
+            else:
+                checks.append({"rule": "object_hash_bound",
+                               "passed": digest in bound_hashes,
+                               "evidence_hash": digest})
             wav_result = wav_observations.get(digest)
             if wav_result:
                 checks.extend(dict(item) for item in wav_result.get("checks", []))
@@ -737,10 +748,11 @@ def _boolean_status(checks, successful_status="matched"):
     return (successful_status if value == 1.0 else "contradicted"), value
 
 
-def assess_axes(native, chain, bound_hashes, wav_observations,
+def assess_axes(native, chain, bound_hashes, missing_hashes, wav_observations,
                 relationship_observations, parser_observations, workflow_input):
     file_value, file_checks, file_findings = BoundFileIntegrityPass.evaluate(
-        native, bound_hashes, wav_observations, parser_observations)
+        native, bound_hashes, missing_hashes, wav_observations,
+        parser_observations)
     rel_value, rel_checks, rel_findings = _relationship_integrity_results(
         relationship_observations)
     cross_value, cross_checks, cross_findings = ExpandedCrossEvidencePass.evaluate(

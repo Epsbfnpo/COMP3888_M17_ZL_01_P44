@@ -43,6 +43,7 @@ The main approach is to reuse Ben's evidence graph and execution framework, conn
 - Separates submitter-declared technical properties from measured file properties and reports inconsistencies.
 - Requires `workflow_id`, `modifiers`, and submitter declarations in `submission.json`, and loads policies for 16 workflow types.
 - `WorkflowCompletenessPass` reports the state of each required, conditional, and optional expectation.
+- A missing non-final object is reported as `MISSING_OBJECT` and its file-binding check is `not_assessed`; absence affects workflow completeness (or legacy declared-object availability when no workflow is selected) but is not evidence of a file-integrity contradiction.
 - Reports integrity, C2PA attestation, and AI disclosure independently. The top-level C2PA axis is scoped to the final artefact; supporting-node manifests are reported separately and cannot raise the final score. AI disclosure measures declaration coverage; it does not detect AI-generated content.
 - Separates file integrity, structural validity, declaration consistency, content reconstruction, CrossEvidence, and cryptographic attestation. Structural endpoint validity and C2PA do not inflate the integrity value; C2PA remains in the separate attestation-strength axis.
 - Provides CSEC request conversion, a standard response contract, timeout control, and explicit `unsupported` and `error` states.

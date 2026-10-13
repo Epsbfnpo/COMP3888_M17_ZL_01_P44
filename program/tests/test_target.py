@@ -102,12 +102,44 @@ class TargetTests(unittest.TestCase):
 
     def test_workflow_completeness_ignores_unrequired_missing_raw_object(self):
         request = copy.deepcopy(self.template)
-        del request["objects"][request["chain"]["artefacts"][0]["artefact_hash"]]
+        missing_hash = request["chain"]["artefacts"][0]["artefact_hash"]
+        del request["objects"][missing_hash]
         result = self.score(request)
         self.assertEqual(result["execution_status"], "succeeded")
         self.assertEqual(result["axes"]["completeness"]["value"], 1.0)
         self.assertTrue(any(f["code"] == "MISSING_OBJECT" for f in result["findings"]))
+        self.assertFalse(any(f["code"] == "FILE_INTEGRITY_CONTRADICTION"
+                             and f.get("evidence_hash") == missing_hash
+                             for f in result["findings"]))
+        missing_check = next(
+            item for item in result["assessment_checks"]["bound_file_integrity"]
+            if item["rule"] == "object_hash_bound"
+            and item["evidence_hash"] == missing_hash)
+        self.assertIsNone(missing_check["passed"])
+        self.assertEqual(missing_check["status"], "not_assessed")
+        self.assertEqual(missing_check["reason_code"], "MISSING_OBJECT")
         self.assertNotIn("decision", result)
+
+    def test_missing_nonfinal_file_is_not_an_integrity_contradiction(self):
+        request = copy.deepcopy(self.template)
+        missing_hash = request["chain"]["artefacts"][0]["artefact_hash"]
+        request["objects"][missing_hash] = f"objects/{missing_hash}.bin"
+
+        result = self.score(request)
+
+        self.assertEqual(result["execution_status"], "succeeded")
+        self.assertTrue(any(f["code"] == "MISSING_OBJECT"
+                            and f.get("evidence_hash") == missing_hash
+                            for f in result["findings"]))
+        self.assertFalse(any(f["code"] == "FILE_INTEGRITY_CONTRADICTION"
+                             and f.get("evidence_hash") == missing_hash
+                             for f in result["findings"]))
+        missing_check = next(
+            item for item in result["assessment_checks"]["bound_file_integrity"]
+            if item["rule"] == "object_hash_bound"
+            and item["evidence_hash"] == missing_hash)
+        self.assertIsNone(missing_check["passed"])
+        self.assertEqual(missing_check["status"], "not_assessed")
 
     def _workflow_request(self, root, workflow_id, node_specs, final_index=-1, modifiers=None):
         (root / "objects").mkdir()
