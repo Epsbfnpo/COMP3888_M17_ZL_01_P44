@@ -27,7 +27,11 @@ from music_target.engine import (
     strict_pcm_check,
 )
 from libevchain.pipeline import EvidencePass
-from music_target.assessment_passes import C2PAAttestationPass, ExpandedCrossEvidencePass
+from music_target.assessment_passes import (
+    C2PAAttestationPass,
+    ExpandedCrossEvidencePass,
+    _summarize_physical_similarity,
+)
 from music_target.audio_derivation import (
     MAX_SOURCE_CORRELATION,
     ResourceBudgetExceeded,
@@ -81,7 +85,7 @@ class TargetTests(unittest.TestCase):
                   result["assessment_checks"]["integrity_layers"]}
         self.assertFalse(layers["structural_validity"]["contributes_to_integrity"])
         self.assertFalse(layers["cryptographic_attestation"]["contributes_to_integrity"])
-        self.assertIsNone(result["axes"]["integrity"]["value"])
+        self.assertEqual(result["axes"]["integrity"]["value"], 1.0)
         self.assertEqual(result["axes"]["ai_disclosure"]["value"], 1.0)
         self.assertIn("workflow_assessment", result)
         self.assertIsNone(result["validation"]["cryptographically_valid"])
@@ -326,7 +330,7 @@ class TargetTests(unittest.TestCase):
         self.assertEqual(len(failed), 1)
         self.assertEqual(failed[0]["failure_type"], "unsupported")
         self.assertTrue(any(item["status"] == "unavailable"
-                            for item in result["assessment_checks"]["source_contribution"]))
+                            for item in result["assessment_checks"]["physical_similarity"]))
 
     def test_unsupported_final_wav_still_returns_unsupported(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -392,7 +396,7 @@ class TargetTests(unittest.TestCase):
         self.assertEqual(failures[0]["reason_code"], "non_finite_samples")
         self.assertTrue(any(
             item["status"] == "unavailable"
-            for item in result["assessment_checks"]["source_contribution"]))
+            for item in result["assessment_checks"]["physical_similarity"]))
 
     def test_trailing_bytes_are_reported_as_nonfatal_riff_warning(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -467,135 +471,65 @@ class TargetTests(unittest.TestCase):
             "gain": gain,
         }
 
-    def test_audio_derivation_pass_matches_declared_linear_mix(self):
-        left = [int(5000 * math.sin(index / 17)) for index in range(2000)]
-        right = [int(3500 * math.cos(index / 23)) for index in range(2000)]
+    def test_physical_similarity_scores_clear_mix_contributions(self):
+        left = [int(5000 * math.sin(index / 17)) for index in range(4000)]
+        right = [int(3500 * math.cos(index / 23)) for index in range(4000)]
         target = [round(0.6 * a + 0.4 * b) for a, b in zip(left, right)]
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
-            specs = [{"type": "audio/stem", "data": self._pcm16(left)},
-                     {"type": "audio/stem", "data": self._pcm16(right)},
-                     {"type": "audio/mix", "data": self._pcm16(target),
-                      "parents": [(0, "mixed_from", self._linear_attributes(
-                          "linear_mix", 0.25, 0.6)),
-                                  (1, "mixed_from", self._linear_attributes(
-                                      "linear_mix", 0.25, 0.4))]}]
-            result = self.score(self._workflow_request(
-                root, "multitrack_recording_mix_master", specs), root)
-        check = result["assessment_checks"]["audio_derivation"][0]
-        self.assertEqual(check["status"], "matched")
-        self.assertLess(check["normalized_rmse"], 0.02)
-        self.assertEqual(check["coverage_ratio"], 1.0)
-        self.assertGreater(check["matched_coverage_ratio"], 0.99)
-        self.assertIn("validation_normalized_rmse", check)
-        relationship_checks = result["assessment_checks"]["relationship_integrity"]
-        self.assertEqual(len(relationship_checks), 6)
-        self.assertTrue(all(item["source_pass"] == "RelationshipIntegrityPass"
-                            and item["passed"] for item in relationship_checks))
-
-    def test_audio_derivation_requires_sufficient_target_coverage(self):
-        source = self._deterministic_samples(2000, 17)
-        target = source + self._deterministic_samples(2000, 18)
-        with tempfile.TemporaryDirectory() as directory:
-            root = Path(directory)
             specs = [
-                {"type": "audio/stem", "data": self._pcm16(source)},
+                {"type": "audio/stem", "data": self._pcm16(left)},
+                {"type": "audio/stem", "data": self._pcm16(right)},
                 {"type": "audio/mix", "data": self._pcm16(target),
-                 "parents": [(0, "mixed_from", self._linear_attributes(
-                     "linear_mix", 0.25, 1.0))]},
+                 "parents": [(0, "mixed_from"), (1, "mixed_from")]},
             ]
             result = self.score(self._workflow_request(
                 root, "multitrack_recording_mix_master", specs), root)
-        check = result["assessment_checks"]["audio_derivation"][0]
-        self.assertEqual(check["status"], "not_applicable")
-        self.assertLess(check["coverage_ratio"], 0.9)
-        self.assertIn("insufficient_target_coverage", check["manual_review_reasons"])
+        checks = result["assessment_checks"]["physical_similarity"]
+        self.assertEqual(len(checks), 2)
+        self.assertEqual({item["status"] for item in checks}, {"corroborated"})
+        self.assertTrue(all(item["comparison_mode"] == "multi_source_contribution"
+                            for item in checks))
+        self.assertTrue(all(item["integrity_contribution"] == 1.0 for item in checks))
+        self.assertTrue(all(item["content_match_is_provenance"] is False
+                            for item in checks))
 
-    def test_audio_derivation_rejects_redundant_correlated_sources(self):
-        first = self._deterministic_samples(2400, 23)
-        second = first.copy()
-        second[0] += 1
-        target = [round(0.4 * left + 0.4 * right)
-                  for left, right in zip(first, second)]
+    def test_physical_similarity_treats_correlated_sources_as_inconclusive(self):
+        first = self._deterministic_samples(4000, 23)
+        duplicate = first.copy()
+        duplicate[0] += 1
+        target = [round(0.8 * value) for value in first]
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             specs = [
                 {"type": "audio/stem", "data": self._pcm16(first)},
-                {"type": "audio/stem", "data": self._pcm16(second)},
+                {"type": "audio/stem", "data": self._pcm16(duplicate)},
                 {"type": "audio/mix", "data": self._pcm16(target),
-                 "parents": [(0, "mixed_from", self._linear_attributes(
-                     "linear_mix", 0.3, 0.4)),
-                             (1, "mixed_from", self._linear_attributes(
-                                 "linear_mix", 0.3, 0.4))]},
+                 "parents": [(0, "mixed_from"), (1, "mixed_from")]},
             ]
             result = self.score(self._workflow_request(
                 root, "multitrack_recording_mix_master", specs), root)
-        check = result["assessment_checks"]["audio_derivation"][0]
-        self.assertEqual(check["status"], "not_applicable")
-        self.assertGreaterEqual(check["max_source_correlation"], 0.995)
-        self.assertIn("redundant_or_highly_correlated_sources",
-                      check["manual_review_reasons"])
-
-    def test_audio_derivation_pass_contradicts_unrelated_declared_linear_mix(self):
-        source = [int(5000 * math.sin(index / 17)) for index in range(2000)]
-        target = [int(5000 * math.sin(index / 3.7)) for index in range(2000)]
-        with tempfile.TemporaryDirectory() as directory:
-            root = Path(directory)
-            specs = [{"type": "audio/stem", "data": self._pcm16(source)},
-                     {"type": "audio/mix", "data": self._pcm16(target),
-                      "parents": [(0, "mixed_from", self._linear_attributes(
-                          "linear_mix", 0.25, 1.0))]}]
-            result = self.score(self._workflow_request(
-                root, "multitrack_recording_mix_master", specs), root)
-        self.assertEqual(result["assessment_checks"]["audio_derivation"][0]["status"],
-                         "contradicted")
-        self.assertTrue(any(item["code"] == "AUDIO_DERIVATION_CONTRADICTION"
+        checks = result["assessment_checks"]["physical_similarity"]
+        self.assertEqual({item["status"] for item in checks}, {"inconclusive"})
+        self.assertTrue(all(item["integrity_contribution"] is None
+                            for item in checks))
+        self.assertTrue(any(item["code"] == "PHYSICAL_SIMILARITY_INCONCLUSIVE"
                             for item in result["findings"]))
 
-    def test_audio_derivation_reports_sustained_local_tampering(self):
-        rate, duration = 1000, 20.0
-        source = self._deterministic_samples(round(rate * duration), 801)
-        target = source.copy()
-        replacement = self._deterministic_samples(round(rate * 0.5), 802)
-        target[10 * rate:10 * rate + len(replacement)] = replacement
-        with tempfile.TemporaryDirectory() as directory:
-            root = Path(directory)
-            specs = [
-                {"type": "audio/stem", "data": self._pcm16(source, rate=rate)},
-                {"type": "audio/mix", "data": self._pcm16(target, rate=rate),
-                 "parents": [(0, "mixed_from", self._linear_attributes(
-                     "linear_mix", duration, 1.0))]},
-            ]
-            result = self.score(self._workflow_request(
-                root, "multitrack_recording_mix_master", specs), root)
-        check = result["assessment_checks"]["audio_derivation"][0]
-        self.assertEqual(check["status"], "contradicted")
-        self.assertIn("sustained_local_mismatch", check["manual_review_reasons"])
-        self.assertLess(check["matched_coverage_ratio"], 1.0)
-        self.assertTrue(check["local_mismatch_regions"])
-        region = check["local_mismatch_regions"][0]
-        self.assertAlmostEqual(region["start_seconds"], 10.0, delta=0.1)
-        self.assertAlmostEqual(region["end_seconds"], 10.5, delta=0.1)
-
-    def test_declared_linear_range_longer_than_sixty_seconds_is_evaluated(self):
-        rate, duration = 1000, 70.0
-        source = self._deterministic_samples(round(rate * duration), 811)
-        target = source.copy()
-        target[-1] = max(-32768, min(32767, target[-1] + 1))
-        with tempfile.TemporaryDirectory() as directory:
-            root = Path(directory)
-            specs = [
-                {"type": "audio/stem", "data": self._pcm16(source, rate=rate)},
-                {"type": "audio/mix", "data": self._pcm16(target, rate=rate),
-                 "parents": [(0, "mixed_from", self._linear_attributes(
-                     "linear_mix", duration, 1.0))]},
-            ]
-            result = self.score(self._workflow_request(
-                root, "multitrack_recording_mix_master", specs), root)
-        check = result["assessment_checks"]["audio_derivation"][0]
-        self.assertEqual(check["status"], "matched", check)
-        self.assertEqual(check["target_duration_seconds"], duration)
-        self.assertEqual(check["coverage_ratio"], 1.0)
+    def test_physical_summary_averages_relationships_within_each_target(self):
+        results = []
+        for target, contributions in (("target-a", [1.0, 1.0, 1.0, 1.0, 0.0]),
+                                      ("target-b", [1.0])):
+            for contribution in contributions:
+                results.append({
+                    "target_hash": target,
+                    "status": ("corroborated" if contribution else "contradicted"),
+                    "integrity_contribution": contribution,
+                })
+        summary = _summarize_physical_similarity(results)
+        self.assertEqual(summary["target_values"], {"target-a": 0.8,
+                                                     "target-b": 1.0})
+        self.assertEqual(summary["value"], 0.9)
 
     def test_pcm_reader_uses_ndarray_cached_windows_and_enforces_budget(self):
         rate = 1000
@@ -688,7 +622,10 @@ class TargetTests(unittest.TestCase):
         np.testing.assert_allclose(first["frames"], expected,
                                    rtol=1e-5, atol=2e-6)
 
-    def test_audio_derivation_pass_applies_declared_time_offset(self):
+    # Historical fixtures remain beside the deprecated reconstruction code for
+    # reference.  They are intentionally not discovered: the active report
+    # contract is exercised by the unified physical-similarity tests below.
+    def _legacy_audio_derivation_pass_applies_declared_time_offset(self):
         source = [int(5000 * math.sin(index / 17)) for index in range(2000)]
         target = [0] * 100 + [round(0.7 * item) for item in source]
         with tempfile.TemporaryDirectory() as directory:
@@ -701,7 +638,7 @@ class TargetTests(unittest.TestCase):
                 root, "multitrack_recording_mix_master", specs), root)
         self.assertEqual(result["assessment_checks"]["audio_derivation"][0]["status"], "matched")
 
-    def test_audio_derivation_pass_does_not_assess_unscoped_mix(self):
+    def _legacy_audio_derivation_pass_does_not_assess_unscoped_mix(self):
         source, target = self._pcm16([1000] * 200), self._pcm16([900] * 200)
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
@@ -715,7 +652,7 @@ class TargetTests(unittest.TestCase):
         self.assertEqual(result["assessment_checks"]["audio_derivation"][0]["reason_code"],
                          "missing_derivation_parameters")
 
-    def test_audio_derivation_does_not_infer_or_refit_gain(self):
+    def _legacy_audio_derivation_does_not_infer_or_refit_gain(self):
         source = self._deterministic_samples(2000, 71)
         target = [round(0.5 * value) for value in source]
         declared = self._linear_attributes("linear_mix", 0.25, 0.5)
@@ -756,7 +693,7 @@ class TargetTests(unittest.TestCase):
         )
         self.assertEqual(content_layer["status"], "contradicted")
 
-    def test_edit_derivation_pass_matches_declared_crop_and_gain(self):
+    def _legacy_edit_derivation_pass_matches_declared_crop_and_gain(self):
         source = [int(7000 * math.sin(index / 19)) for index in range(2400)]
         edited = [round(0.7 * value) for value in source[400:1600]]
         with tempfile.TemporaryDirectory() as directory:
@@ -779,7 +716,7 @@ class TargetTests(unittest.TestCase):
         self.assertEqual(check["status"], "matched")
         self.assertEqual(check["verified_scope"], "linear_edit")
 
-    def test_edit_derivation_flags_repeated_source_segment_as_ambiguous(self):
+    def _legacy_edit_derivation_flags_repeated_source_segment_as_ambiguous(self):
         block = self._deterministic_samples(3200, 31)
         middle = self._deterministic_samples(3200, 32)
         source = block + middle + block
@@ -805,7 +742,7 @@ class TargetTests(unittest.TestCase):
         self.assertIn("ambiguous_source_segment_location",
                       check["manual_review_reasons"])
 
-    def test_edit_derivation_pass_matches_splice_offsets_and_declared_fades(self):
+    def _legacy_edit_derivation_pass_matches_splice_offsets_and_declared_fades(self):
         first = [int(7000 * math.sin(index / 19)) for index in range(1600)]
         second = [int(6000 * math.cos(index / 23)) for index in range(1600)]
         fade_frames = 80
@@ -839,7 +776,7 @@ class TargetTests(unittest.TestCase):
         self.assertEqual(result["assessment_checks"]["edit_derivation"][0]["status"],
                          "matched")
 
-    def test_stem_derivation_pass_matches_declared_linear_stem(self):
+    def _legacy_stem_derivation_pass_matches_declared_linear_stem(self):
         first = [int(4000 * math.sin(index / 13)) for index in range(2000)]
         second = [int(3000 * math.cos(index / 29)) for index in range(2000)]
         stem = [round(0.55 * left + 0.35 * right)
@@ -860,7 +797,7 @@ class TargetTests(unittest.TestCase):
         self.assertEqual(result["assessment_checks"]["stem_derivation"][0]["status"],
                          "matched")
 
-    def test_comp_derivation_pass_reconstructs_comp_sheet_timeline(self):
+    def _legacy_comp_derivation_pass_reconstructs_comp_sheet_timeline(self):
         take_a = [int(6000 * math.sin(index / 17)) for index in range(2400)]
         take_b = [int(5000 * math.cos(index / 31)) for index in range(2400)]
         comp = take_a[400:1200] + take_b[1200:2000]
@@ -902,7 +839,7 @@ class TargetTests(unittest.TestCase):
         self.assertTrue(all(item["status"] in {"matched", "corroborated"}
                             for item in physical), physical)
 
-    def test_master_derivation_pass_corroborates_content_continuity(self):
+    def _legacy_master_derivation_pass_corroborates_content_continuity(self):
         source = self._deterministic_samples(8000, 41)
         master = [round(0.8 * value) for value in source]
         with tempfile.TemporaryDirectory() as directory:
@@ -927,7 +864,7 @@ class TargetTests(unittest.TestCase):
         self.assertFalse(check["alignment_ambiguous"])
         self.assertEqual(check["parameter_source"], "submitter_declared")
 
-    def test_master_duration_delta_uses_full_files_beyond_sixty_seconds(self):
+    def _legacy_master_duration_delta_uses_full_files_beyond_sixty_seconds(self):
         rate, source_duration, master_duration = 1000, 70.0, 75.0
         source = self._deterministic_samples(round(rate * source_duration), 831)
         master = source + self._deterministic_samples(
@@ -951,7 +888,7 @@ class TargetTests(unittest.TestCase):
         self.assertEqual(check["duration_delta_seconds"], 5.0)
         self.assertGreater(check["alignment_coverage_ratio"], 0.99)
 
-    def test_master_derivation_does_not_infer_missing_alignment(self):
+    def _legacy_master_derivation_does_not_infer_missing_alignment(self):
         source = [int(9000 * math.sin(2 * math.pi * index / 100))
                   for index in range(16000)]
         master = [round(0.8 * value) for value in source]
@@ -969,7 +906,7 @@ class TargetTests(unittest.TestCase):
         self.assertEqual(check["reason_code"], "missing_derivation_parameters")
         self.assertEqual(check["claim_status"], "declared_unverified")
 
-    def test_master_derivation_does_not_replace_declared_alignment(self):
+    def _legacy_master_derivation_does_not_replace_declared_alignment(self):
         source = self._deterministic_samples(8000, 72)
         shifted = source[1000:] + source[:1000]
         with tempfile.TemporaryDirectory() as directory:
@@ -992,7 +929,7 @@ class TargetTests(unittest.TestCase):
         self.assertEqual(check["declared_offset_seconds"], 0.0)
         self.assertLess(check["declared_alignment_correlation"], 0.2)
 
-    def test_master_derivation_handles_mild_processing_and_sample_rate_conversion(self):
+    def _legacy_master_derivation_handles_mild_processing_and_sample_rate_conversion(self):
         source = self._deterministic_samples(16000, 51)
         processed = []
         previous = 0
@@ -1027,7 +964,7 @@ class TargetTests(unittest.TestCase):
         self.assertIn(check["status"], {"corroborated", "not_applicable"})
         self.assertNotEqual(check["status"], "contradicted")
 
-    def test_audio_alignment_pass_estimates_an_undeclared_shift(self):
+    def _legacy_audio_alignment_pass_estimates_an_undeclared_shift(self):
         source = self._deterministic_samples(8000, 101)
         target = [0] * 800 + source
         with tempfile.TemporaryDirectory() as directory:
@@ -1044,7 +981,7 @@ class TargetTests(unittest.TestCase):
         self.assertAlmostEqual(check["estimated_offset_seconds"], 0.1, delta=0.05)
         self.assertEqual(check["parameter_source"], "signal_estimated_diagnostic")
 
-    def test_source_contribution_and_decoy_passes_find_unused_source(self):
+    def _legacy_source_contribution_and_decoy_passes_find_unused_source(self):
         used = self._deterministic_samples(8000, 111)
         unused = self._deterministic_samples(8000, 112)
         mix = [round(0.8 * value) for value in used]
@@ -1073,7 +1010,7 @@ class TargetTests(unittest.TestCase):
                             item["source_hash"] == source_hashes[1]
                             for item in decoys))
 
-    def test_source_contribution_guard_rejects_highly_correlated_sources(self):
+    def _legacy_source_contribution_guard_rejects_highly_correlated_sources(self):
         base = self._deterministic_samples(8000, 211)
         # A pure scalar rescaling is perfectly correlated with its source
         # (correlation is scale-invariant) but is still a distinct file.
@@ -1109,7 +1046,7 @@ class TargetTests(unittest.TestCase):
         for item in decoys:
             self.assertEqual(item["status"], "not_applicable")
 
-    def test_stem_mix_residual_withholds_matrix_for_highly_correlated_sources(self):
+    def _legacy_stem_mix_residual_withholds_matrix_for_highly_correlated_sources(self):
         base = self._deterministic_samples(8000, 221)
         scaled = [round(0.6 * value) for value in base]
         target = [round(0.4 * a + 0.2 * b) for a, b in zip(base, scaled)]
@@ -1158,7 +1095,7 @@ class TargetTests(unittest.TestCase):
     def _finding_codes(result):
         return [item["code"] for item in result["findings"]]
 
-    def test_stem_mix_residual_matches_dual_mono_stereo_stem(self):
+    def _legacy_stem_mix_residual_matches_dual_mono_stereo_stem(self):
         base = self._deterministic_samples(8000, 301)
         stem = [round(0.5 * value) for value in base]
         mix = [round(0.4 * value) for value in base]
@@ -1173,7 +1110,7 @@ class TargetTests(unittest.TestCase):
         self._assert_matrix_withheld(check)
         self.assertNotIn("PHYSICAL_AUDIO_CONTRADICTION", self._finding_codes(result))
 
-    def test_stem_mix_residual_matches_panned_stereo_stem(self):
+    def _legacy_stem_mix_residual_matches_panned_stereo_stem(self):
         base = self._deterministic_samples(8000, 301)
         result = self._score_mix([
             {"type": "audio/stem", "data": self._pcm16_stereo(
@@ -1189,7 +1126,7 @@ class TargetTests(unittest.TestCase):
         self.assertLessEqual(check["normalized_rmse"], 0.05)
         self._assert_matrix_withheld(check)
 
-    def test_stem_mix_residual_contradicts_dual_mono_stem_with_unrelated_target(self):
+    def _legacy_stem_mix_residual_contradicts_dual_mono_stem_with_unrelated_target(self):
         stem = [round(0.5 * value) for value in self._deterministic_samples(8000, 301)]
         other = [round(0.5 * value) for value in self._deterministic_samples(8000, 304)]
         result = self._score_mix([
@@ -1203,7 +1140,7 @@ class TargetTests(unittest.TestCase):
         self._assert_matrix_withheld(check)
         self.assertIn("PHYSICAL_AUDIO_CONTRADICTION", self._finding_codes(result))
 
-    def test_stem_mix_residual_contradicts_duplicate_stems_with_unrelated_target(self):
+    def _legacy_stem_mix_residual_contradicts_duplicate_stems_with_unrelated_target(self):
         base = self._deterministic_samples(8000, 301)
         duplicate = [round(0.5 * value) for value in base]
         other = self._deterministic_samples(8000, 304)
@@ -1251,7 +1188,7 @@ class TargetTests(unittest.TestCase):
             self.assertEqual(decoys[digest]["status"], "not_applicable")
         return result, contributions[hashes[2]], decoys[hashes[2]]
 
-    def test_source_contribution_flags_unrelated_decoy_beside_duplicate_sources(self):
+    def _legacy_source_contribution_flags_unrelated_decoy_beside_duplicate_sources(self):
         result, contribution, decoy = self._duplicates_plus_third_source(False)
         self.assertEqual(contribution["status"], "not_supported")
         self.assertEqual(decoy["status"], "suspected_decoy")
@@ -1259,14 +1196,14 @@ class TargetTests(unittest.TestCase):
         self.assertEqual(codes.count("DECLARED_SOURCE_NOT_SUPPORTED"), 1)
         self.assertEqual(codes.count("DECOY_SOURCE_SUSPECTED"), 1)
 
-    def test_source_contribution_corroborates_used_source_beside_duplicate_sources(self):
+    def _legacy_source_contribution_corroborates_used_source_beside_duplicate_sources(self):
         result, contribution, decoy = self._duplicates_plus_third_source(True)
         self.assertEqual(contribution["status"], "corroborated")
         self.assertAlmostEqual(contribution["estimated_gain"], 0.4, delta=0.02)
         self.assertEqual(decoy["status"], "clear")
         self.assertNotIn("DECOY_SOURCE_SUSPECTED", self._finding_codes(result))
 
-    def test_independent_sources_keep_gains_and_channel_matrix(self):
+    def _legacy_independent_sources_keep_gains_and_channel_matrix(self):
         first = self._deterministic_samples(8000, 301)
         second = self._deterministic_samples(8000, 302)
         mix = [round(0.5 * a + 0.3 * b) for a, b in zip(first, second)]
@@ -1292,7 +1229,7 @@ class TargetTests(unittest.TestCase):
         self.assertEqual([item["status"] for item in
                           result["assessment_checks"]["decoy_source"]], ["clear", "clear"])
 
-    def test_processed_audio_match_corroborates_light_processing(self):
+    def _legacy_processed_audio_match_corroborates_light_processing(self):
         source = self._deterministic_samples(12000, 121)
         processed, previous = [], 0
         for value in source:
@@ -1316,7 +1253,7 @@ class TargetTests(unittest.TestCase):
         self.assertTrue(check["declared_complex_processing"])
         self.assertGreaterEqual(check["robust_similarity"], 0.72)
 
-    def test_stem_mix_residual_pass_estimates_source_gain(self):
+    def _legacy_stem_mix_residual_pass_estimates_source_gain(self):
         source = self._deterministic_samples(8000, 131)
         target = [round(0.4 * value) for value in source]
         with tempfile.TemporaryDirectory() as directory:
@@ -1334,7 +1271,7 @@ class TargetTests(unittest.TestCase):
                                delta=0.02)
         self.assertTrue(check["estimated_parameters_are_diagnostic"])
 
-    def test_excerpted_from_pass_finds_sample_in_recording(self):
+    def _legacy_excerpted_from_pass_finds_sample_in_recording(self):
         source = self._deterministic_samples(16000, 141)
         sample = source[4800:8800]
         with tempfile.TemporaryDirectory() as directory:
@@ -1351,7 +1288,7 @@ class TargetTests(unittest.TestCase):
         self.assertAlmostEqual(check["estimated_source_start_seconds"], 0.6,
                                delta=0.08)
 
-    def test_excerpt_search_finds_audio_after_sixty_seconds(self):
+    def _legacy_excerpt_search_finds_audio_after_sixty_seconds(self):
         rate = 1000
         source = self._deterministic_samples(70 * rate, 1141)
         sample = source[65 * rate:66 * rate]
@@ -1370,7 +1307,7 @@ class TargetTests(unittest.TestCase):
                                delta=0.08)
         self.assertTrue(check["search_complete"])
 
-    def test_incomplete_budget_never_returns_search_contradiction(self):
+    def _legacy_incomplete_budget_never_returns_search_contradiction(self):
         source = self._deterministic_samples(8000, 1151)
         sample = source[2000:4000]
         with tempfile.TemporaryDirectory() as directory:
@@ -1389,7 +1326,7 @@ class TargetTests(unittest.TestCase):
         self.assertEqual(check["reason_code"], "resource_budget_exhausted")
         self.assertFalse(check["search_complete"])
 
-    def test_mastering_derivation_public_pass_name_is_exposed(self):
+    def _legacy_mastering_derivation_public_pass_name_is_exposed(self):
         source = self._deterministic_samples(8000, 151)
         attrs = {"derivation_scope": "master_similarity",
                  "source_start_seconds": 0.0, "source_end_seconds": 1.0,
@@ -1408,7 +1345,7 @@ class TargetTests(unittest.TestCase):
         self.assertEqual(check["pass"], "MasteringDerivationPass")
         self.assertEqual(check["legacy_pass"], "MasterDerivationPass")
 
-    def test_integrity_layers_do_not_score_endpoint_validity_as_content(self):
+    def _legacy_integrity_layers_do_not_score_endpoint_validity_as_content(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             specs = [
@@ -1431,6 +1368,190 @@ class TargetTests(unittest.TestCase):
                           result["assessment_checks"]["assessment_status_semantics"]},
                          {"matched", "corroborated", "contradicted",
                           "not_applicable", "unavailable"})
+
+    def test_unified_physical_output_replaces_legacy_report_keys(self):
+        result = self.score()
+        checks = result["assessment_checks"]
+        legacy_keys = {
+            "audio_derivation", "edit_derivation", "comp_derivation",
+            "stem_derivation", "master_derivation", "audio_alignment",
+            "source_contribution", "comp_verification",
+            "processed_audio_match", "stem_mix_residual",
+            "mastering_derivation", "excerpted_from", "decoy_source",
+        }
+        self.assertTrue(legacy_keys.isdisjoint(checks))
+        self.assertIn("physical_similarity", checks)
+        self.assertIn("physical_similarity_summary", checks)
+        allowed = {"corroborated", "contradicted", "inconclusive", "unavailable"}
+        self.assertTrue(all(item["status"] in allowed
+                            for item in checks["physical_similarity"]))
+        self.assertTrue(all(item["content_match_is_provenance"] is False
+                            for item in checks["physical_similarity"]))
+        semantics = {item["status"] for item in
+                     checks["assessment_status_semantics"]}
+        self.assertEqual(semantics, allowed)
+
+    def test_pairwise_continuity_corroborates_light_processing(self):
+        source = self._deterministic_samples(12000, 121)
+        processed, previous = [], 0
+        for value in source:
+            filtered = round(0.75 * value + 0.25 * previous)
+            previous = value
+            processed.append(max(-15000, min(15000, round(0.65 * filtered))))
+        attrs = {"source_start_seconds": 0.0, "source_end_seconds": 1.5,
+                 "target_start_seconds": 0.0, "target_end_seconds": 1.5,
+                 "transformation_description": "light EQ and compression"}
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            specs = [
+                {"type": "audio/raw-take", "data": self._pcm16(source)},
+                {"type": "audio/edited-take", "data": self._pcm16(processed),
+                 "parents": [(0, "edited_from", attrs)]},
+            ]
+            result = self.score(self._workflow_request(
+                root, "take_comping_and_editing", specs), root)
+        check = result["assessment_checks"]["physical_similarity"][0]
+        self.assertEqual(check["comparison_mode"], "pairwise_continuity")
+        self.assertEqual(check["status"], "corroborated")
+        self.assertGreaterEqual(check["metrics"]["robust_similarity"], 0.72)
+        self.assertEqual(check["integrity_contribution"], 1.0)
+
+    def test_generic_derivation_difference_is_inconclusive_not_adverse(self):
+        source = self._deterministic_samples(8000, 171)
+        unrelated = self._deterministic_samples(8000, 172)
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            specs = [
+                {"type": "audio/raw-track", "data": self._pcm16(source)},
+                {"type": "audio/edited-take", "data": self._pcm16(unrelated),
+                 "parents": [(0, "derived_from")]},
+            ]
+            result = self.score(self._workflow_request(
+                root, "custom_or_unknown_workflow", specs), root)
+        check = result["assessment_checks"]["physical_similarity"][0]
+        self.assertEqual(check["status"], "inconclusive")
+        self.assertIsNone(check["integrity_contribution"])
+        self.assertFalse(any(item["code"] == "PHYSICAL_SIMILARITY_CONTRADICTION"
+                             for item in result["findings"]))
+
+    def test_clear_unused_mix_source_is_contradicted_only_with_joint_support(self):
+        used = self._deterministic_samples(8000, 181)
+        decoy = self._deterministic_samples(8000, 182)
+        target = [round(0.65 * value) for value in used]
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            specs = [
+                {"type": "audio/stem", "data": self._pcm16(used)},
+                {"type": "audio/stem", "data": self._pcm16(decoy)},
+                {"type": "audio/mix", "data": self._pcm16(target),
+                 "parents": [(0, "mixed_from"), (1, "mixed_from")]},
+            ]
+            result = self.score(self._workflow_request(
+                root, "multitrack_recording_mix_master", specs), root)
+        checks = result["assessment_checks"]["physical_similarity"]
+        statuses = sorted(item["status"] for item in checks)
+        self.assertEqual(statuses, ["contradicted", "corroborated"])
+        contradicted = next(item for item in checks
+                            if item["status"] == "contradicted")
+        self.assertEqual(contradicted["reason_code"],
+                         "declared_source_not_supported")
+        self.assertEqual(contradicted["joint_model_status"], "corroborated")
+        self.assertEqual(contradicted["integrity_contribution"], 0.0)
+        self.assertTrue(any(item["code"] == "PHYSICAL_SIMILARITY_CONTRADICTION"
+                            for item in result["findings"]))
+
+    def test_excerpt_search_corroborates_and_budget_failure_is_unavailable(self):
+        source = self._deterministic_samples(16000, 141)
+        sample = source[4800:8800]
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            request = self._workflow_request(root, "custom_or_unknown_workflow", [
+                {"type": "audio/raw-track", "data": self._pcm16(source)},
+                {"type": "audio/sample", "data": self._pcm16(sample),
+                 "parents": [(0, "excerpted_from")]},
+            ])
+            result = self.score(request, root)
+            with mock.patch(
+                    "music_target.audio_derivation.MAX_REQUEST_WORK_UNITS", 0.1):
+                limited = self.score(request, root)
+        check = result["assessment_checks"]["physical_similarity"][0]
+        self.assertEqual(check["comparison_mode"], "excerpt_search")
+        self.assertEqual(check["status"], "corroborated")
+        self.assertAlmostEqual(
+            check["metrics"]["estimated_source_start_seconds"], 0.6, delta=0.08)
+        limited_check = limited["assessment_checks"]["physical_similarity"][0]
+        self.assertEqual(limited_check["status"], "unavailable")
+        self.assertEqual(limited_check["reason_code"], "resource_budget_exhausted")
+        self.assertIsNone(limited_check["integrity_contribution"])
+
+    def test_master_continuity_corroborates_gain_and_format_tolerant_content(self):
+        source = self._deterministic_samples(8000, 151)
+        master = [round(0.8 * value) for value in source]
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            specs = [
+                {"type": "audio/mix", "data": self._pcm16(source)},
+                {"type": "audio/master", "data": self._pcm16(master),
+                 "parents": [(0, "mastered_from")]},
+            ]
+            result = self.score(self._workflow_request(
+                root, "mastering_service_only", specs), root)
+        check = result["assessment_checks"]["physical_similarity"][0]
+        self.assertEqual(check["comparison_mode"], "master_continuity")
+        self.assertEqual(check["status"], "corroborated")
+        self.assertGreaterEqual(check["metrics"]["waveform_correlation"], 0.95)
+        self.assertFalse(check["content_match_is_provenance"])
+
+    def test_comp_relationship_has_one_primary_result_with_selection_details(self):
+        take = self._deterministic_samples(4000, 191)
+        comp = take[800:2400]
+        take_wav, comp_wav = self._pcm16(take), self._pcm16(comp)
+        take_hash = hashlib.sha256(take_wav).hexdigest()
+        comp_hash = hashlib.sha256(comp_wav).hexdigest()
+        sheet = json.dumps({
+            "schema_version": "1.0", "sheet_type": "comp",
+            "target_hash": comp_hash,
+            "selections": [{
+                "selection_id": "S1", "take_id": "Take A",
+                "source_hash": take_hash,
+                "source_start_seconds": 0.1, "source_end_seconds": 0.3,
+                "target_start_seconds": 0.0, "target_end_seconds": 0.2,
+                "gain": 1.0,
+            }],
+        }).encode()
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            specs = [
+                {"type": "audio/raw-take", "data": take_wav},
+                {"type": "text/comp-sheet", "data": sheet, "suffix": "json"},
+                {"type": "audio/edited-take", "data": comp_wav,
+                 "parents": [(0, "comped_from"), (1, "input_to")]},
+            ]
+            result = self.score(self._workflow_request(
+                root, "take_comping_and_editing", specs), root)
+        comp_checks = [item for item in
+                       result["assessment_checks"]["physical_similarity"]
+                       if item["relationship_type"] == "comped_from"]
+        self.assertEqual(len(comp_checks), 1)
+        self.assertEqual(comp_checks[0]["comparison_mode"], "selection_timeline")
+        self.assertEqual(comp_checks[0]["status"], "corroborated")
+        self.assertEqual([item["selection_id"] for item in
+                          comp_checks[0]["selection_results"]], ["S1"])
+
+    def test_integrity_uses_physical_layer_and_only_endpoint_results(self):
+        result = self.score()
+        layers = {item["layer"]: item for item in
+                  result["assessment_checks"]["integrity_layers"]}
+        self.assertNotIn("content_reconstruction", layers)
+        self.assertIn("physical_similarity", layers)
+        self.assertFalse(layers["structural_validity"]["contributes_to_integrity"])
+        self.assertEqual(layers["structural_validity"]["status"], "corroborated")
+        summary = result["assessment_checks"]["physical_similarity_summary"][0]
+        self.assertEqual(summary["scored_relationships"],
+                         summary["counts"]["corroborated"] +
+                         summary["counts"]["contradicted"])
+        self.assertEqual(summary["declared_relationships"],
+                         len(result["assessment_checks"]["physical_similarity"]))
 
     def test_comp_sheet_text_parser_extracts_selections(self):
         raw_hash, target_hash = "1" * 64, "2" * 64
@@ -2195,7 +2316,9 @@ class InputValidationTests(unittest.TestCase):
             "chain/artefacts/1/attributes/creation_methd": "Did you mean 'creation_method'?",
             "chain/artefacts/3/attributes/technical/bitdepth": "Did you mean 'bit_depth'?",
         })
-        mix_check = result["assessment_checks"]["audio_derivation"][0]
+        mix_check = next(
+            item for item in result["assessment_checks"]["physical_similarity"]
+            if item["target_hash"] == nodes[2]["artefact_hash"])
         self.assertEqual(mix_check["status"], "unavailable")
         self.assertEqual(mix_check["reason_code"], "input_error")
         relationship = next(item for item in result["findings"]
@@ -2228,8 +2351,8 @@ class InputValidationTests(unittest.TestCase):
                 ])
                 result = self.score(request, root)
             self.assertEqual(result["execution_status"], "succeeded", result["error"])
-            statuses[name] = result["assessment_checks"]["edit_derivation"][0]["status"]
-        self.assertEqual(statuses["correct"], "matched")
+            statuses[name] = result["assessment_checks"]["physical_similarity"][0]["status"]
+        self.assertIn(statuses["correct"], {"corroborated", "inconclusive"})
         self.assertEqual(statuses["typo"], "unavailable")
 
     def test_unused_object_mapping_is_reported_not_fatal(self):
@@ -2329,7 +2452,7 @@ class InputValidationTests(unittest.TestCase):
         validate(result, "scoring-response.schema.json")
         self.assertEqual(result["execution_status"], "succeeded", result["error"])
         statuses = {(item["status"], item.get("reason_code"))
-                    for item in result["assessment_checks"]["audio_alignment"]}
+                    for item in result["assessment_checks"]["physical_similarity"]}
         self.assertEqual(statuses, {("unavailable", "resource_budget_exhausted")})
         self.assertFalse(any("CONTRADICTION" in code for code in self._codes(result)))
 

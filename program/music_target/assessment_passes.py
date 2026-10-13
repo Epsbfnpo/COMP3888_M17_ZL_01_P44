@@ -9,23 +9,8 @@ from pathlib import Path
 from legacy_parsers.c2pa_parser import parse_c2pa_file
 from legacy_parsers.ern_parser import parse_ern_file
 from legacy_parsers.rin_parser import parse_rin_file
-from music_target.audio_derivation import (
-    AudioDerivationPass,
-    CompDerivationPass,
-    EditDerivationPass,
-    StemDerivationPass,
-)
 from music_target.midi_parser import parse_midi_file
-from music_target.physical_audio_passes import (
-    AudioAlignmentPass,
-    CompVerificationPass,
-    DecoySourcePass,
-    ExcerptedFromPass,
-    MasteringDerivationPass,
-    ProcessedAudioMatchPass,
-    SourceContributionPass,
-    StemMixResidualPass,
-)
+from music_target.physical_audio_passes import PhysicalSimilarityPass
 from music_target.sheet_parsers import parse_comp_sheet_file, parse_cue_sheet_file
 
 
@@ -709,20 +694,17 @@ class AIDisclosurePass:
 
 
 ASSESSMENT_STATUS_SEMANTICS = [
-    {"status": "matched",
-     "meaning": "An exact, explicitly scoped check passed on independent validation data.",
-     "numeric_treatment": "1.0 when the layer is eligible for integrity scoring."},
     {"status": "corroborated",
-     "meaning": "Independent evidence supports the claim but does not prove exact derivation.",
-     "numeric_treatment": "Reported separately; never silently scored as an exact match."},
+     "meaning": "Independent evidence clearly supports content consistency, but does not prove provenance direction or authorship.",
+     "numeric_treatment": "1.0 in an eligible evidence layer."},
     {"status": "contradicted",
      "meaning": "An applicable assessed claim conflicts with observed evidence.",
      "numeric_treatment": "0.0 in its eligible layer and emits a contradiction finding."},
-    {"status": "not_applicable",
-     "meaning": "The check exists but the submitted transformation or evidence is outside its reliable scope.",
-     "numeric_treatment": "Excluded from the denominator; may request manual review."},
+    {"status": "inconclusive",
+     "meaning": "The check ran, but the evidence did not reach either reliable endpoint.",
+     "numeric_treatment": "Excluded from the denominator and reported as a finding."},
     {"status": "unavailable",
-     "meaning": "The claim may be present, but required evidence or declared parameters were absent or unreadable, so the check did not run.",
+     "meaning": "The check could not run, for example because a file, parameter, budget, or analysable signal was unavailable.",
      "numeric_treatment": "Excluded from the denominator and never treated as zero."},
 ]
 
@@ -740,12 +722,52 @@ def _layer(name, status, value, contributes, reason, check_count,
     }
 
 
-def _boolean_status(checks, successful_status="matched"):
+def _boolean_status(checks, successful_status="corroborated"):
     eligible = [item for item in checks if isinstance(item.get("passed"), bool)]
     if not eligible:
         return "unavailable", None
     value = sum(item["passed"] for item in eligible) / len(eligible)
     return (successful_status if value == 1.0 else "contradicted"), value
+
+
+def _summarize_physical_similarity(results):
+    counts = {status: sum(item.get("status") == status for item in results)
+              for status in ("corroborated", "contradicted",
+                             "inconclusive", "unavailable")}
+    target_buckets = {}
+    for item in results:
+        contribution = item.get("integrity_contribution")
+        if contribution is None:
+            continue
+        target_buckets.setdefault(item["target_hash"], []).append(contribution)
+    target_values = {
+        target_hash: round(sum(values) / len(values), 6)
+        for target_hash, values in sorted(target_buckets.items())
+    }
+    value = (round(sum(target_values.values()) / len(target_values), 6)
+             if target_values else None)
+    if counts["contradicted"]:
+        status = "contradicted"
+    elif counts["corroborated"]:
+        status = "corroborated"
+    elif counts["inconclusive"]:
+        status = "inconclusive"
+    else:
+        status = "unavailable"
+    return {
+        "status": status,
+        "value": value,
+        "counts": counts,
+        "declared_relationships": len(results),
+        "scored_relationships": counts["corroborated"] + counts["contradicted"],
+        "assessed_targets": len(target_values),
+        "target_values": target_values,
+        "scoring_policy": (
+            "Only corroborated (1) and contradicted (0) relationships are scored. "
+            "Inconclusive and unavailable relationships are excluded. Relationships "
+            "are averaged within each target before targets are averaged."),
+        "content_match_is_provenance": False,
+    }
 
 
 def assess_axes(native, chain, bound_hashes, missing_hashes, wav_observations,
@@ -758,54 +780,29 @@ def assess_axes(native, chain, bound_hashes, missing_hashes, wav_observations,
     cross_value, cross_checks, cross_findings = ExpandedCrossEvidencePass.evaluate(
         native, workflow_input, parser_observations, wav_observations)
     structural_checks = StructuralValidityPass.evaluate(native)
-    edit_derivations = EditDerivationPass.evaluate(native, chain)
-    comp_derivations = CompDerivationPass.evaluate(native, chain, parser_observations)
-    stem_derivations = StemDerivationPass.evaluate(native, chain)
-    mix_derivations = AudioDerivationPass.evaluate(native, chain)
-    master_derivations = MasteringDerivationPass.evaluate(native, chain)
-    audio_alignments = AudioAlignmentPass.evaluate(native, chain)
-    source_contributions = SourceContributionPass.evaluate(native, chain)
-    comp_verifications = CompVerificationPass.evaluate(
+    physical_similarity = PhysicalSimilarityPass.evaluate(
         native, chain, parser_observations)
-    processed_audio_matches = ProcessedAudioMatchPass.evaluate(native, chain)
-    stem_mix_residuals = StemMixResidualPass.evaluate(native, chain)
-    excerpted_from_checks = ExcerptedFromPass.evaluate(native, chain)
-    decoy_source_checks = DecoySourcePass.evaluate(source_contributions)
-    all_derivations = (edit_derivations + comp_derivations + stem_derivations +
-                       mix_derivations + master_derivations)
-    # Exact scoped reconstruction and master similarity are different evidence
-    # strengths. Corroboration is reported but is not silently scored as proof.
-    scored_derivations = [item for item in all_derivations
-                          if item["status"] in {"matched", "contradicted"}]
-    corroborated_derivations = [item for item in all_derivations
-                                if item["status"] == "corroborated"]
-    derivation_value = (sum(item["status"] == "matched" for item in scored_derivations) /
-                        len(scored_derivations) if scored_derivations else None)
-    derivation_findings = [
-        _finding("AUDIO_DERIVATION_CONTRADICTION",
-                 "The submitted audio contradicts the scoped content-derivation model.",
-                 item["target_hash"], "medium", derivation_result=item)
-        for item in scored_derivations if item["status"] == "contradicted"]
-    physical_checks = (comp_verifications + processed_audio_matches +
-                       stem_mix_residuals + excerpted_from_checks)
-    physical_findings = [
-        _finding("PHYSICAL_AUDIO_CONTRADICTION",
-                 "A bounded signal-content check contradicts the submitted relationship claim.",
-                 item.get("target_hash"), "medium", physical_audio_result=item)
-        for item in physical_checks if item.get("status") == "contradicted"
-    ]
-    physical_findings.extend(
-        _finding("DECLARED_SOURCE_NOT_SUPPORTED",
-                 "A declared source has no measurable unique contribution under the bounded leave-one-out model.",
-                 item.get("target_hash"), "low", source_contribution_result=item)
-        for item in source_contributions if item.get("status") == "not_supported"
-    )
-    physical_findings.extend(
-        _finding("DECOY_SOURCE_SUSPECTED",
-                 "A declared source can be removed without materially changing the bounded reconstruction.",
-                 item.get("target_hash"), "medium", decoy_source_result=item)
-        for item in decoy_source_checks if item.get("status") == "suspected_decoy"
-    )
+    physical_summary = _summarize_physical_similarity(physical_similarity)
+    physical_findings = []
+    for item in physical_similarity:
+        if item["status"] == "contradicted":
+            physical_findings.append(_finding(
+                "PHYSICAL_SIMILARITY_CONTRADICTION",
+                "Independent signal evidence clearly conflicts with the declared relationship.",
+                item.get("target_hash"), "medium",
+                physical_similarity_result=item))
+        elif item["status"] == "inconclusive":
+            physical_findings.append(_finding(
+                "PHYSICAL_SIMILARITY_INCONCLUSIVE",
+                "The physical comparison ran but did not reach a reliable endpoint.",
+                item.get("target_hash"), "low",
+                physical_similarity_result=item))
+        elif item["status"] == "unavailable":
+            physical_findings.append(_finding(
+                "PHYSICAL_SIMILARITY_UNAVAILABLE",
+                "The physical comparison could not be completed and was excluded from scoring.",
+                item.get("target_hash"), "info",
+                physical_similarity_result=item))
     (attestation, validation, attestation_findings,
      c2pa_attestation_records) = C2PAAttestationPass.evaluate(
          native, parser_observations)
@@ -813,46 +810,36 @@ def assess_axes(native, chain, bound_hashes, missing_hashes, wav_observations,
 
     file_status, file_layer_value = _boolean_status(file_checks)
     declaration_status, declaration_layer_value = _boolean_status(rel_checks)
-    cross_status, cross_layer_value = _boolean_status(
-        cross_checks, successful_status="corroborated")
-    if any(item["status"] == "contradicted" for item in scored_derivations):
-        content_status = "contradicted"
-    elif scored_derivations:
-        content_status = "matched"
-    elif corroborated_derivations:
-        content_status = "corroborated"
-    elif any(item["status"] == "not_applicable" for item in all_derivations):
-        content_status = "not_applicable"
-    else:
-        content_status = "unavailable"
-    content_layer_value = derivation_value
+    cross_status, cross_layer_value = _boolean_status(cross_checks)
+    physical_status = physical_summary["status"]
+    physical_layer_value = physical_summary["value"]
     crypto = validation.get("cryptographically_valid")
     if crypto is False:
         cryptographic_status = "contradicted"
     elif crypto is True:
         cryptographic_status = "corroborated"
     elif validation.get("validation_state") == "manifest_absent":
-        cryptographic_status = "not_applicable"
+        cryptographic_status = "unavailable"
     else:
         cryptographic_status = "unavailable"
 
-    review_reasons = [reason for item in all_derivations
-                      for reason in item.get("manual_review_reasons", [])]
+    review_reasons = [item.get("reason") for item in physical_similarity
+                      if item.get("status") == "inconclusive" and item.get("reason")]
     layers = [
         _layer("file_integrity", file_status, file_layer_value, True,
                "SHA-256 binding, cached WAV technical checks, and parser readability of submitted files.",
                len(file_checks)),
-        _layer("structural_validity", "matched", 1.0, False,
+        _layer("structural_validity", "corroborated", 1.0, False,
                "Graph, references, cycles, connectivity, and endpoint roles passed before assessment; this is not content proof.",
                len(structural_checks)),
         _layer("declaration_consistency", declaration_status,
                declaration_layer_value, True,
                "Submitted relationship parameters compared with cached source and target media observations.",
                len(rel_checks)),
-        _layer("content_reconstruction", content_status, content_layer_value,
+        _layer("physical_similarity", physical_status, physical_layer_value,
                True,
-               "Only submitter-declared ranges and gains are assessed. Missing parameters are unavailable, not adverse; Master continuity corroboration remains unscored.",
-               len(all_derivations), review_reasons),
+               "Relationship-specific bounded comparisons share four statuses. Only clear corroboration and contradiction are scored; similarity does not prove provenance.",
+               len(physical_similarity), review_reasons),
         _layer("cross_evidence_support", cross_status, cross_layer_value, True,
                "Independent parser outputs compared with graph, declarations, and media.",
                len(cross_checks)),
@@ -867,12 +854,15 @@ def assess_axes(native, chain, bound_hashes, missing_hashes, wav_observations,
     contradiction_present = any(
         item["contributes_to_integrity"] and item["status"] == "contradicted"
         for item in layers)
-    substantive_support = (content_layer_value is not None or
+    substantive_support = (physical_layer_value is not None or
                            cross_layer_value is not None)
     if not components:
         integrity_availability, integrity_value, integrity_confidence = "unavailable", None, None
     else:
-        integrity_availability = "available" if len(components) == 4 else "partial"
+        physical_is_partial = (physical_summary["declared_relationships"] >
+                               physical_summary["scored_relationships"])
+        integrity_availability = ("available" if len(components) == 4 and
+                                  not physical_is_partial else "partial")
         # File/declaration consistency alone would create a misleading perfect-
         # looking score without content or independent cross-evidence support.
         integrity_value = (sum(components) / len(components)
@@ -882,15 +872,15 @@ def assess_axes(native, chain, bound_hashes, missing_hashes, wav_observations,
     integrity = _axis(
         integrity_availability, integrity_value, integrity_confidence,
         (f"Integrity has {len(components)}/4 score-eligible evidence layers; missing evidence reduces availability and confidence but is never treated as contradiction. A numeric value is withheld "
-         "without content reconstruction or independent CrossEvidence unless a contradiction exists. "
+         "without physical similarity or independent CrossEvidence unless a contradiction exists. "
          "Structural validity and cryptographic attestation are reported separately and do not raise integrity. "
-         f"{len(corroborated_derivations)} Master/content corroboration result(s) were not scored as exact matches."))
+         f"Physical similarity scored {physical_summary['scored_relationships']}/{physical_summary['declared_relationships']} declared relationship(s); inconclusive and unavailable results were excluded. Content similarity is not proof of provenance."))
 
     review_findings = []
     if review_reasons:
         review_findings.append(_finding(
             "MANUAL_REVIEW_RECOMMENDED",
-            "One or more content checks are ambiguous, insufficiently covered, or outside the supported model.",
+            "One or more physical comparisons are ambiguous and require contextual review.",
             severity="low", review_reasons=sorted(set(review_reasons))))
     sample_data_findings = []
     for node in native["artefacts"]:
@@ -913,22 +903,10 @@ def assess_axes(native, chain, bound_hashes, missing_hashes, wav_observations,
         "assessment_status_semantics": ASSESSMENT_STATUS_SEMANTICS,
         "cross_evidence": cross_checks,
         "c2pa_attestation_records": c2pa_attestation_records,
-        "edit_derivation": edit_derivations,
-        "comp_derivation": comp_derivations,
-        "stem_derivation": stem_derivations,
-        # Retained for compatibility: this key remains the mixed_from linear-mix pass.
-        "audio_derivation": mix_derivations,
-        "master_derivation": master_derivations,
-        "audio_alignment": audio_alignments,
-        "source_contribution": source_contributions,
-        "comp_verification": comp_verifications,
-        "processed_audio_match": processed_audio_matches,
-        "stem_mix_residual": stem_mix_residuals,
-        "mastering_derivation": master_derivations,
-        "excerpted_from": excerpted_from_checks,
-        "decoy_source": decoy_source_checks,
+        "physical_similarity": physical_similarity,
+        "physical_similarity_summary": [physical_summary],
     }
-    findings = (file_findings + rel_findings + cross_findings + derivation_findings +
-                physical_findings + review_findings + sample_data_findings +
+    findings = (file_findings + rel_findings + cross_findings + physical_findings +
+                review_findings + sample_data_findings +
                 attestation_findings + ai_findings)
     return integrity, attestation, ai, validation, checks, findings

@@ -1,4 +1,4 @@
-# Music target: local integration handoff v0.4
+# Music target: local integration handoff v0.6
 
 Status: locally tested integration baseline, prepared for review. Not yet sent to CSEC or executed in CSEC's runner.
 
@@ -11,7 +11,7 @@ Status: locally tested integration baseline, prepared for review. Not yet sent t
 ## Pinned target
 
 - Target name: `COMP3888-music-baseline`.
-- Target version: `0.5.0`.
+- Target version: `0.6.0`.
 - Runtime code revision: see `reports/release.json` and `system.source_revision` in each response.
   This is an explicit SHA-256 content identifier, not a claimed Git commit.
 - The supplied Ben library snapshot has no Git metadata; its original files are identified in `reports/source_inventory.json`.
@@ -83,7 +83,7 @@ python3 -B run.py --request /path/to/request.json --root /path/to/case-root
 | Axis | Current meaning |
 |---|---|
 | completeness | Native submissions evaluate applicable workflow expectations; public WAV-only requests retain limited declared-object availability. |
-| integrity | Separately reports file binding, structural validity, declaration consistency, CrossEvidence, held-out edit/comp/stem/mix reconstruction, and master content-continuity corroboration. Structural validity and C2PA attestation do not raise integrity. Remaining weights require calibration. |
+| integrity | Separately reports file binding, structural validity, declaration consistency, unified physical similarity, CrossEvidence, and cryptographic attestation. Only clear physical corroboration/contradiction is scored, per target; structural validity and C2PA attestation do not raise integrity. Remaining weights require calibration. |
 | attestation_strength | C2PA manifest/validation/trust levels when the optional SDK assesses them; otherwise unavailable. |
 | ai_disclosure | Explicit `creation_method` disclosure coverage, not AI-content detection. |
 
@@ -93,12 +93,14 @@ Provenance validation fields are null, not false. No C2PA absence, validity or t
 There is **no target-owned authorship decision policy**. `decision` and `overall_score` are omitted.
 Execution status must not be converted into accepted/rejected. Please report execution and available axis observations only; false-accept/false-reject rates are not supported.
 
-Exact and diagnostic audio conclusions remain separate. `AudioDerivationPass`,
-`EditDerivationPass`, `StemDerivationPass`, and `CompDerivationPass` verify the
-submitter's declared time ranges, gain and fades. The eight physical diagnostics
-may estimate offsets, gains or a channel matrix only to assess signal support;
-a diagnostic `matched`/`corroborated` result cannot cancel an exact declared
-transformation `contradicted` result.
+The active assessment no longer performs exact audio reconstruction. One
+`PhysicalSimilarityPass` chooses a comparison mode from the declared
+relationship and returns exactly one primary result per relationship using
+`corroborated`, `contradicted`, `inconclusive`, or `unavailable`. Only the two
+endpoints enter integrity; ambiguous and unavailable evidence remains visible
+without being treated as adverse. Estimated offsets, gains, or channel matrices
+are diagnostic only. Every result states `content_match_is_provenance: false`:
+signal consistency cannot prove historical direction, authorship, or ownership.
 
 ## Included examples and outputs
 

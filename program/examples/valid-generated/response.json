@@ -5,8 +5,8 @@
   "asset_sha256": "746c90b6d8f6306ce93c347477103c16027d71a4072cf12d10a9f7246ce93d18",
   "system": {
     "name": "COMP3888-music-baseline",
-    "version": "0.5.0",
-    "source_revision": "sha256:83b6bee2b8104d7036749317c7e6900f8c8f904eede2d427097b075edc2f131c"
+    "version": "0.6.0",
+    "source_revision": "sha256:0eff6890a8452b5e31abee02cb065b1846773e01d73023f355e16b6755104b80"
   },
   "execution_status": "succeeded",
   "axes": {
@@ -18,9 +18,9 @@
     },
     "integrity": {
       "availability": "partial",
-      "value": null,
-      "confidence": 0.2,
-      "reasoning": "Integrity has 1/4 score-eligible evidence layers; missing evidence reduces availability and confidence but is never treated as contradiction. A numeric value is withheld without content reconstruction or independent CrossEvidence unless a contradiction exists. Structural validity and cryptographic attestation are reported separately and do not raise integrity. 0 Master/content corroboration result(s) were not scored as exact matches."
+      "value": 1.0,
+      "confidence": 0.4,
+      "reasoning": "Integrity has 2/4 score-eligible evidence layers; missing evidence reduces availability and confidence but is never treated as contradiction. A numeric value is withheld without physical similarity or independent CrossEvidence unless a contradiction exists. Structural validity and cryptographic attestation are reported separately and do not raise integrity. Physical similarity scored 3/3 declared relationship(s); inconclusive and unavailable results were excluded. Content similarity is not proof of provenance."
     },
     "attestation_strength": {
       "availability": "unavailable",
@@ -733,9 +733,9 @@
       "message": "c2pa-python is not installed; C2PA attestation was not assessed."
     }
   ],
-  "processing_ms": 212.74124999763444,
+  "processing_ms": 224.47924996959046,
   "resource_usage": {
-    "cpu_ms": 10.710999999999999,
+    "cpu_ms": 8.318999999999994,
     "peak_rss_kib": null
   },
   "error": null,
@@ -1109,7 +1109,7 @@
     "integrity_layers": [
       {
         "layer": "file_integrity",
-        "status": "matched",
+        "status": "corroborated",
         "value": 1.0,
         "contributes_to_integrity": true,
         "check_count": 20,
@@ -1118,7 +1118,7 @@
       },
       {
         "layer": "structural_validity",
-        "status": "matched",
+        "status": "corroborated",
         "value": 1.0,
         "contributes_to_integrity": false,
         "check_count": 6,
@@ -1135,12 +1135,12 @@
         "manual_review_reasons": []
       },
       {
-        "layer": "content_reconstruction",
-        "status": "unavailable",
-        "value": null,
+        "layer": "physical_similarity",
+        "status": "corroborated",
+        "value": 1.0,
         "contributes_to_integrity": true,
         "check_count": 3,
-        "reason": "Only submitter-declared ranges and gains are assessed. Missing parameters are unavailable, not adverse; Master continuity corroboration remains unscored.",
+        "reason": "Relationship-specific bounded comparisons share four statuses. Only clear corroboration and contradiction are scored; similarity does not prove provenance.",
         "manual_review_reasons": []
       },
       {
@@ -1164,14 +1164,9 @@
     ],
     "assessment_status_semantics": [
       {
-        "status": "matched",
-        "meaning": "An exact, explicitly scoped check passed on independent validation data.",
-        "numeric_treatment": "1.0 when the layer is eligible for integrity scoring."
-      },
-      {
         "status": "corroborated",
-        "meaning": "Independent evidence supports the claim but does not prove exact derivation.",
-        "numeric_treatment": "Reported separately; never silently scored as an exact match."
+        "meaning": "Independent evidence clearly supports content consistency, but does not prove provenance direction or authorship.",
+        "numeric_treatment": "1.0 in an eligible evidence layer."
       },
       {
         "status": "contradicted",
@@ -1179,13 +1174,13 @@
         "numeric_treatment": "0.0 in its eligible layer and emits a contradiction finding."
       },
       {
-        "status": "not_applicable",
-        "meaning": "The check exists but the submitted transformation or evidence is outside its reliable scope.",
-        "numeric_treatment": "Excluded from the denominator; may request manual review."
+        "status": "inconclusive",
+        "meaning": "The check ran, but the evidence did not reach either reliable endpoint.",
+        "numeric_treatment": "Excluded from the denominator and reported as a finding."
       },
       {
         "status": "unavailable",
-        "meaning": "The claim may be present, but required evidence or declared parameters were absent or unreadable, so the check did not run.",
+        "meaning": "The check could not run, for example because a file, parameter, budget, or analysable signal was unavailable.",
         "numeric_treatment": "Excluded from the denominator and never treated as zero."
       }
     ],
@@ -1244,517 +1239,129 @@
         "validation_codes": []
       }
     ],
-    "edit_derivation": [],
-    "comp_derivation": [],
-    "stem_derivation": [
+    "physical_similarity": [
       {
-        "rule": "audio_linear_stem_derivation",
-        "pass": "StemDerivationPass",
-        "target_hash": "6aacc6b93785fbbefb186285e5f9c9ce49a6ccc7c2af664fc2f2a21416001ea0",
-        "source_hashes": [
-          "7580f3a09b8a02bdfc6520235e92f6c8318dd3b52002b7eb8a430abc2c007dea"
-        ],
-        "status": "unavailable",
-        "claim_status": "declared_unverified",
-        "reason": "The relationship was declared, but the submitted parameters are insufficient for content reconstruction.",
-        "reason_code": "missing_derivation_parameters",
-        "missing_parameters": [
-          {
-            "source_hash": "7580f3a09b8a02bdfc6520235e92f6c8318dd3b52002b7eb8a430abc2c007dea",
-            "fields": [
-              "derivation_scope",
-              "source_start_seconds",
-              "source_end_seconds",
-              "target_start_seconds",
-              "target_end_seconds",
-              "gain"
-            ]
-          }
-        ],
-        "content_match_is_provenance": false
-      }
-    ],
-    "audio_derivation": [
-      {
-        "rule": "audio_linear_mix_derivation",
-        "pass": "AudioDerivationPass",
-        "target_hash": "bc1dd3c26ef5f4d97fbb41e653e93a09c940b53c75229594d82c928727134ca0",
-        "source_hashes": [
-          "6aacc6b93785fbbefb186285e5f9c9ce49a6ccc7c2af664fc2f2a21416001ea0"
-        ],
-        "status": "unavailable",
-        "claim_status": "declared_unverified",
-        "reason": "The relationship was declared, but the submitted parameters are insufficient for content reconstruction.",
-        "reason_code": "missing_derivation_parameters",
-        "missing_parameters": [
-          {
-            "source_hash": "6aacc6b93785fbbefb186285e5f9c9ce49a6ccc7c2af664fc2f2a21416001ea0",
-            "fields": [
-              "derivation_scope",
-              "source_start_seconds",
-              "source_end_seconds",
-              "target_start_seconds",
-              "target_end_seconds",
-              "gain"
-            ]
-          }
-        ],
-        "content_match_is_provenance": false
-      }
-    ],
-    "master_derivation": [
-      {
-        "rule": "audio_master_content_continuity",
-        "pass": "MasteringDerivationPass",
-        "target_hash": "746c90b6d8f6306ce93c347477103c16027d71a4072cf12d10a9f7246ce93d18",
-        "source_hashes": [
-          "bc1dd3c26ef5f4d97fbb41e653e93a09c940b53c75229594d82c928727134ca0"
-        ],
-        "status": "unavailable",
-        "claim_status": "declared_unverified",
-        "reason": "The mix-to-master relationship was declared, but no complete comparison ranges were supplied.",
-        "reason_code": "missing_derivation_parameters",
-        "missing_parameters": [
-          {
-            "source_hash": "bc1dd3c26ef5f4d97fbb41e653e93a09c940b53c75229594d82c928727134ca0",
-            "fields": [
-              "derivation_scope",
-              "source_start_seconds",
-              "source_end_seconds",
-              "target_start_seconds",
-              "target_end_seconds"
-            ]
-          }
-        ],
-        "content_match_is_provenance": false,
-        "legacy_pass": "MasterDerivationPass"
-      }
-    ],
-    "audio_alignment": [
-      {
-        "rule": "audio_content_alignment",
-        "pass": "AudioAlignmentPass",
-        "target_hash": "6aacc6b93785fbbefb186285e5f9c9ce49a6ccc7c2af664fc2f2a21416001ea0",
-        "source_hashes": [
-          "7580f3a09b8a02bdfc6520235e92f6c8318dd3b52002b7eb8a430abc2c007dea"
-        ],
-        "content_match_is_provenance": false,
-        "status": "corroborated",
-        "reason": "Signal landmarks support the estimated source/target alignment.",
         "relationship_type": "stemmed_from",
-        "parameter_source": "signal_estimated_diagnostic",
-        "source_start_seconds": 0.0,
-        "target_start_seconds": 0.0,
-        "estimated_offset_seconds": 0.0,
-        "feature_similarity": 0.863829,
-        "waveform_correlation": 0.999995,
-        "ambiguity_margin": 0.863829,
-        "ambiguous": false,
-        "competing_alignment_similarity": 0.0,
-        "compared_duration_seconds": 0.5,
-        "search_complete": true,
-        "searched_source_range_seconds": [
-          0.0,
-          0.5
-        ],
-        "searched_target_range_seconds": [
-          0.0,
-          0.5
-        ],
-        "analysis_proxy_sample_rate_hz": 2000.0
-      },
-      {
-        "rule": "audio_content_alignment",
-        "pass": "AudioAlignmentPass",
-        "target_hash": "bc1dd3c26ef5f4d97fbb41e653e93a09c940b53c75229594d82c928727134ca0",
-        "source_hashes": [
-          "6aacc6b93785fbbefb186285e5f9c9ce49a6ccc7c2af664fc2f2a21416001ea0"
-        ],
-        "content_match_is_provenance": false,
-        "status": "corroborated",
-        "reason": "Signal landmarks support the estimated source/target alignment.",
-        "relationship_type": "mixed_from",
-        "parameter_source": "signal_estimated_diagnostic",
-        "source_start_seconds": 0.0,
-        "target_start_seconds": 0.0,
-        "estimated_offset_seconds": 0.0,
-        "feature_similarity": 0.861462,
-        "waveform_correlation": 0.999988,
-        "ambiguity_margin": 0.861462,
-        "ambiguous": false,
-        "competing_alignment_similarity": 0.0,
-        "compared_duration_seconds": 0.5,
-        "search_complete": true,
-        "searched_source_range_seconds": [
-          0.0,
-          0.5
-        ],
-        "searched_target_range_seconds": [
-          0.0,
-          0.5
-        ],
-        "analysis_proxy_sample_rate_hz": 2000.0
-      },
-      {
-        "rule": "audio_content_alignment",
-        "pass": "AudioAlignmentPass",
-        "target_hash": "746c90b6d8f6306ce93c347477103c16027d71a4072cf12d10a9f7246ce93d18",
-        "source_hashes": [
-          "bc1dd3c26ef5f4d97fbb41e653e93a09c940b53c75229594d82c928727134ca0"
-        ],
-        "content_match_is_provenance": false,
-        "status": "corroborated",
-        "reason": "Signal landmarks support the estimated source/target alignment.",
-        "relationship_type": "mastered_from",
-        "parameter_source": "signal_estimated_diagnostic",
-        "source_start_seconds": 0.0,
-        "target_start_seconds": 0.0,
-        "estimated_offset_seconds": 0.0,
-        "feature_similarity": 0.861774,
-        "waveform_correlation": 0.999971,
-        "ambiguity_margin": 0.861774,
-        "ambiguous": false,
-        "competing_alignment_similarity": 0.0,
-        "compared_duration_seconds": 0.5,
-        "search_complete": true,
-        "searched_source_range_seconds": [
-          0.0,
-          0.5
-        ],
-        "searched_target_range_seconds": [
-          0.0,
-          0.5
-        ],
-        "analysis_proxy_sample_rate_hz": 2000.0
-      }
-    ],
-    "source_contribution": [
-      {
-        "rule": "audio_source_contribution",
-        "pass": "SourceContributionPass",
-        "target_hash": "6aacc6b93785fbbefb186285e5f9c9ce49a6ccc7c2af664fc2f2a21416001ea0",
+        "comparison_mode": "multi_source_contribution",
         "source_hashes": [
           "7580f3a09b8a02bdfc6520235e92f6c8318dd3b52002b7eb8a430abc2c007dea"
         ],
-        "content_match_is_provenance": false,
+        "target_hash": "6aacc6b93785fbbefb186285e5f9c9ce49a6ccc7c2af664fc2f2a21416001ea0",
         "status": "corroborated",
+        "integrity_contribution": 1.0,
+        "similarity_score": null,
+        "parameter_source": "signal_estimated_diagnostic",
+        "declared_ranges_used": false,
+        "analysis_complete": true,
+        "metrics": {
+          "estimated_gain": 0.699861,
+          "gain_stability": 0.999243,
+          "full_model_normalized_rmse": 0.001914,
+          "leave_one_out_normalized_rmse": 1.0,
+          "unique_residual_delta": 0.998086,
+          "analysis_proxy_sample_rate_hz": 2000.0,
+          "joint_residual": {
+            "normalized_rmse": 0.000168,
+            "correlation": 1.0,
+            "peak_amplitude": 0.021323,
+            "clipping_fraction": 0.0,
+            "analysis_proxy_sample_rate_hz": 2000.0,
+            "analysis_sample_rate_hz": 1000,
+            "window_normalized_rmse": [
+              0.000168,
+              0.000168
+            ]
+          }
+        },
+        "threshold_policy": "multi_source_contribution-v1",
+        "content_match_is_provenance": false,
         "reason": "Removing this source materially increases reconstruction residual.",
-        "source_hash": "7580f3a09b8a02bdfc6520235e92f6c8318dd3b52002b7eb8a430abc2c007dea",
-        "relationship_type": "stemmed_from",
-        "estimated_gain": 0.699861,
-        "gain_stability": 0.999243,
-        "full_model_normalized_rmse": 0.001914,
-        "leave_one_out_normalized_rmse": 1.0,
-        "unique_residual_delta": 0.998086,
-        "parameter_source": "signal_estimated_diagnostic",
-        "analysis_proxy_sample_rate_hz": 2000.0,
-        "searched_ranges_seconds": [
-          [
-            0.0,
-            0.5
-          ],
-          [
-            0.0,
-            0.5
-          ]
-        ],
-        "search_complete": true,
-        "estimated_parameters_are_diagnostic": true
+        "joint_model_status": "corroborated"
       },
       {
-        "rule": "audio_source_contribution",
-        "pass": "SourceContributionPass",
-        "target_hash": "bc1dd3c26ef5f4d97fbb41e653e93a09c940b53c75229594d82c928727134ca0",
+        "relationship_type": "mixed_from",
+        "comparison_mode": "multi_source_contribution",
         "source_hashes": [
           "6aacc6b93785fbbefb186285e5f9c9ce49a6ccc7c2af664fc2f2a21416001ea0"
         ],
-        "content_match_is_provenance": false,
+        "target_hash": "bc1dd3c26ef5f4d97fbb41e653e93a09c940b53c75229594d82c928727134ca0",
         "status": "corroborated",
-        "reason": "Removing this source materially increases reconstruction residual.",
-        "source_hash": "6aacc6b93785fbbefb186285e5f9c9ce49a6ccc7c2af664fc2f2a21416001ea0",
-        "relationship_type": "mixed_from",
-        "estimated_gain": 0.857264,
-        "gain_stability": 0.998827,
-        "full_model_normalized_rmse": 0.00293,
-        "leave_one_out_normalized_rmse": 1.0,
-        "unique_residual_delta": 0.99707,
+        "integrity_contribution": 1.0,
+        "similarity_score": null,
         "parameter_source": "signal_estimated_diagnostic",
-        "analysis_proxy_sample_rate_hz": 2000.0,
-        "searched_ranges_seconds": [
-          [
-            0.0,
-            0.5
-          ],
-          [
-            0.0,
-            0.5
-          ]
-        ],
-        "search_complete": true,
-        "estimated_parameters_are_diagnostic": true
-      }
-    ],
-    "comp_verification": [],
-    "processed_audio_match": [
-      {
-        "rule": "processed_audio_content_match",
-        "pass": "ProcessedAudioMatchPass",
-        "target_hash": "6aacc6b93785fbbefb186285e5f9c9ce49a6ccc7c2af664fc2f2a21416001ea0",
-        "source_hashes": [
-          "7580f3a09b8a02bdfc6520235e92f6c8318dd3b52002b7eb8a430abc2c007dea"
-        ],
-        "content_match_is_provenance": false,
-        "status": "not_applicable",
-        "reason": "Processing, source masking, or overlap makes the pairwise content comparison inconclusive.",
-        "relationship_type": "stemmed_from",
-        "declared_complex_processing": false,
-        "parameter_source": "signal_estimated_diagnostic",
-        "waveform_correlation": 0.999995,
-        "landmark_similarity": 0.790509,
-        "dtw_similarity": 0.523214,
-        "envelope_correlation": 0.0,
-        "analysis_proxy_sample_rate_hz": 2000.0,
-        "searched_ranges_seconds": [
-          [
-            0.0,
-            0.5
-          ],
-          [
-            0.0,
-            0.5
-          ]
-        ],
-        "search_complete": true,
-        "robust_similarity": 0.594116
-      },
-      {
-        "rule": "processed_audio_content_match",
-        "pass": "ProcessedAudioMatchPass",
-        "target_hash": "bc1dd3c26ef5f4d97fbb41e653e93a09c940b53c75229594d82c928727134ca0",
-        "source_hashes": [
-          "6aacc6b93785fbbefb186285e5f9c9ce49a6ccc7c2af664fc2f2a21416001ea0"
-        ],
-        "content_match_is_provenance": false,
-        "status": "not_applicable",
-        "reason": "Processing, source masking, or overlap makes the pairwise content comparison inconclusive.",
-        "relationship_type": "mixed_from",
-        "declared_complex_processing": false,
-        "parameter_source": "signal_estimated_diagnostic",
-        "waveform_correlation": 0.999988,
-        "landmark_similarity": 0.786872,
-        "dtw_similarity": 0.599051,
-        "envelope_correlation": 0.0,
-        "analysis_proxy_sample_rate_hz": 2000.0,
-        "searched_ranges_seconds": [
-          [
-            0.0,
-            0.5
-          ],
-          [
-            0.0,
-            0.5
-          ]
-        ],
-        "search_complete": true,
-        "robust_similarity": 0.615774
-      },
-      {
-        "rule": "processed_audio_content_match",
-        "pass": "ProcessedAudioMatchPass",
-        "target_hash": "746c90b6d8f6306ce93c347477103c16027d71a4072cf12d10a9f7246ce93d18",
-        "source_hashes": [
-          "bc1dd3c26ef5f4d97fbb41e653e93a09c940b53c75229594d82c928727134ca0"
-        ],
-        "content_match_is_provenance": false,
-        "status": "not_applicable",
-        "reason": "Processing, source masking, or overlap makes the pairwise content comparison inconclusive.",
-        "relationship_type": "mastered_from",
-        "declared_complex_processing": false,
-        "parameter_source": "signal_estimated_diagnostic",
-        "waveform_correlation": 0.999971,
-        "landmark_similarity": 0.78736,
-        "dtw_similarity": 0.615875,
-        "envelope_correlation": 0.0,
-        "analysis_proxy_sample_rate_hz": 2000.0,
-        "searched_ranges_seconds": [
-          [
-            0.0,
-            0.5
-          ],
-          [
-            0.0,
-            0.5
-          ]
-        ],
-        "search_complete": true,
-        "robust_similarity": 0.620965
-      }
-    ],
-    "stem_mix_residual": [
-      {
-        "rule": "audio_stem_mix_residual",
-        "pass": "StemMixResidualPass",
-        "target_hash": "6aacc6b93785fbbefb186285e5f9c9ce49a6ccc7c2af664fc2f2a21416001ea0",
-        "source_hashes": [
-          "7580f3a09b8a02bdfc6520235e92f6c8318dd3b52002b7eb8a430abc2c007dea"
-        ],
-        "content_match_is_provenance": false,
-        "status": "matched",
-        "reason": "An estimated channel matrix reconstructs the target with low residual.",
-        "source_channel_labels": [
-          "7580f3a09b8a02bdfc6520235e92f6c8318dd3b52002b7eb8a430abc2c007dea:ch1"
-        ],
-        "estimated_channel_matrix": [
-          [
-            0.700007
-          ]
-        ],
-        "estimated_parameters_are_diagnostic": true,
-        "normalized_rmse": 0.000168,
-        "correlation": 1.0,
-        "clipping_fraction": 0.0,
-        "peak_amplitude": 0.021323,
-        "window_normalized_rmse": [
-          0.000168,
-          0.000168
-        ],
-        "analysis_proxy_sample_rate_hz": 2000.0,
-        "searched_ranges_seconds": [
-          [
-            0.0,
-            0.5
-          ],
-          [
-            0.0,
-            0.5
-          ]
-        ],
-        "search_complete": true,
-        "analysis_sample_rate_hz": 1000
-      },
-      {
-        "rule": "audio_stem_mix_residual",
-        "pass": "StemMixResidualPass",
-        "target_hash": "bc1dd3c26ef5f4d97fbb41e653e93a09c940b53c75229594d82c928727134ca0",
-        "source_hashes": [
-          "6aacc6b93785fbbefb186285e5f9c9ce49a6ccc7c2af664fc2f2a21416001ea0"
-        ],
-        "content_match_is_provenance": false,
-        "status": "matched",
-        "reason": "An estimated channel matrix reconstructs the target with low residual.",
-        "source_channel_labels": [
-          "6aacc6b93785fbbefb186285e5f9c9ce49a6ccc7c2af664fc2f2a21416001ea0:ch1"
-        ],
-        "estimated_channel_matrix": [
-          [
-            0.857063
-          ]
-        ],
-        "estimated_parameters_are_diagnostic": true,
-        "normalized_rmse": 0.00026,
-        "correlation": 1.0,
-        "clipping_fraction": 0.0,
-        "peak_amplitude": 0.018271,
-        "window_normalized_rmse": [
-          0.00026,
-          0.00026
-        ],
-        "analysis_proxy_sample_rate_hz": 2000.0,
-        "searched_ranges_seconds": [
-          [
-            0.0,
-            0.5
-          ],
-          [
-            0.0,
-            0.5
-          ]
-        ],
-        "search_complete": true,
-        "analysis_sample_rate_hz": 1000
-      }
-    ],
-    "mastering_derivation": [
-      {
-        "rule": "audio_master_content_continuity",
-        "pass": "MasteringDerivationPass",
-        "target_hash": "746c90b6d8f6306ce93c347477103c16027d71a4072cf12d10a9f7246ce93d18",
-        "source_hashes": [
-          "bc1dd3c26ef5f4d97fbb41e653e93a09c940b53c75229594d82c928727134ca0"
-        ],
-        "status": "unavailable",
-        "claim_status": "declared_unverified",
-        "reason": "The mix-to-master relationship was declared, but no complete comparison ranges were supplied.",
-        "reason_code": "missing_derivation_parameters",
-        "missing_parameters": [
-          {
-            "source_hash": "bc1dd3c26ef5f4d97fbb41e653e93a09c940b53c75229594d82c928727134ca0",
-            "fields": [
-              "derivation_scope",
-              "source_start_seconds",
-              "source_end_seconds",
-              "target_start_seconds",
-              "target_end_seconds"
+        "declared_ranges_used": false,
+        "analysis_complete": true,
+        "metrics": {
+          "estimated_gain": 0.857264,
+          "gain_stability": 0.998827,
+          "full_model_normalized_rmse": 0.00293,
+          "leave_one_out_normalized_rmse": 1.0,
+          "unique_residual_delta": 0.99707,
+          "analysis_proxy_sample_rate_hz": 2000.0,
+          "joint_residual": {
+            "normalized_rmse": 0.00026,
+            "correlation": 1.0,
+            "peak_amplitude": 0.018271,
+            "clipping_fraction": 0.0,
+            "analysis_proxy_sample_rate_hz": 2000.0,
+            "analysis_sample_rate_hz": 1000,
+            "window_normalized_rmse": [
+              0.00026,
+              0.00026
             ]
           }
-        ],
+        },
+        "threshold_policy": "multi_source_contribution-v1",
         "content_match_is_provenance": false,
-        "legacy_pass": "MasterDerivationPass"
-      }
-    ],
-    "excerpted_from": [],
-    "decoy_source": [
-      {
-        "rule": "audio_declared_source_decoy",
-        "pass": "DecoySourcePass",
-        "target_hash": "6aacc6b93785fbbefb186285e5f9c9ce49a6ccc7c2af664fc2f2a21416001ea0",
-        "source_hashes": [
-          "7580f3a09b8a02bdfc6520235e92f6c8318dd3b52002b7eb8a430abc2c007dea"
-        ],
-        "content_match_is_provenance": false,
-        "status": "clear",
-        "reason": "The declared source has measurable unique contribution.",
-        "source_hash": "7580f3a09b8a02bdfc6520235e92f6c8318dd3b52002b7eb8a430abc2c007dea",
-        "unique_residual_delta": 0.998086,
-        "estimated_gain": 0.699861,
-        "analysis_proxy_sample_rate_hz": 2000.0,
-        "searched_ranges_seconds": [
-          [
-            0.0,
-            0.5
-          ],
-          [
-            0.0,
-            0.5
-          ]
-        ],
-        "search_complete": true
+        "reason": "Removing this source materially increases reconstruction residual.",
+        "joint_model_status": "corroborated"
       },
       {
-        "rule": "audio_declared_source_decoy",
-        "pass": "DecoySourcePass",
-        "target_hash": "bc1dd3c26ef5f4d97fbb41e653e93a09c940b53c75229594d82c928727134ca0",
+        "relationship_type": "mastered_from",
+        "comparison_mode": "master_continuity",
         "source_hashes": [
-          "6aacc6b93785fbbefb186285e5f9c9ce49a6ccc7c2af664fc2f2a21416001ea0"
+          "bc1dd3c26ef5f4d97fbb41e653e93a09c940b53c75229594d82c928727134ca0"
         ],
+        "target_hash": "746c90b6d8f6306ce93c347477103c16027d71a4072cf12d10a9f7246ce93d18",
+        "status": "corroborated",
+        "integrity_contribution": 1.0,
+        "similarity_score": 0.620965,
+        "parameter_source": "signal_estimated_diagnostic",
+        "declared_ranges_used": false,
+        "analysis_complete": true,
+        "metrics": {
+          "waveform_correlation": 0.999971,
+          "landmark_similarity": 0.78736,
+          "dtw_similarity": 0.615875,
+          "envelope_correlation": 0.0,
+          "robust_similarity": 0.620965,
+          "analysis_proxy_sample_rate_hz": 2000.0
+        },
+        "threshold_policy": "master_continuity-v1",
         "content_match_is_provenance": false,
-        "status": "clear",
-        "reason": "The declared source has measurable unique contribution.",
-        "source_hash": "6aacc6b93785fbbefb186285e5f9c9ce49a6ccc7c2af664fc2f2a21416001ea0",
-        "unique_residual_delta": 0.99707,
-        "estimated_gain": 0.857264,
-        "analysis_proxy_sample_rate_hz": 2000.0,
-        "searched_ranges_seconds": [
-          [
-            0.0,
-            0.5
-          ],
-          [
-            0.0,
-            0.5
-          ]
-        ],
-        "search_complete": true
+        "reason": "High waveform continuity supports the declared master relationship despite changes in other features."
+      }
+    ],
+    "physical_similarity_summary": [
+      {
+        "status": "corroborated",
+        "value": 1.0,
+        "counts": {
+          "corroborated": 3,
+          "contradicted": 0,
+          "inconclusive": 0,
+          "unavailable": 0
+        },
+        "declared_relationships": 3,
+        "scored_relationships": 3,
+        "assessed_targets": 3,
+        "target_values": {
+          "6aacc6b93785fbbefb186285e5f9c9ce49a6ccc7c2af664fc2f2a21416001ea0": 1.0,
+          "746c90b6d8f6306ce93c347477103c16027d71a4072cf12d10a9f7246ce93d18": 1.0,
+          "bc1dd3c26ef5f4d97fbb41e653e93a09c940b53c75229594d82c928727134ca0": 1.0
+        },
+        "scoring_policy": "Only corroborated (1) and contradicted (0) relationships are scored. Inconclusive and unavailable relationships are excluded. Relationships are averaged within each target before targets are averaged.",
+        "content_match_is_provenance": false
       }
     ]
   }

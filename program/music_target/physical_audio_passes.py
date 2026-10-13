@@ -618,9 +618,11 @@ class ProcessedAudioMatchPass:
     """Corroborate declared edges after gain, EQ, compression or light timing changes."""
 
     @staticmethod
-    def evaluate(native, chain):
+    def evaluate(native, chain, relationships=None):
         results = []
-        for source, target, edge in _audio_edges(native):
+        selected_relationships = (AUDIO_RELATIONSHIPS if relationships is None
+                                  else set(relationships))
+        for source, target, edge in _audio_edges(native, selected_relationships):
             if edge["relationship_type"] == "excerpted_from":
                 continue
             base = _base("processed_audio_content_match", "ProcessedAudioMatchPass",
@@ -644,6 +646,8 @@ class ProcessedAudioMatchPass:
                 robust = 0.20 * waveform + 0.30 * landmarks + 0.30 * dtw + 0.20 * envelope
             except (OSError, ValueError, TypeError) as exc:
                 results.append({**base, "status": "unavailable",
+                                "relationship_type": edge["relationship_type"],
+                                "source_hash": source["artefact_hash"],
                                 "reason": f"Processed-audio comparison unavailable: {exc}",
                                 **_resource_fields(exc)})
                 continue
@@ -892,4 +896,350 @@ class ExcerptedFromPass:
                             "dtw_similarity": round(dtw, 6),
                             **_proxy_fields(source_audio, target_audio),
                             "robust_similarity": round(robust, 6)})
+        return results
+
+
+PHYSICAL_COMPARISON_MODES = {
+    "derived_from": "pairwise_continuity",
+    "edited_from": "pairwise_continuity",
+    "excerpted_from": "excerpt_search",
+    "comped_from": "selection_timeline",
+    "stemmed_from": "multi_source_contribution",
+    "mixed_from": "multi_source_contribution",
+    "mastered_from": "master_continuity",
+    "rendered_from": "unsupported_relationship",
+    "input_to": "unsupported_relationship",
+}
+
+PHYSICAL_RESULT_STATUSES = {
+    "corroborated", "contradicted", "inconclusive", "unavailable",
+}
+
+_METRIC_FIELDS = (
+    "waveform_correlation", "landmark_similarity", "dtw_similarity",
+    "envelope_correlation", "robust_similarity", "estimated_gain",
+    "gain_stability", "full_model_normalized_rmse",
+    "leave_one_out_normalized_rmse", "unique_residual_delta",
+    "normalized_rmse", "correlation", "peak_amplitude",
+    "clipping_fraction", "alignment_ambiguity_margin",
+    "estimated_source_start_seconds", "estimated_target_start_seconds",
+    "analysis_proxy_sample_rate_hz", "analysis_sample_rate_hz",
+)
+
+
+def _edge_key(source_hash, target_hash, relationship_type):
+    return source_hash, target_hash, relationship_type
+
+
+def _relationship_edges(native):
+    """Yield every declared relationship, including unsupported/non-audio ones."""
+    nodes = _node_index(native)
+    flagged = _flagged_edges(native)
+    for target in native["artefacts"]:
+        for edge in target.get("evidence", []):
+            relationship_type = edge.get("relationship_type")
+            if relationship_type not in PHYSICAL_COMPARISON_MODES:
+                continue
+            source_hash = edge.get("hash")
+            source = nodes.get(source_hash)
+            has_input_error = (target["artefact_hash"], source_hash) in flagged
+            yield source, target, edge, has_input_error
+
+
+def _declared_ranges_used(edge):
+    attributes = edge.get("attributes") or {}
+    return all(attributes.get(field) is not None for field in (
+        "source_start_seconds", "source_end_seconds",
+        "target_start_seconds", "target_end_seconds",
+    ))
+
+
+def _metrics(result):
+    if not result:
+        return {}
+    values = {field: result[field] for field in _METRIC_FIELDS
+              if result.get(field) is not None}
+    if result.get("window_normalized_rmse") is not None:
+        values["window_normalized_rmse"] = result["window_normalized_rmse"]
+    if result.get("source_identifiability") is not None:
+        values["source_identifiability"] = result["source_identifiability"]
+    if result.get("max_source_correlation") is not None:
+        values["max_source_correlation"] = result["max_source_correlation"]
+    return values
+
+
+def _analysis_complete(result, status):
+    if not result:
+        return False
+    if result.get("analysis_complete") is not None:
+        return bool(result["analysis_complete"])
+    if result.get("search_complete") is not None:
+        return bool(result["search_complete"])
+    return status != "unavailable"
+
+
+def _uniform_result(source_hash, target_hash, relationship_type, edge, status,
+                    reason, raw=None, reason_code=None, similarity_score=None,
+                    metrics=None, **extra):
+    if status not in PHYSICAL_RESULT_STATUSES:
+        raise ValueError(f"Unsupported physical result status: {status}")
+    raw = raw or {}
+    if similarity_score is None:
+        similarity_score = raw.get("robust_similarity")
+    result = {
+        "relationship_type": relationship_type,
+        "comparison_mode": PHYSICAL_COMPARISON_MODES[relationship_type],
+        "source_hashes": [source_hash] if source_hash else [],
+        "target_hash": target_hash,
+        "status": status,
+        "integrity_contribution": (1.0 if status == "corroborated" else
+                                   0.0 if status == "contradicted" else None),
+        "similarity_score": similarity_score,
+        "parameter_source": raw.get("parameter_source"),
+        "declared_ranges_used": _declared_ranges_used(edge),
+        "analysis_complete": _analysis_complete(raw, status),
+        "metrics": _metrics(raw) if metrics is None else metrics,
+        "threshold_policy": f"{PHYSICAL_COMPARISON_MODES[relationship_type]}-v1",
+        "content_match_is_provenance": False,
+        "reason": reason,
+    }
+    if reason_code:
+        result["reason_code"] = reason_code
+    result.update(extra)
+    return result
+
+
+def _raw_index(results, default_relationship=None):
+    indexed = {}
+    for result in results:
+        sources = result.get("source_hashes") or []
+        source_hash = result.get("source_hash") or (sources[0] if len(sources) == 1 else None)
+        relationship_type = result.get("relationship_type") or default_relationship
+        if source_hash and relationship_type:
+            indexed[_edge_key(source_hash, result.get("target_hash"),
+                              relationship_type)] = result
+    return indexed
+
+
+def _normalize_pairwise(raw, relationship_type, ranges_declared):
+    if not raw:
+        return "unavailable", "No bounded pairwise comparison was produced.", "analysis_unavailable"
+    raw_status = raw.get("status")
+    if raw_status in {"matched", "corroborated"}:
+        return "corroborated", raw.get("reason"), None
+    if raw_status == "contradicted":
+        # A generic derivation may legitimately contain arbitrary processing.
+        # An edit contradiction is strong only when the claimed ranges were
+        # actually used and the submitter did not declare complex processing.
+        strong_scope = (relationship_type == "edited_from" and ranges_declared and
+                        not raw.get("declared_complex_processing") and
+                        _analysis_complete(raw, "contradicted"))
+        if strong_scope:
+            return "contradicted", raw.get("reason"), "clear_content_conflict"
+        return ("inconclusive",
+                "The pairwise signals differ, but the declared relationship permits processing that this comparison cannot exclude.",
+                "processing_or_masking_ambiguous")
+    if raw_status == "unavailable":
+        return "unavailable", raw.get("reason"), raw.get("reason_code", "analysis_unavailable")
+    return ("inconclusive", raw.get("reason") or
+            "The bounded pairwise comparison did not reach either endpoint.",
+            "processing_or_masking_ambiguous")
+
+
+class PhysicalSimilarityPass:
+    """Return one conservative, four-state content result per relationship.
+
+    Content similarity corroborates consistency only.  It never proves the
+    historical direction, authorship, or provenance asserted by an edge.
+    """
+
+    @staticmethod
+    def evaluate(native, chain, parser_observations):
+        pairwise = ProcessedAudioMatchPass.evaluate(
+            native, chain, {"derived_from", "edited_from"})
+        pairwise_index = _raw_index(pairwise)
+        excerpts = _raw_index(ExcerptedFromPass.evaluate(native, chain),
+                              "excerpted_from")
+        contributions_raw = SourceContributionPass.evaluate(native, chain)
+        contributions = _raw_index(contributions_raw)
+        contribution_fallbacks = {
+            item.get("target_hash"): item for item in contributions_raw
+            if not item.get("source_hash")
+        }
+        residuals = {item.get("target_hash"): item
+                     for item in StemMixResidualPass.evaluate(native, chain)}
+        comp_results = CompVerificationPass.evaluate(native, chain, parser_observations)
+        comp_by_edge = {}
+        for item in comp_results:
+            source_hash = item.get("source_hash") or next(
+                iter(item.get("source_hashes") or []), None)
+            if source_hash and item.get("target_hash"):
+                comp_by_edge.setdefault((source_hash, item["target_hash"]), []).append(item)
+        # Master continuity uses the same bounded, processing-tolerant signal
+        # comparison as other pairwise modes.  The former strict reconstruction
+        # pass remains available as legacy code, but is no longer executed here.
+        mastering = _raw_index(ProcessedAudioMatchPass.evaluate(
+            native, chain, {"mastered_from"}))
+
+        results = []
+        for source, target, edge, has_input_error in _relationship_edges(native):
+            source_hash = edge.get("hash")
+            target_hash = target["artefact_hash"]
+            relationship_type = edge["relationship_type"]
+            key = _edge_key(source_hash, target_hash, relationship_type)
+            if has_input_error:
+                results.append(_uniform_result(
+                    source_hash, target_hash, relationship_type, edge,
+                    "unavailable",
+                    "The relationship declaration has input errors, so content comparison was not run.",
+                    reason_code="input_error"))
+                continue
+            if source is None:
+                results.append(_uniform_result(
+                    source_hash, target_hash, relationship_type, edge,
+                    "unavailable", "The declared source object is missing.",
+                    reason_code="missing_source"))
+                continue
+            if not _is_audio(source) or not _is_audio(target):
+                results.append(_uniform_result(
+                    source_hash, target_hash, relationship_type, edge,
+                    "unavailable",
+                    "Physical similarity requires audio at both relationship endpoints.",
+                    reason_code="non_audio_endpoint"))
+                continue
+
+            if relationship_type in {"derived_from", "edited_from"}:
+                raw = pairwise_index.get(key)
+                status, reason, reason_code = _normalize_pairwise(
+                    raw, relationship_type, _declared_ranges_used(edge))
+                results.append(_uniform_result(
+                    source_hash, target_hash, relationship_type, edge, status,
+                    reason, raw, reason_code))
+                continue
+
+            if relationship_type == "excerpted_from":
+                raw = excerpts.get(key)
+                raw_status = (raw or {}).get("status")
+                if raw_status in {"matched", "corroborated"}:
+                    status, reason_code = "corroborated", None
+                elif raw_status == "contradicted" and _analysis_complete(raw, raw_status):
+                    status, reason_code = "contradicted", "no_matching_excerpt"
+                elif raw_status == "unavailable" or not raw:
+                    status, reason_code = "unavailable", (raw or {}).get(
+                        "reason_code", "analysis_unavailable")
+                else:
+                    status, reason_code = "inconclusive", "ambiguous_excerpt"
+                results.append(_uniform_result(
+                    source_hash, target_hash, relationship_type, edge, status,
+                    (raw or {}).get("reason") or "Excerpt comparison was unavailable.",
+                    raw, reason_code))
+                continue
+
+            if relationship_type == "comped_from":
+                selections = comp_by_edge.get((source_hash, target_hash), [])
+                normalized_selections = []
+                for item in selections:
+                    raw_status = item.get("status")
+                    status = ("corroborated" if raw_status in {"matched", "corroborated"}
+                              else "contradicted" if raw_status == "contradicted"
+                              else "unavailable" if raw_status == "unavailable"
+                              else "inconclusive")
+                    normalized_selections.append({
+                        "selection_id": item.get("selection_id"),
+                        "status": status,
+                        "similarity_score": item.get("robust_similarity"),
+                        "reason": item.get("reason"),
+                    })
+                statuses = {item["status"] for item in normalized_selections}
+                if "contradicted" in statuses:
+                    status, reason, reason_code = (
+                        "contradicted", "At least one declared comp selection clearly conflicts with the submitted audio.",
+                        "comp_selection_conflict")
+                elif "corroborated" in statuses:
+                    status, reason, reason_code = (
+                        "corroborated", "The declared comp selections support content continuity.", None)
+                elif "inconclusive" in statuses:
+                    status, reason, reason_code = (
+                        "inconclusive", "The comp selections were analysed but did not reach a clear endpoint.",
+                        "ambiguous_comp_selections")
+                else:
+                    status, reason, reason_code = (
+                        "unavailable", "No usable CompSheet selection was available for this relationship.",
+                        "comp_sheet_unavailable")
+                representative = selections[0] if selections else None
+                scores = [item["similarity_score"] for item in normalized_selections
+                          if item["similarity_score"] is not None]
+                results.append(_uniform_result(
+                    source_hash, target_hash, relationship_type, edge, status,
+                    reason, representative, reason_code,
+                    similarity_score=(sum(scores) / len(scores) if scores else None),
+                    selection_results=normalized_selections,
+                    analysis_complete=bool(selections) and all(
+                        item["status"] != "unavailable" for item in normalized_selections)))
+                continue
+
+            if relationship_type in CONTRIBUTION_RELATIONSHIPS:
+                raw = contributions.get(key) or contribution_fallbacks.get(target_hash)
+                residual = residuals.get(target_hash)
+                raw_status = (raw or {}).get("status")
+                residual_status = (residual or {}).get("status")
+                if raw_status == "corroborated":
+                    status, reason_code = "corroborated", None
+                elif (raw_status == "not_supported" and
+                      residual_status in {"matched", "corroborated"} and
+                      _analysis_complete(residual, residual_status)):
+                    status, reason_code = "contradicted", "declared_source_not_supported"
+                elif raw_status == "unavailable" or not raw:
+                    status, reason_code = "unavailable", (raw or {}).get(
+                        "reason_code", "analysis_unavailable")
+                else:
+                    status, reason_code = "inconclusive", "source_contribution_ambiguous"
+                reason = ((raw or {}).get("reason") or
+                          "The declared source contribution could not be assessed.")
+                joint_metrics = _metrics(residual)
+                metrics = _metrics(raw)
+                if joint_metrics:
+                    metrics["joint_residual"] = joint_metrics
+                results.append(_uniform_result(
+                    source_hash, target_hash, relationship_type, edge, status,
+                    reason, raw, reason_code, metrics=metrics,
+                    joint_model_status=("corroborated" if residual_status in
+                                        {"matched", "corroborated"} else
+                                        "contradicted" if residual_status == "contradicted" else
+                                        "inconclusive" if residual_status == "not_applicable" else
+                                        "unavailable")))
+                continue
+
+            if relationship_type == "mastered_from":
+                raw = mastering.get(key)
+                raw_status = (raw or {}).get("status")
+                waveform_correlation = (raw or {}).get("waveform_correlation", 0.0)
+                if (raw_status in {"matched", "corroborated"} or
+                        waveform_correlation >= 0.95):
+                    status, reason_code = "corroborated", None
+                    reason = (raw or {}).get("reason")
+                    if raw_status not in {"matched", "corroborated"}:
+                        reason = ("High waveform continuity supports the declared master "
+                                  "relationship despite changes in other features.")
+                elif raw_status == "contradicted" and _analysis_complete(raw, raw_status):
+                    status, reason_code = "contradicted", "master_content_conflict"
+                    reason = (raw or {}).get("reason")
+                elif raw_status == "unavailable" or not raw:
+                    status, reason_code = "unavailable", (raw or {}).get(
+                        "reason_code", "analysis_unavailable")
+                    reason = (raw or {}).get("reason")
+                else:
+                    status, reason_code = "inconclusive", "master_processing_ambiguous"
+                    reason = (raw or {}).get("reason")
+                results.append(_uniform_result(
+                    source_hash, target_hash, relationship_type, edge, status,
+                    reason or "Master continuity comparison was unavailable.",
+                    raw, reason_code))
+                continue
+
+            results.append(_uniform_result(
+                source_hash, target_hash, relationship_type, edge,
+                "unavailable",
+                "This relationship has no reliable physical comparison mode.",
+                reason_code="unsupported_relationship_semantics"))
         return results

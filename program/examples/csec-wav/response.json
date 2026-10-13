@@ -5,8 +5,8 @@
   "asset_sha256": "746c90b6d8f6306ce93c347477103c16027d71a4072cf12d10a9f7246ce93d18",
   "system": {
     "name": "COMP3888-music-baseline",
-    "version": "0.5.0",
-    "source_revision": "sha256:83b6bee2b8104d7036749317c7e6900f8c8f904eede2d427097b075edc2f131c"
+    "version": "0.6.0",
+    "source_revision": "sha256:0eff6890a8452b5e31abee02cb065b1846773e01d73023f355e16b6755104b80"
   },
   "execution_status": "succeeded",
   "axes": {
@@ -20,7 +20,7 @@
       "availability": "partial",
       "value": null,
       "confidence": 0.2,
-      "reasoning": "Integrity has 1/4 score-eligible evidence layers; missing evidence reduces availability and confidence but is never treated as contradiction. A numeric value is withheld without content reconstruction or independent CrossEvidence unless a contradiction exists. Structural validity and cryptographic attestation are reported separately and do not raise integrity. 0 Master/content corroboration result(s) were not scored as exact matches."
+      "reasoning": "Integrity has 1/4 score-eligible evidence layers; missing evidence reduces availability and confidence but is never treated as contradiction. A numeric value is withheld without physical similarity or independent CrossEvidence unless a contradiction exists. Structural validity and cryptographic attestation are reported separately and do not raise integrity. Physical similarity scored 0/0 declared relationship(s); inconclusive and unavailable results were excluded. Content similarity is not proof of provenance."
     },
     "attestation_strength": {
       "availability": "unavailable",
@@ -155,9 +155,9 @@
       "message": "No workflow was supplied; completeness is legacy declared-object availability only."
     }
   ],
-  "processing_ms": 195.64824999542907,
+  "processing_ms": 195.77037496492267,
   "resource_usage": {
-    "cpu_ms": 0.7940000000000169,
+    "cpu_ms": 1.0369999999999824,
     "peak_rss_kib": null
   },
   "error": null,
@@ -197,7 +197,7 @@
     "integrity_layers": [
       {
         "layer": "file_integrity",
-        "status": "matched",
+        "status": "corroborated",
         "value": 1.0,
         "contributes_to_integrity": true,
         "check_count": 1,
@@ -206,7 +206,7 @@
       },
       {
         "layer": "structural_validity",
-        "status": "matched",
+        "status": "corroborated",
         "value": 1.0,
         "contributes_to_integrity": false,
         "check_count": 3,
@@ -223,12 +223,12 @@
         "manual_review_reasons": []
       },
       {
-        "layer": "content_reconstruction",
+        "layer": "physical_similarity",
         "status": "unavailable",
         "value": null,
         "contributes_to_integrity": true,
         "check_count": 0,
-        "reason": "Only submitter-declared ranges and gains are assessed. Missing parameters are unavailable, not adverse; Master continuity corroboration remains unscored.",
+        "reason": "Relationship-specific bounded comparisons share four statuses. Only clear corroboration and contradiction are scored; similarity does not prove provenance.",
         "manual_review_reasons": []
       },
       {
@@ -252,14 +252,9 @@
     ],
     "assessment_status_semantics": [
       {
-        "status": "matched",
-        "meaning": "An exact, explicitly scoped check passed on independent validation data.",
-        "numeric_treatment": "1.0 when the layer is eligible for integrity scoring."
-      },
-      {
         "status": "corroborated",
-        "meaning": "Independent evidence supports the claim but does not prove exact derivation.",
-        "numeric_treatment": "Reported separately; never silently scored as an exact match."
+        "meaning": "Independent evidence clearly supports content consistency, but does not prove provenance direction or authorship.",
+        "numeric_treatment": "1.0 in an eligible evidence layer."
       },
       {
         "status": "contradicted",
@@ -267,13 +262,13 @@
         "numeric_treatment": "0.0 in its eligible layer and emits a contradiction finding."
       },
       {
-        "status": "not_applicable",
-        "meaning": "The check exists but the submitted transformation or evidence is outside its reliable scope.",
-        "numeric_treatment": "Excluded from the denominator; may request manual review."
+        "status": "inconclusive",
+        "meaning": "The check ran, but the evidence did not reach either reliable endpoint.",
+        "numeric_treatment": "Excluded from the denominator and reported as a finding."
       },
       {
         "status": "unavailable",
-        "meaning": "The claim may be present, but required evidence or declared parameters were absent or unreadable, so the check did not run.",
+        "meaning": "The check could not run, for example because a file, parameter, budget, or analysable signal was unavailable.",
         "numeric_treatment": "Excluded from the denominator and never treated as zero."
       }
     ],
@@ -293,18 +288,24 @@
         "validation_codes": []
       }
     ],
-    "edit_derivation": [],
-    "comp_derivation": [],
-    "stem_derivation": [],
-    "audio_derivation": [],
-    "master_derivation": [],
-    "audio_alignment": [],
-    "source_contribution": [],
-    "comp_verification": [],
-    "processed_audio_match": [],
-    "stem_mix_residual": [],
-    "mastering_derivation": [],
-    "excerpted_from": [],
-    "decoy_source": []
+    "physical_similarity": [],
+    "physical_similarity_summary": [
+      {
+        "status": "unavailable",
+        "value": null,
+        "counts": {
+          "corroborated": 0,
+          "contradicted": 0,
+          "inconclusive": 0,
+          "unavailable": 0
+        },
+        "declared_relationships": 0,
+        "scored_relationships": 0,
+        "assessed_targets": 0,
+        "target_values": {},
+        "scoring_policy": "Only corroborated (1) and contradicted (0) relationships are scored. Inconclusive and unavailable relationships are excluded. Relationships are averaged within each target before targets are averaged.",
+        "content_match_is_provenance": false
+      }
+    ]
   }
 }
