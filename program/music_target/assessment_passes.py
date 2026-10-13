@@ -674,16 +674,24 @@ class AIDisclosurePass:
 
     @staticmethod
     def evaluate(native):
-        audio = [node for node in native["artefacts"] if node["artefact_type"].startswith("audio/")
-                 or node["artefact_type"] == "audio"]
+        flagged = (native.get("_input_issues") or {}).get("declaration_nodes") or {}
+        all_audio = [node for node in native["artefacts"] if node["artefact_type"].startswith("audio/")
+                     or node["artefact_type"] == "audio"]
+        # Declarations with unrecognised fields are not corrected; those nodes
+        # are left out of disclosure coverage instead of counting as undisclosed.
+        audio = [node for node in all_audio if node["artefact_hash"] not in flagged]
+        excluded = len(all_audio) - len(audio)
         if not audio:
-            return _axis(reasoning="No applicable audio artefacts were submitted."), []
+            return _axis(reasoning="No applicable audio artefacts were submitted."
+                         if not excluded else
+                         "Every audio declaration has input errors; disclosure coverage was not assessed."), []
         declared = [node for node in audio
                     if (node.get("attributes") or {}).get("creation_method") not in (None, "", [], {})]
         value = len(declared) / len(audio)
         availability = "available" if declared else "unavailable"
         axis = _axis(availability, value if declared else None, 0.8 if declared else None,
-                     f"Explicit creation_method declarations cover {len(declared)}/{len(audio)} audio artefacts; this is disclosure coverage, not AI detection.")
+                     f"Explicit creation_method declarations cover {len(declared)}/{len(audio)} audio artefacts; this is disclosure coverage, not AI detection."
+                     + (f" {excluded} audio artefact(s) with declaration input errors were not assessed." if excluded else ""))
         findings = [] if len(declared) == len(audio) else [
             _finding("AI_DISCLOSURE_MISSING", "One or more audio artefacts lack creation_method disclosure.", severity="medium")]
         return axis, findings

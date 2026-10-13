@@ -79,7 +79,7 @@
         },
         "final_artefact_hash": {
           "type": "string",
-          "pattern": "^[0-9a-f]{64}$"
+          "pattern": "^[0-9a-fA-F]{64}$"
         },
         "artefacts": {
           "type": "array",
@@ -94,7 +94,7 @@
             "properties": {
               "artefact_hash": {
                 "type": "string",
-                "pattern": "^[0-9a-f]{64}$"
+                "pattern": "^[0-9a-fA-F]{64}$"
               },
               "artefact_type": {
                 "type": "string",
@@ -102,7 +102,7 @@
               },
               "attributes": {
                 "type": "object",
-                "additionalProperties": false,
+                "additionalProperties": true,
                 "properties": {
                   "creation_method": {
                     "oneOf": [
@@ -127,7 +127,7 @@
                   },
                   "technical": {
                     "type": "object",
-                    "additionalProperties": false,
+                    "additionalProperties": true,
                     "properties": {
                       "duration_seconds": {
                         "type": [
@@ -198,7 +198,7 @@
                   "properties": {
                     "hash": {
                       "type": "string",
-                      "pattern": "^[0-9a-f]{64}$"
+                      "pattern": "^[0-9a-fA-F]{64}$"
                     },
                     "relationship_type": {
                       "type": "string",
@@ -206,7 +206,7 @@
                     },
                     "attributes": {
                       "type": "object",
-                      "additionalProperties": false,
+                      "additionalProperties": true,
                       "properties": {
                         "assertion_origin": { "enum": ["submitter", "daw-session", "c2pa-ingredient", "ddex-rin", "ddex-ern"] },
                         "confirmed_by_submitter": { "type": "boolean" },
@@ -245,11 +245,11 @@
       "type": "object",
       "minProperties": 1,
       "propertyNames": {
-        "pattern": "^[0-9a-f]{64}$"
+        "pattern": "^[0-9a-fA-F]{64}$"
       },
       "additionalProperties": {
         "type": "string",
-        "pattern": "^objects/[0-9a-f]{64}\\.(?:png|mp4|wav|mid|midi|xml|json|c2pa|txt|csv|pdf|zip|als|logicx|ptx)$"
+        "pattern": "^objects/[0-9a-fA-F]{64}\\.[A-Za-z0-9]{1,8}$"
       }
     },
     "options": {

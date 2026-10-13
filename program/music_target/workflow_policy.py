@@ -116,6 +116,11 @@ class WorkflowCompletenessPass:
         self.workflows = {item["workflow_id"]: item for item in policy["workflows"]}
         self.allowed_modifiers = set(policy["workflow_selection"]["modifiers"])
         self.parser_observations = {}
+        # Nodes declared and supplied but not assessable because of an input
+        # error (bad hash format, hash mismatch, size limit...). They count as
+        # present-but-not-assessed, never as missing.
+        self.input_error_hashes = set()
+        self.declaration_error_hashes = set()
 
     PARSER_REQUIRED_TYPES = {
         "project/midi", "metadata/ddex-rin", "metadata/ddex-ern",
@@ -146,17 +151,22 @@ class WorkflowCompletenessPass:
             wanted = set(rule.get("artifact_types", []))
             candidates, matches = [], []
             for node in nodes:
-                if node["artefact_hash"] not in bound_hashes or node["artefact_type"] not in wanted:
+                if node["artefact_type"] not in wanted:
+                    continue
+                if (node["artefact_hash"] not in bound_hashes and
+                        node["artefact_hash"] not in self.input_error_hashes):
                     continue
                 if rule.get("role") and _node_role(node, final_hash) != rule["role"]:
                     continue
                 candidates.append(node["artefact_hash"])
+                if node["artefact_hash"] in self.input_error_hashes:
+                    continue
                 if self._parser_usable(node):
                     matches.append(node["artefact_hash"])
             minimum = rule.get("min_count", 1)
             status = ("satisfied" if len(matches) >= minimum else
                       "not_assessed" if len(candidates) >= minimum else "missing")
-            parser_note = (" Matching files were present but their required parser did not produce a usable result."
+            parser_note = (" Matching files were present but could not be assessed (input error or unusable parser result)."
                            if status == "not_assessed" else "")
             return self._result(rule, level, status,
                                 f"Found {len(matches)} usable bound matching artefact(s); minimum is {minimum}."
@@ -164,11 +174,12 @@ class WorkflowCompletenessPass:
 
         if kind == "relationship_presence":
             by_hash = {node["artefact_hash"]: node for node in nodes}
-            matches = []
+            matches, pending = [], 0
+            assessable = bound_hashes | self.input_error_hashes
             for target in nodes:
                 for edge in target.get("evidence", []):
                     source = by_hash[edge["hash"]]
-                    if source["artefact_hash"] not in bound_hashes or target["artefact_hash"] not in bound_hashes:
+                    if source["artefact_hash"] not in assessable or target["artefact_hash"] not in assessable:
                         continue
                     if edge["relationship_type"] not in set(rule.get("relationship_types", [])):
                         continue
@@ -178,35 +189,50 @@ class WorkflowCompletenessPass:
                         continue
                     if rule.get("source_role") and _node_role(source, final_hash) != rule["source_role"]:
                         continue
+                    if (source["artefact_hash"] in self.input_error_hashes or
+                            target["artefact_hash"] in self.input_error_hashes):
+                        pending += 1
+                        continue
                     matches.append({"source_hash": source["artefact_hash"],
                                     "target_hash": target["artefact_hash"],
                                     "relationship_type": edge["relationship_type"]})
             minimum = rule.get("min_count", 1)
-            status = "satisfied" if len(matches) >= minimum else "missing"
+            status = ("satisfied" if len(matches) >= minimum else
+                      "not_assessed" if len(matches) + pending >= minimum else "missing")
             return self._result(rule, level, status,
-                                f"Found {len(matches)} matching bound relationship(s); minimum is {minimum}.",
+                                f"Found {len(matches)} matching bound relationship(s); minimum is {minimum}."
+                                + (f" {pending} more could not be assessed because of input errors."
+                                   if pending else ""),
                                 edges=matches)
 
         if kind == "ancestry_path":
             by_hash = {node["artefact_hash"]: node for node in nodes}
             allowed = set(rule.get("allowed_relationship_types", []))
-            sources, pending, seen = [], [final_hash], set()
+            sources, pending, seen, unassessed = [], [final_hash], set(), set()
             while pending:
                 digest = pending.pop()
                 if digest in seen:
                     continue
                 seen.add(digest)
                 node = by_hash[digest]
-                if digest != final_hash and digest in bound_hashes and node["artefact_type"] in rule["source_types"]:
+                if digest != final_hash and node["artefact_type"] in rule["source_types"] and (
+                        digest in bound_hashes or digest in self.input_error_hashes):
                     if not rule.get("source_role") or _node_role(node, final_hash) == rule["source_role"]:
-                        sources.append(digest)
+                        if digest in self.input_error_hashes:
+                            unassessed.add(digest)
+                        else:
+                            sources.append(digest)
                 for edge in node.get("evidence", []):
                     if edge["relationship_type"] in allowed:
                         pending.append(edge["hash"])
             minimum = rule.get("min_count", 1)
-            status = "satisfied" if len(set(sources)) >= minimum else "missing"
+            found = len(set(sources))
+            status = ("satisfied" if found >= minimum else
+                      "not_assessed" if found + len(unassessed) >= minimum else "missing")
             return self._result(rule, level, status,
-                                f"Found {len(set(sources))} qualifying bound ancestor(s); minimum is {minimum}.",
+                                f"Found {found} qualifying bound ancestor(s); minimum is {minimum}."
+                                + (f" {len(unassessed)} more could not be assessed because of input errors."
+                                   if unassessed else ""),
                                 sorted(set(sources)))
 
         if kind == "declaration_presence":
@@ -216,8 +242,14 @@ class WorkflowCompletenessPass:
                 present = value is True
             elif declaration == "artefacts[].creation_method":
                 audio = [node for node in nodes if node["artefact_type"].startswith("audio/")]
-                present = bool(audio) and all((node.get("attributes") or {}).get("creation_method")
-                                              not in (None, "", [], {}) for node in audio)
+                lacking = [node for node in audio
+                           if (node.get("attributes") or {}).get("creation_method") in (None, "", [], {})]
+                present = bool(audio) and not lacking
+                if lacking and all(node["artefact_hash"] in self.declaration_error_hashes
+                                   for node in lacking):
+                    return self._result(rule, level, "not_assessed",
+                                        "Declarations that lack creation_method contain input errors; "
+                                        "they were not corrected or assessed.")
             elif declaration == "contributors[]":
                 value = (workflow_input.get("declarations") or {}).get("contributors")
                 present = isinstance(value, list) and bool(value)
@@ -246,8 +278,12 @@ class WorkflowCompletenessPass:
 
         return self._result(rule, level, "not_assessed", f"Unsupported rule kind: {kind}")
 
-    def evaluate(self, native, workflow_input, bound_hashes, parser_observations=None):
+    def evaluate(self, native, workflow_input, bound_hashes, parser_observations=None,
+                 input_error_hashes=None):
         self.parser_observations = parser_observations or {}
+        self.input_error_hashes = set(input_error_hashes or ())
+        self.declaration_error_hashes = set(
+            ((native.get("_input_issues") or {}).get("declaration_nodes") or {}))
         workflow_id = workflow_input.get("workflow_id")
         if workflow_id not in self.workflows:
             raise WorkflowPolicyError(f"Unknown workflow_id: {workflow_id}")

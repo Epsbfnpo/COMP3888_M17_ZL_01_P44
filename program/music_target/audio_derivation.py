@@ -8,6 +8,7 @@ some undocumented or nonlinear production process.
 from __future__ import annotations
 
 import math
+import time
 from pathlib import Path
 
 import numpy as np
@@ -53,7 +54,34 @@ class ResourceBudgetExceeded(ValueError):
     reason_code = "resource_budget_exhausted"
 
 
+def _check_deadline(chain):
+    """Stop starting new audio work once the caller's time budget is spent."""
+    deadline = getattr(chain, "_deadline", None)
+    if deadline is not None and time.time() >= deadline:
+        raise ResourceBudgetExceeded(
+            "evaluation time budget exhausted before this audio check could finish "
+            "(the remaining checks return results; this one is unavailable)")
+
+
+def _declaration_errors(chain, target_hash, edges):
+    """Input errors on the declarations of ``edges`` into ``target_hash``."""
+    flagged = getattr(chain, "_declaration_error_edges", {}) or {}
+    return [{"source_hash": edge["hash"], "issues": flagged[(target_hash, edge["hash"])]}
+            for edge in edges if (target_hash, edge["hash"]) in flagged]
+
+
+def _input_error_result(base, errors):
+    return {**base, "status": "unavailable",
+            "claim_status": "declared_unverified",
+            "reason": ("A relationship declaration for this target contains unrecognised "
+                       "fields; it was not corrected, so this content check was not run."),
+            "reason_code": "input_error",
+            "input_errors": errors,
+            "content_match_is_provenance": False}
+
+
 def _consume_work(chain, units):
+    _check_deadline(chain)
     used = float(getattr(chain, "_audio_work_units", 0.0)) + float(units)
     chain._audio_work_units = used
     if used > MAX_REQUEST_WORK_UNITS:
@@ -320,6 +348,7 @@ def _analysis_proxy(chain, digest):
         output_position = 0
         try:
             for core_start in range(0, total_frames, chunk_frames):
+                _check_deadline(chain)
                 core_end = min(total_frames, core_start + chunk_frames)
                 read_start = max(0, core_start - half)
                 read_end = min(total_frames, core_end + half)
@@ -588,6 +617,7 @@ def _linear_timeline_metrics(chain, target_digest, edges, group_keys=None):
             pending_region = None
 
     for block_start_frame in range(0, target_meta["total_frames"], chunk_frames):
+        _check_deadline(chain)
         block_end_frame = min(target_meta["total_frames"],
                               block_start_frame + chunk_frames)
         target_audio = _read_pcm_frame_range(
@@ -789,6 +819,10 @@ def _linear_pass(native, chain, *, relationship, target_type, scopes, rule,
         if not edges:
             continue
         base = _base(rule, pass_name, target, edges)
+        errors = _declaration_errors(chain, target["artefact_hash"], edges)
+        if errors:
+            results.append(_input_error_result(base, errors))
+            continue
         if target["artefact_type"] != target_type:
             results.append({**base, "status": "not_applicable",
                             "reason": f"Target is not declared as {target_type}."})
@@ -974,6 +1008,10 @@ class CompDerivationPass:
                 continue
             base = _base("audio_comp_sheet_derivation", "CompDerivationPass",
                          target, graph_edges)
+            errors = _declaration_errors(chain, target["artefact_hash"], graph_edges)
+            if errors:
+                results.append(_input_error_result(base, errors))
+                continue
             selections = []
             for sheet in sheets:
                 default_target = (sheet.get("metadata") or {}).get("target_hash")
@@ -1356,6 +1394,10 @@ class MasterDerivationPass:
                 continue
             base = _base("audio_master_content_continuity", "MasterDerivationPass",
                          target, edges)
+            errors = _declaration_errors(chain, target["artefact_hash"], edges)
+            if errors:
+                results.append(_input_error_result(base, errors))
+                continue
             if target["artefact_type"] != "audio/master" or len(edges) != 1:
                 results.append({**base, "status": "not_applicable",
                                 "reason": "Master analysis requires one audio/mix source and one audio/master target."})

@@ -138,8 +138,15 @@ calibration against licensed real production material.
     Full-file exploratory search now uses cached low-rate NumPy proxies and
     exact checks stream original-rate windows, so there is no audio-duration
     cap. Calibrate the weighted work limit, 128 MiB active-window limit,
-    256 MiB proxy-cache limit, 16-source limit and file-size limits against the
-    CSEC 60-second wall-clock deadline on every supported platform.
+    256 MiB proxy-cache limit and 16-source limit against the caller-supplied
+    wall-clock timeout (current CSEC samples request 60 seconds) on every
+    supported platform. File-size limits are fixed at 512 MiB per object and
+    1 GiB per request; hashing time is not yet counted in the work budget.
+
+20a. Treat isolated non-final objects (hash mismatch, size limit, invalid path,
+    hash or path format errors) as not assessed in `BoundFileIntegrityPass`
+    (`object_hash_bound` with `passed: null`) instead of a failed check, so an
+    input error does not lower the file-integrity layer.
 
 21. Expand malicious-input tests for WAV chunk abuse, XML bombs, hostile PDFs,
     malformed MIDI, symlink/path attacks, oversized JSON, hash collisions in
