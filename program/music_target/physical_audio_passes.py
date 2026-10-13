@@ -740,11 +740,21 @@ class StemMixResidualPass:
                     channel_results.append(fitted)
                 rmse = sum(item["normalized_rmse"] for item in channel_results) / len(channel_results)
                 correlation = sum(item["correlation"] for item in channel_results) / len(channel_results)
-                clipping = (
-                    sum(int(np.count_nonzero(np.abs(channel) >= 0.999))
-                        for channel in target_channels) /
-                    max(1, sum(len(channel) for channel in target_channels))
-                )
+                peak_amplitude = max(
+                    (float(np.max(np.abs(channel))) for channel in target_channels
+                     if len(channel)), default=0.0)
+                if target_audio.get("sample_format") == "float":
+                    level_fields = {"peak_amplitude": round(peak_amplitude, 6)}
+                else:
+                    clipping = (
+                        sum(int(np.count_nonzero(np.abs(channel) >= 0.999))
+                            for channel in target_channels) /
+                        max(1, sum(len(channel) for channel in target_channels))
+                    )
+                    level_fields = {
+                        "clipping_fraction": round(clipping, 6),
+                        "peak_amplitude": round(peak_amplitude, 6),
+                    }
                 window = max(1, RESIDUAL_RATE_HZ // 4)
                 window_rmse = []
                 for start in range(0, len(target_channels[0]), window):
@@ -791,7 +801,7 @@ class StemMixResidualPass:
                             "estimated_parameters_are_diagnostic": True,
                             "normalized_rmse": round(rmse, 6),
                             "correlation": round(correlation, 6),
-                            "clipping_fraction": round(clipping, 6),
+                            **level_fields,
                             "window_normalized_rmse": [round(value, 6)
                                                        for value in window_rmse[:240]],
                             **_proxy_fields(target_audio, *source_audio_objects),

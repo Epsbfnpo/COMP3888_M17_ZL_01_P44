@@ -3,7 +3,6 @@
 import dataclasses
 import hashlib
 import math
-import struct
 from pathlib import Path
 
 from libevchain.evidence_chain import EvidenceChain
@@ -12,16 +11,12 @@ from libevchain.types import AudioType, ALL_RELATIONSHIPS
 
 from music_target import domain
 from music_target.assessment_passes import assess_axes, parse_bound_artefacts
+from music_target.wav_io import UnsupportedWav, WavError, inspect_wav
 from music_target.wav_parser import parse_wav_file
 from music_target.workflow_policy import WorkflowCompletenessPass, load_workflow_policy
 
 MAX_FILE_BYTES = 32 * 1024 * 1024
 MAX_TOTAL_BYTES = 128 * 1024 * 1024
-WAVE_FORMAT_PCM = 0x0001
-WAVE_FORMAT_EXTENSIBLE = 0xFFFE
-PCM_SUBFORMAT_GUID = bytes.fromhex("0100000000001000800000aa00389b71")
-
-
 class InputError(ValueError):
     pass
 
@@ -47,76 +42,37 @@ def empty_axes():
             for name in ["completeness", "integrity", "attestation_strength", "ai_disclosure"]}
 
 
-def strict_pcm_check(path):
-    """Check RIFF bounds and uncompressed integer PCM framing before extraction.
+def _observed_wav(descriptor):
+    codec = "PCM" if descriptor.format_kind == "int" else "IEEE_FLOAT"
+    return {
+        "duration_seconds": descriptor.duration_seconds,
+        "sample_rate_hz": descriptor.sample_rate,
+        "channels": descriptor.channels,
+        "bit_depth": descriptor.container_bits,
+        "format": "WAV",
+        "codec_subtype": codec,
+        "sample_format": descriptor.format_kind,
+        "file_size_bytes": descriptor.file_size,
+        "wav_format_tag": descriptor.format_tag,
+        "valid_bits_per_sample": descriptor.valid_bits,
+        "channel_mask": descriptor.channel_mask,
+        "trailing_bytes": descriptor.trailing_bytes,
+        "wav_warnings": list(descriptor.warnings),
+    }
 
-    Optional metadata is not authenticated. No claim about who created the audio.
-    """
-    data = path.read_bytes()
-    if len(data) < 12 or data[:4] != b"RIFF" or data[8:12] != b"WAVE":
-        raise InputError("Expected a RIFF/WAVE file.")
-    if struct.unpack_from("<I", data, 4)[0] + 8 != len(data):
-        raise InputError("RIFF declared size differs from actual file length.")
-    pos, fmt, payload, seen = 12, None, None, set()
-    while pos < len(data):
-        if pos + 8 > len(data):
-            raise InputError("Truncated WAV chunk header.")
-        name = data[pos:pos + 4]
-        size = struct.unpack_from("<I", data, pos + 4)[0]
-        start, end = pos + 8, pos + 8 + size
-        if end + size % 2 > len(data):
-            raise InputError("WAV chunk exceeds the RIFF container.")
-        if name in (b"fmt ", b"data"):
-            if name in seen:
-                raise InputError("Duplicate mandatory WAV chunk.")
-            seen.add(name)
-        if name == b"fmt ":
-            if size < 16:
-                raise InputError("Truncated WAV fmt chunk.")
-            code, channels, rate, byte_rate, align, bits = struct.unpack_from(
-                "<HHIIHH", data, start)
-            fmt = {"code": code, "channels": channels, "rate": rate,
-                   "byte_rate": byte_rate, "align": align, "bits": bits,
-                   "format_tag": "WAVE_FORMAT_PCM", "valid_bits": bits}
-            if code == WAVE_FORMAT_EXTENSIBLE:
-                if size < 40:
-                    raise InputError("Truncated WAVE_FORMAT_EXTENSIBLE fmt chunk.")
-                extension_size = struct.unpack_from("<H", data, start + 16)[0]
-                if extension_size < 22 or size < 18 + extension_size:
-                    raise InputError("Invalid WAVE_FORMAT_EXTENSIBLE extension size.")
-                valid_bits = struct.unpack_from("<H", data, start + 18)[0]
-                subformat = data[start + 24:start + 40]
-                if subformat != PCM_SUBFORMAT_GUID:
-                    raise Unsupported(
-                        "Only the integer PCM SubFormat of WAVE_FORMAT_EXTENSIBLE is supported.")
-                if not (1 <= valid_bits <= bits):
-                    raise InputError(
-                        "WAVE_FORMAT_EXTENSIBLE valid bits must fit the sample container.")
-                fmt.update({"format_tag": "WAVE_FORMAT_EXTENSIBLE",
-                            "valid_bits": valid_bits})
-        elif name == b"data":
-            if fmt is None:
-                raise InputError("The data chunk must follow fmt in this baseline.")
-            payload = size
-        pos = end + size % 2
-    if fmt is None or payload is None:
-        raise InputError("A fmt chunk and a data chunk are required.")
-    code = fmt["code"]
-    channels, rate = fmt["channels"], fmt["rate"]
-    byte_rate, align, bits = fmt["byte_rate"], fmt["align"], fmt["bits"]
-    if code not in (WAVE_FORMAT_PCM, WAVE_FORMAT_EXTENSIBLE) or bits not in (8, 16, 24, 32):
-        raise Unsupported("Only uncompressed integer PCM WAV (8/16/24/32-bit) is supported.")
-    if not (1 <= channels <= 32 and 1 <= rate <= 384000):
-        raise Unsupported("Channel count or sample rate is outside the baseline limits.")
-    if align != channels * (bits // 8) or byte_rate != rate * align:
-        raise InputError("Inconsistent PCM block alignment or byte rate.")
-    if payload == 0 or payload % align:
-        raise InputError("Empty or truncated PCM sample data.")
-    return {"duration_seconds": payload / byte_rate, "sample_rate_hz": rate,
-            "channels": channels, "bit_depth": bits, "format": "WAV",
-            "codec_subtype": "PCM", "file_size_bytes": len(data),
-            "wav_format_tag": fmt["format_tag"],
-            "valid_bits_per_sample": fmt["valid_bits"]}
+
+def _inspect_supported_wav(path):
+    try:
+        return inspect_wav(path)
+    except UnsupportedWav as exc:
+        raise Unsupported(str(exc)) from exc
+    except WavError as exc:
+        raise InputError(str(exc)) from exc
+
+
+def strict_pcm_check(path):
+    """Stream-check supported integer/float WAV framing before extraction."""
+    return _observed_wav(_inspect_supported_wav(path))
 
 
 class WavMetadataPass(ArtefactPass):
@@ -126,15 +82,21 @@ class WavMetadataPass(ArtefactPass):
             return None, None, ["No verified file is bound to this artefact."]
         path = Path(artefact.get_file())
         try:
-            observed = strict_pcm_check(path)
-            parsed = dataclasses.asdict(parse_wav_file(str(path)))
+            descriptor = _inspect_supported_wav(path)
+            observed = _observed_wav(descriptor)
+            parsed = dataclasses.asdict(parse_wav_file(str(path), descriptor))
             parsed.pop("source_path", None)
-        except (InputError, OSError, ValueError, struct.error) as exc:
+        except (InputError, OSError, ValueError) as exc:
             chain = getattr(artefact, "_evaluation_chain", None)
             if chain is not None and artefact.artefact_hash == chain.final_artefact_hash:
                 raise
             failure_type = "unsupported" if isinstance(exc, Unsupported) else "invalid"
             artefact._wav_parser_failure = str(exc)
+            cause = exc.__cause__
+            artefact._wav_parser_failure_reason_code = getattr(
+                cause, "reason_code", "unsupported_wav_format"
+                if failure_type == "unsupported" else "invalid_wav")
+            artefact._wav_descriptor = None
             return None, {
                 "status": "parser_failed",
                 "failure_type": failure_type,
@@ -151,9 +113,11 @@ class WavMetadataPass(ArtefactPass):
                 }],
                 "claim_mismatches": [],
             }, [
-                "This non-final WAV could not be decoded by the supported PCM parser; only checks that require this node are unavailable.",
+                "This non-final WAV could not be decoded by the supported WAV parser; only checks that require this node are unavailable.",
             ]
         artefact._wav_parser_failure = None
+        artefact._wav_parser_failure_reason_code = None
+        artefact._wav_descriptor = descriptor
         claim = artefact._attributes.get("technical", {})
         checks, mismatches = [], []
         for key, value in claim.items():
@@ -173,7 +137,7 @@ class WavMetadataPass(ArtefactPass):
         return None, {"status": "parsed", "observed": observed,
                       "embedded_metadata": parsed,
                       "checks": checks, "claim_mismatches": mismatches}, [
-            "PCM framing was checked; submission claims were compared with measured file properties.",
+            "WAV framing was checked; submission claims were compared with measured file properties.",
             "Embedded dates, credits and software tags are unauthenticated metadata.",
         ]
 

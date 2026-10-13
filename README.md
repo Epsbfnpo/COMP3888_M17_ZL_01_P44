@@ -25,7 +25,7 @@ The runnable evaluator is in [`program/`](program/). Unless stated otherwise, fi
 
 - Includes a pinned copy of the library source reviewed for this release, with fixes for audio attributes, binary-file binding, and dictionary attribute checks.
 - Registers music audio, MIDI, DAW, RIN, ERN, C2PA, and text evidence types, plus constrained relationship types.
-- Reuses the WAV parser with additional RIFF/PCM structural validation, including integer-PCM `WAVE_FORMAT_EXTENSIBLE` files.
+- Uses one streaming RIFF/WAVE reader for structural inspection, metadata parsing, and bounded sample decoding. It supports integer PCM (8/16/24/32-bit), IEEE float (32/64-bit), and integer/float `WAVE_FORMAT_EXTENSIBLE` without loading the whole file.
 - Provides a bounded MIDI parser; the RIN, ERN, and C2PA parsers are connected to the production execution path.
 - The MIDI parser extracts channel and meta events, notes, tempo, time signatures, controllers, and duration in seconds when it can be calculated.
 - CompSheet and CueSheet parsers support strict JSON, CSV, delimited text, and PDF text extraction. See [`program/docs/SHEET_FORMATS.md`](program/docs/SHEET_FORMATS.md).
@@ -35,7 +35,8 @@ The runnable evaluator is in [`program/`](program/). Unless stated otherwise, fi
 - `RelationshipIntegrityPass` is a registered libevchain `EvidencePass`. It compares only submitter-declared edge parameters with cached source and target observations and replaces the former diagnostic-only `MusicRelationshipPass`.
 - Includes scoped PCM content checks for `edited_from`, `comped_from`, `stemmed_from`, and `mixed_from`, plus conservative mix-to-master continuity corroboration. Exact checks use only submitter-declared ranges, placements, gains, and optional fades; no missing transformation parameter is estimated. Declared reconstruction is evaluated on alternating partitions and reports coverage, matched duration, source redundancy, identifiability, and repeated-segment ambiguity. Consecutive high-energy local residuals lasting at least 0.20 seconds are reported as timed mismatch regions, so a short replacement cannot be hidden by a low whole-track average. Complex or undocumented processing is not automatically treated as a contradiction.
 - Exact declared-range checks stream the complete target timeline at the original sample rate in approximately ten-second blocks. They read only the corresponding source windows, retain cross-block holdout and local-mismatch state, and accumulate sufficient statistics rather than retaining complete decoded tracks.
-- PCM samples are decoded with NumPy into C-contiguous `(frames, channels)` `float32` arrays. The pinned `numpy==2.2.6` dependency supports the project's Python 3.11-3.13 range; no SciPy dependency is used. 8-, 16-, 24-, and 32-bit integer PCM decoding is vectorised.
+- WAV samples are decoded with NumPy into C-contiguous `(frames, channels)` `float32` arrays. The pinned `numpy==2.2.6` dependency supports the project's Python 3.11-3.13 range; no SciPy dependency is used. Integer PCM and IEEE-float decoding are vectorised; finite float values outside `[-1, 1]` are preserved rather than clipped.
+- RIFF size, data size, partial-frame, byte-rate, and trailing-byte anomalies are reported as stable warnings where safe. Unsupported codecs remain unsupported, while float NaN/Infinity causes only dependent content checks to become unavailable and produces `WAV_SAMPLE_DATA_INVALID`.
 - Each audio file also has a request-cached, complete low-rate analysis proxy. Integer-factor Kaiser-windowed sinc filtering produces 2000 Hz for 48 kHz input and 2100 Hz for 44.1 kHz input; later integer and non-integer reductions are low-pass filtered before slicing or interpolation.
 - Adds eight physical-audio diagnostics: `AudioAlignmentPass`, `SourceContributionPass`, `CompVerificationPass`, `ProcessedAudioMatchPass`, `StemMixResidualPass`, `MasteringDerivationPass`, `ExcerptedFromPass`, and `DecoySourcePass`. Exploratory alignment and location checks use FFT-normalised cross-correlation across the complete proxy followed by detailed candidate comparison, rather than searching only the first 60 seconds. Signal-estimated offsets, gains, and channel matrices are labelled diagnostic, never written back into the evidence graph, and cannot cancel a contradiction from an exact submitter-declared check.
 - Master comparison uses the submitted ranges while searching the complete target proxy for competing locations. An alternative may reduce certainty by exposing ambiguity, but it is never substituted for the declaration.
@@ -77,7 +78,7 @@ A known non-final WAV whose encoding is unsupported or malformed follows the
 same isolation principle at parser level. Its graph node and declaration remain
 visible, but WAV-dependent metadata and physical-audio checks are unavailable.
 Independent files and evidence continue to be assessed. The final artefact is
-strict: if its WAV cannot be parsed by the supported PCM implementation, the
+strict: if its WAV cannot be parsed by the supported WAV implementation, the
 request returns `unsupported` or `error` as appropriate.
 
 The program does not infer relationships or fill in missing relationship
@@ -165,8 +166,9 @@ python3 -B check_public.py /path/to/public-bundles
 ```
 
 The second command writes results to `reports/`. Both commands operate locally and do not transmit data.
-The local regression suite contains 97 tests, including coverage for non-final
-WAV isolation, extensible PCM, field-level unavailability, final-scoped C2PA,
+The local regression suite contains 103 tests, including coverage for non-final
+WAV isolation, integer/float extensible PCM, float32/64 decoding, non-finite
+sample rejection, RIFF warnings, field-level unavailability, final-scoped C2PA,
 standalone C2PA ingredient checks, hash caching, sustained local tampering,
 declared ranges beyond 60 seconds, full master duration, ndarray PCM decoding,
 24-bit sign extension, full-file proxy caching, non-integer anti-aliasing,
@@ -180,6 +182,7 @@ The locations below are relative to `program/`.
 |---|---|
 | `vendor/libevchain/` | Local copy of Ben's source with three reviewable fixes |
 | `music_target/domain.py` | Music nodes, relationships, and permitted endpoint roles |
+| `music_target/wav_io.py` | Streaming RIFF/WAVE inspection and vectorised integer/float sample decoding |
 | `music_target/wav_parser.py` | Local copy of the supplied WAV parser |
 | `music_target/engine.py` | File binding, `WavMetadataPass`, `RelationshipIntegrityPass`, library pipeline, and assessment-stage orchestration |
 | `music_target/workflow_policy.py` | Safe policy loading, condition evaluation, and per-expectation workflow completeness |

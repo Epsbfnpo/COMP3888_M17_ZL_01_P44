@@ -6,7 +6,7 @@
   "system": {
     "name": "COMP3888-music-baseline",
     "version": "0.5.0",
-    "source_revision": "sha256:7661a11d28785aa0a9e4d9884a54484d3481d6a11e05ed2a56cd12a58255dc26"
+    "source_revision": "sha256:83b6bee2b8104d7036749317c7e6900f8c8f904eede2d427097b075edc2f131c"
   },
   "execution_status": "succeeded",
   "axes": {
@@ -58,9 +58,13 @@
         "bit_depth": 16,
         "format": "WAV",
         "codec_subtype": "PCM",
+        "sample_format": "int",
         "file_size_bytes": 8044,
         "wav_format_tag": "WAVE_FORMAT_PCM",
-        "valid_bits_per_sample": 16
+        "valid_bits_per_sample": 16,
+        "channel_mask": null,
+        "trailing_bytes": 0,
+        "wav_warnings": []
       },
       "embedded_metadata": {
         "core_format": {
@@ -101,9 +105,13 @@
           "bit_depth": 16,
           "format": "WAV",
           "codec_subtype": "PCM",
+          "sample_format": "int",
           "file_size_bytes": 8044,
           "wav_format_tag": "WAVE_FORMAT_PCM",
-          "valid_bits_per_sample": 16
+          "valid_bits_per_sample": 16,
+          "channel_mask": null,
+          "trailing_bytes": 0,
+          "wav_warnings": []
         },
         "embedded_metadata": {
           "core_format": {
@@ -147,9 +155,9 @@
       "message": "No workflow was supplied; completeness is legacy declared-object availability only."
     }
   ],
-  "processing_ms": 198.62495799316093,
+  "processing_ms": 195.64824999542907,
   "resource_usage": {
-    "cpu_ms": 0.9579999999999866,
+    "cpu_ms": 0.7940000000000169,
     "peak_rss_kib": null
   },
   "error": null,
