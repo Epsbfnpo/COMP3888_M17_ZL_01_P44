@@ -1,3 +1,3 @@
 """Music evidence integration baseline. No authorship classification policy."""
 
-VERSION = "0.4.0"
+VERSION = "0.6.0"

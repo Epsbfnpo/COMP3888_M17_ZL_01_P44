@@ -37,8 +37,18 @@ import json
 import struct
 import sys
 from dataclasses import dataclass, field
-from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Dict, List, Optional
+
+from music_target.wav_io import (
+    WAVE_FORMAT_EXTENSIBLE,
+    WAVE_FORMAT_IEEE_FLOAT,
+    WAVE_FORMAT_PCM,
+    WavDescriptor,
+    WavError,
+    inspect_wav,
+    iter_chunks,
+    read_chunk,
+)
 
 # Standard LIST/INFO sub-chunk IDs mapped to friendly names
 INFO_TAGS = {
@@ -156,37 +166,6 @@ class WavParseResult:
     id3: Optional[WavId3Header] = None
     other_chunks: List[WavOtherChunk] = field(default_factory=list)
     warnings: List[str] = field(default_factory=list)
-
-
-def _iter_chunks(data: bytes):
-    """Yield (chunk_id, chunk_data) for each top-level RIFF chunk. Assumes caller already validated the RIFF/WAVE header."""
-    pos = 12  # after 'RIFF' size 'WAVE'
-    size = len(data)
-    while pos + 8 <= size:
-        chunk_id = data[pos:pos + 4].decode("ascii", errors="replace")
-        chunk_size = struct.unpack("<I", data[pos + 4:pos + 8])[0]
-        chunk_start = pos + 8
-        chunk_end = chunk_start + chunk_size
-        chunk_data = data[chunk_start:min(chunk_end, size)]
-        yield chunk_id, chunk_data
-        # Chunks are word-aligned; skip a pad byte if size is odd
-        pos = chunk_end + (chunk_size % 2)
-
-
-def _parse_fmt(chunk_data: bytes) -> Optional[WavCoreFormat]:
-    if len(chunk_data) < 16:
-        return None
-    (audio_format, num_channels, sample_rate, byte_rate,
-     block_align, bits_per_sample) = struct.unpack("<HHIIHH", chunk_data[:16])
-    return WavCoreFormat(
-        audio_format_code=audio_format,
-        audio_format=WAV_FORMAT_NAMES.get(audio_format, f"Unknown (0x{audio_format:04X})"),
-        num_channels=num_channels,
-        sample_rate_hz=sample_rate,
-        byte_rate=byte_rate,
-        block_align=block_align,
-        bits_per_sample=bits_per_sample,
-    )
 
 
 def _parse_list_info(chunk_data: bytes) -> Optional[Dict[str, str]]:
@@ -313,7 +292,8 @@ def _parse_id3(chunk_data: bytes) -> Optional[WavId3Header]:
     return WavId3Header(id3_version=version, flags=flags, declared_size=size)
 
 
-def parse_wav_file(path: str) -> WavParseResult:
+def parse_wav_file(path: str,
+                   descriptor: WavDescriptor | None = None) -> WavParseResult:
     """Read whatever WAV core/optional metadata is present in `path`.
 
     Mirrors the other parsers in this package: missing/optional chunks are
@@ -321,68 +301,75 @@ def parse_wav_file(path: str) -> WavParseResult:
     reported via `warnings` rather than raised to the caller.
     """
     try:
-        data = Path(path).read_bytes()
-    except OSError as exc:
-        return WavParseResult(source_path=path, warnings=[f"could not read file: {exc}"])
+        descriptor = descriptor or inspect_wav(path)
+    except (OSError, WavError) as exc:
+        reason = getattr(exc, "reason_code", "read_error")
+        return WavParseResult(
+            source_path=path, warnings=[f"{reason}: {exc}"])
 
-    if len(data) < 12 or data[0:4] != b"RIFF" or data[8:12] != b"WAVE":
-        return WavParseResult(source_path=path, warnings=["not a valid WAV/RIFF file"])
+    code = {
+        "WAVE_FORMAT_PCM": WAVE_FORMAT_PCM,
+        "WAVE_FORMAT_IEEE_FLOAT": WAVE_FORMAT_IEEE_FLOAT,
+        "WAVE_FORMAT_EXTENSIBLE": WAVE_FORMAT_EXTENSIBLE,
+    }[descriptor.format_tag]
+    result = WavParseResult(
+        source_path=path,
+        core_format=WavCoreFormat(
+            audio_format_code=code,
+            audio_format=WAV_FORMAT_NAMES[code],
+            num_channels=descriptor.channels,
+            sample_rate_hz=descriptor.sample_rate,
+            byte_rate=descriptor.sample_rate * descriptor.block_align,
+            block_align=descriptor.block_align,
+            bits_per_sample=descriptor.container_bits,
+            data_size_bytes=descriptor.data_size,
+            duration_seconds=round(descriptor.duration_seconds, 3),
+        ),
+    )
+    warnings: List[str] = list(descriptor.warnings)
 
-    result = WavParseResult(source_path=path)
-    warnings: List[str] = []
-    seen_fmt = False
+    try:
+        chunks = iter_chunks(path, descriptor)
+        for chunk in chunks:
+            cid = chunk.chunk_id.decode("ascii", errors="replace").strip()
+            if cid in {"fmt", "data"}:
+                continue
+            try:
+                chunk_data = read_chunk(path, chunk)
+            except WavError as exc:
+                warnings.append(f"{cid or 'unknown'}: {exc.reason_code}: {exc}")
+                result.other_chunks.append(WavOtherChunk(
+                    chunk_id=cid, size=chunk.size,
+                    note="metadata payload not read"))
+                continue
 
-    for chunk_id, chunk_data in _iter_chunks(data):
-        cid = chunk_id.strip()
-
-        if cid == "fmt":
-            result.core_format = _parse_fmt(chunk_data)
-            seen_fmt = True
-
-        elif cid == "LIST":
-            info = _parse_list_info(chunk_data)
-            if info:
-                result.info.update(info)
+            if cid == "LIST":
+                info = _parse_list_info(chunk_data)
+                if info:
+                    result.info.update(info)
+                else:
+                    result.other_chunks.append(WavOtherChunk(
+                        chunk_id="LIST", size=chunk.size, note="non-INFO LIST"))
+            elif cid == "bext":
+                result.broadcast_extension = _parse_bext(chunk_data)
+            elif cid == "cue":
+                cues = _parse_cue(chunk_data)
+                if cues:
+                    result.cue_points = cues
+            elif cid == "smpl":
+                result.sampler = _parse_smpl(chunk_data)
+            elif cid == "fact":
+                result.fact = _parse_fact(chunk_data)
+            elif cid.lower() == "id3":
+                id3 = _parse_id3(chunk_data)
+                if id3:
+                    result.id3 = id3
             else:
-                result.other_chunks.append(WavOtherChunk(chunk_id="LIST", size=len(chunk_data), note="non-INFO LIST"))
-
-        elif cid == "bext":
-            result.broadcast_extension = _parse_bext(chunk_data)
-
-        elif cid == "cue":
-            cues = _parse_cue(chunk_data)
-            if cues:
-                result.cue_points = cues
-
-        elif cid == "smpl":
-            result.sampler = _parse_smpl(chunk_data)
-
-        elif cid == "fact":
-            result.fact = _parse_fact(chunk_data)
-
-        elif cid.lower() == "id3":
-            id3 = _parse_id3(chunk_data)
-            if id3:
-                result.id3 = id3
-
-        elif cid == "data":
-            if result.core_format is not None:
-                result.core_format.data_size_bytes = len(chunk_data)
-            else:
-                warnings.append("'data' chunk found before a valid 'fmt ' chunk; data_size_bytes not recorded")
-
-        else:
-            result.other_chunks.append(WavOtherChunk(chunk_id=cid, size=len(chunk_data)))
-
-    if not seen_fmt:
-        warnings.append("no 'fmt ' chunk found (required by the WAV/RIFF spec)")
-    elif result.core_format is None:
-        warnings.append("'fmt ' chunk present but too short to parse")
-
-    if result.core_format and result.core_format.byte_rate and result.core_format.data_size_bytes is not None:
-        result.core_format.duration_seconds = round(
-            result.core_format.data_size_bytes / result.core_format.byte_rate, 3
-        )
+                result.other_chunks.append(WavOtherChunk(
+                    chunk_id=cid, size=chunk.size))
+    except (OSError, WavError) as exc:
+        reason = getattr(exc, "reason_code", "read_error")
+        warnings.append(f"{reason}: {exc}")
 
     result.warnings = warnings
     return result

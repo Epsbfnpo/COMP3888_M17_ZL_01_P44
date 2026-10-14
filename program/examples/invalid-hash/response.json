@@ -5,8 +5,8 @@
   "asset_sha256": "746c90b6d8f6306ce93c347477103c16027d71a4072cf12d10a9f7246ce93d18",
   "system": {
     "name": "COMP3888-music-baseline",
-    "version": "0.4.0",
-    "source_revision": "sha256:2e10eec544e85dd907692a0296d89eb2549e0d9d4cddc7e16d3da6f0df710d13"
+    "version": "0.5.0",
+    "source_revision": "sha256:b3c4711f0b91d809bd3736e2e668ee91efa78b6b13fb30f623c742de41034471"
   },
   "execution_status": "error",
   "axes": {
@@ -46,14 +46,15 @@
   },
   "findings": [
     {
-      "code": "INVALID_OR_FAILED_INPUT",
-      "severity": "medium",
-      "message": "SHA-256 mismatch for declared object 746c90b6d8f6306ce93c347477103c16027d71a4072cf12d10a9f7246ce93d18."
+      "code": "OBJECT_HASH_MISMATCH",
+      "severity": "high",
+      "message": "SHA-256 mismatch for declared object 746c90b6d8f6306ce93c347477103c16027d71a4072cf12d10a9f7246ce93d18.",
+      "evidence_hash": "746c90b6d8f6306ce93c347477103c16027d71a4072cf12d10a9f7246ce93d18"
     }
   ],
-  "processing_ms": 181.3707080000313,
+  "processing_ms": 603.643791997456,
   "resource_usage": {
-    "cpu_ms": 1.0780000000000234,
+    "cpu_ms": 1.0824579999999528,
     "peak_rss_kib": null
   },
   "error": "SHA-256 mismatch for declared object 746c90b6d8f6306ce93c347477103c16027d71a4072cf12d10a9f7246ce93d18."

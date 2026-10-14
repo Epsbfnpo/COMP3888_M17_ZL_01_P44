@@ -2,6 +2,7 @@
 """One local scoring request per process. Use --help for accepted inputs."""
 
 import argparse
+import copy
 import json
 import subprocess
 import sys
@@ -12,23 +13,94 @@ BASE = Path(__file__).resolve().parent
 sys.path.insert(0, str(BASE / "vendor"))
 
 from music_target.contract import (
-    InputError, Unsupported, public_bundle_request, read_json,
-    response_shell, to_native, validate,
+    DEFAULT_TIMEOUT_SECONDS, INPUT_ERROR_CODES, SHA256, InputError, Unsupported,
+    public_bundle_request, read_json, response_shell, source_revision, to_native,
+    validate,
 )
-from music_target.engine import evaluate_chain, finding
+from music_target.engine import ObjectsChangedDuringEvaluation, evaluate_chain, finding
 
 
-def evaluate(request, root, mode, allow_local_files=False):
+HASH_FIELDS = ("evidence_hash", "source_hash", "target_hash", "artefact_hash")
+
+
+def _sanitise_hash_fields(response):
+    """Keep malformed submitted hashes out of fields the response schema types.
+
+    Hashes are never corrected; a value that is not lower-case SHA-256 is
+    reported under ``submitted_<field>`` instead (findings) or dropped
+    (unknown_inputs, whose items allow no extra fields).
+    """
+    for item in response.get("findings", []):
+        for field in HASH_FIELDS:
+            value = item.get(field)
+            if isinstance(value, str) and not SHA256.fullmatch(value):
+                item[f"submitted_{field}"] = item.pop(field)
+    for item in response.get("unknown_inputs", []):
+        for field in HASH_FIELDS:
+            value = item.get(field)
+            if isinstance(value, str) and not SHA256.fullmatch(value):
+                item.pop(field)
+
+
+def _summarise_input_errors(response):
+    errors = [item for item in response["findings"] if item["code"] in INPUT_ERROR_CODES]
+    if not errors:
+        return
+    response["findings"].append(finding(
+        "SCORE_AFFECTED_BY_INPUT_ERRORS",
+        f"{len(errors)} input error(s) made the checks that depend on them unavailable; "
+        "nothing was corrected, and scores may change once the input is fixed.",
+        severity="medium"))
+    note = (f" {len(errors)} input error(s) made dependent checks unavailable; "
+            "see SCORE_AFFECTED_BY_INPUT_ERRORS.")
+    for assessment in response["axes"].values():
+        if assessment["availability"] == "available":
+            assessment["availability"] = "partial"
+        assessment["reasoning"] = (assessment.get("reasoning") or "") + note
+
+
+def _evaluate_with_change_retry(native, request, root, input_report, deadline,
+                                allow_local_files):
+    """Evaluate once; if non-final files changed meanwhile, re-run once with them isolated."""
+    changed = {}
+    for attempt in range(2):
+        try:
+            return evaluate_chain(
+                copy.deepcopy(native), request["objects"], root, request.get("workflow"),
+                allow_disconnected=not input_report["coverage"]["complete"],
+                deadline=deadline, changed_objects=changed,
+                allow_external_objects=allow_local_files)
+        except ObjectsChangedDuringEvaluation as exc:
+            if attempt:
+                problems = list(changed.values()) + list(exc.changed.values())
+                raise InputError("Objects kept changing during evaluation; no stable result "
+                                 "could be produced.", problems) from None
+            changed.update(exc.changed)
+
+
+def evaluate(request, root, mode, deadline=None, allow_local_files=False):
     response = response_shell(request, mode)
     started, cpu = time.perf_counter(), time.process_time()
     try:
-        native = to_native(request, mode)
+        native, input_report = to_native(
+            request, mode, include_report=True, allow_local_files=allow_local_files)
         (response["axes"], response["findings"], workflow_assessment,
-         validation, assessment_checks) = evaluate_chain(
-            native, request["objects"], root, request.get("workflow"),
-            allow_external_files=(
-                allow_local_files and mode == "native"
-                and request.get("options", {}).get("local_file_references") is True))
+         validation, assessment_checks) = _evaluate_with_change_retry(
+            native, request, root, input_report, deadline, allow_local_files)
+        response["coverage"] = input_report["coverage"]
+        response["unknown_inputs"] = input_report["unknown_inputs"]
+        response["findings"] = input_report["findings"] + response["findings"]
+        if not input_report["coverage"]["complete"]:
+            note = (f" Results cover {input_report['coverage']['evaluated_artefacts']}/"
+                    f"{input_report['coverage']['submitted_artefacts']} artefacts and "
+                    f"{input_report['coverage']['evaluated_relationships']}/"
+                    f"{input_report['coverage']['submitted_relationships']} relationships; "
+                    "unknown values were not inferred.")
+            for assessment in response["axes"].values():
+                if assessment["availability"] == "available":
+                    assessment["availability"] = "partial"
+                assessment["reasoning"] = (assessment.get("reasoning") or "") + note
+        _summarise_input_errors(response)
         if workflow_assessment is not None:
             response["workflow_assessment"] = workflow_assessment
         if assessment_checks:
@@ -39,13 +111,15 @@ def evaluate(request, root, mode, allow_local_files=False):
     except Unsupported as exc:
         response["execution_status"] = "unsupported"
         response["error"] = str(exc)
-        response["findings"] = [finding("UNSUPPORTED_INPUT", str(exc))]
+        response["findings"] = exc.findings or [finding("UNSUPPORTED_INPUT", str(exc))]
     except Exception as exc:
         response["execution_status"] = "error"
         response["error"] = str(exc)
-        response["findings"] = [finding("INVALID_OR_FAILED_INPUT", str(exc), severity="medium")]
+        response["findings"] = (getattr(exc, "findings", None) or
+                                [finding("INVALID_OR_FAILED_INPUT", str(exc), severity="medium")])
     response["processing_ms"] = (time.perf_counter() - started) * 1000
     response["resource_usage"]["cpu_ms"] = (time.process_time() - cpu) * 1000
+    _sanitise_hash_fields(response)
     options = request.get("options")
     if isinstance(options, dict) and options.get("include_reasoning") is False:
         for assessment in response["axes"].values():
@@ -54,17 +128,39 @@ def evaluate(request, root, mode, allow_local_files=False):
     return response
 
 
+# Technical guard only: subprocess waits overflow on extremely large timeouts.
+# Roughly 11.6 days, so it never shortens a realistic caller timeout.
+MAX_WAIT_SECONDS = 1_000_000
+
+
+def effective_timeout(options):
+    """Return the caller's ``timeout_seconds``; the evaluator adds no ceiling.
+
+    The default applies only when a request carries no valid value, for
+    example a request built from a public bundle without options.
+    """
+    requested = options.get("timeout_seconds") if isinstance(options, dict) else None
+    if type(requested) is int and requested > 0:
+        return min(requested, MAX_WAIT_SECONDS)
+    return DEFAULT_TIMEOUT_SECONDS
+
+
 def run_isolated(request, root, mode, command=None, allow_local_files=False):
     if allow_local_files and mode != "native":
-        raise InputError("External file access is only available for trusted native requests.")
-    response = response_shell(request, mode)
-    options = request.get("options", {})
-    requested = options.get("timeout_seconds", 60) if isinstance(options, dict) else 60
-    timeout = min(requested, 60) if type(requested) is int and requested > 0 else 60
+        raise ValueError("--allow-local-files is restricted to trusted native manifests.")
+    # A successful worker supplies its own source revision. Avoid hashing the
+    # full source tree in the parent unless a parent-generated failure response
+    # must be returned.
+    response = response_shell(request, mode, include_source_revision=False)
+    timeout = effective_timeout(request.get("options", {}))
+    # Audio checks stop starting new work shortly before the caller's deadline,
+    # so a slow request still returns the results it has instead of timing out.
+    reserve = min(5.0, max(0.5, 0.1 * timeout))
+    deadline = time.time() + max(0.0, timeout - reserve)
     command = command or [sys.executable, "-B", str(BASE / "run.py"), "--worker"]
-    if allow_local_files and command[-1] != "--allow-local-files":
-        command = [*command, "--allow-local-files"]
-    payload = json.dumps({"request": request, "root": str(root), "mode": mode}, allow_nan=False)
+    payload = json.dumps({"request": request, "root": str(root), "mode": mode,
+                          "deadline": deadline,
+                          "allow_local_files": allow_local_files}, allow_nan=False)
     started = time.perf_counter()
     try:
         result = subprocess.run(command, input=payload, text=True, capture_output=True, timeout=timeout)
@@ -74,12 +170,14 @@ def run_isolated(request, root, mode, command=None, allow_local_files=False):
         validate(response, "scoring-response.schema.json")
     except subprocess.TimeoutExpired:
         response["execution_status"] = "timeout"
-        response["error"] = f"Evaluation exceeded the enforced {timeout}-second timeout."
+        response["error"] = f"Evaluation exceeded the requested {timeout}-second timeout."
         response["findings"] = [finding("TIMEOUT", response["error"], severity="medium")]
     except Exception as exc:
         response["execution_status"] = "error"
         response["error"] = str(exc)
         response["findings"] = [finding("WORKER_ERROR", str(exc), severity="medium")]
+    if response["system"]["source_revision"] is None:
+        response["system"]["source_revision"] = source_revision()
     response["processing_ms"] = (time.perf_counter() - started) * 1000
     validate(response, "scoring-response.schema.json")
     return response
@@ -93,23 +191,22 @@ def main():
     inputs.add_argument("--native", type=Path, help="Music native-request JSON with a Ben-format chain")
     parser.add_argument("--root", type=Path, help="Directory containing the declared objects/ files")
     parser.add_argument("--output", type=Path, help="Save the response to this file instead of stdout")
-    parser.add_argument(
-        "--allow-local-files", action="store_true",
-        help="Authorize external paths in a native request marked local_file_references.")
+    parser.add_argument("--allow-local-files", action="store_true",
+                        help="Allow external paths in a trusted native manifest that opts in")
     parser.add_argument("--worker", action="store_true", help=argparse.SUPPRESS)
     args = parser.parse_args()
     try:
         if args.worker:
             payload = json.load(sys.stdin)
-            response = evaluate(
-                payload["request"], payload["root"], payload["mode"],
-                allow_local_files=args.allow_local_files)
+            response = evaluate(payload["request"], payload["root"], payload["mode"],
+                                deadline=payload.get("deadline"),
+                                allow_local_files=payload.get("allow_local_files", False))
         else:
-            if args.allow_local_files and not args.native:
-                parser.error("--allow-local-files can only be used with --native")
             selected = args.request or args.bundle or args.native
             if selected is None or args.root is None:
                 parser.error("one input option and --root are required")
+            if args.allow_local_files and not args.native:
+                raise InputError("--allow-local-files is restricted to trusted native manifests.")
             request = read_json(selected)
             if args.bundle:
                 request = public_bundle_request(request)

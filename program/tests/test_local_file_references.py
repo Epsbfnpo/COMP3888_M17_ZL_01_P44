@@ -1,6 +1,7 @@
 import copy
 import hashlib
 import json
+import subprocess
 import sys
 import tempfile
 import threading
@@ -84,6 +85,25 @@ class LocalFileReferenceTests(unittest.TestCase):
             loaded, target.parent, "native", allow_local_files=True)
         self.assertEqual(response["execution_status"], "succeeded", response.get("error"))
 
+    def test_cli_requires_explicit_authorization_for_local_references(self):
+        target = self.bundle / "submission.json"
+        self.manifest["objects"] = L.referenced_object_paths(self.files, target)
+        target.write_text(json.dumps(self.manifest), encoding="utf-8")
+        command = [
+            sys.executable, "-B", str(BASE / "run.py"), "--native", str(target),
+            "--root", str(self.bundle),
+        ]
+        denied = subprocess.run(command, capture_output=True, text=True, check=False)
+        denied_response = json.loads(denied.stdout)
+        self.assertEqual(denied_response["execution_status"], "error")
+        self.assertIn("--allow-local-files", denied_response["error"])
+
+        allowed = subprocess.run(
+            command + ["--allow-local-files"], capture_output=True, text=True, check=False)
+        allowed_response = json.loads(allowed.stdout)
+        self.assertEqual(allowed_response["execution_status"], "succeeded",
+                         allowed_response.get("error"))
+
     def test_full_assessment_stages_referenced_originals_inside_worker_root(self):
         response = builder_operations.assess_manifest(
             self.manifest, self.files, lambda _text: None, self.cancel)
@@ -139,7 +159,7 @@ class LocalFileReferenceTests(unittest.TestCase):
         self.assertEqual(response["execution_status"], "error")
         self.assertIn("final artefact file is missing", response["error"])
 
-    def test_copy_mode_preserves_names_handles_collisions_and_reuses_content(self):
+    def test_copy_mode_uses_content_addressed_names_and_reuses_content(self):
         other_dir = self.root / "Other"
         other_dir.mkdir()
         second = other_dir / self.source.name
@@ -152,7 +172,8 @@ class LocalFileReferenceTests(unittest.TestCase):
         paths = L.copied_object_paths(files)
         self.assertEqual(len(set(paths.values())), 2)
         self.assertTrue(all(Path(value).parent.as_posix() == "objects" for value in paths.values()))
-        self.assertTrue(any("Track one – 夜 (" in value for value in paths.values()))
+        self.assertTrue(all(Path(value).stem == entry["hash"]
+                            for entry, value in zip(files, paths.values())))
         manifest = copy.deepcopy(self.manifest)
         manifest["options"]["local_file_references"] = False
         manifest["chain"]["artefacts"].append({

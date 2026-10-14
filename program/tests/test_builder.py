@@ -128,7 +128,8 @@ class AssessmentTests(unittest.TestCase):
                          {"completeness", "integrity", "attestation_strength", "ai_disclosure"})
         self.assertIn("workflow_assessment", response)
         self.assertIn("assessment_checks", response)
-        self.assertIsNone(response["axes"]["integrity"]["value"])
+        self.assertGreaterEqual(response["axes"]["integrity"]["value"], 0.0)
+        self.assertLessEqual(response["axes"]["integrity"]["value"], 1.0)
         self.assertNotIn("overall_score", response)
         self.assertEqual(self.request, original)
 

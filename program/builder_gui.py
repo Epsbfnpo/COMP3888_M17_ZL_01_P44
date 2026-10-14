@@ -263,7 +263,7 @@ class RelDialog(Dialog):
         if td is None or sd is None:
             messagebox.showinfo("Ranges", "Choose target and source WAV files first.", parent=self)
             return
-        end = round(min(td, sd, L.MAX_ANALYSIS_SECONDS), 3)
+        end = round(min(td, sd, L.MAX_SUGGESTED_RANGE_SECONDS), 3)
         for name in ("ss", "ts"):
             self.vars[name].set("0")
         for name in ("se", "te"):

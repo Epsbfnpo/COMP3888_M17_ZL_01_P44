@@ -5,8 +5,8 @@
   "asset_sha256": "746c90b6d8f6306ce93c347477103c16027d71a4072cf12d10a9f7246ce93d18",
   "system": {
     "name": "COMP3888-music-baseline",
-    "version": "0.4.0",
-    "source_revision": "sha256:2e10eec544e85dd907692a0296d89eb2549e0d9d4cddc7e16d3da6f0df710d13"
+    "version": "0.6.0",
+    "source_revision": "sha256:0eff6890a8452b5e31abee02cb065b1846773e01d73023f355e16b6755104b80"
   },
   "execution_status": "succeeded",
   "axes": {
@@ -17,16 +17,16 @@
       "reasoning": "Workflow mastering_service_only: 7/7 assessed required/conditional weight satisfied. Optional evidence is excluded."
     },
     "integrity": {
-      "availability": "available",
+      "availability": "partial",
       "value": 1.0,
-      "confidence": 0.65,
-      "reasoning": "20 file, 3 relationship, 0 cross-evidence, and 0 applicable audio-derivation checks ran. Hash consistency is not creator authentication."
+      "confidence": 0.4,
+      "reasoning": "Integrity has 2/4 score-eligible evidence layers; missing evidence reduces availability and confidence but is never treated as contradiction. A numeric value is withheld without physical similarity or independent CrossEvidence unless a contradiction exists. Structural validity and cryptographic attestation are reported separately and do not raise integrity. Physical similarity scored 3/3 declared relationship(s); inconclusive and unavailable results were excluded. Content similarity is not proof of provenance."
     },
     "attestation_strength": {
-      "availability": "available",
-      "value": 0.0,
-      "confidence": 0.9,
-      "reasoning": "C2PA SDK ran but found no active manifest."
+      "availability": "unavailable",
+      "value": null,
+      "confidence": null,
+      "reasoning": "C2PA SDK is unavailable for the final artefact, so no cryptographic attestation was assessed."
     },
     "ai_disclosure": {
       "availability": "available",
@@ -36,22 +36,21 @@
     }
   },
   "validation": {
-    "validation_state": "manifest_absent",
-    "signature_present": false,
+    "validation_state": null,
+    "signature_present": null,
     "signature_valid": null,
     "cryptographically_valid": null,
     "credential_trusted": null,
     "codes": [],
-    "reasons": [
-      "No active manifest found."
-    ]
+    "reasons": []
   },
   "findings": [
     {
       "code": "WAV_OBSERVATION",
       "severity": "info",
       "message": "Measured WAV properties and extracted metadata.",
-      "evidence_hash": "746c90b6d8f6306ce93c347477103c16027d71a4072cf12d10a9f7246ce93d18",
+      "evidence_hash": "7580f3a09b8a02bdfc6520235e92f6c8318dd3b52002b7eb8a430abc2c007dea",
+      "status": "parsed",
       "observed": {
         "duration_seconds": 0.5,
         "sample_rate_hz": 8000,
@@ -59,7 +58,13 @@
         "bit_depth": 16,
         "format": "WAV",
         "codec_subtype": "PCM",
-        "file_size_bytes": 8044
+        "sample_format": "int",
+        "file_size_bytes": 8044,
+        "wav_format_tag": "WAVE_FORMAT_PCM",
+        "valid_bits_per_sample": 16,
+        "channel_mask": null,
+        "trailing_bytes": 0,
+        "wav_warnings": []
       },
       "embedded_metadata": {
         "core_format": {
@@ -82,43 +87,40 @@
         "other_chunks": [],
         "warnings": []
       },
-      "claim_mismatches": []
-    },
-    {
-      "code": "WAV_OBSERVATION",
-      "severity": "info",
-      "message": "Measured WAV properties and extracted metadata.",
-      "evidence_hash": "bc1dd3c26ef5f4d97fbb41e653e93a09c940b53c75229594d82c928727134ca0",
-      "observed": {
-        "duration_seconds": 0.5,
-        "sample_rate_hz": 8000,
-        "channels": 1,
-        "bit_depth": 16,
-        "format": "WAV",
-        "codec_subtype": "PCM",
-        "file_size_bytes": 8044
-      },
-      "embedded_metadata": {
-        "core_format": {
-          "audio_format_code": 1,
-          "audio_format": "PCM",
-          "num_channels": 1,
-          "sample_rate_hz": 8000,
-          "byte_rate": 16000,
-          "block_align": 2,
-          "bits_per_sample": 16,
-          "data_size_bytes": 8000,
-          "duration_seconds": 0.5
+      "checks": [
+        {
+          "rule": "technical.duration_seconds_matches_observed",
+          "passed": true,
+          "evidence_hash": "7580f3a09b8a02bdfc6520235e92f6c8318dd3b52002b7eb8a430abc2c007dea",
+          "declared": 0.5,
+          "observed": 0.5,
+          "source_pass": "WavMetadataPass"
         },
-        "info": {},
-        "broadcast_extension": null,
-        "cue_points": [],
-        "sampler": null,
-        "fact": null,
-        "id3": null,
-        "other_chunks": [],
-        "warnings": []
-      },
+        {
+          "rule": "technical.sample_rate_hz_matches_observed",
+          "passed": true,
+          "evidence_hash": "7580f3a09b8a02bdfc6520235e92f6c8318dd3b52002b7eb8a430abc2c007dea",
+          "declared": 8000,
+          "observed": 8000,
+          "source_pass": "WavMetadataPass"
+        },
+        {
+          "rule": "technical.channels_matches_observed",
+          "passed": true,
+          "evidence_hash": "7580f3a09b8a02bdfc6520235e92f6c8318dd3b52002b7eb8a430abc2c007dea",
+          "declared": 1,
+          "observed": 1,
+          "source_pass": "WavMetadataPass"
+        },
+        {
+          "rule": "technical.bit_depth_matches_observed",
+          "passed": true,
+          "evidence_hash": "7580f3a09b8a02bdfc6520235e92f6c8318dd3b52002b7eb8a430abc2c007dea",
+          "declared": 16,
+          "observed": 16,
+          "source_pass": "WavMetadataPass"
+        }
+      ],
       "claim_mismatches": []
     },
     {
@@ -126,6 +128,7 @@
       "severity": "info",
       "message": "Measured WAV properties and extracted metadata.",
       "evidence_hash": "6aacc6b93785fbbefb186285e5f9c9ce49a6ccc7c2af664fc2f2a21416001ea0",
+      "status": "parsed",
       "observed": {
         "duration_seconds": 0.5,
         "sample_rate_hz": 8000,
@@ -133,7 +136,13 @@
         "bit_depth": 16,
         "format": "WAV",
         "codec_subtype": "PCM",
-        "file_size_bytes": 8044
+        "sample_format": "int",
+        "file_size_bytes": 8044,
+        "wav_format_tag": "WAVE_FORMAT_PCM",
+        "valid_bits_per_sample": 16,
+        "channel_mask": null,
+        "trailing_bytes": 0,
+        "wav_warnings": []
       },
       "embedded_metadata": {
         "core_format": {
@@ -156,13 +165,48 @@
         "other_chunks": [],
         "warnings": []
       },
+      "checks": [
+        {
+          "rule": "technical.duration_seconds_matches_observed",
+          "passed": true,
+          "evidence_hash": "6aacc6b93785fbbefb186285e5f9c9ce49a6ccc7c2af664fc2f2a21416001ea0",
+          "declared": 0.5,
+          "observed": 0.5,
+          "source_pass": "WavMetadataPass"
+        },
+        {
+          "rule": "technical.sample_rate_hz_matches_observed",
+          "passed": true,
+          "evidence_hash": "6aacc6b93785fbbefb186285e5f9c9ce49a6ccc7c2af664fc2f2a21416001ea0",
+          "declared": 8000,
+          "observed": 8000,
+          "source_pass": "WavMetadataPass"
+        },
+        {
+          "rule": "technical.channels_matches_observed",
+          "passed": true,
+          "evidence_hash": "6aacc6b93785fbbefb186285e5f9c9ce49a6ccc7c2af664fc2f2a21416001ea0",
+          "declared": 1,
+          "observed": 1,
+          "source_pass": "WavMetadataPass"
+        },
+        {
+          "rule": "technical.bit_depth_matches_observed",
+          "passed": true,
+          "evidence_hash": "6aacc6b93785fbbefb186285e5f9c9ce49a6ccc7c2af664fc2f2a21416001ea0",
+          "declared": 16,
+          "observed": 16,
+          "source_pass": "WavMetadataPass"
+        }
+      ],
       "claim_mismatches": []
     },
     {
       "code": "WAV_OBSERVATION",
       "severity": "info",
       "message": "Measured WAV properties and extracted metadata.",
-      "evidence_hash": "7580f3a09b8a02bdfc6520235e92f6c8318dd3b52002b7eb8a430abc2c007dea",
+      "evidence_hash": "bc1dd3c26ef5f4d97fbb41e653e93a09c940b53c75229594d82c928727134ca0",
+      "status": "parsed",
       "observed": {
         "duration_seconds": 0.5,
         "sample_rate_hz": 8000,
@@ -170,7 +214,13 @@
         "bit_depth": 16,
         "format": "WAV",
         "codec_subtype": "PCM",
-        "file_size_bytes": 8044
+        "sample_format": "int",
+        "file_size_bytes": 8044,
+        "wav_format_tag": "WAVE_FORMAT_PCM",
+        "valid_bits_per_sample": 16,
+        "channel_mask": null,
+        "trailing_bytes": 0,
+        "wav_warnings": []
       },
       "embedded_metadata": {
         "core_format": {
@@ -193,36 +243,160 @@
         "other_chunks": [],
         "warnings": []
       },
+      "checks": [
+        {
+          "rule": "technical.duration_seconds_matches_observed",
+          "passed": true,
+          "evidence_hash": "bc1dd3c26ef5f4d97fbb41e653e93a09c940b53c75229594d82c928727134ca0",
+          "declared": 0.5,
+          "observed": 0.5,
+          "source_pass": "WavMetadataPass"
+        },
+        {
+          "rule": "technical.sample_rate_hz_matches_observed",
+          "passed": true,
+          "evidence_hash": "bc1dd3c26ef5f4d97fbb41e653e93a09c940b53c75229594d82c928727134ca0",
+          "declared": 8000,
+          "observed": 8000,
+          "source_pass": "WavMetadataPass"
+        },
+        {
+          "rule": "technical.channels_matches_observed",
+          "passed": true,
+          "evidence_hash": "bc1dd3c26ef5f4d97fbb41e653e93a09c940b53c75229594d82c928727134ca0",
+          "declared": 1,
+          "observed": 1,
+          "source_pass": "WavMetadataPass"
+        },
+        {
+          "rule": "technical.bit_depth_matches_observed",
+          "passed": true,
+          "evidence_hash": "bc1dd3c26ef5f4d97fbb41e653e93a09c940b53c75229594d82c928727134ca0",
+          "declared": 16,
+          "observed": 16,
+          "source_pass": "WavMetadataPass"
+        }
+      ],
       "claim_mismatches": []
     },
     {
-      "code": "RELATIONSHIP_OBSERVATION",
+      "code": "WAV_OBSERVATION",
       "severity": "info",
-      "message": "Relationship diagnostics; only explicitly scoped linear mixes receive separate content analysis.",
-      "source_hash": "bc1dd3c26ef5f4d97fbb41e653e93a09c940b53c75229594d82c928727134ca0",
-      "target_hash": "746c90b6d8f6306ce93c347477103c16027d71a4072cf12d10a9f7246ce93d18",
-      "relationship": "mastered_from",
-      "content_relationship_verified": null,
-      "duration_delta_seconds": 0.0
+      "message": "Measured WAV properties and extracted metadata.",
+      "evidence_hash": "746c90b6d8f6306ce93c347477103c16027d71a4072cf12d10a9f7246ce93d18",
+      "status": "parsed",
+      "observed": {
+        "duration_seconds": 0.5,
+        "sample_rate_hz": 8000,
+        "channels": 1,
+        "bit_depth": 16,
+        "format": "WAV",
+        "codec_subtype": "PCM",
+        "sample_format": "int",
+        "file_size_bytes": 8044,
+        "wav_format_tag": "WAVE_FORMAT_PCM",
+        "valid_bits_per_sample": 16,
+        "channel_mask": null,
+        "trailing_bytes": 0,
+        "wav_warnings": []
+      },
+      "embedded_metadata": {
+        "core_format": {
+          "audio_format_code": 1,
+          "audio_format": "PCM",
+          "num_channels": 1,
+          "sample_rate_hz": 8000,
+          "byte_rate": 16000,
+          "block_align": 2,
+          "bits_per_sample": 16,
+          "data_size_bytes": 8000,
+          "duration_seconds": 0.5
+        },
+        "info": {},
+        "broadcast_extension": null,
+        "cue_points": [],
+        "sampler": null,
+        "fact": null,
+        "id3": null,
+        "other_chunks": [],
+        "warnings": []
+      },
+      "checks": [
+        {
+          "rule": "technical.duration_seconds_matches_observed",
+          "passed": true,
+          "evidence_hash": "746c90b6d8f6306ce93c347477103c16027d71a4072cf12d10a9f7246ce93d18",
+          "declared": 0.5,
+          "observed": 0.5,
+          "source_pass": "WavMetadataPass"
+        },
+        {
+          "rule": "technical.sample_rate_hz_matches_observed",
+          "passed": true,
+          "evidence_hash": "746c90b6d8f6306ce93c347477103c16027d71a4072cf12d10a9f7246ce93d18",
+          "declared": 8000,
+          "observed": 8000,
+          "source_pass": "WavMetadataPass"
+        },
+        {
+          "rule": "technical.channels_matches_observed",
+          "passed": true,
+          "evidence_hash": "746c90b6d8f6306ce93c347477103c16027d71a4072cf12d10a9f7246ce93d18",
+          "declared": 1,
+          "observed": 1,
+          "source_pass": "WavMetadataPass"
+        },
+        {
+          "rule": "technical.bit_depth_matches_observed",
+          "passed": true,
+          "evidence_hash": "746c90b6d8f6306ce93c347477103c16027d71a4072cf12d10a9f7246ce93d18",
+          "declared": 16,
+          "observed": 16,
+          "source_pass": "WavMetadataPass"
+        }
+      ],
+      "claim_mismatches": []
     },
     {
-      "code": "RELATIONSHIP_OBSERVATION",
+      "code": "RELATIONSHIP_INTEGRITY_OBSERVATION",
       "severity": "info",
-      "message": "Relationship diagnostics; only explicitly scoped linear mixes receive separate content analysis.",
-      "source_hash": "6aacc6b93785fbbefb186285e5f9c9ce49a6ccc7c2af664fc2f2a21416001ea0",
-      "target_hash": "bc1dd3c26ef5f4d97fbb41e653e93a09c940b53c75229594d82c928727134ca0",
-      "relationship": "mixed_from",
-      "content_relationship_verified": null,
-      "duration_delta_seconds": 0.0
-    },
-    {
-      "code": "RELATIONSHIP_OBSERVATION",
-      "severity": "info",
-      "message": "Relationship diagnostics; only explicitly scoped linear mixes receive separate content analysis.",
+      "message": "Declared relationship parameters were checked by the cached EvidencePass; separate content analysis may corroborate or contradict the submitted transformation.",
+      "pass": "RelationshipIntegrityPass",
       "source_hash": "7580f3a09b8a02bdfc6520235e92f6c8318dd3b52002b7eb8a430abc2c007dea",
       "target_hash": "6aacc6b93785fbbefb186285e5f9c9ce49a6ccc7c2af664fc2f2a21416001ea0",
       "relationship": "stemmed_from",
+      "endpoint_roles_validated": true,
       "content_relationship_verified": null,
+      "value": null,
+      "checks": [],
+      "duration_delta_seconds": 0.0
+    },
+    {
+      "code": "RELATIONSHIP_INTEGRITY_OBSERVATION",
+      "severity": "info",
+      "message": "Declared relationship parameters were checked by the cached EvidencePass; separate content analysis may corroborate or contradict the submitted transformation.",
+      "pass": "RelationshipIntegrityPass",
+      "source_hash": "6aacc6b93785fbbefb186285e5f9c9ce49a6ccc7c2af664fc2f2a21416001ea0",
+      "target_hash": "bc1dd3c26ef5f4d97fbb41e653e93a09c940b53c75229594d82c928727134ca0",
+      "relationship": "mixed_from",
+      "endpoint_roles_validated": true,
+      "content_relationship_verified": null,
+      "value": null,
+      "checks": [],
+      "duration_delta_seconds": 0.0
+    },
+    {
+      "code": "RELATIONSHIP_INTEGRITY_OBSERVATION",
+      "severity": "info",
+      "message": "Declared relationship parameters were checked by the cached EvidencePass; separate content analysis may corroborate or contradict the submitted transformation.",
+      "pass": "RelationshipIntegrityPass",
+      "source_hash": "bc1dd3c26ef5f4d97fbb41e653e93a09c940b53c75229594d82c928727134ca0",
+      "target_hash": "746c90b6d8f6306ce93c347477103c16027d71a4072cf12d10a9f7246ce93d18",
+      "relationship": "mastered_from",
+      "endpoint_roles_validated": true,
+      "content_relationship_verified": null,
+      "value": null,
+      "checks": [],
       "duration_delta_seconds": 0.0
     },
     {
@@ -232,6 +406,7 @@
       "parser": "wav",
       "parser_status": "parsed",
       "parser_result": {
+        "status": "parsed",
         "observed": {
           "duration_seconds": 0.5,
           "sample_rate_hz": 8000,
@@ -239,7 +414,13 @@
           "bit_depth": 16,
           "format": "WAV",
           "codec_subtype": "PCM",
-          "file_size_bytes": 8044
+          "sample_format": "int",
+          "file_size_bytes": 8044,
+          "wav_format_tag": "WAVE_FORMAT_PCM",
+          "valid_bits_per_sample": 16,
+          "channel_mask": null,
+          "trailing_bytes": 0,
+          "wav_warnings": []
         },
         "embedded_metadata": {
           "core_format": {
@@ -262,6 +443,40 @@
           "other_chunks": [],
           "warnings": []
         },
+        "checks": [
+          {
+            "rule": "technical.duration_seconds_matches_observed",
+            "passed": true,
+            "evidence_hash": "7580f3a09b8a02bdfc6520235e92f6c8318dd3b52002b7eb8a430abc2c007dea",
+            "declared": 0.5,
+            "observed": 0.5,
+            "source_pass": "WavMetadataPass"
+          },
+          {
+            "rule": "technical.sample_rate_hz_matches_observed",
+            "passed": true,
+            "evidence_hash": "7580f3a09b8a02bdfc6520235e92f6c8318dd3b52002b7eb8a430abc2c007dea",
+            "declared": 8000,
+            "observed": 8000,
+            "source_pass": "WavMetadataPass"
+          },
+          {
+            "rule": "technical.channels_matches_observed",
+            "passed": true,
+            "evidence_hash": "7580f3a09b8a02bdfc6520235e92f6c8318dd3b52002b7eb8a430abc2c007dea",
+            "declared": 1,
+            "observed": 1,
+            "source_pass": "WavMetadataPass"
+          },
+          {
+            "rule": "technical.bit_depth_matches_observed",
+            "passed": true,
+            "evidence_hash": "7580f3a09b8a02bdfc6520235e92f6c8318dd3b52002b7eb8a430abc2c007dea",
+            "declared": 16,
+            "observed": 16,
+            "source_pass": "WavMetadataPass"
+          }
+        ],
         "claim_mismatches": []
       },
       "evidence_hash": "7580f3a09b8a02bdfc6520235e92f6c8318dd3b52002b7eb8a430abc2c007dea"
@@ -273,6 +488,7 @@
       "parser": "wav",
       "parser_status": "parsed",
       "parser_result": {
+        "status": "parsed",
         "observed": {
           "duration_seconds": 0.5,
           "sample_rate_hz": 8000,
@@ -280,7 +496,13 @@
           "bit_depth": 16,
           "format": "WAV",
           "codec_subtype": "PCM",
-          "file_size_bytes": 8044
+          "sample_format": "int",
+          "file_size_bytes": 8044,
+          "wav_format_tag": "WAVE_FORMAT_PCM",
+          "valid_bits_per_sample": 16,
+          "channel_mask": null,
+          "trailing_bytes": 0,
+          "wav_warnings": []
         },
         "embedded_metadata": {
           "core_format": {
@@ -303,6 +525,40 @@
           "other_chunks": [],
           "warnings": []
         },
+        "checks": [
+          {
+            "rule": "technical.duration_seconds_matches_observed",
+            "passed": true,
+            "evidence_hash": "6aacc6b93785fbbefb186285e5f9c9ce49a6ccc7c2af664fc2f2a21416001ea0",
+            "declared": 0.5,
+            "observed": 0.5,
+            "source_pass": "WavMetadataPass"
+          },
+          {
+            "rule": "technical.sample_rate_hz_matches_observed",
+            "passed": true,
+            "evidence_hash": "6aacc6b93785fbbefb186285e5f9c9ce49a6ccc7c2af664fc2f2a21416001ea0",
+            "declared": 8000,
+            "observed": 8000,
+            "source_pass": "WavMetadataPass"
+          },
+          {
+            "rule": "technical.channels_matches_observed",
+            "passed": true,
+            "evidence_hash": "6aacc6b93785fbbefb186285e5f9c9ce49a6ccc7c2af664fc2f2a21416001ea0",
+            "declared": 1,
+            "observed": 1,
+            "source_pass": "WavMetadataPass"
+          },
+          {
+            "rule": "technical.bit_depth_matches_observed",
+            "passed": true,
+            "evidence_hash": "6aacc6b93785fbbefb186285e5f9c9ce49a6ccc7c2af664fc2f2a21416001ea0",
+            "declared": 16,
+            "observed": 16,
+            "source_pass": "WavMetadataPass"
+          }
+        ],
         "claim_mismatches": []
       },
       "evidence_hash": "6aacc6b93785fbbefb186285e5f9c9ce49a6ccc7c2af664fc2f2a21416001ea0"
@@ -314,6 +570,7 @@
       "parser": "wav",
       "parser_status": "parsed",
       "parser_result": {
+        "status": "parsed",
         "observed": {
           "duration_seconds": 0.5,
           "sample_rate_hz": 8000,
@@ -321,7 +578,13 @@
           "bit_depth": 16,
           "format": "WAV",
           "codec_subtype": "PCM",
-          "file_size_bytes": 8044
+          "sample_format": "int",
+          "file_size_bytes": 8044,
+          "wav_format_tag": "WAVE_FORMAT_PCM",
+          "valid_bits_per_sample": 16,
+          "channel_mask": null,
+          "trailing_bytes": 0,
+          "wav_warnings": []
         },
         "embedded_metadata": {
           "core_format": {
@@ -344,6 +607,40 @@
           "other_chunks": [],
           "warnings": []
         },
+        "checks": [
+          {
+            "rule": "technical.duration_seconds_matches_observed",
+            "passed": true,
+            "evidence_hash": "bc1dd3c26ef5f4d97fbb41e653e93a09c940b53c75229594d82c928727134ca0",
+            "declared": 0.5,
+            "observed": 0.5,
+            "source_pass": "WavMetadataPass"
+          },
+          {
+            "rule": "technical.sample_rate_hz_matches_observed",
+            "passed": true,
+            "evidence_hash": "bc1dd3c26ef5f4d97fbb41e653e93a09c940b53c75229594d82c928727134ca0",
+            "declared": 8000,
+            "observed": 8000,
+            "source_pass": "WavMetadataPass"
+          },
+          {
+            "rule": "technical.channels_matches_observed",
+            "passed": true,
+            "evidence_hash": "bc1dd3c26ef5f4d97fbb41e653e93a09c940b53c75229594d82c928727134ca0",
+            "declared": 1,
+            "observed": 1,
+            "source_pass": "WavMetadataPass"
+          },
+          {
+            "rule": "technical.bit_depth_matches_observed",
+            "passed": true,
+            "evidence_hash": "bc1dd3c26ef5f4d97fbb41e653e93a09c940b53c75229594d82c928727134ca0",
+            "declared": 16,
+            "observed": 16,
+            "source_pass": "WavMetadataPass"
+          }
+        ],
         "claim_mismatches": []
       },
       "evidence_hash": "bc1dd3c26ef5f4d97fbb41e653e93a09c940b53c75229594d82c928727134ca0"
@@ -355,6 +652,7 @@
       "parser": "wav",
       "parser_status": "parsed",
       "parser_result": {
+        "status": "parsed",
         "observed": {
           "duration_seconds": 0.5,
           "sample_rate_hz": 8000,
@@ -362,7 +660,13 @@
           "bit_depth": 16,
           "format": "WAV",
           "codec_subtype": "PCM",
-          "file_size_bytes": 8044
+          "sample_format": "int",
+          "file_size_bytes": 8044,
+          "wav_format_tag": "WAVE_FORMAT_PCM",
+          "valid_bits_per_sample": 16,
+          "channel_mask": null,
+          "trailing_bytes": 0,
+          "wav_warnings": []
         },
         "embedded_metadata": {
           "core_format": {
@@ -385,17 +689,66 @@
           "other_chunks": [],
           "warnings": []
         },
+        "checks": [
+          {
+            "rule": "technical.duration_seconds_matches_observed",
+            "passed": true,
+            "evidence_hash": "746c90b6d8f6306ce93c347477103c16027d71a4072cf12d10a9f7246ce93d18",
+            "declared": 0.5,
+            "observed": 0.5,
+            "source_pass": "WavMetadataPass"
+          },
+          {
+            "rule": "technical.sample_rate_hz_matches_observed",
+            "passed": true,
+            "evidence_hash": "746c90b6d8f6306ce93c347477103c16027d71a4072cf12d10a9f7246ce93d18",
+            "declared": 8000,
+            "observed": 8000,
+            "source_pass": "WavMetadataPass"
+          },
+          {
+            "rule": "technical.channels_matches_observed",
+            "passed": true,
+            "evidence_hash": "746c90b6d8f6306ce93c347477103c16027d71a4072cf12d10a9f7246ce93d18",
+            "declared": 1,
+            "observed": 1,
+            "source_pass": "WavMetadataPass"
+          },
+          {
+            "rule": "technical.bit_depth_matches_observed",
+            "passed": true,
+            "evidence_hash": "746c90b6d8f6306ce93c347477103c16027d71a4072cf12d10a9f7246ce93d18",
+            "declared": 16,
+            "observed": 16,
+            "source_pass": "WavMetadataPass"
+          }
+        ],
         "claim_mismatches": []
       },
       "evidence_hash": "746c90b6d8f6306ce93c347477103c16027d71a4072cf12d10a9f7246ce93d18"
+    },
+    {
+      "code": "C2PA_PARSER_UNAVAILABLE",
+      "severity": "low",
+      "message": "c2pa-python is not installed; C2PA attestation was not assessed."
     }
   ],
-  "processing_ms": 193.10437500007538,
+  "processing_ms": 224.47924996959046,
   "resource_usage": {
-    "cpu_ms": 4.812000000000011,
+    "cpu_ms": 8.318999999999994,
     "peak_rss_kib": null
   },
   "error": null,
+  "coverage": {
+    "complete": true,
+    "submitted_artefacts": 4,
+    "evaluated_artefacts": 4,
+    "skipped_artefacts": 0,
+    "submitted_relationships": 3,
+    "evaluated_relationships": 3,
+    "skipped_relationships": 0
+  },
+  "unknown_inputs": [],
   "workflow_assessment": {
     "policy_id": "comp3888-music-workflow-evidence",
     "policy_version": "0.1.0-candidate",
@@ -576,22 +929,34 @@
       {
         "rule": "technical.duration_seconds_matches_observed",
         "passed": true,
-        "evidence_hash": "7580f3a09b8a02bdfc6520235e92f6c8318dd3b52002b7eb8a430abc2c007dea"
+        "evidence_hash": "7580f3a09b8a02bdfc6520235e92f6c8318dd3b52002b7eb8a430abc2c007dea",
+        "declared": 0.5,
+        "observed": 0.5,
+        "source_pass": "WavMetadataPass"
       },
       {
         "rule": "technical.sample_rate_hz_matches_observed",
         "passed": true,
-        "evidence_hash": "7580f3a09b8a02bdfc6520235e92f6c8318dd3b52002b7eb8a430abc2c007dea"
+        "evidence_hash": "7580f3a09b8a02bdfc6520235e92f6c8318dd3b52002b7eb8a430abc2c007dea",
+        "declared": 8000,
+        "observed": 8000,
+        "source_pass": "WavMetadataPass"
       },
       {
         "rule": "technical.channels_matches_observed",
         "passed": true,
-        "evidence_hash": "7580f3a09b8a02bdfc6520235e92f6c8318dd3b52002b7eb8a430abc2c007dea"
+        "evidence_hash": "7580f3a09b8a02bdfc6520235e92f6c8318dd3b52002b7eb8a430abc2c007dea",
+        "declared": 1,
+        "observed": 1,
+        "source_pass": "WavMetadataPass"
       },
       {
         "rule": "technical.bit_depth_matches_observed",
         "passed": true,
-        "evidence_hash": "7580f3a09b8a02bdfc6520235e92f6c8318dd3b52002b7eb8a430abc2c007dea"
+        "evidence_hash": "7580f3a09b8a02bdfc6520235e92f6c8318dd3b52002b7eb8a430abc2c007dea",
+        "declared": 16,
+        "observed": 16,
+        "source_pass": "WavMetadataPass"
       },
       {
         "rule": "object_hash_bound",
@@ -601,22 +966,34 @@
       {
         "rule": "technical.duration_seconds_matches_observed",
         "passed": true,
-        "evidence_hash": "6aacc6b93785fbbefb186285e5f9c9ce49a6ccc7c2af664fc2f2a21416001ea0"
+        "evidence_hash": "6aacc6b93785fbbefb186285e5f9c9ce49a6ccc7c2af664fc2f2a21416001ea0",
+        "declared": 0.5,
+        "observed": 0.5,
+        "source_pass": "WavMetadataPass"
       },
       {
         "rule": "technical.sample_rate_hz_matches_observed",
         "passed": true,
-        "evidence_hash": "6aacc6b93785fbbefb186285e5f9c9ce49a6ccc7c2af664fc2f2a21416001ea0"
+        "evidence_hash": "6aacc6b93785fbbefb186285e5f9c9ce49a6ccc7c2af664fc2f2a21416001ea0",
+        "declared": 8000,
+        "observed": 8000,
+        "source_pass": "WavMetadataPass"
       },
       {
         "rule": "technical.channels_matches_observed",
         "passed": true,
-        "evidence_hash": "6aacc6b93785fbbefb186285e5f9c9ce49a6ccc7c2af664fc2f2a21416001ea0"
+        "evidence_hash": "6aacc6b93785fbbefb186285e5f9c9ce49a6ccc7c2af664fc2f2a21416001ea0",
+        "declared": 1,
+        "observed": 1,
+        "source_pass": "WavMetadataPass"
       },
       {
         "rule": "technical.bit_depth_matches_observed",
         "passed": true,
-        "evidence_hash": "6aacc6b93785fbbefb186285e5f9c9ce49a6ccc7c2af664fc2f2a21416001ea0"
+        "evidence_hash": "6aacc6b93785fbbefb186285e5f9c9ce49a6ccc7c2af664fc2f2a21416001ea0",
+        "declared": 16,
+        "observed": 16,
+        "source_pass": "WavMetadataPass"
       },
       {
         "rule": "object_hash_bound",
@@ -626,22 +1003,34 @@
       {
         "rule": "technical.duration_seconds_matches_observed",
         "passed": true,
-        "evidence_hash": "bc1dd3c26ef5f4d97fbb41e653e93a09c940b53c75229594d82c928727134ca0"
+        "evidence_hash": "bc1dd3c26ef5f4d97fbb41e653e93a09c940b53c75229594d82c928727134ca0",
+        "declared": 0.5,
+        "observed": 0.5,
+        "source_pass": "WavMetadataPass"
       },
       {
         "rule": "technical.sample_rate_hz_matches_observed",
         "passed": true,
-        "evidence_hash": "bc1dd3c26ef5f4d97fbb41e653e93a09c940b53c75229594d82c928727134ca0"
+        "evidence_hash": "bc1dd3c26ef5f4d97fbb41e653e93a09c940b53c75229594d82c928727134ca0",
+        "declared": 8000,
+        "observed": 8000,
+        "source_pass": "WavMetadataPass"
       },
       {
         "rule": "technical.channels_matches_observed",
         "passed": true,
-        "evidence_hash": "bc1dd3c26ef5f4d97fbb41e653e93a09c940b53c75229594d82c928727134ca0"
+        "evidence_hash": "bc1dd3c26ef5f4d97fbb41e653e93a09c940b53c75229594d82c928727134ca0",
+        "declared": 1,
+        "observed": 1,
+        "source_pass": "WavMetadataPass"
       },
       {
         "rule": "technical.bit_depth_matches_observed",
         "passed": true,
-        "evidence_hash": "bc1dd3c26ef5f4d97fbb41e653e93a09c940b53c75229594d82c928727134ca0"
+        "evidence_hash": "bc1dd3c26ef5f4d97fbb41e653e93a09c940b53c75229594d82c928727134ca0",
+        "declared": 16,
+        "observed": 16,
+        "source_pass": "WavMetadataPass"
       },
       {
         "rule": "object_hash_bound",
@@ -651,57 +1040,328 @@
       {
         "rule": "technical.duration_seconds_matches_observed",
         "passed": true,
-        "evidence_hash": "746c90b6d8f6306ce93c347477103c16027d71a4072cf12d10a9f7246ce93d18"
+        "evidence_hash": "746c90b6d8f6306ce93c347477103c16027d71a4072cf12d10a9f7246ce93d18",
+        "declared": 0.5,
+        "observed": 0.5,
+        "source_pass": "WavMetadataPass"
       },
       {
         "rule": "technical.sample_rate_hz_matches_observed",
         "passed": true,
-        "evidence_hash": "746c90b6d8f6306ce93c347477103c16027d71a4072cf12d10a9f7246ce93d18"
+        "evidence_hash": "746c90b6d8f6306ce93c347477103c16027d71a4072cf12d10a9f7246ce93d18",
+        "declared": 8000,
+        "observed": 8000,
+        "source_pass": "WavMetadataPass"
       },
       {
         "rule": "technical.channels_matches_observed",
         "passed": true,
-        "evidence_hash": "746c90b6d8f6306ce93c347477103c16027d71a4072cf12d10a9f7246ce93d18"
+        "evidence_hash": "746c90b6d8f6306ce93c347477103c16027d71a4072cf12d10a9f7246ce93d18",
+        "declared": 1,
+        "observed": 1,
+        "source_pass": "WavMetadataPass"
       },
       {
         "rule": "technical.bit_depth_matches_observed",
         "passed": true,
-        "evidence_hash": "746c90b6d8f6306ce93c347477103c16027d71a4072cf12d10a9f7246ce93d18"
+        "evidence_hash": "746c90b6d8f6306ce93c347477103c16027d71a4072cf12d10a9f7246ce93d18",
+        "declared": 16,
+        "observed": 16,
+        "source_pass": "WavMetadataPass"
       }
     ],
-    "relationship_integrity": [
+    "structural_validity": [
       {
-        "rule": "relationship_endpoints_registered",
+        "rule": "graph_loaded_without_cycle",
+        "passed": true
+      },
+      {
+        "rule": "all_nodes_connected_to_final",
+        "passed": true
+      },
+      {
+        "rule": "declared_hash_references_resolve",
+        "passed": true
+      },
+      {
+        "rule": "relationship_endpoint_roles_registered",
         "passed": true,
         "source_hash": "7580f3a09b8a02bdfc6520235e92f6c8318dd3b52002b7eb8a430abc2c007dea",
         "target_hash": "6aacc6b93785fbbefb186285e5f9c9ce49a6ccc7c2af664fc2f2a21416001ea0",
         "relationship_type": "stemmed_from"
       },
       {
-        "rule": "relationship_endpoints_registered",
+        "rule": "relationship_endpoint_roles_registered",
         "passed": true,
         "source_hash": "6aacc6b93785fbbefb186285e5f9c9ce49a6ccc7c2af664fc2f2a21416001ea0",
         "target_hash": "bc1dd3c26ef5f4d97fbb41e653e93a09c940b53c75229594d82c928727134ca0",
         "relationship_type": "mixed_from"
       },
       {
-        "rule": "relationship_endpoints_registered",
+        "rule": "relationship_endpoint_roles_registered",
         "passed": true,
         "source_hash": "bc1dd3c26ef5f4d97fbb41e653e93a09c940b53c75229594d82c928727134ca0",
         "target_hash": "746c90b6d8f6306ce93c347477103c16027d71a4072cf12d10a9f7246ce93d18",
         "relationship_type": "mastered_from"
       }
     ],
-    "cross_evidence": [],
-    "audio_derivation": [
+    "relationship_integrity": [],
+    "integrity_layers": [
       {
-        "rule": "audio_linear_mix_derivation",
-        "target_hash": "bc1dd3c26ef5f4d97fbb41e653e93a09c940b53c75229594d82c928727134ca0",
+        "layer": "file_integrity",
+        "status": "corroborated",
+        "value": 1.0,
+        "contributes_to_integrity": true,
+        "check_count": 20,
+        "reason": "SHA-256 binding, cached WAV technical checks, and parser readability of submitted files.",
+        "manual_review_reasons": []
+      },
+      {
+        "layer": "structural_validity",
+        "status": "corroborated",
+        "value": 1.0,
+        "contributes_to_integrity": false,
+        "check_count": 6,
+        "reason": "Graph, references, cycles, connectivity, and endpoint roles passed before assessment; this is not content proof.",
+        "manual_review_reasons": []
+      },
+      {
+        "layer": "declaration_consistency",
+        "status": "unavailable",
+        "value": null,
+        "contributes_to_integrity": true,
+        "check_count": 0,
+        "reason": "Submitted relationship parameters compared with cached source and target media observations.",
+        "manual_review_reasons": []
+      },
+      {
+        "layer": "physical_similarity",
+        "status": "corroborated",
+        "value": 1.0,
+        "contributes_to_integrity": true,
+        "check_count": 3,
+        "reason": "Relationship-specific bounded comparisons share four statuses. Only clear corroboration and contradiction are scored; similarity does not prove provenance.",
+        "manual_review_reasons": []
+      },
+      {
+        "layer": "cross_evidence_support",
+        "status": "unavailable",
+        "value": null,
+        "contributes_to_integrity": true,
+        "check_count": 0,
+        "reason": "Independent parser outputs compared with graph, declarations, and media.",
+        "manual_review_reasons": []
+      },
+      {
+        "layer": "cryptographic_attestation",
+        "status": "unavailable",
+        "value": null,
+        "contributes_to_integrity": false,
+        "check_count": 0,
+        "reason": "C2PA remains in the separate attestation-strength axis and never inflates integrity.",
+        "manual_review_reasons": []
+      }
+    ],
+    "assessment_status_semantics": [
+      {
+        "status": "corroborated",
+        "meaning": "Independent evidence clearly supports content consistency, but does not prove provenance direction or authorship.",
+        "numeric_treatment": "1.0 in an eligible evidence layer."
+      },
+      {
+        "status": "contradicted",
+        "meaning": "An applicable assessed claim conflicts with observed evidence.",
+        "numeric_treatment": "0.0 in its eligible layer and emits a contradiction finding."
+      },
+      {
+        "status": "inconclusive",
+        "meaning": "The check ran, but the evidence did not reach either reliable endpoint.",
+        "numeric_treatment": "Excluded from the denominator and reported as a finding."
+      },
+      {
+        "status": "unavailable",
+        "meaning": "The check could not run, for example because a file, parameter, budget, or analysable signal was unavailable.",
+        "numeric_treatment": "Excluded from the denominator and never treated as zero."
+      }
+    ],
+    "cross_evidence": [],
+    "c2pa_attestation_records": [
+      {
+        "scope": "supporting",
+        "source_kind": "embedded",
+        "manifest_container_hash": "7580f3a09b8a02bdfc6520235e92f6c8318dd3b52002b7eb8a430abc2c007dea",
+        "asset_hash": "7580f3a09b8a02bdfc6520235e92f6c8318dd3b52002b7eb8a430abc2c007dea",
+        "binding_relationship": null,
+        "sdk_available": false,
+        "reader_succeeded": false,
+        "manifest_present": false,
+        "signature_present": false,
+        "validation_state": "sdk_unavailable",
+        "validation_codes": []
+      },
+      {
+        "scope": "supporting",
+        "source_kind": "embedded",
+        "manifest_container_hash": "6aacc6b93785fbbefb186285e5f9c9ce49a6ccc7c2af664fc2f2a21416001ea0",
+        "asset_hash": "6aacc6b93785fbbefb186285e5f9c9ce49a6ccc7c2af664fc2f2a21416001ea0",
+        "binding_relationship": null,
+        "sdk_available": false,
+        "reader_succeeded": false,
+        "manifest_present": false,
+        "signature_present": false,
+        "validation_state": "sdk_unavailable",
+        "validation_codes": []
+      },
+      {
+        "scope": "supporting",
+        "source_kind": "embedded",
+        "manifest_container_hash": "bc1dd3c26ef5f4d97fbb41e653e93a09c940b53c75229594d82c928727134ca0",
+        "asset_hash": "bc1dd3c26ef5f4d97fbb41e653e93a09c940b53c75229594d82c928727134ca0",
+        "binding_relationship": null,
+        "sdk_available": false,
+        "reader_succeeded": false,
+        "manifest_present": false,
+        "signature_present": false,
+        "validation_state": "sdk_unavailable",
+        "validation_codes": []
+      },
+      {
+        "scope": "final",
+        "source_kind": "embedded",
+        "manifest_container_hash": "746c90b6d8f6306ce93c347477103c16027d71a4072cf12d10a9f7246ce93d18",
+        "asset_hash": "746c90b6d8f6306ce93c347477103c16027d71a4072cf12d10a9f7246ce93d18",
+        "binding_relationship": null,
+        "sdk_available": false,
+        "reader_succeeded": false,
+        "manifest_present": false,
+        "signature_present": false,
+        "validation_state": "sdk_unavailable",
+        "validation_codes": []
+      }
+    ],
+    "physical_similarity": [
+      {
+        "relationship_type": "stemmed_from",
+        "comparison_mode": "multi_source_contribution",
+        "source_hashes": [
+          "7580f3a09b8a02bdfc6520235e92f6c8318dd3b52002b7eb8a430abc2c007dea"
+        ],
+        "target_hash": "6aacc6b93785fbbefb186285e5f9c9ce49a6ccc7c2af664fc2f2a21416001ea0",
+        "status": "corroborated",
+        "integrity_contribution": 1.0,
+        "similarity_score": null,
+        "parameter_source": "signal_estimated_diagnostic",
+        "declared_ranges_used": false,
+        "analysis_complete": true,
+        "metrics": {
+          "estimated_gain": 0.699861,
+          "gain_stability": 0.999243,
+          "full_model_normalized_rmse": 0.001914,
+          "leave_one_out_normalized_rmse": 1.0,
+          "unique_residual_delta": 0.998086,
+          "analysis_proxy_sample_rate_hz": 2000.0,
+          "joint_residual": {
+            "normalized_rmse": 0.000168,
+            "correlation": 1.0,
+            "peak_amplitude": 0.021323,
+            "clipping_fraction": 0.0,
+            "analysis_proxy_sample_rate_hz": 2000.0,
+            "analysis_sample_rate_hz": 1000,
+            "window_normalized_rmse": [
+              0.000168,
+              0.000168
+            ]
+          }
+        },
+        "threshold_policy": "multi_source_contribution-v1",
+        "content_match_is_provenance": false,
+        "reason": "Removing this source materially increases reconstruction residual.",
+        "joint_model_status": "corroborated"
+      },
+      {
+        "relationship_type": "mixed_from",
+        "comparison_mode": "multi_source_contribution",
         "source_hashes": [
           "6aacc6b93785fbbefb186285e5f9c9ce49a6ccc7c2af664fc2f2a21416001ea0"
         ],
-        "status": "not_applicable",
-        "reason": "Every mixed_from edge must explicitly declare derivation_scope=linear_mix."
+        "target_hash": "bc1dd3c26ef5f4d97fbb41e653e93a09c940b53c75229594d82c928727134ca0",
+        "status": "corroborated",
+        "integrity_contribution": 1.0,
+        "similarity_score": null,
+        "parameter_source": "signal_estimated_diagnostic",
+        "declared_ranges_used": false,
+        "analysis_complete": true,
+        "metrics": {
+          "estimated_gain": 0.857264,
+          "gain_stability": 0.998827,
+          "full_model_normalized_rmse": 0.00293,
+          "leave_one_out_normalized_rmse": 1.0,
+          "unique_residual_delta": 0.99707,
+          "analysis_proxy_sample_rate_hz": 2000.0,
+          "joint_residual": {
+            "normalized_rmse": 0.00026,
+            "correlation": 1.0,
+            "peak_amplitude": 0.018271,
+            "clipping_fraction": 0.0,
+            "analysis_proxy_sample_rate_hz": 2000.0,
+            "analysis_sample_rate_hz": 1000,
+            "window_normalized_rmse": [
+              0.00026,
+              0.00026
+            ]
+          }
+        },
+        "threshold_policy": "multi_source_contribution-v1",
+        "content_match_is_provenance": false,
+        "reason": "Removing this source materially increases reconstruction residual.",
+        "joint_model_status": "corroborated"
+      },
+      {
+        "relationship_type": "mastered_from",
+        "comparison_mode": "master_continuity",
+        "source_hashes": [
+          "bc1dd3c26ef5f4d97fbb41e653e93a09c940b53c75229594d82c928727134ca0"
+        ],
+        "target_hash": "746c90b6d8f6306ce93c347477103c16027d71a4072cf12d10a9f7246ce93d18",
+        "status": "corroborated",
+        "integrity_contribution": 1.0,
+        "similarity_score": 0.620965,
+        "parameter_source": "signal_estimated_diagnostic",
+        "declared_ranges_used": false,
+        "analysis_complete": true,
+        "metrics": {
+          "waveform_correlation": 0.999971,
+          "landmark_similarity": 0.78736,
+          "dtw_similarity": 0.615875,
+          "envelope_correlation": 0.0,
+          "robust_similarity": 0.620965,
+          "analysis_proxy_sample_rate_hz": 2000.0
+        },
+        "threshold_policy": "master_continuity-v1",
+        "content_match_is_provenance": false,
+        "reason": "High waveform continuity supports the declared master relationship despite changes in other features."
+      }
+    ],
+    "physical_similarity_summary": [
+      {
+        "status": "corroborated",
+        "value": 1.0,
+        "counts": {
+          "corroborated": 3,
+          "contradicted": 0,
+          "inconclusive": 0,
+          "unavailable": 0
+        },
+        "declared_relationships": 3,
+        "scored_relationships": 3,
+        "assessed_targets": 3,
+        "target_values": {
+          "6aacc6b93785fbbefb186285e5f9c9ce49a6ccc7c2af664fc2f2a21416001ea0": 1.0,
+          "746c90b6d8f6306ce93c347477103c16027d71a4072cf12d10a9f7246ce93d18": 1.0,
+          "bc1dd3c26ef5f4d97fbb41e653e93a09c940b53c75229594d82c928727134ca0": 1.0
+        },
+        "scoring_policy": "Only corroborated (1) and contradicted (0) relationships are scored. Inconclusive and unavailable relationships are excluded. Relationships are averaged within each target before targets are averaged.",
+        "content_match_is_provenance": false
       }
     ]
   }

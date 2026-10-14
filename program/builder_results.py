@@ -31,6 +31,17 @@ LAYER_STATUSES = {
     "not_applicable": "hide",
 }
 
+AUDIO_DIAGNOSTIC_STATUSES = {
+    "matched": "success",
+    "corroborated": "supportive",
+    "clear": "success",
+    "contradicted": "issue",
+    "not_supported": "issue",
+    "suspected_decoy": "issue",
+    "unavailable": "unassessed",
+    "not_applicable": "hide",
+}
+
 PARSER_STATUSES = {
     "parsed": "success",
     "partial": "unassessed",
@@ -49,11 +60,25 @@ CHECK_COLLECTIONS = {
     "audio_derivation": DERIVATION_STATUSES,
     "master_derivation": DERIVATION_STATUSES,
     "integrity_layers": LAYER_STATUSES,
+    "audio_alignment": AUDIO_DIAGNOSTIC_STATUSES,
+    "source_contribution": AUDIO_DIAGNOSTIC_STATUSES,
+    "comp_verification": AUDIO_DIAGNOSTIC_STATUSES,
+    "processed_audio_match": AUDIO_DIAGNOSTIC_STATUSES,
+    "stem_mix_residual": AUDIO_DIAGNOSTIC_STATUSES,
+    "excerpted_from": AUDIO_DIAGNOSTIC_STATUSES,
+    "decoy_source": AUDIO_DIAGNOSTIC_STATUSES,
 }
 
 ATTENTION_FINDINGS = {
     "MISSING_OBJECT": ("Missing file", "Locate the original file; confirm its SHA-256 matches the manifest."),
     "PARSER_FAILED": ("Invalid evidence", "Replace or repair the file so its declared format can be parsed."),
+    "WAV_PARSER_FAILED": ("Audio not assessed", "Replace or repair this audio with a supported integer-PCM WAV file."),
+    "CROSS_EVIDENCE_CHECK_UNAVAILABLE": ("Cross-evidence check not assessed", "Provide the supported source fields or bindings needed to compare this evidence."),
+    "UNKNOWN_ARTEFACT_TYPE_SKIPPED": ("Evidence not assessed", "Choose a supported artefact type; the evaluator did not infer a type for this file."),
+    "UNKNOWN_RELATIONSHIP_TYPE_SKIPPED": ("Relationship not assessed", "Choose a supported relationship type; the evaluator did not infer the submitted relationship."),
+    "RELATIONSHIP_SKIPPED_QUARANTINED_ENDPOINT": ("Relationship not assessed", "Correct the unsupported endpoint type, then rerun evaluation."),
+    "RELATIONSHIP_ENDPOINTS_SKIPPED": ("Relationship not assessed", "Choose a registered relationship whose source and target roles match these files."),
+    "PARTIAL_INPUT_COVERAGE": ("Assessment incomplete", "Correct or replace skipped input types and relationships, then rerun the assessment."),
     "C2PA_READ_FAILED": ("Attestation not assessed", "Check the C2PA file and provide a readable supported manifest if attestation is required."),
     "C2PA_PARSER_UNAVAILABLE": ("Attestation not assessed", "Install the optional C2PA verification dependency if this check is needed."),
     "AI_DISCLOSURE_MISSING": ("Missing declaration", "Declare the creation method for each relevant audio artefact."),
@@ -73,8 +98,15 @@ def _hash_label(digest, names):
 def _affected(item, names):
     source = item.get("source_hash")
     target = item.get("target_hash")
-    if source or target:
+    sources = item.get("source_hashes") or []
+    if source and target:
         return f"{_hash_label(source, names)} → {_hash_label(target, names)}"
+    if target and sources:
+        return f"{', '.join(_hash_label(digest, names) for digest in sources)} → {_hash_label(target, names)}"
+    if target:
+        return _hash_label(target, names)
+    if source:
+        return _hash_label(source, names)
     digest = next((item.get(key) for key in (
         "evidence_hash", "asset_hash", "audio_hash", "owner_hash", "target_hash",
         "source_hash") if item.get(key)), None)
@@ -106,8 +138,29 @@ def _suggestion_for_check(collection, item, status):
                 "evidence supported by this content check.")
     if collection == "integrity_layers":
         return "Provide the applicable files or independent evidence needed for this layer to be assessed."
+    if collection in {
+            "audio_alignment", "source_contribution", "comp_verification",
+            "processed_audio_match", "stem_mix_residual", "mastering_derivation",
+            "excerpted_from", "decoy_source"}:
+        if status == "unassessed":
+            return ("Provide readable source and target audio and complete declared ranges; "
+                    "if the resource budget was reached, reduce the audio workload and retry.")
+        return ("Review the declared source, target, and transformation details against the "
+                "reported signal mismatch; signal similarity alone does not prove provenance.")
     return ("Check the related evidence and correct or add the information required "
             "for this check.")
+
+
+def _check_explanation(item):
+    explanation = (item.get("reason") or item.get("explanation")
+                   or item.get("rule", "The check needs attention."))
+    regions = item.get("local_mismatch_regions") or []
+    if regions:
+        intervals = ", ".join(
+            f"{region['start_seconds']:.2f}–{region['end_seconds']:.2f} s"
+            for region in regions)
+        explanation = f"{explanation} Affected intervals: {intervals}."
+    return explanation
 
 
 def _workflow_suggestion(result, rule):
@@ -222,7 +275,8 @@ def attention_items(response, file_names=None, policy_rules=None):
                     disposition = "hide"
             elif collection in ("bound_file_integrity", "structural_validity",
                                 "relationship_integrity", "cross_evidence"):
-                disposition = mapping.get(item.get("passed"), "unknown")
+                disposition = ("unassessed" if item.get("status") == "unavailable"
+                               else mapping.get(item.get("passed"), "unknown"))
                 if (collection == "bound_file_integrity"
                         and item.get("rule") == "declared_type_parser_succeeds"
                         and item.get("passed") is False):
@@ -237,12 +291,10 @@ def attention_items(response, file_names=None, policy_rules=None):
                 title = "Check not assessed"
             else:
                 title = f"Needs review ({item.get('status', item.get('passed', 'unknown'))})"
-            explanation = (item.get("reason") or item.get("explanation")
-                           or item.get("rule", "The check needs attention."))
             issues.append({
                 "status": title,
                 "affected": _affected(item, names),
-                "explanation": explanation,
+                "explanation": _check_explanation(item),
                 "suggestion": _suggestion_for_check(collection, item, disposition),
             })
 
@@ -253,6 +305,10 @@ def attention_items(response, file_names=None, policy_rules=None):
         "CROSS_EVIDENCE_CONTRADICTION",
         "AUDIO_DERIVATION_CONTRADICTION",
         "TECHNICAL_CLAIM_MISMATCH",
+        "PHYSICAL_AUDIO_CONTRADICTION",
+        "DECLARED_SOURCE_NOT_SUPPORTED",
+        "DECOY_SOURCE_SUSPECTED",
+        "CROSS_EVIDENCE_CHECK_UNAVAILABLE",
     }
     findings = response.get("findings", [])
     failed_parser_hashes = {

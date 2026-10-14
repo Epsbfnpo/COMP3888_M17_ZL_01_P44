@@ -5,8 +5,8 @@
   "asset_sha256": "d126d616641d42ac8b0a07ec302c9fa1ec049f86200931a0a60c8f3080284b77",
   "system": {
     "name": "COMP3888-music-baseline",
-    "version": "0.4.0",
-    "source_revision": "sha256:2e10eec544e85dd907692a0296d89eb2549e0d9d4cddc7e16d3da6f0df710d13"
+    "version": "0.5.0",
+    "source_revision": "sha256:83b6bee2b8104d7036749317c7e6900f8c8f904eede2d427097b075edc2f131c"
   },
   "execution_status": "unsupported",
   "axes": {
@@ -48,13 +48,13 @@
     {
       "code": "UNSUPPORTED_INPUT",
       "severity": "info",
-      "message": "This target evaluates WAV audio only; PNG/MP4 are unsupported."
+      "message": "The final artefact has unregistered type 'image/png'; no evaluation root can be formed."
     }
   ],
-  "processing_ms": 177.25424999980532,
+  "processing_ms": 195.2603330137208,
   "resource_usage": {
-    "cpu_ms": 1.6710000000000058,
+    "cpu_ms": 0.5150000000000154,
     "peak_rss_kib": null
   },
-  "error": "This target evaluates WAV audio only; PNG/MP4 are unsupported."
+  "error": "The final artefact has unregistered type 'image/png'; no evaluation root can be formed."
 }

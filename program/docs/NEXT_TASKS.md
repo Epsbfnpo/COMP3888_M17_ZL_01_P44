@@ -1,12 +1,19 @@
 # Future Work
 
-Updated: 2026-10-03
+Updated: 2026-10-14
 
 This file is the current consolidated roadmap for `v3/program`. It replaces the
 shorter v0.4 task list and incorporates unresolved work from the legacy v3
 prototype. The implemented baseline already includes workflow completeness,
-MIDI/RIN/ERN/C2PA/CompSheet/CueSheet parsing, CrossEvidence, and scoped Edit,
-Comp, Stem, Mix, and Master content checks.
+MIDI/RIN/ERN/C2PA/CompSheet/CueSheet parsing and CrossEvidence. The active audio
+content path is now one `PhysicalSimilarityPass`: relationship types select a
+bounded comparison mode, while all relationships share a four-state output and
+endpoint-only scoring policy. Exact reconstruction passes are deprecated and no
+longer executed or reported. The retained signal measurements still need
+calibration against licensed real production material. The implemented v1
+measurements and provisional endpoints are recorded in
+[`PHYSICAL_SIMILARITY.md`](PHYSICAL_SIMILARITY.md); that technical reference
+must be updated whenever a threshold policy changes.
 
 ## Scope principles
 
@@ -26,30 +33,26 @@ Comp, Stem, Mix, and Master content checks.
    masters, and documented processing choices. Include honest-positive,
    incomplete, contradictory, and adversarial submissions.
 
-2. Build a false-positive regression corpus for content derivation. It must
+2. Build a false-positive regression corpus for physical similarity. It must
    include repeated loops, identical copied regions, same-tempo/same-key but
    unrelated music, duplicate or highly correlated sources, source-separated
    stems reconstructed from a final mix, short partial matches, shuffled stems,
    phase inversion, silence, clipping, and AI-generated process evidence.
 
-3. Calibrate the hardened Edit, Comp, Stem, and Mix checks with real labelled
-   audio. Checks now require submitter-declared ranges and gains and never fit
-   missing transformation parameters. Partitioned validation, coverage
-   reporting, correlated-source detection, source-identifiability checks,
-   repeated-segment ambiguity, and provenance disclaimers are implemented;
-   their thresholds still require real-world false-positive/false-negative
-   measurement.
+3. Calibrate each comparison mode with real labelled audio: pairwise continuity,
+   excerpt search, CompSheet selection timeline, multi-source contribution, and
+   master continuity. Measure the two endpoint thresholds separately and verify
+   that uncertain transformations reliably remain `inconclusive`.
 
-4. Calibrate the hardened Master continuity assessment with real mastered
-   material. Master assessment now uses declared source/target ranges; competing
-   locations may expose ambiguity but are never substituted for the declared
-   alignment. Coverage, manual-review reasons, and `corroborated` separation are implemented. Expand labelled tests
-   for stronger EQ, compression, limiting, dither, fades, silence insertion,
-   clipping, and sample-rate conversion.
+4. Calibrate master continuity with real mastered material. Expand labelled
+   tests for stronger EQ, compression, limiting, dither, fades, silence
+   insertion, clipping, and sample-rate conversion. Confirm that ordinary
+   mastering remains corroborated or inconclusive, while only clearly unrelated
+   content reaches contradicted.
 
 5. Calibrate the separated integrity layers with labelled data and client input.
-   File integrity, structural validity, declaration consistency, content
-   reconstruction, CrossEvidence, and cryptographic attestation are now visible
+   File integrity, structural validity, declaration consistency, physical
+   similarity, CrossEvidence, and cryptographic attestation are now visible
    separately; structural validity and cryptographic attestation do not inflate
    integrity. Confirm the remaining score-eligible layer weights and confidence
    model without adding an overall decision policy.
@@ -81,13 +84,14 @@ Comp, Stem, Mix, and Master content checks.
     plus `objects/`. The CLI should explain which required evidence is missing
     before evaluation.
 
-11. Add explicit manual-review output without introducing a decision policy.
-    Report machine-readable review reasons for ambiguous alignment, insufficient
-    coverage, parser limitations, unsupported processing, conflicting evidence,
-    custom workflows, and unavailable cryptographic validation.
+11. Refine the explicit manual-review output without introducing a decision
+    policy. `inconclusive` and `unavailable` physical results already emit
+    machine-readable findings; consolidate repeated reasons and confirm the UI
+    wording with the client.
 
-12. Complete positive, missing, `not_assessed`, `not_applicable`, contradiction,
-    and parser-failure end-to-end cases for all 16 workflows and their modifiers.
+12. Complete `corroborated`, `contradicted`, `inconclusive`, `unavailable`,
+    missing, `not_assessed`, and parser-failure end-to-end cases for all 16
+    workflows and their modifiers.
     Confirm required/conditional/optional classifications and weights with the
     client.
 
@@ -114,14 +118,15 @@ Comp, Stem, Mix, and Master content checks.
     other team's runner after the contract is agreed.
 
 17. Produce a user-facing final report that shows the four dimensions,
-    per-expectation workflow results, relationship evidence levels, content-test
-    coverage, contradictions, unavailable checks, and manual-review reasons. Do
+    per-expectation workflow results, relationship evidence levels, physical
+    similarity status counts, per-target values, contradictions, unavailable
+    checks, and manual-review reasons. Do
     not collapse these into an unexplained overall score.
 
 18. Synchronise examples, README, handoff documentation, schemas, release
     version, source revision, verification report, and test counts after each
-    release. The current release records must be regenerated after the new
-    derivation suite.
+    release. The current release records must be regenerated after the unified
+    physical-similarity change.
 
 ## P2: Engineering quality and broader media support
 
@@ -129,18 +134,30 @@ Comp, Stem, Mix, and Master content checks.
     validation, dependency vulnerability checks, linting, and release artefact
     generation. Test supported Python versions and target platforms.
 
-20. Add performance and resource tests for long audio, large bundles, many
-    relationships, high channel counts, and worst-case alignment inputs. Review
-    the current 60-second analysis cap, 16-source limit, and file-size limits
-    using measured runtime and memory data.
+20. Expand performance and resource tests for large bundles, many
+    relationships, high channel counts, and worst-case FFT alignment inputs.
+    Full-file exploratory search now uses cached low-rate NumPy proxies, so
+    there is no fixed 60-second search window. Calibrate the weighted work limit,
+    128 MiB active-window limit,
+    256 MiB proxy-cache limit and 16-source limit against the caller-supplied
+    wall-clock timeout (current CSEC samples request 60 seconds) on every
+    supported platform. File-size limits are fixed at 512 MiB per object and
+    1 GiB per request; hashing time is not yet counted in the work budget.
+
+20a. Completed: isolated non-final objects (hash mismatch, size limit, invalid
+    path, hash or path format errors) are not assessed in
+    `BoundFileIntegrityPass` (`object_hash_bound` with `passed: null`), so an
+    input error does not lower the file-integrity layer.
 
 21. Expand malicious-input tests for WAV chunk abuse, XML bombs, hostile PDFs,
     malformed MIDI, symlink/path attacks, oversized JSON, hash collisions in
     mappings, parser timeouts, and denial-of-service patterns.
 
-22. Prioritise FLAC, AIFF, BWF, RF64, floating-point WAV, and other formats from
-    actual client submissions. Define conversion and resampling rules without
-    hiding transformations from the report.
+22. Prioritise FLAC, AIFF, RF64/BW64, compressed WAV codecs, and other formats
+    from actual client submissions. Integer/float RIFF/WAVE and matching
+    EXTENSIBLE SubFormats now share a streaming decoder. Define future
+    conversion and resampling rules without hiding transformations from the
+    report.
 
 23. Expand CompSheet and CueSheet aliases, frame/timecode formats, validation,
     and crossfade fields. Add scanned-document OCR only if client data shows it

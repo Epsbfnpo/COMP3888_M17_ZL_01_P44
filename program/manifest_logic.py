@@ -23,9 +23,9 @@ HASH_METHOD = "sha256"
 PROFILE = "music-native-v0.1"
 
 MAX_NODES = 128
-MAX_FILE_BYTES = 64 * 1024 * 1024      # engine.py
-MAX_TOTAL_BYTES = 256 * 1024 * 1024    # engine.py
-MAX_ANALYSIS_SECONDS = 60              # audio_derivation.py
+MAX_FILE_BYTES = 32 * 1024 * 1024      # music_target/engine.py
+MAX_TOTAL_BYTES = 128 * 1024 * 1024    # music_target/engine.py
+MAX_SUGGESTED_RANGE_SECONDS = 60       # UI convenience only; evaluator can stream full ranges.
 
 AUDIO_TYPES = (
     "audio/raw-take", "audio/raw-track", "audio/edited-take", "audio/stem",
@@ -102,43 +102,20 @@ def wav_technical(path) -> dict:
 
 
 def object_rel_path(entry: dict) -> str:
-    filename = Path(entry["path"]).name if entry.get("path") else f"{entry['hash']}.wav"
-    return f"objects/{filename}"
+    suffix = Path(entry["path"]).suffix.lower() if entry.get("path") else ".wav"
+    if not re.fullmatch(r"\.[a-z0-9]{1,8}", suffix):
+        suffix = ".wav"
+    return f"objects/{entry['hash']}{suffix}"
 
 
 def copied_object_paths(files: list[dict]) -> dict[str, str]:
-    """Map hashes to readable original filenames, resolving selected-file collisions."""
-    names = {}
+    """Map each hash to a content-addressed path accepted by the evaluator."""
+    result = {}
     for entry in files:
         digest = entry["hash"]
-        if digest in names:
+        if digest in result:
             continue
-        names[digest] = (Path(entry["path"]).name if entry.get("path")
-                         else f"{digest}.wav")
-
-    counts = {}
-    for name in names.values():
-        counts[name.casefold()] = counts.get(name.casefold(), 0) + 1
-
-    reserved = {name.casefold() for name in names.values()}
-    used = set()
-    result = {}
-    for digest, original in sorted(names.items(), key=lambda item: (item[1].casefold(), item[0])):
-        path = Path(original)
-        stem, suffix = path.stem, path.suffix
-        candidate = original
-        if counts[original.casefold()] > 1 or candidate.casefold() in used:
-            for digits in range(8, 65, 4):
-                candidate = f"{stem} ({digest[:digits]}){suffix}"
-                if candidate.casefold() not in used and (
-                        candidate.casefold() not in reserved or candidate == original):
-                    break
-            else:
-                raise ValueError(f"Could not create a unique portable name for {original!r}.")
-        if Path(candidate).name != candidate or candidate in ("", ".", ".."):
-            raise ValueError(f"Unsafe original filename: {original!r}")
-        used.add(candidate.casefold())
-        result[digest] = f"objects/{candidate}"
+        result[digest] = object_rel_path(entry)
     return result
 
 
@@ -260,11 +237,6 @@ def relationship_issues(rel, target, source):
         if abs((se - ss) - (te - ts)) > tol:
             warnings.append(f"{rtype}: source and target ranges differ in length "
                             "(no time-stretch model; the content check will fail)")
-    if rtype in LINEAR_TYPES and any(v is not None and v > MAX_ANALYSIS_SECONDS
-                                     for v in (se, te)):
-        warnings.append(f"{rtype}: only the first {MAX_ANALYSIS_SECONDS} s of audio "
-                        "is analysed; later ranges cannot be checked")
-
     s_tech, t_tech = source.get("technical") or {}, target.get("technical") or {}
     if se is not None and s_tech.get("duration_seconds") is not None \
             and se > s_tech["duration_seconds"]:

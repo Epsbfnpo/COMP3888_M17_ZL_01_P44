@@ -98,3 +98,71 @@ class AttentionDisplayTests(unittest.TestCase):
             {"rule": "valid", "passed": True},
         ]}}
         self.assertEqual(attention_items(response), [])
+
+    def test_latest_main_audio_diagnostics_show_only_issues_and_unassessed_checks(self):
+        response = {"assessment_checks": {
+            "audio_alignment": [
+                {"status": "corroborated", "target_hash": "b" * 64,
+                 "source_hashes": ["a" * 64], "reason": "Alignment supported."},
+                {"status": "unavailable", "target_hash": "c" * 64,
+                 "reason": "Resource budget exhausted."},
+            ],
+            "comp_verification": [
+                {"status": "contradicted", "target_hash": "d" * 64,
+                 "source_hashes": ["e" * 64], "reason": "Declared comp does not match.",
+                 "local_mismatch_regions": [
+                     {"start_seconds": 4.25, "end_seconds": 4.75},
+                 ]},
+                {"status": "not_applicable", "target_hash": "f" * 64,
+                 "reason": "Not a comp."},
+            ],
+            "decoy_source": [
+                {"status": "clear", "target_hash": "1" * 64, "reason": "No decoy."},
+                {"status": "suspected_decoy", "target_hash": "2" * 64,
+                 "source_hash": "3" * 64, "reason": "Source has no measured contribution."},
+            ],
+            "cross_evidence": [
+                {"rule": "binding", "passed": None, "status": "unavailable",
+                 "evidence_hash": "4" * 64, "reason": "Binding absent."},
+            ],
+        }}
+        names = {
+            "a" * 64: "source.wav", "b" * 64: "aligned.wav",
+            "c" * 64: "unknown.wav", "d" * 64: "comp.wav",
+            "e" * 64: "take.wav", "2" * 64: "final.wav",
+            "3" * 64: "unused.wav", "4" * 64: "metadata.xml",
+        }
+        issues = attention_items(response, names)
+        self.assertEqual(len(issues), 4)
+        explanations = [item["explanation"] for item in issues]
+        self.assertTrue(any(item.startswith("Declared comp does not match.")
+                            for item in explanations))
+        self.assertTrue(any(item == "Resource budget exhausted." for item in explanations))
+        self.assertTrue(any(item == "Source has no measured contribution."
+                            for item in explanations))
+        self.assertTrue(any(item == "Binding absent." for item in explanations))
+        self.assertTrue(all(item["suggestion"] for item in issues))
+        self.assertTrue(any("take.wav → comp.wav" == item["affected"] for item in issues))
+        self.assertTrue(any("4.25–4.75 s" in item["explanation"] for item in issues))
+
+    def test_latest_main_quarantined_inputs_are_reported_as_unassessed(self):
+        response = {"findings": [
+            {"code": "UNKNOWN_ARTEFACT_TYPE_SKIPPED",
+             "evidence_hash": "a" * 64,
+             "message": "Unknown file type was skipped."},
+            {"code": "UNKNOWN_RELATIONSHIP_TYPE_SKIPPED",
+             "source_hash": "a" * 64, "target_hash": "b" * 64,
+             "message": "Unknown relationship was skipped."},
+            {"code": "RELATIONSHIP_ENDPOINTS_SKIPPED",
+             "source_hash": "a" * 64, "target_hash": "b" * 64,
+             "message": "Relationship endpoints were skipped."},
+            {"code": "PARTIAL_INPUT_COVERAGE",
+             "message": "Some submitted inputs were not evaluated."},
+        ]}
+        issues = attention_items(response, {
+            "a" * 64: "source.wav", "b" * 64: "master.wav"})
+        self.assertEqual(len(issues), 4)
+        self.assertTrue(all("not assessed" in issue["status"].lower()
+                            or "incomplete" in issue["status"].lower()
+                            for issue in issues))
+        self.assertTrue(all(issue["suggestion"] for issue in issues))

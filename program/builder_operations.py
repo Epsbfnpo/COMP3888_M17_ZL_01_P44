@@ -179,9 +179,10 @@ def export_bundle(manifest: dict, files: list[dict], target: Path, copy_files: b
 
 def _suffixed_object_path(relative: Path, digest: str, target_root: Path,
                           cancel: Event) -> Path:
-    for digits in range(8, 65, 4):
-        candidate = relative.with_name(
-            f"{relative.stem} ({digest[:digits]}){relative.suffix}")
+    extension = relative.suffix[1:]
+    for index in range(1, 1_000_000):
+        suffix = f"{extension[:8 - len(str(index))]}{index}"
+        candidate = relative.with_suffix(f".{suffix}")
         if candidate == relative:
             continue
         destination = (target_root / candidate).resolve()
