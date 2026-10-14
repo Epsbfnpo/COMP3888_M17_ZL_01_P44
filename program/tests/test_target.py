@@ -8,6 +8,7 @@ import sys
 import shutil
 import tempfile
 import time
+import types
 import unittest
 import wave
 from pathlib import Path
@@ -31,6 +32,12 @@ from music_target.assessment_passes import (
     C2PAAttestationPass,
     ExpandedCrossEvidencePass,
     _summarize_physical_similarity,
+    assess_axes,
+)
+from music_target.scoring_profile import (
+    ScoringProfileError,
+    load_default_scoring_profile,
+    load_scoring_profile,
 )
 from music_target.physical_audio_passes import PhysicalSimilarityPass
 from music_target.audio_derivation import (
@@ -1539,6 +1546,108 @@ class TargetTests(unittest.TestCase):
                          len(result["assessment_checks"]["physical_similarity"]))
         self.assert_physical_similarity_disabled(result)
 
+    def test_integrity_layers_carry_default_profile_weights(self):
+        result = self.score()
+        layers = {item["layer"]: item for item in
+                  result["assessment_checks"]["integrity_layers"]}
+        for name in ("file_integrity", "declaration_consistency", "cross_evidence_support"):
+            self.assertEqual(layers[name]["weight"], 1.0)
+        for name in ("structural_validity", "physical_similarity", "cryptographic_attestation"):
+            self.assertIsNone(layers[name]["weight"])
+        profile = result["assessment_checks"]["scoring_profile"][0]
+        self.assertEqual(profile, {"profile_id": "default-v1", "profile_version": 1})
+
+    def test_default_scoring_profile_reproduces_plain_average(self):
+        final_hash = "a" * 64
+        native = {"artefacts": [{"artefact_hash": final_hash, "artefact_type": "audio/final",
+                                 "attributes": {}, "evidence": []}],
+                  "final_artefact_hash": final_hash}
+        wav_observations = {final_hash: {"checks": [
+            {"rule": "technical.sample_rate_hz_matches_observed", "passed": False,
+             "evidence_hash": final_hash},
+        ]}}
+        parser_observations = {"b" * 64: {"parser": "rin",
+                                          "data": {"contributors": [{"name": "Jane Doe"}]}}}
+        workflow_input = {"declarations": {"contributors": ["Jane Doe"]}}
+        chain = types.SimpleNamespace(artefacts={final_hash: types.SimpleNamespace()})
+
+        default_integrity, *_ = assess_axes(
+            native, chain, {final_hash}, set(), wav_observations, [],
+            parser_observations, workflow_input)
+        # file_integrity: 1 of 2 checks passes (0.5); cross_evidence_support:
+        # the one rin-overlap check passes (1.0); declaration_consistency has
+        # no checks and stays unavailable. Equal default weights reproduce
+        # the plain mean of the two populated layers.
+        self.assertAlmostEqual(default_integrity["value"], (0.5 + 1.0) / 2)
+
+        skewed_profile = {
+            "profile_id": "test-skewed", "profile_version": 1,
+            "integrity": {
+                "layer_weights": {"file_integrity": 3.0, "declaration_consistency": 1.0,
+                                  "cross_evidence_support": 1.0},
+                "withholding_rule": {"min_components_for_substantive_mean": 2,
+                                    "require_substantive_support_or_contradiction": True},
+                "confidence_formula": {"ceiling": 0.8, "denominator_layers": 3},
+            },
+        }
+        skewed_integrity, *_ = assess_axes(
+            native, chain, {final_hash}, set(), wav_observations, [],
+            parser_observations, workflow_input, scoring_profile=skewed_profile)
+        # Weighting file_integrity's 0.5 three times as heavily as
+        # cross_evidence_support's 1.0 pulls the weighted mean down from the
+        # plain average -- proving the profile's weights actually drive the
+        # computation rather than being reported but unused.
+        self.assertAlmostEqual(skewed_integrity["value"], (0.5 * 3 + 1.0 * 1) / 4)
+        self.assertLess(skewed_integrity["value"], default_integrity["value"])
+
+    def test_severe_contradiction_caps_the_weighted_mean(self):
+        final_hash = "a" * 64
+        native = {"artefacts": [{"artefact_hash": final_hash, "artefact_type": "audio/final",
+                                 "attributes": {}, "evidence": []}],
+                  "final_artefact_hash": final_hash}
+        # The WAV technical check passes, but object_hash_bound fails because
+        # final_hash is deliberately left out of bound_hashes below -- a
+        # severe, exact-identity contradiction, not a fuzzy measurement.
+        wav_observations = {final_hash: {"checks": [
+            {"rule": "technical.sample_rate_hz_matches_observed", "passed": True,
+             "evidence_hash": final_hash},
+        ]}}
+        parser_observations = {"b" * 64: {"parser": "rin",
+                                          "data": {"contributors": [{"name": "Jane Doe"}]}}}
+        workflow_input = {"declarations": {"contributors": ["Jane Doe"]}}
+        chain = types.SimpleNamespace(artefacts={final_hash: types.SimpleNamespace()})
+
+        integrity, *_ = assess_axes(
+            native, chain, set(), set(), wav_observations, [],
+            parser_observations, workflow_input)
+        # file_integrity = 0.5 (1 of 2 checks), cross_evidence_support = 1.0;
+        # the plain weighted mean would be 0.75, but object_hash_bound is on
+        # the default profile's severe list, so it is capped at 0.25 instead.
+        self.assertAlmostEqual(integrity["value"], 0.25)
+
+    def test_severe_contradiction_cap_does_not_raise_an_already_low_value(self):
+        final_hash = "a" * 64
+        native = {"artefacts": [{"artefact_hash": final_hash, "artefact_type": "audio/final",
+                                 "attributes": {}, "evidence": []}],
+                  "final_artefact_hash": final_hash}
+        # No wav checks at all -- file_integrity has only the failing
+        # object_hash_bound check, so its layer value is 0.0, not just low.
+        wav_observations = {}
+        # The submitted contributor does not overlap the RIN document's, so
+        # the one cross-evidence check also fails outright (0.0).
+        parser_observations = {"b" * 64: {"parser": "rin",
+                                          "data": {"contributors": [{"name": "Jane Doe"}]}}}
+        workflow_input = {"declarations": {"contributors": ["Someone Else"]}}
+        chain = types.SimpleNamespace(artefacts={final_hash: types.SimpleNamespace()})
+
+        integrity, *_ = assess_axes(
+            native, chain, set(), set(), wav_observations, [],
+            parser_observations, workflow_input)
+        # The weighted mean (0.0) is already below the 0.25 cap. A ceiling
+        # only pulls a value down toward it; it must never raise a lower
+        # value up to meet it.
+        self.assertAlmostEqual(integrity["value"], 0.0)
+
     def test_comp_sheet_text_parser_extracts_selections(self):
         raw_hash, target_hash = "1" * 64, "2" * 64
         text = ("Song Title: Fixture Song\n"
@@ -2542,6 +2651,153 @@ class InputValidationTests(unittest.TestCase):
             with self.assertRaises(wav_io_module.WavError) as caught:
                 list(read_frames(path, descriptor))
         self.assertEqual(caught.exception.reason_code, "file_changed_after_inspection")
+
+
+class ScoringProfileTests(unittest.TestCase):
+    def _profile(self, **overrides):
+        profile = {
+            "profile_id": "unit-test", "profile_version": 1,
+            "integrity": {
+                "layer_weights": {"file_integrity": 1.0, "declaration_consistency": 1.0,
+                                  "cross_evidence_support": 1.0},
+                "withholding_rule": {"min_components_for_substantive_mean": 2,
+                                    "require_substantive_support_or_contradiction": True},
+                "confidence_formula": {"ceiling": 0.8, "denominator_layers": 3},
+            },
+        }
+        for path, value in overrides.items():
+            *keys, last = path.split(".")
+            target = profile
+            for key in keys:
+                target = target[key]
+            target[last] = value
+        return profile
+
+    def _write(self, directory, profile):
+        path = Path(directory) / "profile.json"
+        path.write_text(json.dumps(profile))
+        return path
+
+    def test_default_profile_loads_and_validates(self):
+        profile = load_default_scoring_profile()
+        self.assertEqual(profile["profile_id"], "default-v1")
+        self.assertEqual(profile["integrity"]["layer_weights"],
+                         {"file_integrity": 1.0, "declaration_consistency": 1.0,
+                          "cross_evidence_support": 1.0})
+        self.assertEqual(profile["integrity"]["confidence_formula"]["denominator_layers"], 3)
+
+    def test_missing_layer_weight_is_rejected(self):
+        with tempfile.TemporaryDirectory() as directory:
+            profile = self._profile()
+            del profile["integrity"]["layer_weights"]["cross_evidence_support"]
+            with self.assertRaises(ScoringProfileError):
+                load_scoring_profile(self._write(directory, profile))
+
+    def test_unknown_layer_weight_is_rejected(self):
+        with tempfile.TemporaryDirectory() as directory:
+            profile = self._profile()
+            profile["integrity"]["layer_weights"]["content_reconstruction"] = 1.0
+            with self.assertRaises(ScoringProfileError):
+                load_scoring_profile(self._write(directory, profile))
+
+    def test_non_positive_weight_is_rejected(self):
+        with tempfile.TemporaryDirectory() as directory:
+            profile = self._profile(**{"integrity.layer_weights.file_integrity": 0})
+            with self.assertRaises(ScoringProfileError):
+                load_scoring_profile(self._write(directory, profile))
+
+    def test_negative_weight_is_rejected(self):
+        with tempfile.TemporaryDirectory() as directory:
+            profile = self._profile(**{"integrity.layer_weights.declaration_consistency": -1.0})
+            with self.assertRaises(ScoringProfileError):
+                load_scoring_profile(self._write(directory, profile))
+
+    def test_non_finite_weight_is_rejected(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = self._write(directory, self._profile())
+            path.write_text(path.read_text().replace('"file_integrity": 1.0', '"file_integrity": NaN'))
+            with self.assertRaises(ScoringProfileError):
+                load_scoring_profile(path)
+
+    def test_mismatched_denominator_layers_is_rejected(self):
+        with tempfile.TemporaryDirectory() as directory:
+            profile = self._profile(**{"integrity.confidence_formula.denominator_layers": 4})
+            with self.assertRaises(ScoringProfileError):
+                load_scoring_profile(self._write(directory, profile))
+
+    def test_unknown_top_level_key_is_rejected(self):
+        with tempfile.TemporaryDirectory() as directory:
+            profile = self._profile()
+            profile["extra"] = True
+            with self.assertRaises(ScoringProfileError):
+                load_scoring_profile(self._write(directory, profile))
+
+    def test_duplicate_json_key_is_rejected(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "profile.json"
+            path.write_text('{"profile_id": "a", "profile_id": "b", "profile_version": 1, '
+                            '"integrity": {}}')
+            with self.assertRaises(ScoringProfileError):
+                load_scoring_profile(path)
+
+    def test_missing_file_is_rejected(self):
+        with self.assertRaises(ScoringProfileError):
+            load_scoring_profile("/nonexistent/scoring_profile.json")
+
+    def test_rationale_is_documentation_only_and_optional(self):
+        with tempfile.TemporaryDirectory() as directory:
+            profile = self._profile()
+            profile["integrity"]["layer_weight_rationale"] = {"file_integrity": "baseline"}
+            loaded = load_scoring_profile(self._write(directory, profile))
+            self.assertEqual(loaded["integrity"]["layer_weight_rationale"], {"file_integrity": "baseline"})
+
+    def test_default_profile_has_severe_contradiction_rules_active(self):
+        profile = load_default_scoring_profile()
+        self.assertIn("object_hash_bound", profile["integrity"]["severe_contradiction_rules"])
+        self.assertEqual(profile["integrity"]["severe_contradiction_cap"], 0.25)
+
+    def test_severe_rules_without_cap_is_rejected(self):
+        with tempfile.TemporaryDirectory() as directory:
+            profile = self._profile(**{"integrity.severe_contradiction_rules": ["object_hash_bound"]})
+            with self.assertRaises(ScoringProfileError):
+                load_scoring_profile(self._write(directory, profile))
+
+    def test_severe_cap_without_rules_is_rejected(self):
+        with tempfile.TemporaryDirectory() as directory:
+            profile = self._profile(**{"integrity.severe_contradiction_cap": 0.25})
+            with self.assertRaises(ScoringProfileError):
+                load_scoring_profile(self._write(directory, profile))
+
+    def test_empty_severe_rules_list_is_rejected(self):
+        with tempfile.TemporaryDirectory() as directory:
+            profile = self._profile(**{"integrity.severe_contradiction_rules": [],
+                                       "integrity.severe_contradiction_cap": 0.25})
+            with self.assertRaises(ScoringProfileError):
+                load_scoring_profile(self._write(directory, profile))
+
+    def test_duplicate_severe_rule_is_rejected(self):
+        with tempfile.TemporaryDirectory() as directory:
+            profile = self._profile(**{
+                "integrity.severe_contradiction_rules": ["object_hash_bound", "object_hash_bound"],
+                "integrity.severe_contradiction_cap": 0.25})
+            with self.assertRaises(ScoringProfileError):
+                load_scoring_profile(self._write(directory, profile))
+
+    def test_severe_cap_out_of_range_is_rejected(self):
+        with tempfile.TemporaryDirectory() as directory:
+            profile = self._profile(**{"integrity.severe_contradiction_rules": ["object_hash_bound"],
+                                       "integrity.severe_contradiction_cap": 1.5})
+            with self.assertRaises(ScoringProfileError):
+                load_scoring_profile(self._write(directory, profile))
+
+    def test_valid_severe_contradiction_pair_loads(self):
+        with tempfile.TemporaryDirectory() as directory:
+            profile = self._profile(**{"integrity.severe_contradiction_rules": ["object_hash_bound"],
+                                       "integrity.severe_contradiction_cap": 0.25})
+            loaded = load_scoring_profile(self._write(directory, profile))
+            self.assertEqual(loaded["integrity"]["severe_contradiction_rules"], ["object_hash_bound"])
+            self.assertEqual(loaded["integrity"]["severe_contradiction_cap"], 0.25)
+
 
 if __name__ == "__main__":
     unittest.main()

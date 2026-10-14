@@ -10,6 +10,7 @@ from legacy_parsers.c2pa_parser import parse_c2pa_file
 from legacy_parsers.ern_parser import parse_ern_file
 from legacy_parsers.rin_parser import parse_rin_file
 from music_target.midi_parser import parse_midi_file
+from music_target.scoring_profile import load_default_scoring_profile
 from music_target.sheet_parsers import parse_comp_sheet_file, parse_cue_sheet_file
 
 
@@ -709,7 +710,7 @@ ASSESSMENT_STATUS_SEMANTICS = [
 
 
 def _layer(name, status, value, contributes, reason, check_count,
-           manual_review_reasons=None):
+           manual_review_reasons=None, weight=None):
     return {
         "layer": name,
         "status": status,
@@ -718,6 +719,11 @@ def _layer(name, status, value, contributes, reason, check_count,
         "check_count": check_count,
         "reason": reason,
         "manual_review_reasons": sorted(set(manual_review_reasons or [])),
+        # The configured weight this layer carries in the active scoring
+        # profile. Only set for a layer the profile can weight (see
+        # scoring_profile.INTEGRITY_LAYER_NAMES) -- never for a
+        # non-contributing layer, since it has no scoring weight to report.
+        "weight": weight,
     }
 
 
@@ -823,7 +829,27 @@ def _disabled_physical_similarity(native):
 
 
 def assess_axes(native, chain, bound_hashes, missing_hashes, wav_observations,
-                relationship_observations, parser_observations, workflow_input):
+                relationship_observations, parser_observations, workflow_input,
+                scoring_profile=None):
+    # A caller-supplied profile lets integrity layer weighting be configured
+    # without touching this function; the default profile's values are
+    # defined to reproduce today's hardcoded behaviour exactly. An
+    # explicitly supplied but malformed profile must not be silently
+    # replaced by the default -- only the absence of a profile (None) falls
+    # back; load_scoring_profile() already raises on anything malformed.
+    if scoring_profile is None:
+        scoring_profile = load_default_scoring_profile()
+    integrity_profile = scoring_profile["integrity"]
+    layer_weights = integrity_profile["layer_weights"]
+    withholding_rule = integrity_profile["withholding_rule"]
+    confidence_formula = integrity_profile["confidence_formula"]
+    # Both optional, and only meaningful together: a profile that defines
+    # neither leaves Integrity exactly as the plain weighted mean (today's
+    # behaviour); load_scoring_profile() rejects a profile that defines only
+    # one of the pair, since each is meaningless without the other.
+    severe_contradiction_rules = set(integrity_profile.get("severe_contradiction_rules") or [])
+    severe_contradiction_cap = integrity_profile.get("severe_contradiction_cap")
+
     file_value, file_checks, file_findings = BoundFileIntegrityPass.evaluate(
         native, bound_hashes, missing_hashes, wav_observations,
         parser_observations)
@@ -858,47 +884,86 @@ def assess_axes(native, chain, bound_hashes, missing_hashes, wav_observations,
     layers = [
         _layer("file_integrity", file_status, file_layer_value, True,
                "SHA-256 binding, cached WAV technical checks, and parser readability of submitted files.",
-               len(file_checks)),
+               len(file_checks), weight=layer_weights["file_integrity"]),
         _layer("structural_validity", "corroborated", 1.0, False,
                "Graph, references, cycles, connectivity, and endpoint roles passed before assessment; this is not content proof.",
                len(structural_checks)),
         _layer("declaration_consistency", declaration_status,
                declaration_layer_value, True,
                "Submitted relationship parameters compared with cached source and target media observations.",
-               len(rel_checks)),
+               len(rel_checks), weight=layer_weights["declaration_consistency"]),
         _layer("physical_similarity", "unavailable", None, False,
                "Legacy signal comparisons are disabled by policy and never contribute to integrity.",
                0),
         _layer("cross_evidence_support", cross_status, cross_layer_value, True,
                "Independent parser outputs compared with graph, declarations, and media.",
-               len(cross_checks)),
+               len(cross_checks), weight=layer_weights["cross_evidence_support"]),
         _layer("cryptographic_attestation", cryptographic_status,
                (attestation.get("value")
                 if cryptographic_status in {"corroborated", "contradicted"} else None), False,
                "C2PA remains in the separate attestation-strength axis and never inflates integrity.",
                1 if validation else 0),
     ]
-    components = [item["value"] for item in layers
-                  if item["contributes_to_integrity"] and item["value"] is not None]
+    scored_layers = [item for item in layers
+                     if item["contributes_to_integrity"] and item["value"] is not None]
+    components = [item["value"] for item in scored_layers]
     contradiction_present = any(
         item["contributes_to_integrity"] and item["status"] == "contradicted"
         for item in layers)
     substantive_support = cross_layer_value is not None
+    min_components = withholding_rule["min_components_for_substantive_mean"]
+    require_support = withholding_rule["require_substantive_support_or_contradiction"]
+    denominator_layers = confidence_formula["denominator_layers"]
     if not components:
         integrity_availability, integrity_value, integrity_confidence = "unavailable", None, None
     else:
-        integrity_availability = ("available" if len(components) == 3
+        integrity_availability = ("available" if len(components) == denominator_layers
                                   else "partial")
         # File/declaration consistency alone would create a misleading perfect-
         # looking score without content or independent cross-evidence support.
-        integrity_value = (sum(components) / len(components)
-                           if ((len(components) >= 2 and substantive_support) or
-                               contradiction_present) else None)
-        integrity_confidence = round(0.8 * len(components) / 3, 3)
+        threshold_met = (len(components) >= min_components and
+                         (substantive_support or not require_support))
+        if threshold_met or contradiction_present:
+            weight_total = sum(item["weight"] for item in scored_layers)
+            integrity_value = (sum(item["value"] * item["weight"] for item in scored_layers)
+                               / weight_total)
+            # A severe contradiction is a ceiling, not an override: it only
+            # pulls the weighted mean down toward the cap, never below where
+            # it already was, and never raises a lower mean up to meet it.
+            if severe_contradiction_rules and severe_contradiction_cap is not None:
+                severe_hit = any(
+                    item.get("passed") is False and item["rule"] in severe_contradiction_rules
+                    for item in file_checks + rel_checks + cross_checks)
+                if severe_hit:
+                    integrity_value = min(integrity_value, severe_contradiction_cap)
+        else:
+            integrity_value = None
+        integrity_confidence = round(
+            confidence_formula["ceiling"] * len(components) / denominator_layers, 3)
+    # Describe the withholding rule that actually ran, not a fixed assumption
+    # about it. At the shipped default (min_components=2, require_support=
+    # True) this reproduces the original fixed sentence verbatim, so a
+    # response scored under the default profile is unaffected. Under any
+    # other profile, state the configured rule and whether it permitted or
+    # withheld a value for *this* assessment -- never why it should have,
+    # since the score itself is computed above and unchanged by this text.
+    if min_components == 2 and require_support:
+        withholding_clause = ("A numeric value is withheld "
+            "without independent CrossEvidence unless a contradiction exists. ")
+    else:
+        if require_support:
+            rule_description = (f"requires at least {min_components} populated contributing layer(s) "
+                                "including independent CrossEvidence support")
+        else:
+            rule_description = f"requires at least {min_components} populated contributing layer(s)"
+        outcome = "permitted" if integrity_value is not None else "withheld"
+        withholding_clause = (
+            f"The active scoring profile's withholding rule {rule_description}, unless a contradiction "
+            f"exists; it {outcome} a numeric value for this assessment. ")
     integrity = _axis(
         integrity_availability, integrity_value, integrity_confidence,
-        (f"Integrity has {len(components)}/3 score-eligible evidence layers; missing evidence reduces availability and confidence but is never treated as contradiction. A numeric value is withheld "
-         "without independent CrossEvidence unless a contradiction exists. "
+        (f"Integrity has {len(components)}/{denominator_layers} score-eligible evidence layers; missing evidence reduces availability and confidence but is never treated as contradiction. "
+         f"{withholding_clause}"
          "Structural validity and cryptographic attestation are reported separately and do not raise integrity. "
          "Legacy signal comparisons are disabled by policy and do not produce findings or affect integrity."))
 
@@ -916,6 +981,11 @@ def assess_axes(native, chain, bound_hashes, missing_hashes, wav_observations,
                 digest, "medium", reason_code=reason_code,
                 error=getattr(artefact, "_wav_parser_failure", None)))
     checks = {
+        # Identifies the scoring profile actually used for this assessment
+        # -- read from the profile object itself, never a hardcoded literal
+        # -- so a response can always be traced back to its configuration.
+        "scoring_profile": [{"profile_id": scoring_profile["profile_id"],
+                             "profile_version": scoring_profile["profile_version"]}],
         "bound_file_integrity": file_checks,
         "structural_validity": structural_checks,
         "relationship_integrity": rel_checks,
