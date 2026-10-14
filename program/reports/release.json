@@ -1,9 +1,9 @@
 {
-  "target_version": "0.6.0",
-  "source_revision": "sha256:0eff6890a8452b5e31abee02cb065b1846773e01d73023f355e16b6755104b80",
+  "target_version": "0.7.0",
+  "source_revision": "sha256:6d6cf145cceb10f559b4d113a365c4d86ed3e1ab39cb208865218ad5e77bc19c",
   "python": "3.13.7",
   "platform": "Darwin",
-  "tests_run": 101,
+  "tests_run": 102,
   "failures": 0,
   "errors": 0,
   "dependencies": {

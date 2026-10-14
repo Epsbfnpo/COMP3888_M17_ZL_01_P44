@@ -5,15 +5,11 @@ Updated: 2026-10-14
 This file is the current consolidated roadmap for `v3/program`. It replaces the
 shorter v0.4 task list and incorporates unresolved work from the legacy v3
 prototype. The implemented baseline already includes workflow completeness,
-MIDI/RIN/ERN/C2PA/CompSheet/CueSheet parsing and CrossEvidence. The active audio
-content path is now one `PhysicalSimilarityPass`: relationship types select a
-bounded comparison mode, while all relationships share a four-state output and
-endpoint-only scoring policy. Exact reconstruction passes are deprecated and no
-longer executed or reported. The retained signal measurements still need
-calibration against licensed real production material. The implemented v1
-measurements and provisional endpoints are recorded in
-[`PHYSICAL_SIMILARITY.md`](PHYSICAL_SIMILARITY.md); that technical reference
-must be updated whenever a threshold policy changes.
+MIDI/RIN/ERN/C2PA/CompSheet/CueSheet parsing and CrossEvidence. In v0.7.0 the
+legacy `PhysicalSimilarityPass` is policy-disabled and is not imported or
+invoked by assessment. Relationships receive non-scoring compatibility
+placeholders only. The current priority is the claim ledger, deterministic
+cross-evidence checks, hash-binding coverage, and evidence-chain reporting.
 
 ## Scope principles
 
@@ -26,7 +22,22 @@ must be updated whenever a threshold policy changes.
 - Keep the non-technical UI and proprietary DAW parsing behind evidence
   validity, calibration, and submission tooling.
 
-## P0: Evidence validity and false-positive control
+## Completed P0: disable unreliable signal scoring
+
+- `PhysicalSimilarityPass` is not executed by assessment.
+- Physical diagnostics have `scoring_eligible: false` and never contribute to
+  integrity.
+- No signal-based contradiction, inconclusive, unavailable, or manual-review
+  finding is emitted.
+- Compatibility placeholders use `reason_code: disabled_by_policy` and retain
+  `content_match_is_provenance: false`.
+- Tests assert that the deprecated pass is never invoked.
+
+## P3: Deferred optional audio research
+
+The following historical calibration tasks do not block the evidence-chain
+work. Revisit them only if the client later requests optional audio
+fingerprinting or other non-scoring diagnostics.
 
 1. Obtain licensed, provenance-explained real production datasets covering the
    full chain: raw takes, edited takes, CompSheets, stems, mixes, pre-masters,
@@ -84,14 +95,15 @@ must be updated whenever a threshold policy changes.
     plus `objects/`. The CLI should explain which required evidence is missing
     before evaluation.
 
-11. Refine the explicit manual-review output without introducing a decision
-    policy. `inconclusive` and `unavailable` physical results already emit
-    machine-readable findings; consolidate repeated reasons and confirm the UI
-    wording with the client.
+11. Add the claim ledger and its versioned integrity policy. Deduplicate each
+    material claim, attach measured/embedded/documented/attested evidence with
+    binding, independence and credential dimensions, and compute consistency
+    separately from assessment coverage. Do not introduce a decision policy.
 
-12. Complete `corroborated`, `contradicted`, `inconclusive`, `unavailable`,
-    missing, `not_assessed`, and parser-failure end-to-end cases for all 16
-    workflows and their modifiers.
+12. Complete `corroborated`, `contradicted`, `not_assessed`, invalid-input,
+    missing-evidence, and parser-failure claim-ledger cases for all 16 workflows
+    and their modifiers. Physical placeholders remain `unavailable` and
+    non-scoring.
     Confirm required/conditional/optional classifications and weights with the
     client.
 
@@ -118,15 +130,14 @@ must be updated whenever a threshold policy changes.
     other team's runner after the contract is agreed.
 
 17. Produce a user-facing final report that shows the four dimensions,
-    per-expectation workflow results, relationship evidence levels, physical
-    similarity status counts, per-target values, contradictions, unavailable
-    checks, and manual-review reasons. Do
-    not collapse these into an unexplained overall score.
+    per-expectation workflow results, the claim ledger, contradictions,
+    unassessed claims, hash-binding coverage, missing evidence and recommended
+    additions. Show the disabled physical diagnostic separately and do not
+    collapse the report into an unexplained overall score.
 
 18. Synchronise examples, README, handoff documentation, schemas, release
     version, source revision, verification report, and test counts after each
-    release. The current release records must be regenerated after the unified
-    physical-similarity change.
+    release. Phase 0 records and examples were regenerated for v0.7.0.
 
 ## P2: Engineering quality and broader media support
 
@@ -135,14 +146,11 @@ must be updated whenever a threshold policy changes.
     generation. Test supported Python versions and target platforms.
 
 20. Expand performance and resource tests for large bundles, many
-    relationships, high channel counts, and worst-case FFT alignment inputs.
-    Full-file exploratory search now uses cached low-rate NumPy proxies, so
-    there is no fixed 60-second search window. Calibrate the weighted work limit,
-    128 MiB active-window limit,
-    256 MiB proxy-cache limit and 16-source limit against the caller-supplied
-    wall-clock timeout (current CSEC samples request 60 seconds) on every
-    supported platform. File-size limits are fixed at 512 MiB per object and
-    1 GiB per request; hashing time is not yet counted in the work budget.
+    relationships, high channel counts, parsers and cross-document comparisons.
+    Retain the deprecated signal-helper limits only for direct legacy tests or
+    a future optional diagnostic provider. File-size limits are fixed at
+    512 MiB per object and 1 GiB per request; hashing time is not yet counted in
+    the work budget.
 
 20a. Completed: isolated non-final objects (hash mismatch, size limit, invalid
     path, hash or path format errors) are not assessed in

@@ -1,13 +1,32 @@
-# Physical Similarity Validation Framework
+# Physical Similarity Diagnostic Policy
 
-Status: active technical reference for v0.6.0.
+Status: policy-disabled in v0.7.0.
 
-This document describes the physical-audio content checks executed by
-`PhysicalSimilarityPass`. It records the current v1 implementation so that its
-results can be reproduced and reviewed. The numeric thresholds below are
-provisional engineering policy, not universal facts about music production.
-They require calibration with labelled real-world and adversarial audio before
-the system can support a customer acceptance policy.
+The active assessment path does not import or invoke
+`PhysicalSimilarityPass`. Exact reconstruction, waveform and feature
+comparison, source contribution, residual modelling, master continuity, and
+excerpt search are not executed. Their narrow signal assumptions produced
+misleading results for legitimate high-frequency and processed material, so the
+pass is disabled rather than merely removed from the numeric denominator.
+
+For compatibility, every retained relationship receives an `unavailable`
+placeholder with `comparison_mode: disabled`,
+`reason_code: disabled_by_policy`, `scoring_eligible: false`,
+`integrity_contribution: null`, `analysis_complete: false`, and
+`content_match_is_provenance: false`. The summary reports `enabled: false`, a
+null value, and zero scored relationships. No physical-similarity or
+signal-driven manual-review finding is emitted.
+
+The implementation remains in `music_target/physical_audio_passes.py` and
+`music_target/audio_derivation.py` as deprecated code for later cleanup. The
+remaining sections preserve the historical v0.6 implementation details for
+auditability only. Their modes, thresholds, scoring rules, and findings are not
+active customer policy.
+
+## Historical v0.6 implementation (inactive)
+
+The text below records the former v1 implementation so that its behaviour can
+be reviewed. It is not executed by v0.7.0.
 
 ## 1. Purpose and evidence boundary
 
@@ -407,4 +426,14 @@ standalone authenticity detector or decision policy.
   integrity-layer integration.
 - `docs/SHEET_FORMATS.md`: CompSheet fields used by `selection_timeline`.
 - `docs/NEXT_TASKS.md`: threshold calibration and real-fixture requirements.
+
+## Active future boundary
+
+Audio fingerprinting is not included in v0.7.0. A future provider may be added
+only as an optional, local, resource-bounded diagnostic. It must remain outside
+integrity, retain `scoring_eligible: false` and
+`content_match_is_provenance: false`, and treat a non-match as inconclusive
+rather than proof of contradiction. Enabling a provider requires an explicit
+versioned policy, dependency and licence review, and representative fixtures;
+installing a library alone must never activate it.
 

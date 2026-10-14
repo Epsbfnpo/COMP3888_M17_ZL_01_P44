@@ -10,7 +10,6 @@ from legacy_parsers.c2pa_parser import parse_c2pa_file
 from legacy_parsers.ern_parser import parse_ern_file
 from legacy_parsers.rin_parser import parse_rin_file
 from music_target.midi_parser import parse_midi_file
-from music_target.physical_audio_passes import PhysicalSimilarityPass
 from music_target.sheet_parsers import parse_comp_sheet_file, parse_cue_sheet_file
 
 
@@ -770,6 +769,59 @@ def _summarize_physical_similarity(results):
     }
 
 
+def _disabled_physical_similarity(native):
+    """Return non-scoring placeholders without reading or comparing samples."""
+    results = []
+    for target in native["artefacts"]:
+        for edge in target.get("evidence", []):
+            results.append({
+                "relationship_type": edge["relationship_type"],
+                "comparison_mode": "disabled",
+                "source_hashes": [edge["hash"]],
+                "target_hash": target["artefact_hash"],
+                "status": "unavailable",
+                "integrity_contribution": None,
+                "scoring_eligible": False,
+                "similarity_score": None,
+                "parameter_source": "not_used",
+                "declared_ranges_used": False,
+                "analysis_complete": False,
+                "metrics": {},
+                "threshold_policy": None,
+                "content_match_is_provenance": False,
+                "reason_code": "disabled_by_policy",
+                "reason": (
+                    "Legacy signal comparisons are disabled because their narrow "
+                    "audio assumptions are not reliable across real production "
+                    "workflows."
+                ),
+            })
+    summary = {
+        "enabled": False,
+        "scoring_eligible": False,
+        "status": "unavailable",
+        "reason_code": "disabled_by_policy",
+        "reason": (
+            "Legacy signal comparisons are disabled because their narrow audio "
+            "assumptions are not reliable across real production workflows."
+        ),
+        "value": None,
+        "counts": {
+            "corroborated": 0,
+            "contradicted": 0,
+            "inconclusive": 0,
+            "unavailable": len(results),
+        },
+        "declared_relationships": len(results),
+        "scored_relationships": 0,
+        "assessed_targets": 0,
+        "target_values": {},
+        "scoring_policy": "disabled; no signal result contributes to integrity",
+        "content_match_is_provenance": False,
+    }
+    return results, summary
+
+
 def assess_axes(native, chain, bound_hashes, missing_hashes, wav_observations,
                 relationship_observations, parser_observations, workflow_input):
     file_value, file_checks, file_findings = BoundFileIntegrityPass.evaluate(
@@ -780,29 +832,11 @@ def assess_axes(native, chain, bound_hashes, missing_hashes, wav_observations,
     cross_value, cross_checks, cross_findings = ExpandedCrossEvidencePass.evaluate(
         native, workflow_input, parser_observations, wav_observations)
     structural_checks = StructuralValidityPass.evaluate(native)
-    physical_similarity = PhysicalSimilarityPass.evaluate(
-        native, chain, parser_observations)
-    physical_summary = _summarize_physical_similarity(physical_similarity)
-    physical_findings = []
-    for item in physical_similarity:
-        if item["status"] == "contradicted":
-            physical_findings.append(_finding(
-                "PHYSICAL_SIMILARITY_CONTRADICTION",
-                "Independent signal evidence clearly conflicts with the declared relationship.",
-                item.get("target_hash"), "medium",
-                physical_similarity_result=item))
-        elif item["status"] == "inconclusive":
-            physical_findings.append(_finding(
-                "PHYSICAL_SIMILARITY_INCONCLUSIVE",
-                "The physical comparison ran but did not reach a reliable endpoint.",
-                item.get("target_hash"), "low",
-                physical_similarity_result=item))
-        elif item["status"] == "unavailable":
-            physical_findings.append(_finding(
-                "PHYSICAL_SIMILARITY_UNAVAILABLE",
-                "The physical comparison could not be completed and was excluded from scoring.",
-                item.get("target_hash"), "info",
-                physical_similarity_result=item))
+    # Phase 0 evidence-chain transition: the legacy signal implementation is
+    # intentionally not invoked. Its assumptions produced misleading findings
+    # for legitimate high-frequency and processed material. Keep the public
+    # keys stable while reporting explicit, non-scoring placeholders and summary.
+    physical_similarity, physical_summary = _disabled_physical_similarity(native)
     (attestation, validation, attestation_findings,
      c2pa_attestation_records) = C2PAAttestationPass.evaluate(
          native, parser_observations)
@@ -811,8 +845,6 @@ def assess_axes(native, chain, bound_hashes, missing_hashes, wav_observations,
     file_status, file_layer_value = _boolean_status(file_checks)
     declaration_status, declaration_layer_value = _boolean_status(rel_checks)
     cross_status, cross_layer_value = _boolean_status(cross_checks)
-    physical_status = physical_summary["status"]
-    physical_layer_value = physical_summary["value"]
     crypto = validation.get("cryptographically_valid")
     if crypto is False:
         cryptographic_status = "contradicted"
@@ -823,8 +855,6 @@ def assess_axes(native, chain, bound_hashes, missing_hashes, wav_observations,
     else:
         cryptographic_status = "unavailable"
 
-    review_reasons = [item.get("reason") for item in physical_similarity
-                      if item.get("status") == "inconclusive" and item.get("reason")]
     layers = [
         _layer("file_integrity", file_status, file_layer_value, True,
                "SHA-256 binding, cached WAV technical checks, and parser readability of submitted files.",
@@ -836,10 +866,9 @@ def assess_axes(native, chain, bound_hashes, missing_hashes, wav_observations,
                declaration_layer_value, True,
                "Submitted relationship parameters compared with cached source and target media observations.",
                len(rel_checks)),
-        _layer("physical_similarity", physical_status, physical_layer_value,
-               True,
-               "Relationship-specific bounded comparisons share four statuses. Only clear corroboration and contradiction are scored; similarity does not prove provenance.",
-               len(physical_similarity), review_reasons),
+        _layer("physical_similarity", "unavailable", None, False,
+               "Legacy signal comparisons are disabled by policy and never contribute to integrity.",
+               0),
         _layer("cross_evidence_support", cross_status, cross_layer_value, True,
                "Independent parser outputs compared with graph, declarations, and media.",
                len(cross_checks)),
@@ -854,34 +883,25 @@ def assess_axes(native, chain, bound_hashes, missing_hashes, wav_observations,
     contradiction_present = any(
         item["contributes_to_integrity"] and item["status"] == "contradicted"
         for item in layers)
-    substantive_support = (physical_layer_value is not None or
-                           cross_layer_value is not None)
+    substantive_support = cross_layer_value is not None
     if not components:
         integrity_availability, integrity_value, integrity_confidence = "unavailable", None, None
     else:
-        physical_is_partial = (physical_summary["declared_relationships"] >
-                               physical_summary["scored_relationships"])
-        integrity_availability = ("available" if len(components) == 4 and
-                                  not physical_is_partial else "partial")
+        integrity_availability = ("available" if len(components) == 3
+                                  else "partial")
         # File/declaration consistency alone would create a misleading perfect-
         # looking score without content or independent cross-evidence support.
         integrity_value = (sum(components) / len(components)
                            if ((len(components) >= 2 and substantive_support) or
                                contradiction_present) else None)
-        integrity_confidence = round(0.8 * len(components) / 4, 3)
+        integrity_confidence = round(0.8 * len(components) / 3, 3)
     integrity = _axis(
         integrity_availability, integrity_value, integrity_confidence,
-        (f"Integrity has {len(components)}/4 score-eligible evidence layers; missing evidence reduces availability and confidence but is never treated as contradiction. A numeric value is withheld "
-         "without physical similarity or independent CrossEvidence unless a contradiction exists. "
+        (f"Integrity has {len(components)}/3 score-eligible evidence layers; missing evidence reduces availability and confidence but is never treated as contradiction. A numeric value is withheld "
+         "without independent CrossEvidence unless a contradiction exists. "
          "Structural validity and cryptographic attestation are reported separately and do not raise integrity. "
-         f"Physical similarity scored {physical_summary['scored_relationships']}/{physical_summary['declared_relationships']} declared relationship(s); inconclusive and unavailable results were excluded. Content similarity is not proof of provenance."))
+         "Legacy signal comparisons are disabled by policy and do not produce findings or affect integrity."))
 
-    review_findings = []
-    if review_reasons:
-        review_findings.append(_finding(
-            "MANUAL_REVIEW_RECOMMENDED",
-            "One or more physical comparisons are ambiguous and require contextual review.",
-            severity="low", review_reasons=sorted(set(review_reasons))))
     sample_data_findings = []
     for node in native["artefacts"]:
         digest = node["artefact_hash"]
@@ -906,7 +926,7 @@ def assess_axes(native, chain, bound_hashes, missing_hashes, wav_observations,
         "physical_similarity": physical_similarity,
         "physical_similarity_summary": [physical_summary],
     }
-    findings = (file_findings + rel_findings + cross_findings + physical_findings +
-                review_findings + sample_data_findings +
+    findings = (file_findings + rel_findings + cross_findings +
+                sample_data_findings +
                 attestation_findings + ai_findings)
     return integrity, attestation, ai, validation, checks, findings
