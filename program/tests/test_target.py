@@ -1648,6 +1648,144 @@ class TargetTests(unittest.TestCase):
         # value up to meet it.
         self.assertAlmostEqual(integrity["value"], 0.0)
 
+    def _cap_assessment(self, bound_final=True, contributors=("Jane Doe",),
+                        rin_audio_hashes=(), scoring_profile=None, wav_check=True):
+        """Run assess_axes on a one-node graph plus one RIN document."""
+        final_hash = "a" * 64
+        native = {"artefacts": [{"artefact_hash": final_hash, "artefact_type": "audio/final",
+                                 "attributes": {}, "evidence": []}],
+                  "final_artefact_hash": final_hash}
+        wav_observations = {final_hash: {"checks": [
+            {"rule": "technical.sample_rate_hz_matches_observed", "passed": True,
+             "evidence_hash": final_hash},
+        ]}} if wav_check else {}
+        parser_observations = {"b" * 64: {"parser": "rin", "data": {
+            "contributors": [{"name": "Jane Doe"}],
+            "audio_bindings": [{"sha256": digest, "file_reference": "take.wav"}
+                               for digest in rin_audio_hashes]}}}
+        workflow_input = {"declarations": {"contributors": list(contributors)}}
+        chain = types.SimpleNamespace(artefacts={final_hash: types.SimpleNamespace()})
+        integrity, _, _, _, checks, findings = assess_axes(
+            native, chain, {final_hash} if bound_final else set(), set(),
+            wav_observations, [], parser_observations, workflow_input,
+            scoring_profile=scoring_profile)
+        cap_findings = [item for item in findings
+                        if item["code"] == "INTEGRITY_SCORE_CAP_TRIGGERED"]
+        return integrity, checks, cap_findings
+
+    def test_no_severe_failure_emits_no_cap_explanation(self):
+        integrity, checks, cap_findings = self._cap_assessment()
+        self.assertAlmostEqual(integrity["value"], 1.0)
+        self.assertNotIn("Severe-contradiction cap", integrity["reasoning"])
+        self.assertTrue(integrity["reasoning"].endswith("do not produce findings or affect integrity."))
+        self.assertEqual(cap_findings, [])
+        record = checks["integrity_score_cap"][0]
+        self.assertFalse(record["cap_triggered"])
+        self.assertFalse(record["cap_applied"])
+        self.assertEqual(record["triggering_rules"], [])
+        self.assertEqual(record["triggering_evidence"], [])
+        self.assertEqual(record["pre_cap_score"], record["final_score"])
+
+    def test_severe_cap_triggered_and_applied_is_explained(self):
+        integrity, checks, cap_findings = self._cap_assessment(bound_final=False)
+        record = checks["integrity_score_cap"][0]
+        self.assertTrue(record["cap_triggered"])
+        self.assertTrue(record["cap_applied"])
+        self.assertAlmostEqual(record["pre_cap_score"], 0.75)
+        self.assertEqual(record["cap_threshold"], 0.25)
+        self.assertAlmostEqual(record["final_score"], 0.25)
+        self.assertEqual(record["final_score"], integrity["value"])
+        self.assertEqual(record["triggering_rules"], ["object_hash_bound"])
+        self.assertEqual(record["triggering_evidence"], [
+            {"rule": "object_hash_bound", "layer": "file_integrity", "evidence_hash": "a" * 64}])
+        self.assertIn("Severe-contradiction cap (0.25) triggered by failed check(s): "
+                      "object_hash_bound. The weighted score of 0.75 was capped at 0.25.",
+                      integrity["reasoning"])
+        self.assertEqual(len(cap_findings), 1)
+        finding = cap_findings[0]
+        self.assertEqual(finding["severity"], "info")
+        self.assertTrue(finding["cap_applied"])
+        self.assertNotIn("evidence_hash", finding)
+
+    def test_severe_cap_triggered_but_not_applied_does_not_claim_a_reduction(self):
+        integrity, checks, cap_findings = self._cap_assessment(
+            bound_final=False, contributors=("Someone Else",), wav_check=False)
+        record = checks["integrity_score_cap"][0]
+        self.assertTrue(record["cap_triggered"])
+        self.assertFalse(record["cap_applied"])
+        self.assertAlmostEqual(record["pre_cap_score"], 0.0)
+        self.assertAlmostEqual(record["final_score"], 0.0)
+        self.assertIn("already at or below the cap, so it was not reduced (final 0.0)",
+                      integrity["reasoning"])
+        self.assertNotIn("was capped at", integrity["reasoning"])
+        self.assertEqual(len(cap_findings), 1)
+        self.assertFalse(cap_findings[0]["cap_applied"])
+        self.assertIn("was not reduced", cap_findings[0]["message"])
+
+    def test_multiple_severe_failures_are_all_reported(self):
+        undeclared = "c" * 64
+        integrity, checks, cap_findings = self._cap_assessment(
+            bound_final=False, rin_audio_hashes=(undeclared,))
+        record = checks["integrity_score_cap"][0]
+        self.assertEqual(record["triggering_rules"],
+                         ["object_hash_bound", "rin_bound_audio_hash_exists_in_graph"])
+        self.assertIn({"rule": "rin_bound_audio_hash_exists_in_graph",
+                       "layer": "cross_evidence_support",
+                       "evidence_hash": "b" * 64, "audio_hash": undeclared},
+                      record["triggering_evidence"])
+        self.assertEqual(len(record["triggering_evidence"]), 2)
+        self.assertIn("object_hash_bound, rin_bound_audio_hash_exists_in_graph",
+                      integrity["reasoning"])
+        self.assertEqual(cap_findings[0]["triggering_rules"], record["triggering_rules"])
+
+    def test_cap_explanation_leaves_score_and_confidence_unchanged(self):
+        uncapped_profile = copy.deepcopy(load_default_scoring_profile())
+        del uncapped_profile["integrity"]["severe_contradiction_rules"]
+        del uncapped_profile["integrity"]["severe_contradiction_cap"]
+        for kwargs in ({}, {"bound_final": False},
+                       {"bound_final": False, "contributors": ("Someone Else",),
+                        "wav_check": False}):
+            capped, checks, _ = self._cap_assessment(**kwargs)
+            uncapped, uncapped_checks, uncapped_findings = self._cap_assessment(
+                scoring_profile=uncapped_profile, **kwargs)
+            record = checks["integrity_score_cap"][0]
+            # The pre-cap score is exactly the plain weighted mean, and the
+            # final score is exactly the ceiling applied to it.
+            self.assertEqual(record["pre_cap_score"], uncapped["value"])
+            self.assertEqual(capped["value"], min(uncapped["value"], 0.25)
+                             if record["cap_triggered"] else uncapped["value"])
+            self.assertEqual(capped["confidence"], uncapped["confidence"])
+            self.assertEqual(capped["availability"], uncapped["availability"])
+            # A profile without a cap reports no cap at all.
+            self.assertNotIn("integrity_score_cap", uncapped_checks)
+            self.assertEqual(uncapped_findings, [])
+            self.assertNotIn("Severe-contradiction cap", uncapped["reasoning"])
+
+    def test_triggered_cap_response_passes_schema_validation(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            shutil.copytree(self.folder / "objects", root / "objects")
+            final_hash = self.template["chain"]["final_artefact_hash"]
+            nonfinal = next(digest for digest in self.template["objects"] if digest != final_hash)
+            path = root / self.template["objects"][nonfinal]
+            data = bytearray(path.read_bytes())
+            data[-1] ^= 1
+            path.write_bytes(bytes(data))
+            result = self.score(folder=root)
+        self.assertEqual(result["execution_status"], "succeeded", result["error"])
+        record = result["assessment_checks"]["integrity_score_cap"][0]
+        self.assertTrue(record["cap_triggered"])
+        self.assertTrue(record["cap_applied"])
+        self.assertEqual(record["triggering_evidence"], [
+            {"rule": "object_hash_bound", "layer": "file_integrity", "evidence_hash": nonfinal}])
+        self.assertEqual(result["axes"]["integrity"]["value"], 0.25)
+        self.assertIn("was capped at 0.25", result["axes"]["integrity"]["reasoning"])
+        self.assertEqual(self._cap_codes(result).count("INTEGRITY_SCORE_CAP_TRIGGERED"), 1)
+
+    @staticmethod
+    def _cap_codes(result):
+        return [item["code"] for item in result["findings"]]
+
     def test_comp_sheet_text_parser_extracts_selections(self):
         raw_hash, target_hash = "1" * 64, "2" * 64
         text = ("Song Title: Fixture Song\n"

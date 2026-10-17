@@ -828,6 +828,41 @@ def _disabled_physical_similarity(native):
     return results, summary
 
 
+#: Identifier fields a check may already carry; copied verbatim into a cap
+#: trigger so it can be traced to its evidence. Nothing is derived.
+_TRIGGER_IDENTIFIER_FIELDS = (
+    "evidence_hash", "audio_hash", "ingredient_hash", "asset_hash",
+    "manifest_container_hash", "source_hash", "target_hash", "selection_id",
+)
+
+
+def _severe_triggers(severe_rules, checks_by_layer):
+    """Return every failed check whose rule is on the severe list."""
+    triggers = []
+    for layer, checks in checks_by_layer:
+        for item in checks:
+            if item.get("passed") is False and item["rule"] in severe_rules:
+                trigger = {"rule": item["rule"], "layer": layer}
+                trigger.update({field: item[field] for field in _TRIGGER_IDENTIFIER_FIELDS
+                                if item.get(field) is not None})
+                triggers.append(trigger)
+    return triggers
+
+
+def _cap_reasoning(cap_record):
+    """One sentence stating what the severe-contradiction cap did."""
+    rules = ", ".join(cap_record["triggering_rules"])
+    pre_cap = round(cap_record["pre_cap_score"], 4)
+    final = round(cap_record["final_score"], 4)
+    cap = cap_record["cap_threshold"]
+    if cap_record["cap_applied"]:
+        effect = f"The weighted score of {pre_cap} was capped at {final}."
+    else:
+        effect = (f"The weighted score of {pre_cap} was already at or below the cap, "
+                  f"so it was not reduced (final {final}).")
+    return f" Severe-contradiction cap ({cap}) triggered by failed check(s): {rules}. {effect}"
+
+
 def assess_axes(native, chain, bound_hashes, missing_hashes, wav_observations,
                 relationship_observations, parser_observations, workflow_input,
                 scoring_profile=None):
@@ -914,6 +949,8 @@ def assess_axes(native, chain, bound_hashes, missing_hashes, wav_observations,
     min_components = withholding_rule["min_components_for_substantive_mean"]
     require_support = withholding_rule["require_substantive_support_or_contradiction"]
     denominator_layers = confidence_formula["denominator_layers"]
+    pre_cap_value = None
+    severe_triggers = []
     if not components:
         integrity_availability, integrity_value, integrity_confidence = "unavailable", None, None
     else:
@@ -927,14 +964,16 @@ def assess_axes(native, chain, bound_hashes, missing_hashes, wav_observations,
             weight_total = sum(item["weight"] for item in scored_layers)
             integrity_value = (sum(item["value"] * item["weight"] for item in scored_layers)
                                / weight_total)
+            pre_cap_value = integrity_value
             # A severe contradiction is a ceiling, not an override: it only
             # pulls the weighted mean down toward the cap, never below where
             # it already was, and never raises a lower mean up to meet it.
             if severe_contradiction_rules and severe_contradiction_cap is not None:
-                severe_hit = any(
-                    item.get("passed") is False and item["rule"] in severe_contradiction_rules
-                    for item in file_checks + rel_checks + cross_checks)
-                if severe_hit:
+                severe_triggers = _severe_triggers(severe_contradiction_rules, (
+                    ("file_integrity", file_checks),
+                    ("declaration_consistency", rel_checks),
+                    ("cross_evidence_support", cross_checks)))
+                if severe_triggers:
                     integrity_value = min(integrity_value, severe_contradiction_cap)
         else:
             integrity_value = None
@@ -960,12 +999,41 @@ def assess_axes(native, chain, bound_hashes, missing_hashes, wav_observations,
         withholding_clause = (
             f"The active scoring profile's withholding rule {rule_description}, unless a contradiction "
             f"exists; it {outcome} a numeric value for this assessment. ")
+    # Explain the cap separately from the score: "triggered" means a severe
+    # check failed; "applied" means the cap actually lowered the value.
+    cap_record = None
+    cap_findings = []
+    if severe_contradiction_rules and severe_contradiction_cap is not None:
+        triggering_rules = sorted({item["rule"] for item in severe_triggers})
+        cap_record = {
+            "cap_triggered": bool(severe_triggers),
+            "cap_applied": bool(severe_triggers) and integrity_value < pre_cap_value,
+            "pre_cap_score": pre_cap_value,
+            "cap_threshold": severe_contradiction_cap,
+            "final_score": integrity_value,
+            "configured_severe_rules": sorted(severe_contradiction_rules),
+            "triggering_rules": triggering_rules,
+            "triggering_evidence": severe_triggers,
+        }
+    cap_clause = ""
+    if cap_record and cap_record["cap_triggered"]:
+        cap_clause = _cap_reasoning(cap_record)
+        cap_findings.append(_finding(
+            "INTEGRITY_SCORE_CAP_TRIGGERED",
+            "Scoring adjustment, not an additional contradiction: one or more severe checks "
+            "failed, so the severe-contradiction cap was evaluated for Integrity"
+            + ("; it reduced the score." if cap_record["cap_applied"]
+               else "; the score was already at or below the cap and was not reduced."),
+            **{key: cap_record[key] for key in (
+                "cap_triggered", "cap_applied", "pre_cap_score", "cap_threshold",
+                "final_score", "triggering_rules")}))
     integrity = _axis(
         integrity_availability, integrity_value, integrity_confidence,
         (f"Integrity has {len(components)}/{denominator_layers} score-eligible evidence layers; missing evidence reduces availability and confidence but is never treated as contradiction. "
          f"{withholding_clause}"
          "Structural validity and cryptographic attestation are reported separately and do not raise integrity. "
-         "Legacy signal comparisons are disabled by policy and do not produce findings or affect integrity."))
+         "Legacy signal comparisons are disabled by policy and do not produce findings or affect integrity."
+         f"{cap_clause}"))
 
     sample_data_findings = []
     for node in native["artefacts"]:
@@ -996,7 +1064,9 @@ def assess_axes(native, chain, bound_hashes, missing_hashes, wav_observations,
         "physical_similarity": physical_similarity,
         "physical_similarity_summary": [physical_summary],
     }
+    if cap_record is not None:
+        checks["integrity_score_cap"] = [cap_record]
     findings = (file_findings + rel_findings + cross_findings +
-                sample_data_findings +
+                sample_data_findings + cap_findings +
                 attestation_findings + ai_findings)
     return integrity, attestation, ai, validation, checks, findings
