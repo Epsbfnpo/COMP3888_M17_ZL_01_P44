@@ -8,6 +8,7 @@ import sys
 import shutil
 import tempfile
 import time
+import types
 import unittest
 import wave
 from pathlib import Path
@@ -31,7 +32,14 @@ from music_target.assessment_passes import (
     C2PAAttestationPass,
     ExpandedCrossEvidencePass,
     _summarize_physical_similarity,
+    assess_axes,
 )
+from music_target.scoring_profile import (
+    ScoringProfileError,
+    load_default_scoring_profile,
+    load_scoring_profile,
+)
+from music_target.physical_audio_passes import PhysicalSimilarityPass
 from music_target.audio_derivation import (
     MAX_SOURCE_CORRELATION,
     ResourceBudgetExceeded,
@@ -64,6 +72,27 @@ class TargetTests(unittest.TestCase):
         validate(response, "scoring-response.schema.json")
         return response
 
+    def assert_physical_similarity_disabled(self, result):
+        checks = result["assessment_checks"]
+        summary = checks["physical_similarity_summary"][0]
+        layer = next(item for item in checks["integrity_layers"]
+                     if item["layer"] == "physical_similarity")
+        self.assertFalse(summary["enabled"])
+        self.assertFalse(summary["scoring_eligible"])
+        self.assertEqual(summary["status"], "unavailable")
+        self.assertEqual(summary["reason_code"], "disabled_by_policy")
+        self.assertEqual(summary["scored_relationships"], 0)
+        self.assertIsNone(summary["value"])
+        self.assertFalse(layer["contributes_to_integrity"])
+        self.assertIsNone(layer["value"])
+        self.assertTrue(all(item["status"] == "unavailable"
+                            and item["reason_code"] == "disabled_by_policy"
+                            and item["scoring_eligible"] is False
+                            and item["integrity_contribution"] is None
+                            for item in checks["physical_similarity"]))
+        self.assertFalse(any(item["code"].startswith("PHYSICAL_SIMILARITY_")
+                             for item in result["findings"]))
+
     def test_valid_graph_uses_library_and_exposes_four_observations(self):
         result = self.score()
         self.assertEqual(result["execution_status"], "succeeded", result["error"])
@@ -85,7 +114,8 @@ class TargetTests(unittest.TestCase):
                   result["assessment_checks"]["integrity_layers"]}
         self.assertFalse(layers["structural_validity"]["contributes_to_integrity"])
         self.assertFalse(layers["cryptographic_attestation"]["contributes_to_integrity"])
-        self.assertEqual(result["axes"]["integrity"]["value"], 1.0)
+        self.assertIsNone(result["axes"]["integrity"]["value"])
+        self.assert_physical_similarity_disabled(result)
         self.assertEqual(result["axes"]["ai_disclosure"]["value"], 1.0)
         self.assertIn("workflow_assessment", result)
         self.assertIsNone(result["validation"]["cryptographically_valid"])
@@ -378,7 +408,7 @@ class TargetTests(unittest.TestCase):
             with self.assertRaises(NonFiniteSamples):
                 list(read_frames(path, descriptor))
 
-    def test_nonfinite_nonfinal_wav_only_disables_dependent_content_checks(self):
+    def test_nonfinite_nonfinal_wav_is_not_sample_decoded_when_signal_checks_are_disabled(self):
         samples = [0.0] * 799 + [float("inf")]
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
@@ -390,13 +420,9 @@ class TargetTests(unittest.TestCase):
                 ])
             result = self.score(request, root)
         self.assertEqual(result["execution_status"], "succeeded", result["error"])
-        failures = [item for item in result["findings"]
-                    if item["code"] == "WAV_SAMPLE_DATA_INVALID"]
-        self.assertEqual(len(failures), 1)
-        self.assertEqual(failures[0]["reason_code"], "non_finite_samples")
-        self.assertTrue(any(
-            item["status"] == "unavailable"
-            for item in result["assessment_checks"]["physical_similarity"]))
+        self.assertFalse(any(item["code"] == "WAV_SAMPLE_DATA_INVALID"
+                             for item in result["findings"]))
+        self.assert_physical_similarity_disabled(result)
 
     def test_trailing_bytes_are_reported_as_nonfatal_riff_warning(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -471,7 +497,7 @@ class TargetTests(unittest.TestCase):
             "gain": gain,
         }
 
-    def test_physical_similarity_scores_clear_mix_contributions(self):
+    def test_physical_similarity_does_not_score_clear_mix_contributions(self):
         left = [int(5000 * math.sin(index / 17)) for index in range(4000)]
         right = [int(3500 * math.cos(index / 23)) for index in range(4000)]
         target = [round(0.6 * a + 0.4 * b) for a, b in zip(left, right)]
@@ -485,16 +511,11 @@ class TargetTests(unittest.TestCase):
             ]
             result = self.score(self._workflow_request(
                 root, "multitrack_recording_mix_master", specs), root)
-        checks = result["assessment_checks"]["physical_similarity"]
-        self.assertEqual(len(checks), 2)
-        self.assertEqual({item["status"] for item in checks}, {"corroborated"})
-        self.assertTrue(all(item["comparison_mode"] == "multi_source_contribution"
-                            for item in checks))
-        self.assertTrue(all(item["integrity_contribution"] == 1.0 for item in checks))
-        self.assertTrue(all(item["content_match_is_provenance"] is False
-                            for item in checks))
+        self.assert_physical_similarity_disabled(result)
+        self.assertEqual(
+            len(result["assessment_checks"]["physical_similarity"]), 2)
 
-    def test_physical_similarity_treats_correlated_sources_as_inconclusive(self):
+    def test_physical_similarity_does_not_analyse_correlated_sources(self):
         first = self._deterministic_samples(4000, 23)
         duplicate = first.copy()
         duplicate[0] += 1
@@ -509,12 +530,15 @@ class TargetTests(unittest.TestCase):
             ]
             result = self.score(self._workflow_request(
                 root, "multitrack_recording_mix_master", specs), root)
-        checks = result["assessment_checks"]["physical_similarity"]
-        self.assertEqual({item["status"] for item in checks}, {"inconclusive"})
-        self.assertTrue(all(item["integrity_contribution"] is None
-                            for item in checks))
-        self.assertTrue(any(item["code"] == "PHYSICAL_SIMILARITY_INCONCLUSIVE"
-                            for item in result["findings"]))
+        self.assert_physical_similarity_disabled(result)
+
+    def test_policy_disabled_physical_pass_is_never_invoked(self):
+        with mock.patch.object(
+                PhysicalSimilarityPass, "evaluate",
+                side_effect=AssertionError("legacy signal pass must not run")):
+            result = self.score()
+        self.assertEqual(result["execution_status"], "succeeded", result["error"])
+        self.assert_physical_similarity_disabled(result)
 
     def test_physical_summary_averages_relationships_within_each_target(self):
         results = []
@@ -1391,7 +1415,7 @@ class TargetTests(unittest.TestCase):
                      checks["assessment_status_semantics"]}
         self.assertEqual(semantics, allowed)
 
-    def test_pairwise_continuity_corroborates_light_processing(self):
+    def test_pairwise_continuity_is_not_run(self):
         source = self._deterministic_samples(12000, 121)
         processed, previous = [], 0
         for value in source:
@@ -1410,13 +1434,9 @@ class TargetTests(unittest.TestCase):
             ]
             result = self.score(self._workflow_request(
                 root, "take_comping_and_editing", specs), root)
-        check = result["assessment_checks"]["physical_similarity"][0]
-        self.assertEqual(check["comparison_mode"], "pairwise_continuity")
-        self.assertEqual(check["status"], "corroborated")
-        self.assertGreaterEqual(check["metrics"]["robust_similarity"], 0.72)
-        self.assertEqual(check["integrity_contribution"], 1.0)
+        self.assert_physical_similarity_disabled(result)
 
-    def test_generic_derivation_difference_is_inconclusive_not_adverse(self):
+    def test_generic_derivation_difference_is_not_analysed_or_adverse(self):
         source = self._deterministic_samples(8000, 171)
         unrelated = self._deterministic_samples(8000, 172)
         with tempfile.TemporaryDirectory() as directory:
@@ -1428,13 +1448,9 @@ class TargetTests(unittest.TestCase):
             ]
             result = self.score(self._workflow_request(
                 root, "custom_or_unknown_workflow", specs), root)
-        check = result["assessment_checks"]["physical_similarity"][0]
-        self.assertEqual(check["status"], "inconclusive")
-        self.assertIsNone(check["integrity_contribution"])
-        self.assertFalse(any(item["code"] == "PHYSICAL_SIMILARITY_CONTRADICTION"
-                             for item in result["findings"]))
+        self.assert_physical_similarity_disabled(result)
 
-    def test_clear_unused_mix_source_is_contradicted_only_with_joint_support(self):
+    def test_declared_mix_sources_are_not_judged_by_legacy_signal_model(self):
         used = self._deterministic_samples(8000, 181)
         decoy = self._deterministic_samples(8000, 182)
         target = [round(0.65 * value) for value in used]
@@ -1448,19 +1464,9 @@ class TargetTests(unittest.TestCase):
             ]
             result = self.score(self._workflow_request(
                 root, "multitrack_recording_mix_master", specs), root)
-        checks = result["assessment_checks"]["physical_similarity"]
-        statuses = sorted(item["status"] for item in checks)
-        self.assertEqual(statuses, ["contradicted", "corroborated"])
-        contradicted = next(item for item in checks
-                            if item["status"] == "contradicted")
-        self.assertEqual(contradicted["reason_code"],
-                         "declared_source_not_supported")
-        self.assertEqual(contradicted["joint_model_status"], "corroborated")
-        self.assertEqual(contradicted["integrity_contribution"], 0.0)
-        self.assertTrue(any(item["code"] == "PHYSICAL_SIMILARITY_CONTRADICTION"
-                            for item in result["findings"]))
+        self.assert_physical_similarity_disabled(result)
 
-    def test_excerpt_search_corroborates_and_budget_failure_is_unavailable(self):
+    def test_excerpt_search_is_not_run_even_when_budget_is_available(self):
         source = self._deterministic_samples(16000, 141)
         sample = source[4800:8800]
         with tempfile.TemporaryDirectory() as directory:
@@ -1471,20 +1477,9 @@ class TargetTests(unittest.TestCase):
                  "parents": [(0, "excerpted_from")]},
             ])
             result = self.score(request, root)
-            with mock.patch(
-                    "music_target.audio_derivation.MAX_REQUEST_WORK_UNITS", 0.1):
-                limited = self.score(request, root)
-        check = result["assessment_checks"]["physical_similarity"][0]
-        self.assertEqual(check["comparison_mode"], "excerpt_search")
-        self.assertEqual(check["status"], "corroborated")
-        self.assertAlmostEqual(
-            check["metrics"]["estimated_source_start_seconds"], 0.6, delta=0.08)
-        limited_check = limited["assessment_checks"]["physical_similarity"][0]
-        self.assertEqual(limited_check["status"], "unavailable")
-        self.assertEqual(limited_check["reason_code"], "resource_budget_exhausted")
-        self.assertIsNone(limited_check["integrity_contribution"])
+        self.assert_physical_similarity_disabled(result)
 
-    def test_master_continuity_corroborates_gain_and_format_tolerant_content(self):
+    def test_master_continuity_is_not_run(self):
         source = self._deterministic_samples(8000, 151)
         master = [round(0.8 * value) for value in source]
         with tempfile.TemporaryDirectory() as directory:
@@ -1496,13 +1491,9 @@ class TargetTests(unittest.TestCase):
             ]
             result = self.score(self._workflow_request(
                 root, "mastering_service_only", specs), root)
-        check = result["assessment_checks"]["physical_similarity"][0]
-        self.assertEqual(check["comparison_mode"], "master_continuity")
-        self.assertEqual(check["status"], "corroborated")
-        self.assertGreaterEqual(check["metrics"]["waveform_correlation"], 0.95)
-        self.assertFalse(check["content_match_is_provenance"])
+        self.assert_physical_similarity_disabled(result)
 
-    def test_comp_relationship_has_one_primary_result_with_selection_details(self):
+    def test_comp_relationship_has_one_disabled_diagnostic_placeholder(self):
         take = self._deterministic_samples(4000, 191)
         comp = take[800:2400]
         take_wav, comp_wav = self._pcm16(take), self._pcm16(comp)
@@ -1533,25 +1524,141 @@ class TargetTests(unittest.TestCase):
                        result["assessment_checks"]["physical_similarity"]
                        if item["relationship_type"] == "comped_from"]
         self.assertEqual(len(comp_checks), 1)
-        self.assertEqual(comp_checks[0]["comparison_mode"], "selection_timeline")
-        self.assertEqual(comp_checks[0]["status"], "corroborated")
-        self.assertEqual([item["selection_id"] for item in
-                          comp_checks[0]["selection_results"]], ["S1"])
+        self.assertEqual(comp_checks[0]["comparison_mode"], "disabled")
+        self.assertEqual(comp_checks[0]["status"], "unavailable")
+        self.assertFalse(comp_checks[0]["scoring_eligible"])
+        self.assert_physical_similarity_disabled(result)
 
-    def test_integrity_uses_physical_layer_and_only_endpoint_results(self):
+    def test_integrity_excludes_policy_disabled_physical_layer(self):
         result = self.score()
         layers = {item["layer"]: item for item in
                   result["assessment_checks"]["integrity_layers"]}
         self.assertNotIn("content_reconstruction", layers)
         self.assertIn("physical_similarity", layers)
         self.assertFalse(layers["structural_validity"]["contributes_to_integrity"])
+        self.assertFalse(layers["physical_similarity"]["contributes_to_integrity"])
+        self.assertIsNone(layers["physical_similarity"]["value"])
         self.assertEqual(layers["structural_validity"]["status"], "corroborated")
         summary = result["assessment_checks"]["physical_similarity_summary"][0]
-        self.assertEqual(summary["scored_relationships"],
-                         summary["counts"]["corroborated"] +
-                         summary["counts"]["contradicted"])
+        self.assertEqual(summary["scored_relationships"], 0)
+        self.assertFalse(summary["scoring_eligible"])
         self.assertEqual(summary["declared_relationships"],
                          len(result["assessment_checks"]["physical_similarity"]))
+        self.assert_physical_similarity_disabled(result)
+
+    def test_integrity_layers_carry_default_profile_weights(self):
+        result = self.score()
+        layers = {item["layer"]: item for item in
+                  result["assessment_checks"]["integrity_layers"]}
+        for name in ("file_integrity", "declaration_consistency", "cross_evidence_support"):
+            self.assertEqual(layers[name]["weight"], 1.0)
+        for name in ("structural_validity", "physical_similarity", "cryptographic_attestation"):
+            self.assertIsNone(layers[name]["weight"])
+        profile = result["assessment_checks"]["scoring_profile"][0]
+        self.assertEqual(profile, {"profile_id": "default-v1", "profile_version": 1})
+        # No severe rule failed, so no cap record or cap sentence appears.
+        self.assertNotIn("severe_contradiction_cap", result["assessment_checks"])
+        self.assertNotIn("severe contradiction", result["axes"]["integrity"]["reasoning"])
+
+    def test_default_scoring_profile_reproduces_plain_average(self):
+        final_hash = "a" * 64
+        native = {"artefacts": [{"artefact_hash": final_hash, "artefact_type": "audio/final",
+                                 "attributes": {}, "evidence": []}],
+                  "final_artefact_hash": final_hash}
+        wav_observations = {final_hash: {"checks": [
+            {"rule": "technical.sample_rate_hz_matches_observed", "passed": False,
+             "evidence_hash": final_hash},
+        ]}}
+        parser_observations = {"b" * 64: {"parser": "rin",
+                                          "data": {"contributors": [{"name": "Jane Doe"}]}}}
+        workflow_input = {"declarations": {"contributors": ["Jane Doe"]}}
+        chain = types.SimpleNamespace(artefacts={final_hash: types.SimpleNamespace()})
+
+        default_integrity, *_ = assess_axes(
+            native, chain, {final_hash}, set(), wav_observations, [],
+            parser_observations, workflow_input)
+        # file_integrity: 1 of 2 checks passes (0.5); cross_evidence_support:
+        # the one rin-overlap check passes (1.0); declaration_consistency has
+        # no checks and stays unavailable. Equal default weights reproduce
+        # the plain mean of the two populated layers.
+        self.assertAlmostEqual(default_integrity["value"], (0.5 + 1.0) / 2)
+
+        skewed_profile = {
+            "profile_id": "test-skewed", "profile_version": 1,
+            "integrity": {
+                "layer_weights": {"file_integrity": 3.0, "declaration_consistency": 1.0,
+                                  "cross_evidence_support": 1.0},
+                "withholding_rule": {"min_components_for_substantive_mean": 2,
+                                    "require_substantive_support_or_contradiction": True},
+                "confidence_formula": {"ceiling": 0.8, "denominator_layers": 3},
+            },
+        }
+        skewed_integrity, *_ = assess_axes(
+            native, chain, {final_hash}, set(), wav_observations, [],
+            parser_observations, workflow_input, scoring_profile=skewed_profile)
+        # Weighting file_integrity's 0.5 three times as heavily as
+        # cross_evidence_support's 1.0 pulls the weighted mean down from the
+        # plain average -- proving the profile's weights actually drive the
+        # computation rather than being reported but unused.
+        self.assertAlmostEqual(skewed_integrity["value"], (0.5 * 3 + 1.0 * 1) / 4)
+        self.assertLess(skewed_integrity["value"], default_integrity["value"])
+
+    def test_severe_contradiction_caps_the_weighted_mean(self):
+        final_hash = "a" * 64
+        native = {"artefacts": [{"artefact_hash": final_hash, "artefact_type": "audio/final",
+                                 "attributes": {}, "evidence": []}],
+                  "final_artefact_hash": final_hash}
+        # The WAV technical check passes, but object_hash_bound fails because
+        # final_hash is deliberately left out of bound_hashes below -- a
+        # severe, exact-identity contradiction, not a fuzzy measurement.
+        wav_observations = {final_hash: {"checks": [
+            {"rule": "technical.sample_rate_hz_matches_observed", "passed": True,
+             "evidence_hash": final_hash},
+        ]}}
+        parser_observations = {"b" * 64: {"parser": "rin",
+                                          "data": {"contributors": [{"name": "Jane Doe"}]}}}
+        workflow_input = {"declarations": {"contributors": ["Jane Doe"]}}
+        chain = types.SimpleNamespace(artefacts={final_hash: types.SimpleNamespace()})
+
+        integrity, _, _, _, checks, _ = assess_axes(
+            native, chain, set(), set(), wav_observations, [],
+            parser_observations, workflow_input)
+        # file_integrity = 0.5 (1 of 2 checks), cross_evidence_support = 1.0;
+        # the plain weighted mean would be 0.75, but object_hash_bound is on
+        # the default profile's severe list, so it is capped at 0.25 instead.
+        self.assertAlmostEqual(integrity["value"], 0.25)
+        # The cap is explained, not silent.
+        self.assertIn("A severe contradiction (object_hash_bound) capped Integrity at 0.25; "
+                      "the weighted mean was 0.750.", integrity["reasoning"])
+        record = checks["severe_contradiction_cap"][0]
+        self.assertEqual(record["triggered_rules"], ["object_hash_bound"])
+        self.assertAlmostEqual(record["weighted_mean"], 0.75)
+        self.assertTrue(record["value_lowered"])
+
+    def test_severe_contradiction_cap_does_not_raise_an_already_low_value(self):
+        final_hash = "a" * 64
+        native = {"artefacts": [{"artefact_hash": final_hash, "artefact_type": "audio/final",
+                                 "attributes": {}, "evidence": []}],
+                  "final_artefact_hash": final_hash}
+        # No wav checks at all -- file_integrity has only the failing
+        # object_hash_bound check, so its layer value is 0.0, not just low.
+        wav_observations = {}
+        # The submitted contributor does not overlap the RIN document's, so
+        # the one cross-evidence check also fails outright (0.0).
+        parser_observations = {"b" * 64: {"parser": "rin",
+                                          "data": {"contributors": [{"name": "Jane Doe"}]}}}
+        workflow_input = {"declarations": {"contributors": ["Someone Else"]}}
+        chain = types.SimpleNamespace(artefacts={final_hash: types.SimpleNamespace()})
+
+        integrity, _, _, _, checks, _ = assess_axes(
+            native, chain, set(), set(), wav_observations, [],
+            parser_observations, workflow_input)
+        # The weighted mean (0.0) is already below the 0.25 cap. A ceiling
+        # only pulls a value down toward it; it must never raise a lower
+        # value up to meet it.
+        self.assertAlmostEqual(integrity["value"], 0.0)
+        self.assertIn("already at or below the 0.25 cap", integrity["reasoning"])
+        self.assertFalse(checks["severe_contradiction_cap"][0]["value_lowered"])
 
     def test_comp_sheet_text_parser_extracts_selections(self):
         raw_hash, target_hash = "1" * 64, "2" * 64
@@ -2320,7 +2427,8 @@ class InputValidationTests(unittest.TestCase):
             item for item in result["assessment_checks"]["physical_similarity"]
             if item["target_hash"] == nodes[2]["artefact_hash"])
         self.assertEqual(mix_check["status"], "unavailable")
-        self.assertEqual(mix_check["reason_code"], "input_error")
+        self.assertEqual(mix_check["reason_code"], "disabled_by_policy")
+        self.assertFalse(mix_check["scoring_eligible"])
         relationship = next(item for item in result["findings"]
                             if item["code"] == "RELATIONSHIP_INTEGRITY_OBSERVATION"
                             and item["target_hash"] == nodes[2]["artefact_hash"])
@@ -2351,9 +2459,14 @@ class InputValidationTests(unittest.TestCase):
                 ])
                 result = self.score(request, root)
             self.assertEqual(result["execution_status"], "succeeded", result["error"])
-            statuses[name] = result["assessment_checks"]["physical_similarity"][0]["status"]
-        self.assertIn(statuses["correct"], {"corroborated", "inconclusive"})
-        self.assertEqual(statuses["typo"], "unavailable")
+            check = result["assessment_checks"]["physical_similarity"][0]
+            statuses[name] = (check["status"], check["reason_code"])
+            self.assertFalse(check["scoring_eligible"])
+            self.assertIsNone(check["integrity_contribution"])
+        self.assertEqual(statuses["correct"],
+                         ("unavailable", "disabled_by_policy"))
+        self.assertEqual(statuses["typo"],
+                         ("unavailable", "disabled_by_policy"))
 
     def test_unused_object_mapping_is_reported_not_fatal(self):
         request = copy.deepcopy(self.template)
@@ -2446,14 +2559,17 @@ class InputValidationTests(unittest.TestCase):
         self.assertEqual(result["execution_status"], "error")
         self.assertEqual(self._codes(result), ["OBJECT_CHANGED_DURING_EVALUATION"] * 2)
 
-    def test_expired_deadline_degrades_audio_checks_instead_of_timing_out(self):
+    def test_expired_deadline_keeps_physical_diagnostics_policy_disabled(self):
         result = run.evaluate(copy.deepcopy(self.template), self.folder, "native",
                               deadline=time.time() - 1)
         validate(result, "scoring-response.schema.json")
         self.assertEqual(result["execution_status"], "succeeded", result["error"])
         statuses = {(item["status"], item.get("reason_code"))
                     for item in result["assessment_checks"]["physical_similarity"]}
-        self.assertEqual(statuses, {("unavailable", "resource_budget_exhausted")})
+        self.assertEqual(statuses, {("unavailable", "disabled_by_policy")})
+        summary = result["assessment_checks"]["physical_similarity_summary"][0]
+        self.assertFalse(summary["enabled"])
+        self.assertFalse(summary["scoring_eligible"])
         self.assertFalse(any("CONTRADICTION" in code for code in self._codes(result)))
 
     def test_worker_receives_a_deadline_before_the_timeout(self):
@@ -2547,6 +2663,153 @@ class InputValidationTests(unittest.TestCase):
             with self.assertRaises(wav_io_module.WavError) as caught:
                 list(read_frames(path, descriptor))
         self.assertEqual(caught.exception.reason_code, "file_changed_after_inspection")
+
+
+class ScoringProfileTests(unittest.TestCase):
+    def _profile(self, **overrides):
+        profile = {
+            "profile_id": "unit-test", "profile_version": 1,
+            "integrity": {
+                "layer_weights": {"file_integrity": 1.0, "declaration_consistency": 1.0,
+                                  "cross_evidence_support": 1.0},
+                "withholding_rule": {"min_components_for_substantive_mean": 2,
+                                    "require_substantive_support_or_contradiction": True},
+                "confidence_formula": {"ceiling": 0.8, "denominator_layers": 3},
+            },
+        }
+        for path, value in overrides.items():
+            *keys, last = path.split(".")
+            target = profile
+            for key in keys:
+                target = target[key]
+            target[last] = value
+        return profile
+
+    def _write(self, directory, profile):
+        path = Path(directory) / "profile.json"
+        path.write_text(json.dumps(profile))
+        return path
+
+    def test_default_profile_loads_and_validates(self):
+        profile = load_default_scoring_profile()
+        self.assertEqual(profile["profile_id"], "default-v1")
+        self.assertEqual(profile["integrity"]["layer_weights"],
+                         {"file_integrity": 1.0, "declaration_consistency": 1.0,
+                          "cross_evidence_support": 1.0})
+        self.assertEqual(profile["integrity"]["confidence_formula"]["denominator_layers"], 3)
+
+    def test_missing_layer_weight_is_rejected(self):
+        with tempfile.TemporaryDirectory() as directory:
+            profile = self._profile()
+            del profile["integrity"]["layer_weights"]["cross_evidence_support"]
+            with self.assertRaises(ScoringProfileError):
+                load_scoring_profile(self._write(directory, profile))
+
+    def test_unknown_layer_weight_is_rejected(self):
+        with tempfile.TemporaryDirectory() as directory:
+            profile = self._profile()
+            profile["integrity"]["layer_weights"]["content_reconstruction"] = 1.0
+            with self.assertRaises(ScoringProfileError):
+                load_scoring_profile(self._write(directory, profile))
+
+    def test_non_positive_weight_is_rejected(self):
+        with tempfile.TemporaryDirectory() as directory:
+            profile = self._profile(**{"integrity.layer_weights.file_integrity": 0})
+            with self.assertRaises(ScoringProfileError):
+                load_scoring_profile(self._write(directory, profile))
+
+    def test_negative_weight_is_rejected(self):
+        with tempfile.TemporaryDirectory() as directory:
+            profile = self._profile(**{"integrity.layer_weights.declaration_consistency": -1.0})
+            with self.assertRaises(ScoringProfileError):
+                load_scoring_profile(self._write(directory, profile))
+
+    def test_non_finite_weight_is_rejected(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = self._write(directory, self._profile())
+            path.write_text(path.read_text().replace('"file_integrity": 1.0', '"file_integrity": NaN'))
+            with self.assertRaises(ScoringProfileError):
+                load_scoring_profile(path)
+
+    def test_mismatched_denominator_layers_is_rejected(self):
+        with tempfile.TemporaryDirectory() as directory:
+            profile = self._profile(**{"integrity.confidence_formula.denominator_layers": 4})
+            with self.assertRaises(ScoringProfileError):
+                load_scoring_profile(self._write(directory, profile))
+
+    def test_unknown_top_level_key_is_rejected(self):
+        with tempfile.TemporaryDirectory() as directory:
+            profile = self._profile()
+            profile["extra"] = True
+            with self.assertRaises(ScoringProfileError):
+                load_scoring_profile(self._write(directory, profile))
+
+    def test_duplicate_json_key_is_rejected(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "profile.json"
+            path.write_text('{"profile_id": "a", "profile_id": "b", "profile_version": 1, '
+                            '"integrity": {}}')
+            with self.assertRaises(ScoringProfileError):
+                load_scoring_profile(path)
+
+    def test_missing_file_is_rejected(self):
+        with self.assertRaises(ScoringProfileError):
+            load_scoring_profile("/nonexistent/scoring_profile.json")
+
+    def test_rationale_is_documentation_only_and_optional(self):
+        with tempfile.TemporaryDirectory() as directory:
+            profile = self._profile()
+            profile["integrity"]["layer_weight_rationale"] = {"file_integrity": "baseline"}
+            loaded = load_scoring_profile(self._write(directory, profile))
+            self.assertEqual(loaded["integrity"]["layer_weight_rationale"], {"file_integrity": "baseline"})
+
+    def test_default_profile_has_severe_contradiction_rules_active(self):
+        profile = load_default_scoring_profile()
+        self.assertIn("object_hash_bound", profile["integrity"]["severe_contradiction_rules"])
+        self.assertEqual(profile["integrity"]["severe_contradiction_cap"], 0.25)
+
+    def test_severe_rules_without_cap_is_rejected(self):
+        with tempfile.TemporaryDirectory() as directory:
+            profile = self._profile(**{"integrity.severe_contradiction_rules": ["object_hash_bound"]})
+            with self.assertRaises(ScoringProfileError):
+                load_scoring_profile(self._write(directory, profile))
+
+    def test_severe_cap_without_rules_is_rejected(self):
+        with tempfile.TemporaryDirectory() as directory:
+            profile = self._profile(**{"integrity.severe_contradiction_cap": 0.25})
+            with self.assertRaises(ScoringProfileError):
+                load_scoring_profile(self._write(directory, profile))
+
+    def test_empty_severe_rules_list_is_rejected(self):
+        with tempfile.TemporaryDirectory() as directory:
+            profile = self._profile(**{"integrity.severe_contradiction_rules": [],
+                                       "integrity.severe_contradiction_cap": 0.25})
+            with self.assertRaises(ScoringProfileError):
+                load_scoring_profile(self._write(directory, profile))
+
+    def test_duplicate_severe_rule_is_rejected(self):
+        with tempfile.TemporaryDirectory() as directory:
+            profile = self._profile(**{
+                "integrity.severe_contradiction_rules": ["object_hash_bound", "object_hash_bound"],
+                "integrity.severe_contradiction_cap": 0.25})
+            with self.assertRaises(ScoringProfileError):
+                load_scoring_profile(self._write(directory, profile))
+
+    def test_severe_cap_out_of_range_is_rejected(self):
+        with tempfile.TemporaryDirectory() as directory:
+            profile = self._profile(**{"integrity.severe_contradiction_rules": ["object_hash_bound"],
+                                       "integrity.severe_contradiction_cap": 1.5})
+            with self.assertRaises(ScoringProfileError):
+                load_scoring_profile(self._write(directory, profile))
+
+    def test_valid_severe_contradiction_pair_loads(self):
+        with tempfile.TemporaryDirectory() as directory:
+            profile = self._profile(**{"integrity.severe_contradiction_rules": ["object_hash_bound"],
+                                       "integrity.severe_contradiction_cap": 0.25})
+            loaded = load_scoring_profile(self._write(directory, profile))
+            self.assertEqual(loaded["integrity"]["severe_contradiction_rules"], ["object_hash_bound"])
+            self.assertEqual(loaded["integrity"]["severe_contradiction_cap"], 0.25)
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -185,6 +185,10 @@ def main():
     inputs.add_argument("--native", type=Path, help="Music native-request JSON with a Ben-format chain")
     parser.add_argument("--root", type=Path, help="Directory containing the declared objects/ files")
     parser.add_argument("--output", type=Path, help="Save the response to this file instead of stdout")
+    parser.add_argument("--audio-analysis", action="store_true",
+                        help="Append optional audfprint, SpectroMap and librosa observations; never changes scores")
+    parser.add_argument("--audio-analysis-policy", type=Path,
+                        help="Enable report-only audio analysis using a local policy JSON")
     parser.add_argument("--worker", action="store_true", help=argparse.SUPPRESS)
     args = parser.parse_args()
     try:
@@ -199,7 +203,17 @@ def main():
             request = read_json(selected)
             if args.bundle:
                 request = public_bundle_request(request)
-            response = run_isolated(request, args.root, "native" if args.native else "csec")
+            mode = "native" if args.native else "csec"
+            started = time.monotonic()
+            deadline = started + effective_timeout(request.get("options", {}))
+            response = run_isolated(request, args.root, mode)
+            if args.audio_analysis or args.audio_analysis_policy:
+                from music_target.audio_diagnostics.policy import DEFAULT_PATH
+                from music_target.audio_diagnostics.runner import augment_response
+                response = augment_response(response, request, args.root, mode,
+                                            args.audio_analysis_policy or DEFAULT_PATH, deadline)
+                response["processing_ms"] = (time.monotonic() - started) * 1000
+                validate(response, "scoring-response.schema.json")
         serialized = json.dumps(response, indent=2, ensure_ascii=False, allow_nan=False) + "\n"
         if args.output:
             args.output.write_text(serialized)

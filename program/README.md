@@ -1,5 +1,10 @@
 # Start Here: Music Evidence Chain and CSEC Integration
 
+Optional audfprint, SpectroMap and librosa **report-only audio diagnostics** are
+available with `--audio-analysis`. See [setup, examples and evidence boundaries](docs/AUDIO_DIAGNOSTICS.md).
+They do not affect scores, weights, confidence or caps. The legacy signal pass
+remains disabled. Install optional dependencies with `python -m pip install -r requirements-audio.txt`.
+
 This directory contains an implemented baseline for assessing evidence from music production workflows. It was assembled from the two local projects supplied for this work on 2026-09-10. No code from `audio_evchain` was read, reused, or modified.
 
 The main approach is to reuse Ben's evidence graph and execution framework, connect the music parsers and checks, and expose a runnable interface for CSEC.
@@ -15,7 +20,7 @@ The main approach is to reuse Ben's evidence graph and execution framework, conn
 ## Recommended reading order
 
 1. [CSEC handoff](docs/03_CSEC_HANDOFF.md): integration instructions and supported boundaries.
-2. [Physical similarity technical reference](docs/PHYSICAL_SIMILARITY.md): measurements, per-mode decisions, four-state normalisation, scoring, and limitations.
+2. [Physical similarity technical reference](docs/PHYSICAL_SIMILARITY.md): policy-disabled legacy signal checks and the compatibility output retained for review.
 3. [Sheet formats](docs/SHEET_FORMATS.md): supported CompSheet and CueSheet formats.
 4. [Future work](docs/NEXT_TASKS.md): consolidated P0-P3 roadmap and unresolved legacy items.
 5. [Verification results](reports/verification.md): executed checks and remaining unverified areas.
@@ -32,22 +37,21 @@ The main approach is to reuse Ben's evidence graph and execution framework, conn
 - `WavMetadataPass` emits standardised technical checks once per audio artefact. `BoundFileIntegrityPass` consumes those cached checks instead of repeating the same comparisons.
 - A non-final WAV parser failure is isolated to that node: the program emits `WAV_PARSER_FAILED`, marks only dependent checks unavailable, and continues with independent evidence. An unsupported final WAV still returns `unsupported`.
 - `RelationshipIntegrityPass` is a registered libevchain `EvidencePass`. It compares only submitter-declared edge parameters with cached source and target observations and replaces the former diagnostic-only `MusicRelationshipPass`.
-- Uses one `PhysicalSimilarityPass` for declared audio relationships. Each relationship selects a bounded comparison mode—pairwise continuity, excerpt search, CompSheet selection timeline, multi-source contribution, or master continuity—but every result has the same four states and report shape.
-- The measurements, v1 thresholds, contradiction safeguards, scoring rules, and known limits of those modes are specified in [`docs/PHYSICAL_SIMILARITY.md`](docs/PHYSICAL_SIMILARITY.md).
+- Does not execute the legacy `PhysicalSimilarityPass`. Each declared relationship receives an explicit `unavailable` diagnostic placeholder with `reason_code: disabled_by_policy`, `scoring_eligible: false`, and no integrity contribution. The deprecated implementation remains isolated for later cleanup.
+- The rationale, compatibility output, and boundary for a future optional fingerprint provider are specified in [`docs/PHYSICAL_SIMILARITY.md`](docs/PHYSICAL_SIMILARITY.md).
 - Exact reconstruction is no longer executed or scored. Legacy reconstruction code remains isolated for later removal, but its `matched`/`not_applicable` statuses and pass-specific report keys are not exposed by the assessment path.
-- WAV samples are decoded with NumPy into C-contiguous `(frames, channels)` `float32` arrays. The pinned `numpy==2.2.6` dependency supports the project's Python 3.11-3.13 range; no SciPy dependency is used. Integer PCM and IEEE-float decoding are vectorised; finite float values outside `[-1, 1]` are preserved rather than clipped.
-- RIFF size, data size, partial-frame, byte-rate, and trailing-byte anomalies are reported as stable warnings where safe. Unsupported codecs remain unsupported, while float NaN/Infinity causes only dependent content checks to become unavailable and produces `WAV_SAMPLE_DATA_INVALID`.
-- Each audio file also has a request-cached, complete low-rate analysis proxy. Integer-factor Kaiser-windowed sinc filtering produces 2000 Hz for 48 kHz input and 2100 Hz for 44.1 kHz input; later integer and non-integer reductions are low-pass filtered before slicing or interpolation.
-- The unified pass reuses bounded waveform, landmark, DTW, envelope, contribution, residual, and excerpt-search measurements. Exploratory alignment and location checks use FFT-normalised cross-correlation across the complete proxy rather than searching only the first 60 seconds. Signal-estimated offsets, gains, and channel matrices are diagnostic only and are never written back into the evidence graph.
-- Physical similarity has four public states: `corroborated`, `contradicted`, `inconclusive`, and `unavailable`. Only the first two enter integrity. Every result is labelled `content_match_is_provenance: false` because similarity cannot prove historical direction, authorship, or ownership.
-- Resource control combines a 128 MiB active PCM-window bound, a 256 MiB proxy-cache bound, a weighted request work limit, and the caller's requested wall-clock timeout (`options.timeout_seconds`; the evaluator adds no 60-second cap). Objects are limited to 512 MiB each and 1 GiB per request. Audio checks stop starting new work shortly before the caller's deadline, so a slow request still returns its other results. A resource-limited check returns `unavailable` with `reason_code: resource_budget_exhausted`; an incomplete search cannot return `contradicted`.
-- Audio check output records the ranges actually analysed or searched, whether search/analysis completed, and the analysis-proxy rate used.
+- Deprecated sample helpers can decode WAV data with NumPy into C-contiguous `(frames, channels)` `float32` arrays, but the active assessment path does not call them for signal analysis. The pinned `numpy==2.2.6` dependency supports the project's Python 3.11-3.13 range; no SciPy dependency is used.
+- RIFF size, data size, partial-frame, byte-rate, and trailing-byte anomalies are reported as stable warnings where safe. Unsupported codecs remain unsupported. NaN/Infinity remains rejected by the direct sample reader, but the active assessment does not scan sample content merely to run a disabled diagnostic.
+- Legacy low-rate proxies and waveform, landmark, DTW, contribution, residual, and excerpt-search helpers remain in deprecated modules but are not reached by the assessment path.
+- Physical similarity is diagnostic-only and policy-disabled. Every placeholder is `unavailable`, has `scoring_eligible: false` and `integrity_contribution: null`, and carries `content_match_is_provenance: false`.
+- Objects are limited to 512 MiB each and 1 GiB per request, and the caller's wall-clock timeout has no evaluator-side 60-second cap. Deprecated signal helpers retain PCM-window, proxy-cache, and weighted-work guards, but the active assessment does not invoke them.
+- No sample-content search or signal comparison is started by the active assessment path.
 - Separates submitter-declared technical properties from measured file properties and reports inconsistencies.
 - Requires `workflow_id`, `modifiers`, and submitter declarations in `submission.json`, and loads policies for 16 workflow types.
 - `WorkflowCompletenessPass` reports the state of each required, conditional, and optional expectation.
 - A missing non-final object is reported as `MISSING_OBJECT` and its file-binding check is `not_assessed`; absence affects workflow completeness (or legacy declared-object availability when no workflow is selected) but is not evidence of a file-integrity contradiction.
 - Reports integrity, C2PA attestation, and AI disclosure independently. The top-level C2PA axis is scoped to the final artefact; supporting-node manifests are reported separately and cannot raise the final score. AI disclosure measures declaration coverage; it does not detect AI-generated content.
-- Separates file integrity, structural validity, declaration consistency, physical similarity, CrossEvidence, and cryptographic attestation. Physical relationships are averaged within each target before targets are averaged, so a target with many stems cannot dominate integrity. Structural endpoint validity and C2PA do not inflate integrity; C2PA remains in the separate attestation-strength axis.
+- Separates file integrity, structural validity, declaration consistency, disabled physical diagnostics, CrossEvidence, and cryptographic attestation. Physical diagnostics never affect integrity. Structural endpoint validity and C2PA do not inflate integrity; C2PA remains in the separate attestation-strength axis.
 - Provides CSEC request conversion, a standard response contract, timeout control, and explicit `unsupported` and `error` states.
 - Applies XML size limits and rejects DTD/entity declarations. RIN 2.1 and ERN 4.3 are validated offline with pinned official XSD files, while XSD status remains separate from best-effort field extraction.
 - Binds available RIN `FileReference` and ERN `DeliveryFile` SHA-256 values to recordings/components. Cross-evidence checks cover MIDI, ERN, C2PA ingredients, and AI declaration consistency. Embedded and standalone C2PA manifests are normalised to asset-bound records before their ingredients are checked against the graph.
@@ -77,7 +81,8 @@ and reported without being applied to the retained graph.
 
 A known non-final WAV whose encoding is unsupported or malformed follows the
 same isolation principle at parser level. Its graph node and declaration remain
-visible, but WAV-dependent metadata and physical-audio checks are unavailable.
+visible, but WAV-dependent metadata checks are unavailable; the physical
+diagnostic placeholder remains policy-disabled for every relationship.
 Independent files and evidence continue to be assessed. The final artefact is
 strict: if its WAV cannot be parsed by the supported WAV implementation, the
 request returns `unsupported` or `error` as appropriate.
@@ -95,7 +100,7 @@ bundle (`OBJECT_PATH_INVALID`). Dependent checks become `unavailable`, workflow
 expectations that rely on the node become `not_assessed` rather than missing,
 and a closing `SCORE_AFFECTED_BY_INPUT_ERRORS` finding marks every otherwise
 available axis `partial`. A misspelled relationship field disables that
-relationship's content checks instead of being ignored, so a typo cannot turn
+relationship's deterministic checks instead of being ignored, so a typo cannot turn
 an honest declaration into a contradiction. File content, not the extension,
 decides the audio format: AIFF, FLAC, Ogg or MP3 data in a `.wav` file is
 reported as that format. If a non-final file changes while it is being
@@ -107,57 +112,41 @@ The program does not infer relationships or fill in missing relationship
 parameters. It evaluates only graph edges and transformation parameters supplied
 in the submission. Missing evidence lowers assessment availability and
 confidence; it is not a contradiction and does not directly lower the integrity
-value. When physical evidence is insufficient, the relationship remains a
-submitted claim and its content result is `inconclusive` (the comparison ran
-but could not decide) or `unavailable` (the comparison could not run). Neither
-state enters the numeric denominator.
-
-The relationship selects the comparison mode:
-
-| Relationship | Comparison mode | Conservative interpretation |
-|---|---|---|
-| `derived_from`, `edited_from` | `pairwise_continuity` | Gain- and light-processing-tolerant waveform and feature comparison; arbitrary generic derivation differences remain inconclusive |
-| `excerpted_from` | `excerpt_search` | Bounded full-proxy search for a clear source segment; ambiguous repeated locations are inconclusive |
-| `comped_from` | `selection_timeline` | Parsed CompSheet selections are compared and combined into one primary result per relationship |
-| `stemmed_from`, `mixed_from` | `multi_source_contribution` | Leave-one-out source contribution plus a joint residual guard; a source is contradicted only when unsupported while the remaining joint model is supported |
-| `mastered_from` | `master_continuity` | Processing-tolerant continuity evidence; mastering operations are not reconstructed |
-| `rendered_from`, `input_to`, or a non-audio endpoint | `unsupported_relationship` | `unavailable`; metadata relationships are not converted into acoustic claims |
-
-The four result states are deliberately asymmetric. `corroborated` contributes
-1 and `contradicted` contributes 0. `inconclusive` and `unavailable` contribute
-`null` and are reported as findings. The output never calls physical similarity
-`matched` or `verified`, and every result carries
-`content_match_is_provenance: false`.
+value. The legacy physical-similarity layer is disabled for every relationship
+because its narrow frequency and transformation assumptions can produce
+misleading results for legitimate production material. It emits no
+physical-similarity findings and never changes integrity. Each declared
+relationship remains visible as an `unavailable` compatibility placeholder;
+this describes policy state, not a failed analysis.
 
 Each item in `assessment_checks.physical_similarity` follows one shape:
 
 ```json
 {
   "relationship_type": "derived_from",
-  "comparison_mode": "pairwise_continuity",
+  "comparison_mode": "disabled",
   "source_hashes": ["<source-sha256>"],
   "target_hash": "<target-sha256>",
-  "status": "corroborated",
-  "integrity_contribution": 1.0,
-  "similarity_score": 0.87,
-  "declared_ranges_used": true,
-  "analysis_complete": true,
+  "status": "unavailable",
+  "integrity_contribution": null,
+  "scoring_eligible": false,
+  "similarity_score": null,
+  "declared_ranges_used": false,
+  "analysis_complete": false,
   "metrics": {},
-  "threshold_policy": "pairwise_continuity-v1",
+  "threshold_policy": null,
   "content_match_is_provenance": false,
-  "reason": "Independent signal features support content continuity."
+  "reason_code": "disabled_by_policy",
+  "reason": "Legacy signal comparisons are disabled by policy."
 }
 ```
 
-`assessment_checks.physical_similarity_summary` records status counts and
-per-target values. For example, four corroborated and one contradicted
-relationship for Target A produce 0.8; one corroborated relationship for
-Target B produces 1.0; the layer value is `(0.8 + 1.0) / 2 = 0.9`. This target
-normalisation prevents a large mix from dominating a smaller target merely
-because it declares more source edges.
+`assessment_checks.physical_similarity_summary` reports `enabled: false`,
+`scoring_eligible: false`, a null value, zero scored relationships, and the
+number of declared relationships represented by disabled placeholders.
 
-For example, declared ranges can focus an edit comparison without requiring an
-exact construction recipe:
+Declared ranges remain available to deterministic relationship checks even
+though no signal comparison is run:
 
 ```json
 {
@@ -173,10 +162,7 @@ exact construction recipe:
 }
 ```
 
-If ranges are absent, supported modes may estimate a bounded diagnostic
-alignment. Estimated parameters are labelled diagnostic and do not alter the
-edge. If the result does not reach a reliable endpoint, it is `inconclusive`,
-not adverse evidence.
+No offset, gain, channel matrix, or other signal parameter is estimated.
 
 ## Run the native example
 
@@ -189,7 +175,7 @@ python3 -m pip install -r requirements-c2pa.txt
 python3 -B run.py --native examples/valid-generated/submission.json --root examples/valid-generated
 ```
 
-The example processes four audio nodes in sequence: `raw-track -> stem -> mix -> master`. The expected result contains `execution_status: succeeded`, four WAV observations, three `RELATIONSHIP_INTEGRITY_OBSERVATION` findings, and three corroborated unified physical-similarity results. This is a software-generated teaching fixture, not verified evidence of human-recorded creation.
+The example processes four audio nodes in sequence: `raw-track -> stem -> mix -> master`. The expected result contains `execution_status: succeeded`, four WAV observations, three `RELATIONSHIP_INTEGRITY_OBSERVATION` findings, and three policy-disabled physical diagnostic placeholders. This is a software-generated teaching fixture, not verified evidence of human-recorded creation.
 
 Exercise two failure boundaries:
 
@@ -220,15 +206,19 @@ python3 -B check_public.py /path/to/public-bundles
 ```
 
 The second command writes results to `reports/`. Both commands operate locally and do not transmit data.
-The local regression suite contains 101 tests, including coverage for non-final
+The regression suite includes core and optional audio tests, with coverage for non-final
 input isolation and final-first stopping, unknown-field suggestions, audio
 container detection by content, byte-capped decoding, deadline degradation,
 non-final WAV isolation, integer/float extensible PCM, float32/64 decoding, non-finite
 sample rejection, RIFF warnings, field-level unavailability, final-scoped C2PA,
 standalone C2PA ingredient checks, hash caching, ndarray PCM decoding, 24-bit
-sign extension, full-file proxy caching, non-integer anti-aliasing, unified
-four-state physical output, relationship-specific comparison modes, per-target
-aggregation, and resource-budget degradation without contradiction.
+sign extension, legacy signal-helper isolation, and an explicit assertion that
+the policy-disabled `PhysicalSimilarityPass` is never invoked by assessment.
+Severe-cap tests also check that a capped Integrity value is explained in its
+reasoning and recorded in `assessment_checks.severe_contradiction_cap`. Audio tests
+include a 3-minute long-source excerpt and length-independent SpectroMap peak density.
+Run them with `REQUIRE_AUDIO_BACKENDS=1` so that missing optional backends fail
+instead of being skipped.
 
 ## Directory overview
 
@@ -242,8 +232,8 @@ aggregation, and resource-budget degradation without contradiction.
 | `music_target/workflow_policy.py` | Safe policy loading, condition evaluation, and per-expectation workflow completeness |
 | `music_target/assessment_passes.py` | Cached file and relationship result aggregation, CrossEvidence, C2PA, and AI disclosure assessment logic |
 | `music_target/audio_derivation.py` | Shared audio utilities plus deprecated exact-reconstruction passes retained for later removal; they are not executed by assessment |
-| `music_target/physical_audio_passes.py` | Unified physical-similarity framework and its bounded comparison modes |
-| `docs/PHYSICAL_SIMILARITY.md` | Technical contract for physical measurements, mode-specific decisions, scoring, resource bounds, and limitations |
+| `music_target/physical_audio_passes.py` | Deprecated physical-similarity implementation retained for later cleanup; not imported by the assessment path |
+| `docs/PHYSICAL_SIMILARITY.md` | Policy record for the disabled signal layer and future optional diagnostic boundary |
 | `music_target/midi_parser.py` | Size- and structure-bounded Standard MIDI File parser |
 | `music_target/sheet_parsers.py` | CompSheet/CueSheet JSON, CSV, TXT, and PDF parsers plus field normalisation |
 | `music_target/contract.py` | CSEC/native format adaptation, input validation, and version identification |

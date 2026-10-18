@@ -1,0 +1,200 @@
+"""Configurable Integrity layer weighting and severe-contradiction capping.
+
+Externalises the per-layer weights, withholding rule, and confidence
+formula that ``assess_axes()`` applies when combining the Integrity axis.
+The shipped default profile at ``policies/scoring_profile.json`` reproduces
+``assess_axes()``'s former hardcoded weighting behaviour bit-for-bit for the
+weighted mean itself; any other profile is an explicit, reviewable
+configuration choice, not a silent behaviour change.
+
+``physical_similarity`` is intentionally not a weightable layer here: it is
+policy-disabled (``contributes_to_integrity=False`` in ``assess_axes()``),
+and a weight it can never use would be a configuration value with no
+effect. Re-admitting it to scoring is a separate decision.
+
+The profile also optionally names a set of check ``rule`` strings that are
+treated as severe contradictions: if any of them fails, the weighted mean is
+capped at ``severe_contradiction_cap`` instead of being reported as-is. This
+is a ceiling, not an override -- it only ever pulls the mean down toward the
+cap, never below where it already was. The two keys are optional but must
+be given together; a profile that defines neither leaves Integrity as the
+plain weighted mean.
+"""
+
+from __future__ import annotations
+
+import json
+import math
+from pathlib import Path
+
+#: Layer names assess_axes() can weight -- must match the "layer" values
+#: _layer() assigns to every contributes_to_integrity=True entry.
+INTEGRITY_LAYER_NAMES = ("file_integrity", "declaration_consistency", "cross_evidence_support")
+
+#: assess_axes() has exactly this many contributing layers today. The
+#: confidence formula's denominator describes that structural fact rather
+#: than an independent tunable, so it is checked against this constant
+#: instead of accepted freely -- a smaller value would let confidence
+#: exceed the response schema's [0, 1] bound as soon as more than one
+#: layer populates.
+EXPECTED_CONTRIBUTING_LAYER_COUNT = len(INTEGRITY_LAYER_NAMES)
+
+DEFAULT_PROFILE_PATH = Path(__file__).resolve().parents[1] / "policies" / "scoring_profile.json"
+
+_PROFILE_KEYS = {"profile_id", "profile_version", "description", "integrity"}
+_INTEGRITY_KEYS = {"layer_weights", "layer_weight_rationale", "withholding_rule", "confidence_formula",
+                   "severe_contradiction_rules", "severe_contradiction_cap"}
+_WITHHOLDING_RULE_KEYS = {"min_components_for_substantive_mean", "require_substantive_support_or_contradiction"}
+_CONFIDENCE_FORMULA_KEYS = {"ceiling", "denominator_layers"}
+
+
+class ScoringProfileError(ValueError):
+    pass
+
+
+def _no_duplicates(items):
+    result = {}
+    for key, value in items:
+        if key in result:
+            raise ScoringProfileError(f"Duplicate scoring profile key: {key}")
+        result[key] = value
+    return result
+
+
+def _positive_number(value, where):
+    if (type(value) not in (int, float) or isinstance(value, bool)
+            or not math.isfinite(value) or value <= 0):
+        raise ScoringProfileError(f"{where} must be a finite positive number.")
+    return value
+
+
+def load_scoring_profile(path):
+    """Load and validate a scoring profile JSON file.
+
+    Raises ``ScoringProfileError`` on any structural problem -- a malformed
+    or incomplete profile is never silently patched or defaulted around,
+    since that would mask an intended configuration change.
+    """
+    path = Path(path)
+    try:
+        raw = path.read_text()
+    except OSError as exc:
+        raise ScoringProfileError(f"Could not read scoring profile at {path}: {exc}") from exc
+    try:
+        profile = json.loads(raw, object_pairs_hook=_no_duplicates)
+    except ScoringProfileError:
+        raise
+    except ValueError as exc:
+        raise ScoringProfileError(f"Scoring profile at {path} is not valid JSON: {exc}") from exc
+
+    if not isinstance(profile, dict):
+        raise ScoringProfileError("Scoring profile must be an object.")
+    unknown = set(profile) - _PROFILE_KEYS
+    if unknown:
+        raise ScoringProfileError("Scoring profile has unexpected key(s): " + ", ".join(sorted(unknown)))
+    if not isinstance(profile.get("profile_id"), str) or not profile["profile_id"]:
+        raise ScoringProfileError("Scoring profile must have a non-empty string profile_id.")
+    if type(profile.get("profile_version")) is not int:
+        raise ScoringProfileError("Scoring profile must have an integer profile_version.")
+
+    integrity = profile.get("integrity")
+    if not isinstance(integrity, dict):
+        raise ScoringProfileError("Scoring profile must contain an 'integrity' object.")
+    unknown = set(integrity) - _INTEGRITY_KEYS
+    if unknown:
+        raise ScoringProfileError("integrity has unexpected key(s): " + ", ".join(sorted(unknown)))
+
+    weights = integrity.get("layer_weights")
+    if not isinstance(weights, dict):
+        raise ScoringProfileError("integrity.layer_weights must be an object.")
+    missing = [name for name in INTEGRITY_LAYER_NAMES if name not in weights]
+    if missing:
+        raise ScoringProfileError(
+            "integrity.layer_weights is missing required layer(s): " + ", ".join(missing))
+    unknown = [name for name in weights if name not in INTEGRITY_LAYER_NAMES]
+    if unknown:
+        raise ScoringProfileError(
+            "integrity.layer_weights has unknown layer(s): " + ", ".join(sorted(unknown)))
+    for name in INTEGRITY_LAYER_NAMES:
+        _positive_number(weights[name], f"integrity.layer_weights[{name!r}]")
+
+    # Optional, documentation-only: a human-readable note per layer
+    # explaining why a weight was (or was not) raised above the baseline --
+    # e.g. on forge-cost grounds. Never consumed by scoring logic.
+    rationale = integrity.get("layer_weight_rationale")
+    if rationale is not None:
+        if not isinstance(rationale, dict):
+            raise ScoringProfileError("integrity.layer_weight_rationale must be an object.")
+        unknown = set(rationale) - set(INTEGRITY_LAYER_NAMES)
+        if unknown:
+            raise ScoringProfileError(
+                "integrity.layer_weight_rationale has unknown layer(s): " + ", ".join(sorted(unknown)))
+        for name, text in rationale.items():
+            if not isinstance(text, str) or not text:
+                raise ScoringProfileError(
+                    f"integrity.layer_weight_rationale[{name!r}] must be a non-empty string.")
+
+    rule = integrity.get("withholding_rule")
+    if not isinstance(rule, dict):
+        raise ScoringProfileError("integrity.withholding_rule must be an object.")
+    unknown = set(rule) - _WITHHOLDING_RULE_KEYS
+    if unknown:
+        raise ScoringProfileError(
+            "integrity.withholding_rule has unexpected key(s): " + ", ".join(sorted(unknown)))
+    minimum = rule.get("min_components_for_substantive_mean")
+    if type(minimum) is not int or isinstance(minimum, bool) or minimum < 1:
+        raise ScoringProfileError(
+            "integrity.withholding_rule.min_components_for_substantive_mean must be a positive integer.")
+    if not isinstance(rule.get("require_substantive_support_or_contradiction"), bool):
+        raise ScoringProfileError(
+            "integrity.withholding_rule.require_substantive_support_or_contradiction must be a boolean.")
+
+    formula = integrity.get("confidence_formula")
+    if not isinstance(formula, dict):
+        raise ScoringProfileError("integrity.confidence_formula must be an object.")
+    unknown = set(formula) - _CONFIDENCE_FORMULA_KEYS
+    if unknown:
+        raise ScoringProfileError(
+            "integrity.confidence_formula has unexpected key(s): " + ", ".join(sorted(unknown)))
+    ceiling = formula.get("ceiling")
+    if (type(ceiling) not in (int, float) or isinstance(ceiling, bool)
+            or not math.isfinite(ceiling) or not (0 <= ceiling <= 1)):
+        raise ScoringProfileError("integrity.confidence_formula.ceiling must be a finite number in [0, 1].")
+    denominator = formula.get("denominator_layers")
+    # Not an independent tunable: assess_axes() has exactly
+    # EXPECTED_CONTRIBUTING_LAYER_COUNT contributing layers. Reject a
+    # mismatched value here, at load time, rather than let it surface later
+    # as an opaque schema-validation failure.
+    if denominator != EXPECTED_CONTRIBUTING_LAYER_COUNT:
+        raise ScoringProfileError(
+            "integrity.confidence_formula.denominator_layers must equal "
+            f"{EXPECTED_CONTRIBUTING_LAYER_COUNT} (assess_axes() has exactly "
+            f"{EXPECTED_CONTRIBUTING_LAYER_COUNT} contributing layers: "
+            f"{', '.join(INTEGRITY_LAYER_NAMES)}); got {denominator!r}.")
+
+    rules = integrity.get("severe_contradiction_rules")
+    cap = integrity.get("severe_contradiction_cap")
+    if (rules is None) != (cap is None):
+        raise ScoringProfileError(
+            "integrity.severe_contradiction_rules and integrity.severe_contradiction_cap "
+            "must be given together -- each is meaningless without the other.")
+    if rules is not None:
+        if not isinstance(rules, list) or not rules:
+            raise ScoringProfileError(
+                "integrity.severe_contradiction_rules must be a non-empty list of strings.")
+        if any(not isinstance(item, str) or not item for item in rules):
+            raise ScoringProfileError(
+                "integrity.severe_contradiction_rules must contain only non-empty strings.")
+        if len(rules) != len(set(rules)):
+            raise ScoringProfileError("integrity.severe_contradiction_rules must not contain duplicates.")
+        if (type(cap) not in (int, float) or isinstance(cap, bool)
+                or not math.isfinite(cap) or not (0 <= cap <= 1)):
+            raise ScoringProfileError(
+                "integrity.severe_contradiction_cap must be a finite number in [0, 1].")
+
+    return profile
+
+
+def load_default_scoring_profile():
+    """Load the scoring profile shipped at ``policies/scoring_profile.json``."""
+    return load_scoring_profile(DEFAULT_PROFILE_PATH)

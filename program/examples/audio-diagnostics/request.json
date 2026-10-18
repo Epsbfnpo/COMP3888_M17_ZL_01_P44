@@ -1,0 +1,50 @@
+{
+  "run_id": "842498bc-b128-4b49-a275-6ce319b4d67e",
+  "case_id": "AUDIO-OBSERVATION-FIXTURE",
+  "profile": "music-native-v0.1",
+  "options": {
+    "include_reasoning": true,
+    "offline_only": true,
+    "timeout_seconds": 180
+  },
+  "workflow": {
+    "workflow_id": "sample_and_loop_based_production",
+    "modifiers": [],
+    "description": "Synthetic repeated recording and four-second excerpt; not provenance ground truth.",
+    "declarations": {
+      "submitter_confirmation": true,
+      "contributors": [
+        "Fixture Mastering Engineer"
+      ]
+    }
+  },
+  "chain": {
+    "schema_version": "0.0.3",
+    "hash_method": "sha256",
+    "final_artefact_hash": "8699068584ba01947d52e5f55a973a86adf3c465c32621d1fe4b7c1f8304b638",
+    "artefacts": [
+      {
+        "artefact_hash": "22bf064117b015ad6b47b7e649c83c5378ff26c1def988d09e1edb3ec6cfecfe",
+        "artefact_type": "audio/raw-track",
+        "attributes": {},
+        "evidence": []
+      },
+      {
+        "artefact_hash": "8699068584ba01947d52e5f55a973a86adf3c465c32621d1fe4b7c1f8304b638",
+        "artefact_type": "audio/sample",
+        "attributes": {},
+        "evidence": [
+          {
+            "hash": "22bf064117b015ad6b47b7e649c83c5378ff26c1def988d09e1edb3ec6cfecfe",
+            "relationship_type": "excerpted_from",
+            "attributes": {}
+          }
+        ]
+      }
+    ]
+  },
+  "objects": {
+    "22bf064117b015ad6b47b7e649c83c5378ff26c1def988d09e1edb3ec6cfecfe": "objects/22bf064117b015ad6b47b7e649c83c5378ff26c1def988d09e1edb3ec6cfecfe.wav",
+    "8699068584ba01947d52e5f55a973a86adf3c465c32621d1fe4b7c1f8304b638": "objects/8699068584ba01947d52e5f55a973a86adf3c465c32621d1fe4b7c1f8304b638.wav"
+  }
+}
