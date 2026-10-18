@@ -1,0 +1,685 @@
+{
+  "schema_version": "0.2-candidate",
+  "run_id": "842498bc-b128-4b49-a275-6ce319b4d67e",
+  "case_id": "AUDIO-OBSERVATION-FIXTURE",
+  "asset_sha256": "8699068584ba01947d52e5f55a973a86adf3c465c32621d1fe4b7c1f8304b638",
+  "system": {
+    "name": "COMP3888-music-baseline",
+    "version": "0.7.0",
+    "source_revision": "sha256:6c5fc5687af78a430a26b79deae6e922a54d1e0815da33a647a6d71b31b1d341"
+  },
+  "execution_status": "succeeded",
+  "axes": {
+    "completeness": {
+      "availability": "available",
+      "value": 0.0,
+      "confidence": 1.0,
+      "reasoning": "Workflow sample_and_loop_based_production: 3.5/6 assessed required/conditional weight satisfied. Optional evidence is excluded."
+    },
+    "integrity": {
+      "availability": "partial",
+      "value": null,
+      "confidence": 0.267,
+      "reasoning": "Integrity has 1/3 score-eligible evidence layers; missing evidence reduces availability and confidence but is never treated as contradiction. A numeric value is withheld without independent CrossEvidence unless a contradiction exists. Structural validity and cryptographic attestation are reported separately and do not raise integrity. Legacy signal comparisons are disabled by policy and do not produce findings or affect integrity."
+    },
+    "attestation_strength": {
+      "availability": "unavailable",
+      "value": null,
+      "confidence": null,
+      "reasoning": "C2PA SDK is unavailable for the final artefact, so no cryptographic attestation was assessed."
+    },
+    "ai_disclosure": {
+      "availability": "unavailable",
+      "value": null,
+      "confidence": null,
+      "reasoning": "Explicit creation_method declarations cover 0/2 audio artefacts; this is disclosure coverage, not AI detection."
+    }
+  },
+  "validation": {
+    "validation_state": null,
+    "signature_present": null,
+    "signature_valid": null,
+    "cryptographically_valid": null,
+    "credential_trusted": null,
+    "codes": [],
+    "reasons": []
+  },
+  "findings": [
+    {
+      "code": "WAV_OBSERVATION",
+      "severity": "info",
+      "message": "Measured WAV properties and extracted metadata.",
+      "evidence_hash": "22bf064117b015ad6b47b7e649c83c5378ff26c1def988d09e1edb3ec6cfecfe",
+      "status": "parsed",
+      "observed": {
+        "duration_seconds": 16.0,
+        "sample_rate_hz": 22050,
+        "channels": 1,
+        "bit_depth": 16,
+        "format": "WAV",
+        "codec_subtype": "PCM",
+        "sample_format": "int",
+        "file_size_bytes": 705644,
+        "wav_format_tag": "WAVE_FORMAT_PCM",
+        "valid_bits_per_sample": 16,
+        "channel_mask": null,
+        "trailing_bytes": 0,
+        "wav_warnings": []
+      },
+      "embedded_metadata": {
+        "core_format": {
+          "audio_format_code": 1,
+          "audio_format": "PCM",
+          "num_channels": 1,
+          "sample_rate_hz": 22050,
+          "byte_rate": 44100,
+          "block_align": 2,
+          "bits_per_sample": 16,
+          "data_size_bytes": 705600,
+          "duration_seconds": 16.0
+        },
+        "info": {},
+        "broadcast_extension": null,
+        "cue_points": [],
+        "sampler": null,
+        "fact": null,
+        "id3": null,
+        "other_chunks": [],
+        "warnings": []
+      },
+      "checks": [],
+      "claim_mismatches": []
+    },
+    {
+      "code": "WAV_OBSERVATION",
+      "severity": "info",
+      "message": "Measured WAV properties and extracted metadata.",
+      "evidence_hash": "8699068584ba01947d52e5f55a973a86adf3c465c32621d1fe4b7c1f8304b638",
+      "status": "parsed",
+      "observed": {
+        "duration_seconds": 4.0,
+        "sample_rate_hz": 22050,
+        "channels": 1,
+        "bit_depth": 16,
+        "format": "WAV",
+        "codec_subtype": "PCM",
+        "sample_format": "int",
+        "file_size_bytes": 176444,
+        "wav_format_tag": "WAVE_FORMAT_PCM",
+        "valid_bits_per_sample": 16,
+        "channel_mask": null,
+        "trailing_bytes": 0,
+        "wav_warnings": []
+      },
+      "embedded_metadata": {
+        "core_format": {
+          "audio_format_code": 1,
+          "audio_format": "PCM",
+          "num_channels": 1,
+          "sample_rate_hz": 22050,
+          "byte_rate": 44100,
+          "block_align": 2,
+          "bits_per_sample": 16,
+          "data_size_bytes": 176400,
+          "duration_seconds": 4.0
+        },
+        "info": {},
+        "broadcast_extension": null,
+        "cue_points": [],
+        "sampler": null,
+        "fact": null,
+        "id3": null,
+        "other_chunks": [],
+        "warnings": []
+      },
+      "checks": [],
+      "claim_mismatches": []
+    },
+    {
+      "code": "RELATIONSHIP_INTEGRITY_OBSERVATION",
+      "severity": "info",
+      "message": "Declared relationship parameters were checked by the cached EvidencePass; separate content analysis may corroborate or contradict the submitted transformation.",
+      "pass": "RelationshipIntegrityPass",
+      "source_hash": "22bf064117b015ad6b47b7e649c83c5378ff26c1def988d09e1edb3ec6cfecfe",
+      "target_hash": "8699068584ba01947d52e5f55a973a86adf3c465c32621d1fe4b7c1f8304b638",
+      "relationship": "excerpted_from",
+      "endpoint_roles_validated": true,
+      "content_relationship_verified": null,
+      "value": null,
+      "checks": [],
+      "duration_delta_seconds": -12.0
+    },
+    {
+      "code": "PARSER_OBSERVATION",
+      "severity": "info",
+      "message": "audio/raw-track: parsed",
+      "parser": "wav",
+      "parser_status": "parsed",
+      "parser_result": {
+        "status": "parsed",
+        "observed": {
+          "duration_seconds": 16.0,
+          "sample_rate_hz": 22050,
+          "channels": 1,
+          "bit_depth": 16,
+          "format": "WAV",
+          "codec_subtype": "PCM",
+          "sample_format": "int",
+          "file_size_bytes": 705644,
+          "wav_format_tag": "WAVE_FORMAT_PCM",
+          "valid_bits_per_sample": 16,
+          "channel_mask": null,
+          "trailing_bytes": 0,
+          "wav_warnings": []
+        },
+        "embedded_metadata": {
+          "core_format": {
+            "audio_format_code": 1,
+            "audio_format": "PCM",
+            "num_channels": 1,
+            "sample_rate_hz": 22050,
+            "byte_rate": 44100,
+            "block_align": 2,
+            "bits_per_sample": 16,
+            "data_size_bytes": 705600,
+            "duration_seconds": 16.0
+          },
+          "info": {},
+          "broadcast_extension": null,
+          "cue_points": [],
+          "sampler": null,
+          "fact": null,
+          "id3": null,
+          "other_chunks": [],
+          "warnings": []
+        },
+        "checks": [],
+        "claim_mismatches": []
+      },
+      "evidence_hash": "22bf064117b015ad6b47b7e649c83c5378ff26c1def988d09e1edb3ec6cfecfe"
+    },
+    {
+      "code": "PARSER_OBSERVATION",
+      "severity": "info",
+      "message": "audio/sample: parsed",
+      "parser": "wav",
+      "parser_status": "parsed",
+      "parser_result": {
+        "status": "parsed",
+        "observed": {
+          "duration_seconds": 4.0,
+          "sample_rate_hz": 22050,
+          "channels": 1,
+          "bit_depth": 16,
+          "format": "WAV",
+          "codec_subtype": "PCM",
+          "sample_format": "int",
+          "file_size_bytes": 176444,
+          "wav_format_tag": "WAVE_FORMAT_PCM",
+          "valid_bits_per_sample": 16,
+          "channel_mask": null,
+          "trailing_bytes": 0,
+          "wav_warnings": []
+        },
+        "embedded_metadata": {
+          "core_format": {
+            "audio_format_code": 1,
+            "audio_format": "PCM",
+            "num_channels": 1,
+            "sample_rate_hz": 22050,
+            "byte_rate": 44100,
+            "block_align": 2,
+            "bits_per_sample": 16,
+            "data_size_bytes": 176400,
+            "duration_seconds": 4.0
+          },
+          "info": {},
+          "broadcast_extension": null,
+          "cue_points": [],
+          "sampler": null,
+          "fact": null,
+          "id3": null,
+          "other_chunks": [],
+          "warnings": []
+        },
+        "checks": [],
+        "claim_mismatches": []
+      },
+      "evidence_hash": "8699068584ba01947d52e5f55a973a86adf3c465c32621d1fe4b7c1f8304b638"
+    },
+    {
+      "code": "C2PA_PARSER_UNAVAILABLE",
+      "severity": "low",
+      "message": "c2pa-python is not installed; C2PA attestation was not assessed."
+    },
+    {
+      "code": "AI_DISCLOSURE_MISSING",
+      "severity": "medium",
+      "message": "One or more audio artefacts lack creation_method disclosure."
+    },
+    {
+      "code": "WORKFLOW_FINAL_TYPE_MISMATCH",
+      "severity": "medium",
+      "message": "The final artefact type is not allowed by the selected workflow.",
+      "evidence_hash": "8699068584ba01947d52e5f55a973a86adf3c465c32621d1fe4b7c1f8304b638"
+    },
+    {
+      "code": "WORKFLOW_EXPECTATION_MISSING",
+      "severity": "medium",
+      "message": "common.creation_method_disclosure: Declaration 'artefacts[].creation_method' is missing or ambiguous."
+    },
+    {
+      "code": "WORKFLOW_EXPECTATION_MISSING",
+      "severity": "medium",
+      "message": "sample.lineage: Found 0 qualifying bound ancestor(s); minimum is 1."
+    }
+  ],
+  "processing_ms": 200.83125005476177,
+  "resource_usage": {
+    "cpu_ms": 1.582,
+    "peak_rss_kib": null
+  },
+  "error": null,
+  "coverage": {
+    "complete": true,
+    "submitted_artefacts": 2,
+    "evaluated_artefacts": 2,
+    "skipped_artefacts": 0,
+    "submitted_relationships": 1,
+    "evaluated_relationships": 1,
+    "skipped_relationships": 0
+  },
+  "unknown_inputs": [],
+  "workflow_assessment": {
+    "policy_id": "comp3888-music-workflow-evidence",
+    "policy_version": "0.1.0-candidate",
+    "workflow_id": "sample_and_loop_based_production",
+    "workflow_title": "Sample- or loop-based production",
+    "modifiers": [
+      "includes_mixing",
+      "includes_samples_or_loops"
+    ],
+    "allowed_final_type": false,
+    "summary": {
+      "applicable_rules": 5,
+      "assessed_rules": 5,
+      "satisfied_rules": 3,
+      "missing_rules": 2
+    },
+    "rule_results": [
+      {
+        "rule_id": "common.final_artefact",
+        "level": "required",
+        "kind": "artifact_presence",
+        "status": "satisfied",
+        "weight": 1.0,
+        "reason": "Found 1 usable bound matching artefact(s); minimum is 1.",
+        "matched_artefact_hashes": [
+          "8699068584ba01947d52e5f55a973a86adf3c465c32621d1fe4b7c1f8304b638"
+        ],
+        "matched_relationships": []
+      },
+      {
+        "rule_id": "common.submitter_declaration",
+        "level": "required",
+        "kind": "declaration_presence",
+        "status": "satisfied",
+        "weight": 0.5,
+        "reason": "Declaration 'submitter_confirmation' is present.",
+        "matched_artefact_hashes": [],
+        "matched_relationships": []
+      },
+      {
+        "rule_id": "common.creation_method_disclosure",
+        "level": "required",
+        "kind": "declaration_presence",
+        "status": "missing",
+        "weight": 0.5,
+        "reason": "Declaration 'artefacts[].creation_method' is missing or ambiguous.",
+        "matched_artefact_hashes": [],
+        "matched_relationships": []
+      },
+      {
+        "rule_id": "sample.sources",
+        "level": "required",
+        "kind": "artifact_presence",
+        "status": "satisfied",
+        "weight": 2.0,
+        "reason": "Found 1 usable bound matching artefact(s); minimum is 1.",
+        "matched_artefact_hashes": [
+          "8699068584ba01947d52e5f55a973a86adf3c465c32621d1fe4b7c1f8304b638"
+        ],
+        "matched_relationships": []
+      },
+      {
+        "rule_id": "sample.lineage",
+        "level": "required",
+        "kind": "ancestry_path",
+        "status": "missing",
+        "weight": 2.0,
+        "reason": "Found 0 qualifying bound ancestor(s); minimum is 1.",
+        "matched_artefact_hashes": [],
+        "matched_relationships": []
+      },
+      {
+        "rule_id": "sample.original_source",
+        "level": "conditional",
+        "kind": "relationship_presence",
+        "status": "not_applicable",
+        "weight": 1.0,
+        "reason": "Trigger evaluated false: workflow.sample_is_self_created == true",
+        "matched_artefact_hashes": [],
+        "matched_relationships": []
+      },
+      {
+        "rule_id": "sample.clearance",
+        "level": "conditional",
+        "kind": "artifact_presence",
+        "status": "not_applicable",
+        "weight": 0.5,
+        "reason": "Trigger evaluated false: workflow.sample_is_third_party == true and workflow.client_requires_clearance_document == true",
+        "matched_artefact_hashes": [],
+        "matched_relationships": []
+      },
+      {
+        "rule_id": "common.c2pa",
+        "level": "optional",
+        "kind": "artifact_presence",
+        "status": "missing",
+        "weight": null,
+        "reason": "Found 0 usable bound matching artefact(s); minimum is 1.",
+        "matched_artefact_hashes": [],
+        "matched_relationships": []
+      },
+      {
+        "rule_id": "common.rin",
+        "level": "optional",
+        "kind": "artifact_presence",
+        "status": "missing",
+        "weight": null,
+        "reason": "Found 0 usable bound matching artefact(s); minimum is 1.",
+        "matched_artefact_hashes": [],
+        "matched_relationships": []
+      },
+      {
+        "rule_id": "common.ern",
+        "level": "optional",
+        "kind": "artifact_presence",
+        "status": "missing",
+        "weight": null,
+        "reason": "Found 0 usable bound matching artefact(s); minimum is 1.",
+        "matched_artefact_hashes": [],
+        "matched_relationships": []
+      },
+      {
+        "rule_id": "common.session_log",
+        "level": "optional",
+        "kind": "artifact_presence",
+        "status": "missing",
+        "weight": null,
+        "reason": "Found 0 usable bound matching artefact(s); minimum is 1.",
+        "matched_artefact_hashes": [],
+        "matched_relationships": []
+      },
+      {
+        "rule_id": "sample_and_loop_based_production.optional.1",
+        "level": "optional",
+        "kind": "artifact_presence",
+        "status": "missing",
+        "weight": null,
+        "reason": "Found 0 usable bound matching artefact(s); minimum is 1.",
+        "matched_artefact_hashes": [],
+        "matched_relationships": []
+      },
+      {
+        "rule_id": "sample_and_loop_based_production.optional.2",
+        "level": "optional",
+        "kind": "artifact_presence",
+        "status": "missing",
+        "weight": null,
+        "reason": "Found 0 usable bound matching artefact(s); minimum is 1.",
+        "matched_artefact_hashes": [],
+        "matched_relationships": []
+      },
+      {
+        "rule_id": "sample_and_loop_based_production.optional.3",
+        "level": "optional",
+        "kind": "artifact_presence",
+        "status": "missing",
+        "weight": null,
+        "reason": "Found 0 usable bound matching artefact(s); minimum is 1.",
+        "matched_artefact_hashes": [],
+        "matched_relationships": []
+      },
+      {
+        "rule_id": "sample_and_loop_based_production.optional.4",
+        "level": "optional",
+        "kind": "artifact_presence",
+        "status": "missing",
+        "weight": null,
+        "reason": "Found 0 usable bound matching artefact(s); minimum is 1.",
+        "matched_artefact_hashes": [],
+        "matched_relationships": []
+      },
+      {
+        "rule_id": "sample_and_loop_based_production.optional.5",
+        "level": "optional",
+        "kind": "artifact_presence",
+        "status": "missing",
+        "weight": null,
+        "reason": "Found 0 usable bound matching artefact(s); minimum is 1.",
+        "matched_artefact_hashes": [],
+        "matched_relationships": []
+      },
+      {
+        "rule_id": "sample_and_loop_based_production.optional.6",
+        "level": "optional",
+        "kind": "artifact_presence",
+        "status": "missing",
+        "weight": null,
+        "reason": "Found 0 usable bound matching artefact(s); minimum is 1.",
+        "matched_artefact_hashes": [],
+        "matched_relationships": []
+      }
+    ]
+  },
+  "assessment_checks": {
+    "scoring_profile": [
+      {
+        "profile_id": "default-v1",
+        "profile_version": 1
+      }
+    ],
+    "bound_file_integrity": [
+      {
+        "rule": "object_hash_bound",
+        "passed": true,
+        "evidence_hash": "22bf064117b015ad6b47b7e649c83c5378ff26c1def988d09e1edb3ec6cfecfe"
+      },
+      {
+        "rule": "object_hash_bound",
+        "passed": true,
+        "evidence_hash": "8699068584ba01947d52e5f55a973a86adf3c465c32621d1fe4b7c1f8304b638"
+      }
+    ],
+    "structural_validity": [
+      {
+        "rule": "graph_loaded_without_cycle",
+        "passed": true
+      },
+      {
+        "rule": "all_nodes_connected_to_final",
+        "passed": true
+      },
+      {
+        "rule": "declared_hash_references_resolve",
+        "passed": true
+      },
+      {
+        "rule": "relationship_endpoint_roles_registered",
+        "passed": true,
+        "source_hash": "22bf064117b015ad6b47b7e649c83c5378ff26c1def988d09e1edb3ec6cfecfe",
+        "target_hash": "8699068584ba01947d52e5f55a973a86adf3c465c32621d1fe4b7c1f8304b638",
+        "relationship_type": "excerpted_from"
+      }
+    ],
+    "relationship_integrity": [],
+    "integrity_layers": [
+      {
+        "layer": "file_integrity",
+        "status": "corroborated",
+        "value": 1.0,
+        "contributes_to_integrity": true,
+        "check_count": 2,
+        "reason": "SHA-256 binding, cached WAV technical checks, and parser readability of submitted files.",
+        "manual_review_reasons": [],
+        "weight": 1.0
+      },
+      {
+        "layer": "structural_validity",
+        "status": "corroborated",
+        "value": 1.0,
+        "contributes_to_integrity": false,
+        "check_count": 4,
+        "reason": "Graph, references, cycles, connectivity, and endpoint roles passed before assessment; this is not content proof.",
+        "manual_review_reasons": [],
+        "weight": null
+      },
+      {
+        "layer": "declaration_consistency",
+        "status": "unavailable",
+        "value": null,
+        "contributes_to_integrity": true,
+        "check_count": 0,
+        "reason": "Submitted relationship parameters compared with cached source and target media observations.",
+        "manual_review_reasons": [],
+        "weight": 1.0
+      },
+      {
+        "layer": "physical_similarity",
+        "status": "unavailable",
+        "value": null,
+        "contributes_to_integrity": false,
+        "check_count": 0,
+        "reason": "Legacy signal comparisons are disabled by policy and never contribute to integrity.",
+        "manual_review_reasons": [],
+        "weight": null
+      },
+      {
+        "layer": "cross_evidence_support",
+        "status": "unavailable",
+        "value": null,
+        "contributes_to_integrity": true,
+        "check_count": 0,
+        "reason": "Independent parser outputs compared with graph, declarations, and media.",
+        "manual_review_reasons": [],
+        "weight": 1.0
+      },
+      {
+        "layer": "cryptographic_attestation",
+        "status": "unavailable",
+        "value": null,
+        "contributes_to_integrity": false,
+        "check_count": 0,
+        "reason": "C2PA remains in the separate attestation-strength axis and never inflates integrity.",
+        "manual_review_reasons": [],
+        "weight": null
+      }
+    ],
+    "assessment_status_semantics": [
+      {
+        "status": "corroborated",
+        "meaning": "Independent evidence clearly supports content consistency, but does not prove provenance direction or authorship.",
+        "numeric_treatment": "1.0 in an eligible evidence layer."
+      },
+      {
+        "status": "contradicted",
+        "meaning": "An applicable assessed claim conflicts with observed evidence.",
+        "numeric_treatment": "0.0 in its eligible layer and emits a contradiction finding."
+      },
+      {
+        "status": "inconclusive",
+        "meaning": "The check ran, but the evidence did not reach either reliable endpoint.",
+        "numeric_treatment": "Excluded from the denominator and reported as a finding."
+      },
+      {
+        "status": "unavailable",
+        "meaning": "The check could not run, for example because a file, parameter, budget, or analysable signal was unavailable.",
+        "numeric_treatment": "Excluded from the denominator and never treated as zero."
+      }
+    ],
+    "cross_evidence": [],
+    "c2pa_attestation_records": [
+      {
+        "scope": "supporting",
+        "source_kind": "embedded",
+        "manifest_container_hash": "22bf064117b015ad6b47b7e649c83c5378ff26c1def988d09e1edb3ec6cfecfe",
+        "asset_hash": "22bf064117b015ad6b47b7e649c83c5378ff26c1def988d09e1edb3ec6cfecfe",
+        "binding_relationship": null,
+        "sdk_available": false,
+        "reader_succeeded": false,
+        "manifest_present": false,
+        "signature_present": false,
+        "validation_state": "sdk_unavailable",
+        "validation_codes": []
+      },
+      {
+        "scope": "final",
+        "source_kind": "embedded",
+        "manifest_container_hash": "8699068584ba01947d52e5f55a973a86adf3c465c32621d1fe4b7c1f8304b638",
+        "asset_hash": "8699068584ba01947d52e5f55a973a86adf3c465c32621d1fe4b7c1f8304b638",
+        "binding_relationship": null,
+        "sdk_available": false,
+        "reader_succeeded": false,
+        "manifest_present": false,
+        "signature_present": false,
+        "validation_state": "sdk_unavailable",
+        "validation_codes": []
+      }
+    ],
+    "physical_similarity": [
+      {
+        "relationship_type": "excerpted_from",
+        "comparison_mode": "disabled",
+        "source_hashes": [
+          "22bf064117b015ad6b47b7e649c83c5378ff26c1def988d09e1edb3ec6cfecfe"
+        ],
+        "target_hash": "8699068584ba01947d52e5f55a973a86adf3c465c32621d1fe4b7c1f8304b638",
+        "status": "unavailable",
+        "integrity_contribution": null,
+        "scoring_eligible": false,
+        "similarity_score": null,
+        "parameter_source": "not_used",
+        "declared_ranges_used": false,
+        "analysis_complete": false,
+        "metrics": {},
+        "threshold_policy": null,
+        "content_match_is_provenance": false,
+        "reason_code": "disabled_by_policy",
+        "reason": "Legacy signal comparisons are disabled because their narrow audio assumptions are not reliable across real production workflows."
+      }
+    ],
+    "physical_similarity_summary": [
+      {
+        "enabled": false,
+        "scoring_eligible": false,
+        "status": "unavailable",
+        "reason_code": "disabled_by_policy",
+        "reason": "Legacy signal comparisons are disabled because their narrow audio assumptions are not reliable across real production workflows.",
+        "value": null,
+        "counts": {
+          "corroborated": 0,
+          "contradicted": 0,
+          "inconclusive": 0,
+          "unavailable": 1
+        },
+        "declared_relationships": 1,
+        "scored_relationships": 0,
+        "assessed_targets": 0,
+        "target_values": {},
+        "scoring_policy": "disabled; no signal result contributes to integrity",
+        "content_match_is_provenance": false
+      }
+    ]
+  }
+}

@@ -1556,6 +1556,9 @@ class TargetTests(unittest.TestCase):
             self.assertIsNone(layers[name]["weight"])
         profile = result["assessment_checks"]["scoring_profile"][0]
         self.assertEqual(profile, {"profile_id": "default-v1", "profile_version": 1})
+        # No severe rule failed, so no cap record or cap sentence appears.
+        self.assertNotIn("severe_contradiction_cap", result["assessment_checks"])
+        self.assertNotIn("severe contradiction", result["axes"]["integrity"]["reasoning"])
 
     def test_default_scoring_profile_reproduces_plain_average(self):
         final_hash = "a" * 64
@@ -1617,13 +1620,20 @@ class TargetTests(unittest.TestCase):
         workflow_input = {"declarations": {"contributors": ["Jane Doe"]}}
         chain = types.SimpleNamespace(artefacts={final_hash: types.SimpleNamespace()})
 
-        integrity, *_ = assess_axes(
+        integrity, _, _, _, checks, _ = assess_axes(
             native, chain, set(), set(), wav_observations, [],
             parser_observations, workflow_input)
         # file_integrity = 0.5 (1 of 2 checks), cross_evidence_support = 1.0;
         # the plain weighted mean would be 0.75, but object_hash_bound is on
         # the default profile's severe list, so it is capped at 0.25 instead.
         self.assertAlmostEqual(integrity["value"], 0.25)
+        # The cap is explained, not silent.
+        self.assertIn("A severe contradiction (object_hash_bound) capped Integrity at 0.25; "
+                      "the weighted mean was 0.750.", integrity["reasoning"])
+        record = checks["severe_contradiction_cap"][0]
+        self.assertEqual(record["triggered_rules"], ["object_hash_bound"])
+        self.assertAlmostEqual(record["weighted_mean"], 0.75)
+        self.assertTrue(record["value_lowered"])
 
     def test_severe_contradiction_cap_does_not_raise_an_already_low_value(self):
         final_hash = "a" * 64
@@ -1640,13 +1650,15 @@ class TargetTests(unittest.TestCase):
         workflow_input = {"declarations": {"contributors": ["Someone Else"]}}
         chain = types.SimpleNamespace(artefacts={final_hash: types.SimpleNamespace()})
 
-        integrity, *_ = assess_axes(
+        integrity, _, _, _, checks, _ = assess_axes(
             native, chain, set(), set(), wav_observations, [],
             parser_observations, workflow_input)
         # The weighted mean (0.0) is already below the 0.25 cap. A ceiling
         # only pulls a value down toward it; it must never raise a lower
         # value up to meet it.
         self.assertAlmostEqual(integrity["value"], 0.0)
+        self.assertIn("already at or below the 0.25 cap", integrity["reasoning"])
+        self.assertFalse(checks["severe_contradiction_cap"][0]["value_lowered"])
 
     def test_comp_sheet_text_parser_extracts_selections(self):
         raw_hash, target_hash = "1" * 64, "2" * 64

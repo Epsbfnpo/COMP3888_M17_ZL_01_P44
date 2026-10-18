@@ -429,7 +429,13 @@ standalone authenticity detector or decision policy.
 
 ## Active future boundary
 
-Audio fingerprinting is not included in v0.7.0. A future provider may be added
+The optional report-only audio providers are documented in
+[`AUDIO_DIAGNOSTICS.md`](AUDIO_DIAGNOSTICS.md). They run after the core scoring
+worker and do not invoke the legacy implementation described above. Installing
+dependencies does not activate them; use the explicit local audio flag.
+
+The policy for these providers is the same boundary originally recorded in
+v0.7.0: a provider may be added
 only as an optional, local, resource-bounded diagnostic. It must remain outside
 integrity, retain `scoring_eligible: false` and
 `content_match_is_provenance: false`, and treat a non-match as inconclusive

@@ -1,0 +1,7 @@
+# Optional, report-only providers. Core requirements remain separate.
+numpy==2.2.6
+scipy==1.16.3
+librosa==0.11.0
+spectromap @ git+https://github.com/Aaron-AALG/SpectroMap.git@cb475141fb434d65073ade1a79a4f52cb95df160
+# audfprint's unmodified landmark extractor is vendored with its MIT notice.
+# It consumes decoded arrays, so this integration does not require FFmpeg.

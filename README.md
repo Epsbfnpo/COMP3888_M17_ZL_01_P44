@@ -4,6 +4,11 @@ This directory contains an implemented baseline for assessing evidence from musi
 
 The main approach is to reuse Ben's evidence graph and execution framework, connect the music parsers and checks, and expose a runnable interface for CSEC.
 
+The current local branch is `feature/dynamic-weighting-with-cap`, based on commit
+`c6d36fd`, with optional report-only audfprint, SpectroMap and librosa diagnostics
+added on 18 October 2026. These diagnostics do not change any score, weight,
+confidence, withholding rule or cap. LLM integration is outside this update.
+
 The runnable evaluator is in [`program/`](program/). Unless stated otherwise, file locations and commands below are relative to that directory.
 
 ## Team responsibilities
@@ -17,10 +22,12 @@ The runnable evaluator is in [`program/`](program/). Unless stated otherwise, fi
 ## Recommended reading order
 
 1. [CSEC handoff](program/docs/03_CSEC_HANDOFF.md): integration instructions and supported boundaries.
-2. [Physical diagnostic policy](program/docs/PHYSICAL_SIMILARITY.md): disabled legacy signal checks and future optional-diagnostic boundary.
-3. [Sheet formats](program/docs/SHEET_FORMATS.md): supported CompSheet and CueSheet formats.
-4. [Future work](program/docs/NEXT_TASKS.md): consolidated P0-P3 roadmap and unresolved legacy items.
-5. [Verification results](program/reports/verification.md): executed checks and remaining unverified areas.
+2. [Physical diagnostic policy](program/docs/PHYSICAL_SIMILARITY.md): disabled legacy signal checks and the separate non-scoring boundary.
+3. [Audio diagnostics](program/docs/AUDIO_DIAGNOSTICS.md): optional dependencies, execution, providers and output fields.
+4. [Sheet formats](program/docs/SHEET_FORMATS.md): supported CompSheet and CueSheet formats.
+5. [Future work](program/docs/NEXT_TASKS.md): consolidated P0-P3 roadmap and unresolved legacy items.
+6. [Verification results](program/reports/verification.md): historical core verification and remaining unverified areas.
+7. [Audio integration verification](program/reports/audio-diagnostics-verification.json): 149 passing tests and core-result invariance on the repeated-excerpt example.
 
 ## Current implementation
 
@@ -34,10 +41,11 @@ The runnable evaluator is in [`program/`](program/). Unless stated otherwise, fi
 - `WavMetadataPass` emits standardised technical checks once per audio artefact. `BoundFileIntegrityPass` consumes those cached checks instead of repeating the same comparisons.
 - A non-final WAV parser failure is isolated to that node: the program emits `WAV_PARSER_FAILED`, marks only dependent checks unavailable, and continues with independent evidence. An unsupported final WAV still returns `unsupported`.
 - `RelationshipIntegrityPass` is a registered libevchain `EvidencePass`. It compares only submitter-declared edge parameters with cached source and target observations and replaces the former diagnostic-only `MusicRelationshipPass`.
-- Does not execute the legacy `PhysicalSimilarityPass`, exact reconstruction, waveform comparison, landmark/DTW matching, source-contribution analysis, residual modelling, master continuity, or excerpt search.
+- The core assessment does not execute the legacy `PhysicalSimilarityPass`, exact reconstruction, waveform comparison, landmark/DTW matching, source-contribution analysis, residual modelling, master continuity, or excerpt search.
 - Keeps one compatibility placeholder per retained relationship. Every placeholder has `comparison_mode: disabled`, `status: unavailable`, `reason_code: disabled_by_policy`, `scoring_eligible: false`, and `integrity_contribution: null`.
-- Emits no physical-similarity finding and never lets signal content affect integrity. Deprecated signal code remains isolated for later cleanup.
-- Deprecated sample and proxy helpers remain directly testable, but the active assessment path does not decode sample content for signal comparison.
+- The disabled legacy layer emits no physical-similarity findings. The separate optional diagnostic runner appends `AUDIO_*` findings without affecting integrity; deprecated signal code remains isolated.
+- With `--audio-analysis`, audfprint and SpectroMap report candidate content offsets and supported windows, while librosa reports feature correspondences, candidate boundaries and repetition. Their outputs are observations, not independent votes or proof of historical provenance.
+- Deprecated sample and proxy helpers remain directly testable. The core assessment does not decode signal content for comparison; optional diagnostic workers read independently verified WAV snapshots.
 - Objects remain limited to 512 MiB each and 1 GiB per request, and the caller's wall-clock timeout has no evaluator-side 60-second cap.
 - Separates submitter-declared technical properties from measured file properties and reports inconsistencies.
 - Requires `workflow_id`, `modifiers`, and submitter declarations in `submission.json`, and loads policies for 16 workflow types.
@@ -48,7 +56,7 @@ The runnable evaluator is in [`program/`](program/). Unless stated otherwise, fi
 - Applies XML size limits and rejects DTD/entity declarations. RIN 2.1 and ERN 4.3 are validated offline with pinned official XSD files, while XSD status remains separate from best-effort field extraction.
 - Binds available RIN `FileReference` and ERN `DeliveryFile` SHA-256 values to recordings/components. Cross-evidence checks cover MIDI, ERN, C2PA ingredients, and AI declaration consistency. Embedded and standalone C2PA manifests are normalised to asset-bound records before their ingredients are checked against the graph.
 - Invalid free-form comparison values, such as a textual BPM or non-string ISRC, make only that comparison unavailable; they do not turn the complete request into an execution error.
-- Each submitted object is hashed once before direct binding, and the source revision is cached once per process.
+- Core evaluation hashes each submitted object once before direct binding and caches the source revision once per process. Optional diagnostics separately rehash temporary snapshots to confirm they still correspond to the core-bound bytes.
 - Includes successful, hash-error, and unsupported-type examples, and has been run against 11 public CSEC cases.
 
 The four dimensions respect separate evidence boundaries:
@@ -107,7 +115,9 @@ confidence; it is not a contradiction and does not directly lower the integrity
 value. The legacy signal layer is disabled for every relationship because its
 narrow assumptions can produce misleading results for legitimate production
 material. No range, offset, gain, channel matrix, contribution, or content
-similarity is estimated.
+similarity is estimated by the core assessment. When explicitly enabled, the
+separate diagnostic workers may estimate candidate offsets and feature
+correspondences; these observations never replace submitted parameters.
 
 Each retained relationship remains visible through a compatibility placeholder:
 
@@ -126,8 +136,80 @@ Each retained relationship remains visible through a compatibility placeholder:
 ```
 
 This placeholder reports policy state, not an attempted analysis failure. It
-does not emit a physical finding and cannot change integrity. Future audio
-fingerprinting, if requested, will use a separate optional non-scoring provider.
+does not emit a physical finding and cannot change integrity. Optional audio fingerprinting now uses separate report-only providers, enabled
+explicitly with `--audio-analysis` or `--audio-analysis-policy`.
+
+## Optional audio diagnostics
+
+From the repository root:
+
+```bash
+cd program
+python3 -m pip install -r requirements.txt
+python3 -m pip install -r requirements-audio.txt
+python3 -B make_audio_diagnostic_example.py
+python3 -B run.py --native examples/audio-diagnostics/request.json \
+  --root examples/audio-diagnostics --audio-analysis \
+  --output examples/audio-diagnostics/response.json
+```
+
+Use the existing virtual environment where available. `requirements-audio-lock.txt`
+records the tested environment. The vendored audfprint extractor consumes decoded
+arrays, so this integration does not require FFmpeg. Dependency origins and
+licences are recorded in `music_target/audio_diagnostics/vendor/UPSTREAM.json`.
+
+| Provider | Observation |
+|---|---|
+| audfprint | Landmark fingerprints, candidate time offsets and supported windows, including repeated-source candidates |
+| SpectroMap | Spectral peaks detected in fixed 4-second windows, so density does not depend on file length; exact peak-pair comparison and offset voting |
+| librosa | Chroma, MFCC and energy features; candidate boundaries, repetitions and cross-file correspondences |
+
+The parent process first retains the existing core scoring response, then runs
+isolated diagnostic workers on retained, declared audio-to-audio edges. It does
+not search undeclared files or create graph relationships. CompSheet comparison
+requires a matching selection and complete declared ranges. Only the currently
+supported WAV encodings are accepted.
+
+Detailed results are object arrays in `assessment_checks.audio_fingerprint`,
+`assessment_checks.audio_structure` and `assessment_checks.audio_diagnostic_summary`.
+Findings use the `AUDIO_*` prefix and link to details by `diagnostic_id`. Each
+observation has `scoring_eligible: false`, `integrity_contribution: null` and
+`content_match_is_provenance: false`.
+
+Candidate thresholds remain uncalibrated: completed observations are
+`inconclusive`, even when candidates exist; analyses that cannot run are
+`unavailable`. Missing dependencies, invalid local policies, provider failures,
+silence, changed inputs and exhausted caller time do not alter the completed
+core result. A crashed provider's diagnostic includes the tail of its stderr. The synthetic example yields fingerprint candidates near source
+2 and 10 seconds for the same four-second excerpt, demonstrating ambiguity
+rather than a unique historical source.
+
+The proposed development caps of 30 seconds per diagnostic run, 10 seconds per
+provider, 16 relations, 600 seconds per file, 64 MiB active PCM and 1500 feature
+frames were not added. Existing file validation and the caller's
+`options.timeout_seconds` remain active. Diagnostics use only the remaining
+caller time and do not silently truncate a file. A custom local parameter
+policy is enabled with `--audio-analysis-policy policies/audio_analysis_policy.json`.
+
+## Integrity weighting and cap
+
+The active profile is `policies/scoring_profile.json`. Integrity combines three
+available score-eligible layers: `file_integrity`, `declaration_consistency` and
+`cross_evidence_support`, each with default weight 1.0. With no assessed
+contradiction, the default withholding rule requires at least two populated
+layers and independent CrossEvidence before releasing a numeric value.
+Confidence is `0.8 * populated_layers / 3`; it is not a probability of authorship.
+
+An assessed failure of a rule listed in `severe_contradiction_rules` caps an
+otherwise available weighted result with `min(weighted_mean, 0.25)`. The cap
+cannot raise a lower value, and optional audio matches cannot cancel it. Final
+input problems that stop evaluation still return an execution error rather
+than a capped score. When the cap applies, the Integrity reasoning names the
+triggering rule(s) and the uncapped weighted mean, and
+`assessment_checks.severe_contradiction_cap` records `cap`, `triggered_rules`,
+`weighted_mean`, `value` and `value_lowered`. The record is absent when no
+severe rule failed. Diagnostic threshold calibration is separate from weight
+calibration; this integration does not add a fourth scored layer.
 
 ## Run the native example
 
@@ -172,7 +254,13 @@ python3 -B check_public.py /path/to/public-bundles
 ```
 
 The second command writes results to `reports/`. Both commands operate locally and do not transmit data.
-The local regression suite contains 102 tests, including coverage for non-final
+The 18 October 2026 verification passed 144 tests with no failures or skips:
+124 core tests and 20 new diagnostic tests. It exercised the real installed
+providers and verified unchanged axes and original findings when diagnostics
+were enabled. The synthetic tests are engineering checks, not real-session
+accuracy calibration. Run the full dependency-required suite with
+`REQUIRE_AUDIO_BACKENDS=1 python3 -B -m unittest discover -s tests -v`.
+Core tests include coverage for non-final
 input isolation and final-first stopping, unknown-field suggestions, audio
 container detection by content, byte-capped decoding, deadline degradation,
 non-final WAV isolation, integer/float extensible PCM, float32/64 decoding, non-finite
@@ -200,7 +288,16 @@ The locations below are relative to `program/`.
 | `music_target/sheet_parsers.py` | CompSheet/CueSheet JSON, CSV, TXT, and PDF parsers plus field normalisation |
 | `music_target/contract.py` | CSEC/native format adaptation, input validation, and version identification |
 | `policies/workflow_evidence_policy.json` | Candidate required, conditional, and optional evidence policy for 16 workflows |
-| `run.py` | CSEC and local execution entry point |
+| `music_target/audio_diagnostics/` | Report-only task selection, verified snapshots, isolated workers, three provider adapters and result assembly |
+| `policies/audio_analysis_policy.json` | Local provider and candidate-parameter configuration; no scoring controls or proposed development caps |
+| `schemas/audio-diagnostic.schema.json` | Diagnostic result validation and fixed non-scoring fields |
+| `requirements-audio.txt`, `requirements-audio-lock.txt` | Optional audio dependencies and the tested environment |
+| `make_audio_diagnostic_example.py`, `examples/audio-diagnostics/` | Reproducible repeated-excerpt example, request and core/audio reports |
+| `tests/test_audio_diagnostics.py` | Twenty provider, protocol and score-isolation tests |
+| `reports/audio-diagnostics-verification.json` | Current 144-test verification and real-provider example results |
+| `docs/AUDIO_DIAGNOSTICS.md` | Detailed audio setup, usage, output and interpretation |
+| `music_target/scoring_profile.py`, `policies/scoring_profile.json` | Validated three-layer Integrity weights, withholding, confidence and severe-contradiction cap |
+| `run.py` | CSEC/local execution and explicit parent-side audio diagnostic orchestration |
 | `schemas/` | Original CSEC candidate schemas and local music schemas |
 | `schemas/ddex/` | Pinned RIN 2.1 and ERN 4.3 XSD files, source hashes, and licence reminder |
 | `legacy_parsers/` | RIN, ERN, and C2PA parsers used by the production path, plus XSD validation and XML helpers |

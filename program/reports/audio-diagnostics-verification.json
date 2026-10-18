@@ -1,0 +1,61 @@
+{
+ "date": "2026-10-18",
+ "baseline_branch": "feature/dynamic-weighting-with-cap",
+ "baseline_commit": "c6d36fd2feb221cdc5a68bb3f480c3160bf1e2c5",
+ "test_suite": {
+  "passed": 149,
+  "failed": 0,
+  "skipped": 0,
+  "command": "REQUIRE_AUDIO_BACKENDS=1 python -B -m unittest discover -s tests"
+ },
+ "example": {
+  "axes_identical": true,
+  "core_findings_identical": true,
+  "real_providers_completed": [
+   "audfprint",
+   "spectromap",
+   "librosa"
+  ],
+  "source_offsets_seconds": {
+   "audfprint": [
+    1.9969160997732427,
+    10.00780045351474
+   ],
+   "spectromap": [
+    9.996190476190476,
+    1.991111111111111
+   ],
+   "librosa": []
+  },
+  "source_revision": "sha256:6c5fc5687af78a430a26b79deae6e922a54d1e0815da33a647a6d71b31b1d341"
+ },
+ "scope": "Report-only diagnostics; no development caps added; original caller timeout and file validation retained; no LLM.",
+ "accuracy_claim": "Synthetic engineering checks only; candidate thresholds remain uncalibrated.",
+ "long_source_check": {
+  "fixture": "Synthetic 180-second tone sequence; 20-second excerpt at 97.3 seconds.",
+  "spectromap_peak_density_peaks_per_second": {
+   "before_fix": {
+    "4s": 120.25,
+    "180s": 8.04
+   },
+   "after_fix_ratio_limit_tested": 1.25
+  },
+  "spectromap_aligned_excerpt_pair_share": {
+   "before_fix": 0.029,
+   "after_fix": 0.625
+  },
+  "spectromap_supported_target_seconds": {
+   "before_fix": 9.81,
+   "after_fix": 20.0
+  },
+  "regression_tests": [
+   "test_spectromap_peak_density_does_not_depend_on_file_length",
+   "test_long_source_excerpt_is_found_by_both_fingerprint_providers"
+  ]
+ },
+ "fixes": [
+  "SpectroMap peak_search runs on fixed peak_window_seconds windows so peak density no longer falls with file length; peak pairs use exact bins and a 32-frame zone.",
+  "A severe-contradiction cap is explained in Integrity reasoning and recorded in assessment_checks.severe_contradiction_cap.",
+  "Worker protocol violations become structured unavailability; crashed providers report a stderr tail; a worker start failure affects only its own task."
+ ]
+}

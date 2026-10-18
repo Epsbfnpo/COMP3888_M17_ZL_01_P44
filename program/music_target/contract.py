@@ -60,8 +60,11 @@ def validate(document, schema_name):
 def source_revision():
     """Hash the installed source tree once per process."""
     digest = hashlib.sha256()
-    files = [BASE / name for name in ["run.py", "make_examples.py", "check_public.py"]]
+    files = [BASE / name for name in ["run.py", "make_examples.py", "check_public.py",
+                                      "make_audio_diagnostic_example.py"]]
     files.extend(BASE.glob("requirements*.txt"))
+    files.extend((BASE / "music_target/audio_diagnostics/vendor").glob("*.json"))
+    files.extend((BASE / "music_target/audio_diagnostics/vendor").rglob("LICENSE"))
     for folder, pattern in [("music_target", "*.py"), ("vendor", "*.py"),
                             ("schemas", "*.json"), ("legacy_parsers", "*.py"),
                             ("policies", "*.json")]:

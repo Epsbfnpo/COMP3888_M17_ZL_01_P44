@@ -1,5 +1,10 @@
 # Start Here: Music Evidence Chain and CSEC Integration
 
+Optional audfprint, SpectroMap and librosa **report-only audio diagnostics** are
+available with `--audio-analysis`. See [setup, examples and evidence boundaries](docs/AUDIO_DIAGNOSTICS.md).
+They do not affect scores, weights, confidence or caps. The legacy signal pass
+remains disabled. Install optional dependencies with `python -m pip install -r requirements-audio.txt`.
+
 This directory contains an implemented baseline for assessing evidence from music production workflows. It was assembled from the two local projects supplied for this work on 2026-09-10. No code from `audio_evchain` was read, reused, or modified.
 
 The main approach is to reuse Ben's evidence graph and execution framework, connect the music parsers and checks, and expose a runnable interface for CSEC.
@@ -201,7 +206,7 @@ python3 -B check_public.py /path/to/public-bundles
 ```
 
 The second command writes results to `reports/`. Both commands operate locally and do not transmit data.
-The local regression suite contains 102 tests, including coverage for non-final
+The regression suite includes core and optional audio tests, with coverage for non-final
 input isolation and final-first stopping, unknown-field suggestions, audio
 container detection by content, byte-capped decoding, deadline degradation,
 non-final WAV isolation, integer/float extensible PCM, float32/64 decoding, non-finite
@@ -209,6 +214,11 @@ sample rejection, RIFF warnings, field-level unavailability, final-scoped C2PA,
 standalone C2PA ingredient checks, hash caching, ndarray PCM decoding, 24-bit
 sign extension, legacy signal-helper isolation, and an explicit assertion that
 the policy-disabled `PhysicalSimilarityPass` is never invoked by assessment.
+Severe-cap tests also check that a capped Integrity value is explained in its
+reasoning and recorded in `assessment_checks.severe_contradiction_cap`. Audio tests
+include a 3-minute long-source excerpt and length-independent SpectroMap peak density.
+Run them with `REQUIRE_AUDIO_BACKENDS=1` so that missing optional backends fail
+instead of being skipped.
 
 ## Directory overview
 

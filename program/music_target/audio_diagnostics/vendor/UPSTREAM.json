@@ -1,0 +1,22 @@
+{
+  "audfprint": {
+    "repository": "https://github.com/dpwe/audfprint",
+    "commit": "cb03ba99feafd41b8874307f0f4e808a6ce34362",
+    "files": ["audfprint_analyze.py", "stft.py", "audio_read.py", "hash_table.py", "LICENSE"],
+    "modifications": "none",
+    "license": "MIT; audio_read.py and stft.py also retain their original source notices",
+    "usage": "Analyzer.find_peaks, peaks2landmarks, landmarks2hashes; array input only. No uploaded databases or file decoders are used. Offset voting is local adapter code."
+  },
+  "spectromap": {
+    "repository": "https://github.com/Aaron-AALG/SpectroMap",
+    "commit": "cb475141fb434d65073ade1a79a4f52cb95df160",
+    "license": "GPL-3.0",
+    "usage": "Installed optional package; peak_search; matching is local adapter code."
+  },
+  "librosa": {
+    "version": "0.11.0",
+    "repository": "https://github.com/librosa/librosa",
+    "license": "ISC",
+    "usage": "Installed optional package; features and recurrence; no pretrained models or network downloads."
+  }
+}

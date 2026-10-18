@@ -914,6 +914,7 @@ def assess_axes(native, chain, bound_hashes, missing_hashes, wav_observations,
     min_components = withholding_rule["min_components_for_substantive_mean"]
     require_support = withholding_rule["require_substantive_support_or_contradiction"]
     denominator_layers = confidence_formula["denominator_layers"]
+    cap_record = None
     if not components:
         integrity_availability, integrity_value, integrity_confidence = "unavailable", None, None
     else:
@@ -931,11 +932,15 @@ def assess_axes(native, chain, bound_hashes, missing_hashes, wav_observations,
             # pulls the weighted mean down toward the cap, never below where
             # it already was, and never raises a lower mean up to meet it.
             if severe_contradiction_rules and severe_contradiction_cap is not None:
-                severe_hit = any(
-                    item.get("passed") is False and item["rule"] in severe_contradiction_rules
-                    for item in file_checks + rel_checks + cross_checks)
-                if severe_hit:
+                triggered = sorted({
+                    item["rule"] for item in file_checks + rel_checks + cross_checks
+                    if item.get("passed") is False and item["rule"] in severe_contradiction_rules})
+                if triggered:
+                    weighted_mean = integrity_value
                     integrity_value = min(integrity_value, severe_contradiction_cap)
+                    cap_record = {"cap": severe_contradiction_cap, "triggered_rules": triggered,
+                                  "weighted_mean": weighted_mean, "value": integrity_value,
+                                  "value_lowered": integrity_value < weighted_mean}
         else:
             integrity_value = None
         integrity_confidence = round(
@@ -960,10 +965,23 @@ def assess_axes(native, chain, bound_hashes, missing_hashes, wav_observations,
         withholding_clause = (
             f"The active scoring profile's withholding rule {rule_description}, unless a contradiction "
             f"exists; it {outcome} a numeric value for this assessment. ")
+    # A capped value must say so; otherwise a reader sees the cap value with
+    # no indication that a severe contradiction, not the mean, produced it.
+    cap_clause = ""
+    if cap_record:
+        rules = ", ".join(cap_record["triggered_rules"])
+        if cap_record["value_lowered"]:
+            cap_clause = (f"A severe contradiction ({rules}) capped Integrity at {cap_record['cap']:g}; "
+                          f"the weighted mean was {cap_record['weighted_mean']:.3f}. ")
+        else:
+            cap_clause = (f"A severe contradiction ({rules}) was found, but the weighted mean "
+                          f"{cap_record['weighted_mean']:.3f} was already at or below the "
+                          f"{cap_record['cap']:g} cap, which therefore did not change it. ")
     integrity = _axis(
         integrity_availability, integrity_value, integrity_confidence,
         (f"Integrity has {len(components)}/{denominator_layers} score-eligible evidence layers; missing evidence reduces availability and confidence but is never treated as contradiction. "
          f"{withholding_clause}"
+         f"{cap_clause}"
          "Structural validity and cryptographic attestation are reported separately and do not raise integrity. "
          "Legacy signal comparisons are disabled by policy and do not produce findings or affect integrity."))
 
@@ -996,6 +1014,8 @@ def assess_axes(native, chain, bound_hashes, missing_hashes, wav_observations,
         "physical_similarity": physical_similarity,
         "physical_similarity_summary": [physical_summary],
     }
+    if cap_record:
+        checks["severe_contradiction_cap"] = [cap_record]
     findings = (file_findings + rel_findings + cross_findings +
                 sample_data_findings +
                 attestation_findings + ai_findings)
