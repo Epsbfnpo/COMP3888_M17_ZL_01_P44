@@ -1,7 +1,7 @@
 {
-  "profile_id": "default-v1",
-  "profile_version": 1,
-  "description": "The layer_weights, withholding_rule, and confidence_formula values below reproduce assess_axes()'s former hardcoded Integrity weighting exactly. severe_contradiction_rules/severe_contradiction_cap are new, active-by-default behaviour, not a reproduction of prior hardcoding: a severe, near-impossible-to-fake-honestly contradiction now caps the weighted mean instead of being diluted by averaging.",
+  "profile_id": "default-v2",
+  "profile_version": 2,
+  "description": "The layer_weights and confidence_formula values below reproduce assess_axes()'s former hardcoded Integrity weighting. Version 2 restricts substantive support to evidence tiers independent of the submitter: a cross-evidence check from a signature-validated C2PA manifest or from recorder-written BWF/iXML metadata. Submitter-provided documents (RIN, ERN, CompSheet, CueSheet, MIDI, AAF, sound reports, unverified C2PA) still contribute to the cross_evidence_support value and can reveal contradictions, but cannot release a numeric Integrity value on their own. severe_contradiction_rules/severe_contradiction_cap cap the weighted mean when a severe, near-impossible-to-fake-honestly contradiction is found.",
   "integrity": {
     "layer_weights": {
       "file_integrity": 1.0,
@@ -11,11 +11,15 @@
     "layer_weight_rationale": {
       "file_integrity": "Hash binding and parser success are the hardest evidence to fabricate convincingly; baseline weight.",
       "declaration_consistency": "Requires matching declared fields to a file the submitter does not control; baseline weight.",
-      "cross_evidence_support": "Independent-source corroboration (DDEX/CompSheet/CueSheet/C2PA-ingredient); baseline weight. physical_similarity is not weightable here because it is policy-disabled (see docs/PHYSICAL_SIMILARITY.md) and never contributes to integrity; re-admitting it to scoring, and whether a higher weight is then defensible on forge-cost grounds (a convincing fabricated derivation is harder to produce than a convincing flat claim), is a separate, deliberate decision -- not something this profile does silently."
+      "cross_evidence_support": "Corroboration from parsed evidence. Each check carries an evidence_tier: signed_attestation (validated C2PA), recorder_metadata (BWF/iXML written into a hash-bound recording) or submitter_document (RIN, ERN, CompSheet, CueSheet, MIDI, AAF, sound reports, unverified C2PA). Baseline weight. physical_similarity is not weightable here because it is policy-disabled (see docs/PHYSICAL_SIMILARITY.md) and never contributes to integrity."
     },
     "withholding_rule": {
       "min_components_for_substantive_mean": 2,
-      "require_substantive_support_or_contradiction": true
+      "require_substantive_support_or_contradiction": true,
+      "substantive_support_tiers": [
+        "signed_attestation",
+        "recorder_metadata"
+      ]
     },
     "confidence_formula": {
       "ceiling": 0.8,

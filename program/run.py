@@ -18,6 +18,7 @@ from music_target.contract import (
     validate,
 )
 from music_target.engine import ObjectsChangedDuringEvaluation, evaluate_chain, finding
+from music_target.score_explanations import build as build_score_explanations
 
 
 HASH_FIELDS = ("evidence_hash", "source_hash", "target_hash", "artefact_hash")
@@ -124,6 +125,9 @@ def evaluate(request, root, mode, deadline=None, allow_local_files=False):
     if isinstance(options, dict) and options.get("include_reasoning") is False:
         for assessment in response["axes"].values():
             assessment["reasoning"] = None
+    elif response["execution_status"] == "succeeded":
+        # Built last, from the final axes, so every adjustment is reflected.
+        response.setdefault("assessment_checks", {})["score_explanations"] = build_score_explanations(response)
     validate(response, "scoring-response.schema.json")
     return response
 

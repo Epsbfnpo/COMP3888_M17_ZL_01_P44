@@ -24,15 +24,23 @@ def align_tokens(source_tokens, target_tokens, step, source, target, parameters)
         index[token].append(time)
     votes, hits = Counter(), defaultdict(list)
     bin_seconds = parameters.get("offset_bin_seconds", step * 2)
+    source_duration = source["range"][1] - source["range"][0]
+    target_duration = target["range"][1] - target["range"][0]
+    feasible_bins = (source_duration + target_duration) / bin_seconds + 1
     for query_time, token in set(target_tokens):
         for reference_time in index.get(token, []):
             offset = (reference_time - query_time) * step
             bucket = math.floor(offset / bin_seconds + 0.5)
             votes[bucket] += 1
             hits[bucket].append((float(query_time * step), offset))
+    # Every bin's votes, including those below the candidate threshold, so a
+    # second algorithm on the same pair can be compared offset by offset.
+    profile = {"votes": dict(votes), "bin_seconds": bin_seconds, "feasible_bins": feasible_bins,
+               "range_offset_seconds": source["range"][0] - target["range"][0],
+               "background": sum(votes.values()) / feasible_bins}
     if not votes:
         return [], {"source_tokens": len(source_tokens), "target_tokens": len(target_tokens),
-                    "raw_token_pair_matches": 0}
+                    "raw_token_pair_matches": 0}, profile
     low, high = min(votes), max(votes)
     histogram = np.array([votes.get(key, 0) for key in range(low, high + 1)])
     peaks, _ = find_peaks(np.r_[0, histogram, 0],
@@ -40,8 +48,6 @@ def align_tokens(source_tokens, target_tokens, step, source, target, parameters)
     candidates = sorted((low + int(peak) - 1 for peak in peaks),
                         key=lambda key: (-votes[key], key))
     matches = []
-    source_duration = source["range"][1] - source["range"][0]
-    target_duration = target["range"][1] - target["range"][0]
     window = parameters["support_window_seconds"]
     for bucket in candidates:
         entries = hits[bucket]
@@ -63,6 +69,8 @@ def align_tokens(source_tokens, target_tokens, step, source, target, parameters)
     return matches, {"source_tokens": len(source_tokens), "target_tokens": len(target_tokens),
                      "raw_token_pair_matches": sum(votes.values()), "candidate_offsets": len(matches),
                      # Chance-collision background against which a candidate's
-                     # matched_token_pairs can be read; not a threshold.
-                     "mean_votes_per_offset_bin": float(np.mean(histogram)),
-                     "support_window_seconds": window}
+                     # matched_token_pairs can be read; not a threshold. Averaged
+                     # over every feasible offset, not just the voted span, so a
+                     # narrow histogram cannot inflate it.
+                     "mean_votes_per_offset_bin": float(profile["background"]),
+                     "support_window_seconds": window}, profile

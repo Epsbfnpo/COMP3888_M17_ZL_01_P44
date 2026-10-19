@@ -1,6 +1,11 @@
 {
   "policy_id": "audio-observations-experimental-v1",
   "policy_version": 1,
-  "providers": ["audfprint", "spectromap", "librosa"],
+  "providers": [
+    "audfprint",
+    "spectromap",
+    "librosa",
+    "music_semantics"
+  ],
   "parameters": {}
 }

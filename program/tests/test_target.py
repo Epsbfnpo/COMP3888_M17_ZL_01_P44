@@ -67,7 +67,7 @@ from legacy_parsers.rin_parser import parse_rin_file
 from music_target.workflow_policy import WorkflowCompletenessPass, load_workflow_policy
 from music_target.midi_parser import parse_midi_file
 from music_target.sheet_parsers import parse_comp_sheet_file, parse_cue_sheet_file
-from music_target.wav_io import NonFiniteSamples, inspect_wav, read_frames
+from music_target.wav_io import NonFiniteSamples, WavError, inspect_wav, iter_chunks, read_frames
 from make_examples import wav_bytes
 
 
@@ -442,6 +442,35 @@ class TargetTests(unittest.TestCase):
             observed = strict_pcm_check(path)
         self.assertEqual(observed["trailing_bytes"], 5)
         self.assertIn("trailing_bytes:5", observed["wav_warnings"])
+
+    def test_damaged_metadata_after_complete_audio_is_a_warning(self):
+        # Like a commercial library file: complete fmt and data, then an
+        # odd-sized iXML chunk written without its pad byte and zero filler,
+        # which leaves the next chunk header misaligned and oversized.
+        audio = self._float_wav([0.0, 0.5])
+        body = audio[12:] + b"iXML" + struct.pack("<I", 3) + b"<x>" + b"\0\0LI" + struct.pack("<I", 0x7FFFFFF0)
+        data = b"RIFF" + struct.pack("<I", 4 + len(body)) + b"WAVE" + body
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "damaged-tail.wav"
+            path.write_bytes(data)
+            observed = strict_pcm_check(path)
+            decoded = list(read_frames(path, inspect_wav(path)))
+            chunks = [chunk.chunk_id for chunk in iter_chunks(path)]
+        self.assertTrue(any(item.startswith("damaged_trailing_metadata_ignored:")
+                            for item in observed["wav_warnings"]), observed["wav_warnings"])
+        self.assertEqual(sum(len(block) for _, block in decoded), 2)
+        self.assertNotIn(b"\0\0LI", chunks)
+
+    def test_damage_before_the_audio_is_still_rejected(self):
+        audio = self._float_wav([0.0, 0.5])
+        fmt_end = audio.index(b"data")
+        body = audio[12:fmt_end] + b"JUNK" + struct.pack("<I", 0x7FFFFFF0) + audio[fmt_end:]
+        data = b"RIFF" + struct.pack("<I", 4 + len(body)) + b"WAVE" + body
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "damaged-head.wav"
+            path.write_bytes(data)
+            with self.assertRaises(WavError):
+                inspect_wav(path)
 
     def test_unfinalised_sizes_partial_frame_and_byte_rate_are_warned(self):
         data = bytearray(self._wav_container(0x0001, b"\x00\x00\xff", bits=16))
@@ -1567,10 +1596,52 @@ class TargetTests(unittest.TestCase):
         for name in ("structural_validity", "physical_similarity", "cryptographic_attestation"):
             self.assertIsNone(layers[name]["weight"])
         profile = result["assessment_checks"]["scoring_profile"][0]
-        self.assertEqual(profile, {"profile_id": "default-v1", "profile_version": 1})
+        self.assertEqual(profile, {"profile_id": "default-v2", "profile_version": 2})
         # No severe rule failed, so no cap record or cap sentence appears.
         self.assertNotIn("severe_contradiction_cap", result["assessment_checks"])
         self.assertNotIn("severe contradiction", result["axes"]["integrity"]["reasoning"])
+
+    def test_submitter_documents_alone_cannot_release_integrity(self):
+        final_hash = "a" * 64
+        native = {"artefacts": [{"artefact_hash": final_hash, "artefact_type": "audio/final",
+                                 "attributes": {}, "evidence": []}],
+                  "final_artefact_hash": final_hash}
+        wav_observations = {final_hash: {"checks": [
+            {"rule": "technical.sample_rate_hz_matches_observed", "passed": True, "evidence_hash": final_hash}]}}
+        # A RIN supplied by the submitter agrees with the submitter's own
+        # contributor list: a consistent declaration, not independent support.
+        parser_observations = {"b" * 64: {"parser": "rin", "data": {"contributors": [{"name": "Jane Doe"}]}}}
+        workflow_input = {"declarations": {"contributors": ["Jane Doe"]}}
+        chain = types.SimpleNamespace(artefacts={final_hash: types.SimpleNamespace()})
+        integrity, _, _, _, checks, _ = assess_axes(
+            native, chain, {final_hash}, set(), wav_observations, [], parser_observations, workflow_input)
+        self.assertIsNone(integrity["value"])
+        self.assertIn("No independent cross-evidence was assessed", integrity["reasoning"])
+        self.assertEqual({item["evidence_tier"] for item in checks["cross_evidence"]}, {"submitter_document"})
+        layer = next(item for item in checks["integrity_layers"] if item["layer"] == "cross_evidence_support")
+        self.assertEqual(layer["evidence_tier_counts"]["submitter_document"], {"assessed": 1, "passed": 1})
+        # A profile without substantive_support_tiers keeps the original rule.
+        legacy = copy.deepcopy(load_default_scoring_profile())
+        del legacy["integrity"]["withholding_rule"]["substantive_support_tiers"]
+        released, *_ = assess_axes(native, chain, {final_hash}, set(), wav_observations, [],
+                                   parser_observations, workflow_input, scoring_profile=legacy)
+        self.assertAlmostEqual(released["value"], 1.0)
+
+    def test_only_a_validated_c2pa_manifest_is_a_signed_tier(self):
+        from music_target.evidence_tiers import c2pa_tier
+        self.assertEqual(c2pa_tier({"validation_state": "Valid"}), "signed_attestation")
+        self.assertEqual(c2pa_tier({"validation_state": "Trusted"}), "signed_attestation")
+        for state in ("Invalid", None, "manifest_parsed"):
+            self.assertEqual(c2pa_tier({"validation_state": state}), "submitter_document")
+
+    def test_unknown_support_tier_is_rejected(self):
+        with tempfile.TemporaryDirectory() as directory:
+            profile = copy.deepcopy(load_default_scoring_profile())
+            profile["integrity"]["withholding_rule"]["substantive_support_tiers"] = ["vibes"]
+            path = Path(directory) / "profile.json"
+            path.write_text(json.dumps(profile))
+            with self.assertRaises(ScoringProfileError):
+                load_scoring_profile(path)
 
     def test_default_scoring_profile_reproduces_plain_average(self):
         final_hash = "a" * 64
@@ -1644,6 +1715,15 @@ class TargetTests(unittest.TestCase):
                       "the weighted mean was 0.750.", integrity["reasoning"])
         record = checks["severe_contradiction_cap"][0]
         self.assertEqual(record["triggered_rules"], ["object_hash_bound"])
+        # The structured explanation names the cap and the failed check.
+        from music_target.score_explanations import build
+        explanation = build({"axes": {"integrity": integrity}, "assessment_checks": checks})[0]
+        self.assertTrue(explanation["cap_applied"])
+        self.assertAlmostEqual(explanation["weighted_mean"], 0.75)
+        self.assertIn("Capped at 0.25 by severe rule(s) object_hash_bound; the weighted mean was 0.750.",
+                      explanation["statements"])
+        self.assertIn("object_hash_bound", " ".join(item["rule"] for item in explanation["contradictions"]))
+        self.assertIn("Contradictions: object_hash_bound failed", integrity["reasoning"])
         self.assertAlmostEqual(record["weighted_mean"], 0.75)
         self.assertTrue(record["value_lowered"])
 
@@ -2038,7 +2118,44 @@ class TargetTests(unittest.TestCase):
     def test_no_reasoning_option(self):
         request = copy.deepcopy(self.template)
         request["options"]["include_reasoning"] = False
-        self.assertTrue(all(x["reasoning"] is None for x in self.score(request)["axes"].values()))
+        result = self.score(request)
+        self.assertTrue(all(x["reasoning"] is None for x in result["axes"].values()))
+        self.assertNotIn("score_explanations", result.get("assessment_checks", {}))
+
+    def test_evidence_outside_the_workflow_is_inconclusive_not_penalised(self):
+        request = copy.deepcopy(self.template)
+        request["workflow"]["workflow_id"] = "midi_virtual_instrument_production"
+        baseline = self.score(copy.deepcopy(request))
+        document = b"File Name,Scene,Take\n"
+        digest = hashlib.sha256(document).hexdigest()
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            shutil.copytree(BASE / "examples/valid-generated/objects", root / "objects")
+            (root / "objects" / f"{digest}.csv").write_bytes(document)
+            final = request["chain"]["final_artefact_hash"]
+            request["chain"]["artefacts"].insert(0, {"artefact_hash": digest, "artefact_type": "text/sound-report",
+                                                     "attributes": {}, "evidence": []})
+            next(node for node in request["chain"]["artefacts"] if node["artefact_hash"] == final)["evidence"].append(
+                {"hash": digest, "relationship_type": "input_to", "attributes": {}})
+            request["objects"][digest] = f"objects/{digest}.csv"
+            result = self.score(request, root)
+        self.assertEqual(result["axes"]["completeness"], baseline["axes"]["completeness"])
+        finding = next(item for item in result["findings"] if item["code"] == "WORKFLOW_EVIDENCE_OUTSIDE_POLICY")
+        self.assertEqual(finding["severity"], "info")
+        self.assertIn({"artefact_hash": digest, "artefact_type": "text/sound-report", "status": "inconclusive"},
+                      finding["artefacts"])
+        self.assertTrue(all(item["status"] == "inconclusive" for item in finding["artefacts"]))
+        completeness = next(row for row in result["assessment_checks"]["score_explanations"]
+                            if row["axis"] == "completeness")
+        self.assertIn(finding["message"], completeness["statements"])
+
+    def test_every_axis_has_a_score_explanation(self):
+        result = self.score()
+        rows = {row["axis"]: row for row in result["assessment_checks"]["score_explanations"]}
+        self.assertEqual(set(rows), set(result["axes"]))
+        for name, row in rows.items():
+            self.assertEqual(row["value"], result["axes"][name]["value"])
+        self.assertFalse(rows["integrity"]["cap_applied"])
 
 
 class RestoredXmlHelperTests(unittest.TestCase):
@@ -2704,7 +2821,7 @@ class ScoringProfileTests(unittest.TestCase):
 
     def test_default_profile_loads_and_validates(self):
         profile = load_default_scoring_profile()
-        self.assertEqual(profile["profile_id"], "default-v1")
+        self.assertEqual(profile["profile_id"], "default-v2")
         self.assertEqual(profile["integrity"]["layer_weights"],
                          {"file_integrity": 1.0, "declaration_consistency": 1.0,
                           "cross_evidence_support": 1.0})

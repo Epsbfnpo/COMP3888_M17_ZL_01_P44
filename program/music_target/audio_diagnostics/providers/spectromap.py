@@ -64,20 +64,22 @@ def _tokens(audio, parameters):
     return tokens, len(points)
 
 
-def analyse(task, parameters):
-    source, target = read_pair(task, parameters["sample_rate_hz"])
+def analyse(task, parameters, context=None):
+    source, target = read_pair(task, parameters["sample_rate_hz"], (context or {}).get("audio_cache"))
     source_tokens, source_count = _tokens(source, parameters)
     target_tokens, target_count = _tokens(target, parameters)
     if not source_tokens or not target_tokens:
         raise AnalysisUnavailable("insufficient_peaks", "Insufficient SpectroMap peak pairs in a selected range.")
     step = (parameters["n_fft"] - parameters["noverlap"]) / parameters["sample_rate_hz"]
-    matches, metrics = align_tokens(source_tokens, target_tokens, step, source, target, parameters)
+    matches, metrics, profile = align_tokens(source_tokens, target_tokens, step, source, target, parameters)
     metrics.update(source_peaks=source_count, target_peaks=target_count,
                    peak_pair_frequency_bin_width=1, peak_pair_time_bin_width_frames=1,
                    peak_pair_fanout=PAIR_FANOUT, peak_pair_zone_frames=PAIR_ZONE_FRAMES,
                    peak_window_frames=window_frames(parameters),
                    peak_window_seconds=window_frames(parameters) * step)
     value = result(task, "spectromap")
+    if context is not None:
+        context["votes"]["spectromap"] = profile
     value.update(provider_version=version("spectromap"), analysis_complete=True,
                  analysed_ranges=ranges(source, target), matches=matches, metrics=metrics)
     value["limitations"].append("Peak-pair alignment is a local experimental adapter, not an upstream provenance classifier.")

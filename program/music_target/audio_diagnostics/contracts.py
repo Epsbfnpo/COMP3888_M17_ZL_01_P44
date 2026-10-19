@@ -4,7 +4,7 @@ import json
 from functools import lru_cache
 from pathlib import Path
 
-PROVIDERS = ("audfprint", "spectromap", "librosa")
+PROVIDERS = ("audfprint", "spectromap", "librosa", "music_semantics")
 NON_SCORING = {"scoring_eligible": False, "integrity_contribution": None,
                "content_match_is_provenance": False}
 
@@ -22,7 +22,8 @@ def result(task, provider, reason="thresholds_not_calibrated", message=None):
         "relation_id": task["relation_id"],
         "relationship_type": task["relationship_type"],
         "source_hash": task["source_hash"], "target_hash": task["target_hash"],
-        "selection_id": task.get("selection_id"), "provider": provider,
+        "selection_id": task.get("selection_id"), "range_source": task.get("range_source", "whole_file"),
+        "provider": provider,
         "provider_version": None, "adapter_version": "1.0",
         "status": "inconclusive", "reason_code": reason,
         "message": message or "Experimental content observations; thresholds are not calibrated.",

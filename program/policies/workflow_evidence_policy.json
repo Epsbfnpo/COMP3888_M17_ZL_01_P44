@@ -245,7 +245,9 @@
         "text/session-log",
         "metadata/ddex-rin",
         "metadata/ddex-ern",
-        "provenance/c2pa"
+        "provenance/c2pa",
+        "text/sound-report",
+        "project/aaf"
       ]
     },
     {
@@ -338,7 +340,9 @@
         "text/session-log",
         "metadata/ddex-rin",
         "metadata/ddex-ern",
-        "provenance/c2pa"
+        "provenance/c2pa",
+        "text/sound-report",
+        "project/aaf"
       ]
     },
     {
@@ -429,7 +433,9 @@
       "optional": [
         "text/session-log",
         "metadata/ddex-rin",
-        "provenance/c2pa"
+        "provenance/c2pa",
+        "text/sound-report",
+        "project/aaf"
       ]
     },
     {
@@ -646,7 +652,9 @@
         "text/session-log",
         "metadata/ddex-rin",
         "metadata/ddex-ern",
-        "provenance/c2pa"
+        "provenance/c2pa",
+        "text/sound-report",
+        "project/aaf"
       ]
     },
     {

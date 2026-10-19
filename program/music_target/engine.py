@@ -12,6 +12,7 @@ from libevchain.types import AudioType, ALL_RELATIONSHIPS
 from music_target import domain
 from music_target.assessment_passes import assess_axes, parse_bound_artefacts
 from music_target.wav_io import UnsupportedWav, WavError, inspect_wav
+from music_target.recorder_metadata import recorder_fields
 from music_target.wav_parser import parse_wav_file
 from music_target.workflow_policy import WorkflowCompletenessPass, load_workflow_policy
 
@@ -159,8 +160,12 @@ class WavMetadataPass(ArtefactPass):
                            "source_pass": "WavMetadataPass"})
             if not same:
                 mismatches.append({"field": key, "declared": value, "observed": measured})
+        try:
+            recorder = recorder_fields(path, descriptor, parsed)
+        except Exception as exc:  # metadata never decides whether audio is usable
+            recorder = {"present": False, "warnings": ["Recorder metadata could not be read: " + str(exc)]}
         result = {"status": "parsed", "observed": observed,
-                  "embedded_metadata": parsed,
+                  "embedded_metadata": parsed, "recorder_metadata": recorder,
                   "checks": checks, "claim_mismatches": mismatches}
         if skipped_claims:
             result["technical_claims_skipped"] = "input_error"

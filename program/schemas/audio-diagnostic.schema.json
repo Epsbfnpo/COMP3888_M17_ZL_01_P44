@@ -2,29 +2,122 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "Report-only audio observation v1",
   "type": "object",
-  "required": ["diagnostic_id", "relation_id", "source_hash", "target_hash", "relationship_type", "provider", "status", "reason_code", "message", "analysis_complete", "analysed_ranges", "matches", "metrics", "limitations", "scoring_eligible", "integrity_contribution", "content_match_is_provenance"],
+  "required": [
+    "diagnostic_id",
+    "relation_id",
+    "source_hash",
+    "target_hash",
+    "relationship_type",
+    "provider",
+    "status",
+    "reason_code",
+    "message",
+    "analysis_complete",
+    "analysed_ranges",
+    "matches",
+    "metrics",
+    "limitations",
+    "scoring_eligible",
+    "integrity_contribution",
+    "content_match_is_provenance"
+  ],
   "properties": {
-    "diagnostic_id": {"type": "string"},
-    "relation_id": {"type": "string"},
-    "source_hash": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
-    "target_hash": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
-    "relationship_type": {"type": "string"},
-    "provider": {"enum": ["audfprint", "spectromap", "librosa"]},
-    "provider_version": {"type": ["string", "null"]},
-    "adapter_version": {"type": "string"},
-    "selection_id": {"type": ["string", "null"]},
-    "status": {"enum": ["inconclusive", "unavailable"]},
-    "reason_code": {"type": "string"},
-    "message": {"type": "string"},
-    "analysis_complete": {"type": "boolean"},
-    "analysed_ranges": {"type": "object"},
-    "matches": {"type": "array", "items": {"type": "object"}},
-    "metrics": {"type": "object"},
-    "limitations": {"type": "array", "items": {"type": "string"}},
-    "parameters": {"type": "object"},
-    "processing_ms": {"type": "number", "minimum": 0},
-    "scoring_eligible": {"const": false},
-    "integrity_contribution": {"type": "null"},
-    "content_match_is_provenance": {"const": false}
+    "diagnostic_id": {
+      "type": "string"
+    },
+    "relation_id": {
+      "type": "string"
+    },
+    "source_hash": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "target_hash": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "relationship_type": {
+      "type": "string"
+    },
+    "provider": {
+      "enum": [
+        "audfprint",
+        "spectromap",
+        "librosa",
+        "music_semantics",
+        "fingerprint_agreement"
+      ]
+    },
+    "provider_version": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "adapter_version": {
+      "type": "string"
+    },
+    "selection_id": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "status": {
+      "enum": [
+        "inconclusive",
+        "unavailable"
+      ]
+    },
+    "reason_code": {
+      "type": "string"
+    },
+    "message": {
+      "type": "string"
+    },
+    "analysis_complete": {
+      "type": "boolean"
+    },
+    "analysed_ranges": {
+      "type": "object"
+    },
+    "matches": {
+      "type": "array",
+      "items": {
+        "type": "object"
+      }
+    },
+    "metrics": {
+      "type": "object"
+    },
+    "limitations": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "parameters": {
+      "type": "object"
+    },
+    "processing_ms": {
+      "type": "number",
+      "minimum": 0
+    },
+    "scoring_eligible": {
+      "const": false
+    },
+    "integrity_contribution": {
+      "type": "null"
+    },
+    "content_match_is_provenance": {
+      "const": false
+    },
+    "range_source": {
+      "enum": [
+        "whole_file",
+        "declared",
+        "derived_from_declared_source_duration"
+      ]
+    }
   }
 }

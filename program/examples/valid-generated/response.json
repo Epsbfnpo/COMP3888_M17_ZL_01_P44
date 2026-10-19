@@ -6,7 +6,7 @@
   "system": {
     "name": "COMP3888-music-baseline",
     "version": "0.7.0",
-    "source_revision": "sha256:6d6cf145cceb10f559b4d113a365c4d86ed3e1ab39cb208865218ad5e77bc19c"
+    "source_revision": "sha256:d96ac7bb6f29d6c40feb702d26c8c621c5fdc0e7647bf49687e3c3a9dc077133"
   },
   "execution_status": "succeeded",
   "axes": {
@@ -20,7 +20,7 @@
       "availability": "partial",
       "value": null,
       "confidence": 0.267,
-      "reasoning": "Integrity has 1/3 score-eligible evidence layers; missing evidence reduces availability and confidence but is never treated as contradiction. A numeric value is withheld without independent CrossEvidence unless a contradiction exists. Structural validity and cryptographic attestation are reported separately and do not raise integrity. Legacy signal comparisons are disabled by policy and do not produce findings or affect integrity."
+      "reasoning": "Integrity has 1/3 score-eligible evidence layers; missing evidence reduces availability and confidence but is never treated as contradiction. A numeric value is withheld unless at least two layers are populated and an independent cross-evidence check (signed_attestation, recorder_metadata) was assessed, or a contradiction exists; submitter-provided documents corroborate but cannot release a value on their own. No independent cross-evidence was assessed for this submission. Structural validity and cryptographic attestation are reported separately and do not raise integrity. Legacy signal comparisons are disabled by policy and do not produce findings or affect integrity."
     },
     "attestation_strength": {
       "availability": "unavailable",
@@ -85,6 +85,10 @@
         "fact": null,
         "id3": null,
         "other_chunks": [],
+        "warnings": []
+      },
+      "recorder_metadata": {
+        "present": false,
         "warnings": []
       },
       "checks": [
@@ -165,6 +169,10 @@
         "other_chunks": [],
         "warnings": []
       },
+      "recorder_metadata": {
+        "present": false,
+        "warnings": []
+      },
       "checks": [
         {
           "rule": "technical.duration_seconds_matches_observed",
@@ -243,6 +251,10 @@
         "other_chunks": [],
         "warnings": []
       },
+      "recorder_metadata": {
+        "present": false,
+        "warnings": []
+      },
       "checks": [
         {
           "rule": "technical.duration_seconds_matches_observed",
@@ -319,6 +331,10 @@
         "fact": null,
         "id3": null,
         "other_chunks": [],
+        "warnings": []
+      },
+      "recorder_metadata": {
+        "present": false,
         "warnings": []
       },
       "checks": [
@@ -443,6 +459,10 @@
           "other_chunks": [],
           "warnings": []
         },
+        "recorder_metadata": {
+          "present": false,
+          "warnings": []
+        },
         "checks": [
           {
             "rule": "technical.duration_seconds_matches_observed",
@@ -523,6 +543,10 @@
           "fact": null,
           "id3": null,
           "other_chunks": [],
+          "warnings": []
+        },
+        "recorder_metadata": {
+          "present": false,
           "warnings": []
         },
         "checks": [
@@ -607,6 +631,10 @@
           "other_chunks": [],
           "warnings": []
         },
+        "recorder_metadata": {
+          "present": false,
+          "warnings": []
+        },
         "checks": [
           {
             "rule": "technical.duration_seconds_matches_observed",
@@ -689,6 +717,10 @@
           "other_chunks": [],
           "warnings": []
         },
+        "recorder_metadata": {
+          "present": false,
+          "warnings": []
+        },
         "checks": [
           {
             "rule": "technical.duration_seconds_matches_observed",
@@ -731,11 +763,23 @@
       "code": "C2PA_PARSER_UNAVAILABLE",
       "severity": "low",
       "message": "c2pa-python is not installed; C2PA attestation was not assessed."
+    },
+    {
+      "code": "WORKFLOW_EVIDENCE_OUTSIDE_POLICY",
+      "severity": "info",
+      "message": "1 submitted artefact(s) are not described by workflow mastering_service_only; they are inconclusive for completeness and neither raise nor lower it.",
+      "artefacts": [
+        {
+          "artefact_hash": "7580f3a09b8a02bdfc6520235e92f6c8318dd3b52002b7eb8a430abc2c007dea",
+          "artefact_type": "audio/raw-track",
+          "status": "inconclusive"
+        }
+      ]
     }
   ],
-  "processing_ms": 228.68754103546962,
+  "processing_ms": 206.98758296202868,
   "resource_usage": {
-    "cpu_ms": 2.0469999999999935,
+    "cpu_ms": 2.1160000000000068,
     "peak_rss_kib": null
   },
   "error": null,
@@ -920,6 +964,12 @@
     ]
   },
   "assessment_checks": {
+    "scoring_profile": [
+      {
+        "profile_id": "default-v2",
+        "profile_version": 2
+      }
+    ],
     "bound_file_integrity": [
       {
         "rule": "object_hash_bound",
@@ -1114,7 +1164,8 @@
         "contributes_to_integrity": true,
         "check_count": 20,
         "reason": "SHA-256 binding, cached WAV technical checks, and parser readability of submitted files.",
-        "manual_review_reasons": []
+        "manual_review_reasons": [],
+        "weight": 1.0
       },
       {
         "layer": "structural_validity",
@@ -1123,7 +1174,8 @@
         "contributes_to_integrity": false,
         "check_count": 6,
         "reason": "Graph, references, cycles, connectivity, and endpoint roles passed before assessment; this is not content proof.",
-        "manual_review_reasons": []
+        "manual_review_reasons": [],
+        "weight": null
       },
       {
         "layer": "declaration_consistency",
@@ -1132,7 +1184,8 @@
         "contributes_to_integrity": true,
         "check_count": 0,
         "reason": "Submitted relationship parameters compared with cached source and target media observations.",
-        "manual_review_reasons": []
+        "manual_review_reasons": [],
+        "weight": 1.0
       },
       {
         "layer": "physical_similarity",
@@ -1141,7 +1194,8 @@
         "contributes_to_integrity": false,
         "check_count": 0,
         "reason": "Legacy signal comparisons are disabled by policy and never contribute to integrity.",
-        "manual_review_reasons": []
+        "manual_review_reasons": [],
+        "weight": null
       },
       {
         "layer": "cross_evidence_support",
@@ -1149,8 +1203,23 @@
         "value": null,
         "contributes_to_integrity": true,
         "check_count": 0,
-        "reason": "Independent parser outputs compared with graph, declarations, and media.",
-        "manual_review_reasons": []
+        "reason": "Parser outputs compared with the graph, declarations, media and recorder metadata; each check records the evidence_tier that produced it.",
+        "manual_review_reasons": [],
+        "weight": 1.0,
+        "evidence_tier_counts": {
+          "signed_attestation": {
+            "assessed": 0,
+            "passed": 0
+          },
+          "recorder_metadata": {
+            "assessed": 0,
+            "passed": 0
+          },
+          "submitter_document": {
+            "assessed": 0,
+            "passed": 0
+          }
+        }
       },
       {
         "layer": "cryptographic_attestation",
@@ -1159,7 +1228,8 @@
         "contributes_to_integrity": false,
         "check_count": 0,
         "reason": "C2PA remains in the separate attestation-strength axis and never inflates integrity.",
-        "manual_review_reasons": []
+        "manual_review_reasons": [],
+        "weight": null
       }
     ],
     "assessment_status_semantics": [
@@ -1321,6 +1391,88 @@
         "target_values": {},
         "scoring_policy": "disabled; no signal result contributes to integrity",
         "content_match_is_provenance": false
+      }
+    ],
+    "score_explanations": [
+      {
+        "axis": "completeness",
+        "availability": "available",
+        "value": 1.0,
+        "confidence": 1.0,
+        "statements": [
+          "Workflow mastering_service_only: 7/7 assessed required/conditional weight satisfied. Optional evidence is excluded.",
+          "1 submitted artefact(s) are not described by workflow mastering_service_only; they are inconclusive for completeness and neither raise nor lower it."
+        ]
+      },
+      {
+        "axis": "integrity",
+        "availability": "partial",
+        "value": null,
+        "confidence": 0.267,
+        "layers": [
+          {
+            "layer": "file_integrity",
+            "status": "corroborated",
+            "value": 1.0,
+            "weight": 1.0,
+            "check_count": 20
+          },
+          {
+            "layer": "declaration_consistency",
+            "status": "unavailable",
+            "value": null,
+            "weight": 1.0,
+            "check_count": 0
+          },
+          {
+            "layer": "cross_evidence_support",
+            "status": "unavailable",
+            "value": null,
+            "weight": 1.0,
+            "check_count": 0
+          }
+        ],
+        "weighted_mean": null,
+        "cap_applied": false,
+        "cap": null,
+        "withheld": true,
+        "evidence_tier_counts": {
+          "signed_attestation": {
+            "assessed": 0,
+            "passed": 0
+          },
+          "recorder_metadata": {
+            "assessed": 0,
+            "passed": 0
+          },
+          "submitter_document": {
+            "assessed": 0,
+            "passed": 0
+          }
+        },
+        "contradictions": [],
+        "statements": [
+          "Weighted mean of file_integrity 1.000 (weight 1).",
+          "No numeric value: the withholding rule was not met (see reasoning)."
+        ]
+      },
+      {
+        "axis": "attestation_strength",
+        "availability": "unavailable",
+        "value": null,
+        "confidence": null,
+        "statements": [
+          "C2PA SDK is unavailable for the final artefact, so no cryptographic attestation was assessed."
+        ]
+      },
+      {
+        "axis": "ai_disclosure",
+        "availability": "available",
+        "value": 1.0,
+        "confidence": 0.8,
+        "statements": [
+          "Explicit creation_method declarations cover 4/4 audio artefacts; this is disclosure coverage, not AI detection."
+        ]
       }
     ]
   }
