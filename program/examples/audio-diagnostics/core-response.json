@@ -6,7 +6,7 @@
   "system": {
     "name": "COMP3888-music-baseline",
     "version": "0.7.0",
-    "source_revision": "sha256:6c5fc5687af78a430a26b79deae6e922a54d1e0815da33a647a6d71b31b1d341"
+    "source_revision": "sha256:d96ac7bb6f29d6c40feb702d26c8c621c5fdc0e7647bf49687e3c3a9dc077133"
   },
   "execution_status": "succeeded",
   "axes": {
@@ -20,7 +20,7 @@
       "availability": "partial",
       "value": null,
       "confidence": 0.267,
-      "reasoning": "Integrity has 1/3 score-eligible evidence layers; missing evidence reduces availability and confidence but is never treated as contradiction. A numeric value is withheld without independent CrossEvidence unless a contradiction exists. Structural validity and cryptographic attestation are reported separately and do not raise integrity. Legacy signal comparisons are disabled by policy and do not produce findings or affect integrity."
+      "reasoning": "Integrity has 1/3 score-eligible evidence layers; missing evidence reduces availability and confidence but is never treated as contradiction. A numeric value is withheld unless at least two layers are populated and an independent cross-evidence check (signed_attestation, recorder_metadata) was assessed, or a contradiction exists; submitter-provided documents corroborate but cannot release a value on their own. No independent cross-evidence was assessed for this submission. Structural validity and cryptographic attestation are reported separately and do not raise integrity. Legacy signal comparisons are disabled by policy and do not produce findings or affect integrity."
     },
     "attestation_strength": {
       "availability": "unavailable",
@@ -87,6 +87,10 @@
         "other_chunks": [],
         "warnings": []
       },
+      "recorder_metadata": {
+        "present": false,
+        "warnings": []
+      },
       "checks": [],
       "claim_mismatches": []
     },
@@ -130,6 +134,10 @@
         "fact": null,
         "id3": null,
         "other_chunks": [],
+        "warnings": []
+      },
+      "recorder_metadata": {
+        "present": false,
         "warnings": []
       },
       "checks": [],
@@ -193,6 +201,10 @@
           "other_chunks": [],
           "warnings": []
         },
+        "recorder_metadata": {
+          "present": false,
+          "warnings": []
+        },
         "checks": [],
         "claim_mismatches": []
       },
@@ -242,6 +254,10 @@
           "other_chunks": [],
           "warnings": []
         },
+        "recorder_metadata": {
+          "present": false,
+          "warnings": []
+        },
         "checks": [],
         "claim_mismatches": []
       },
@@ -272,11 +288,23 @@
       "code": "WORKFLOW_EXPECTATION_MISSING",
       "severity": "medium",
       "message": "sample.lineage: Found 0 qualifying bound ancestor(s); minimum is 1."
+    },
+    {
+      "code": "WORKFLOW_EVIDENCE_OUTSIDE_POLICY",
+      "severity": "info",
+      "message": "1 submitted artefact(s) are not described by workflow sample_and_loop_based_production; they are inconclusive for completeness and neither raise nor lower it.",
+      "artefacts": [
+        {
+          "artefact_hash": "22bf064117b015ad6b47b7e649c83c5378ff26c1def988d09e1edb3ec6cfecfe",
+          "artefact_type": "audio/raw-track",
+          "status": "inconclusive"
+        }
+      ]
     }
   ],
-  "processing_ms": 200.83125005476177,
+  "processing_ms": 198.5007500043139,
   "resource_usage": {
-    "cpu_ms": 1.582,
+    "cpu_ms": 1.82400000000002,
     "peak_rss_kib": null
   },
   "error": null,
@@ -486,8 +514,8 @@
   "assessment_checks": {
     "scoring_profile": [
       {
-        "profile_id": "default-v1",
-        "profile_version": 1
+        "profile_id": "default-v2",
+        "profile_version": 2
       }
     ],
     "bound_file_integrity": [
@@ -571,9 +599,23 @@
         "value": null,
         "contributes_to_integrity": true,
         "check_count": 0,
-        "reason": "Independent parser outputs compared with graph, declarations, and media.",
+        "reason": "Parser outputs compared with the graph, declarations, media and recorder metadata; each check records the evidence_tier that produced it.",
         "manual_review_reasons": [],
-        "weight": 1.0
+        "weight": 1.0,
+        "evidence_tier_counts": {
+          "signed_attestation": {
+            "assessed": 0,
+            "passed": 0
+          },
+          "recorder_metadata": {
+            "assessed": 0,
+            "passed": 0
+          },
+          "submitter_document": {
+            "assessed": 0,
+            "passed": 0
+          }
+        }
       },
       {
         "layer": "cryptographic_attestation",
@@ -679,6 +721,89 @@
         "target_values": {},
         "scoring_policy": "disabled; no signal result contributes to integrity",
         "content_match_is_provenance": false
+      }
+    ],
+    "score_explanations": [
+      {
+        "axis": "completeness",
+        "availability": "available",
+        "value": 0.0,
+        "confidence": 1.0,
+        "statements": [
+          "Workflow sample_and_loop_based_production: 3.5/6 assessed required/conditional weight satisfied. Optional evidence is excluded.",
+          "The final artefact type is not allowed by the selected workflow.",
+          "1 submitted artefact(s) are not described by workflow sample_and_loop_based_production; they are inconclusive for completeness and neither raise nor lower it."
+        ]
+      },
+      {
+        "axis": "integrity",
+        "availability": "partial",
+        "value": null,
+        "confidence": 0.267,
+        "layers": [
+          {
+            "layer": "file_integrity",
+            "status": "corroborated",
+            "value": 1.0,
+            "weight": 1.0,
+            "check_count": 2
+          },
+          {
+            "layer": "declaration_consistency",
+            "status": "unavailable",
+            "value": null,
+            "weight": 1.0,
+            "check_count": 0
+          },
+          {
+            "layer": "cross_evidence_support",
+            "status": "unavailable",
+            "value": null,
+            "weight": 1.0,
+            "check_count": 0
+          }
+        ],
+        "weighted_mean": null,
+        "cap_applied": false,
+        "cap": null,
+        "withheld": true,
+        "evidence_tier_counts": {
+          "signed_attestation": {
+            "assessed": 0,
+            "passed": 0
+          },
+          "recorder_metadata": {
+            "assessed": 0,
+            "passed": 0
+          },
+          "submitter_document": {
+            "assessed": 0,
+            "passed": 0
+          }
+        },
+        "contradictions": [],
+        "statements": [
+          "Weighted mean of file_integrity 1.000 (weight 1).",
+          "No numeric value: the withholding rule was not met (see reasoning)."
+        ]
+      },
+      {
+        "axis": "attestation_strength",
+        "availability": "unavailable",
+        "value": null,
+        "confidence": null,
+        "statements": [
+          "C2PA SDK is unavailable for the final artefact, so no cryptographic attestation was assessed."
+        ]
+      },
+      {
+        "axis": "ai_disclosure",
+        "availability": "unavailable",
+        "value": null,
+        "confidence": null,
+        "statements": [
+          "Explicit creation_method declarations cover 0/2 audio artefacts; this is disclosure coverage, not AI detection."
+        ]
       }
     ]
   }

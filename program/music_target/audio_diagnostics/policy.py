@@ -15,8 +15,9 @@ DEFAULTS = {
                    "fraction": 0.1, "condition": 2, "peak_window_seconds": 4.0,
                    "minimum_candidate_matches": 5, "support_window_seconds": 0.25},
     "librosa": {"sample_rate_hz": 22050, "n_fft": 2048, "hop_length": 512,
-                "aggregation_seconds": 1.0, "candidate_cosine_similarity": 0.90,
-                "ambiguity_margin": 0.02},
+                "aggregation_seconds": 1.0, "candidate_cosine_similarity": 0.90},
+    "music_semantics": {"sample_rate_hz": 22050, "hop_length": 512, "phrase_beats": 16,
+                        "label_similarity": 0.9, "baseline_shuffles": 20, "minimum_seconds": 8.0},
 }
 
 
@@ -46,7 +47,8 @@ def load_policy(path=DEFAULT_PATH):
     if not isinstance(overrides, dict) or set(overrides) - set(PROVIDERS):
         raise ValueError("Invalid audio parameters.")
     params = {}
-    integer_keys = {"sample_rate_hz", "n_fft", "noverlap", "condition", "hop_length", "minimum_candidate_matches"}
+    integer_keys = {"sample_rate_hz", "n_fft", "noverlap", "condition", "hop_length", "minimum_candidate_matches",
+                    "phrase_beats", "baseline_shuffles"}
     for name in names:
         supplied = overrides.get(name, {})
         if not isinstance(supplied, dict) or set(supplied) - set(DEFAULTS[name]):
@@ -57,7 +59,7 @@ def load_policy(path=DEFAULT_PATH):
                 raise ValueError("Audio parameters must be finite numbers.")
             if key in integer_keys and type(value) is not int:
                 raise ValueError(key + " must be an integer.")
-            if value < 0 or (value == 0 and key not in {"noverlap", "condition", "ambiguity_margin"}):
+            if value < 0 or (value == 0 and key not in {"noverlap", "condition"}):
                 raise ValueError("Invalid audio parameter: " + key)
         if name == "spectromap":
             if params[name]["noverlap"] >= params[name]["n_fft"] or params[name]["condition"] not in (0, 1, 2):
@@ -66,5 +68,7 @@ def load_policy(path=DEFAULT_PATH):
                 raise ValueError("SpectroMap fraction must be in (0, 1].")
         if name == "librosa" and not 0 < params[name]["candidate_cosine_similarity"] <= 1:
             raise ValueError("Invalid cosine candidate threshold.")
+        if name == "music_semantics" and not 0 < params[name]["label_similarity"] <= 1:
+            raise ValueError("Invalid section label similarity.")
     return {**policy, "parameters": params,
             "policy_sha256": hashlib.sha256(raw).hexdigest()}

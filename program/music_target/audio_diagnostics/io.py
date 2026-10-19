@@ -13,8 +13,7 @@ class AnalysisUnavailable(ValueError):
         self.code = code
 
 
-def read_audio(path, start, end, output_rate):
-    from scipy.signal import resample_poly
+def _decode_mono(path, start, end):
     descriptor = inspect_wav(Path(path))
     start = 0.0 if start is None else start
     end = descriptor.duration_seconds if end is None else end
@@ -35,22 +34,63 @@ def read_audio(path, start, end, output_rate):
         raise AnalysisUnavailable("silent_signal", "Selected audio is silent; no content correspondence can be assessed.")
     if rms_mono < rms_channels * 1e-5:
         raise AnalysisUnavailable("channel_cancellation", "Mono conversion cancels the submitted channels; no non-match is inferred.")
-    divisor = math.gcd(output_rate, descriptor.sample_rate)
-    if output_rate != descriptor.sample_rate:
-        mono = resample_poly(mono, output_rate // divisor, descriptor.sample_rate // divisor)
-    return {"samples": np.asarray(mono, dtype=np.float32), "sample_rate_hz": output_rate,
-            "original_sample_rate_hz": descriptor.sample_rate, "channels": descriptor.channels,
-            "range": [float(start), float(end)], "channel_policy": "arithmetic_mean"}
+    mono.setflags(write=False)
+    return mono, descriptor, [float(start), float(end)]
 
 
-def read_pair(task, sample_rate):
+def _cached(cache, key, compute):
+    # One worker runs every provider for a task, so each file range is decoded
+    # once and each analysis rate is resampled once. Failures are cached too,
+    # so every provider reports the same input limitation.
+    if cache is None:
+        return compute()
+    if key not in cache:
+        try:
+            cache[key] = (True, compute())
+        except AnalysisUnavailable as exc:
+            cache[key] = (False, exc)
+    ok, value = cache[key]
+    if not ok:
+        raise value
+    return value
+
+
+def read_audio(path, start, end, output_rate, cache=None):
+    from scipy.signal import resample_poly
+    def resampled():
+        mono, descriptor, span = _cached(cache, ("mono", str(path), start, end),
+                                         lambda: _decode_mono(path, start, end))
+        divisor = math.gcd(output_rate, descriptor.sample_rate)
+        if output_rate != descriptor.sample_rate:
+            mono = resample_poly(mono, output_rate // divisor, descriptor.sample_rate // divisor)
+        samples = np.array(mono, dtype=np.float32)
+        samples.setflags(write=False)  # shared by providers through the cache
+        return {"samples": samples, "sample_rate_hz": output_rate,
+                "original_sample_rate_hz": descriptor.sample_rate, "channels": descriptor.channels,
+                "range": span, "channel_policy": "arithmetic_mean"}
+    return _cached(cache, ("rate", str(path), start, end, output_rate), resampled)
+
+
+RANGE_FIELDS = ("source_start_seconds", "source_end_seconds", "target_start_seconds", "target_end_seconds")
+
+
+def read_pair(task, sample_rate, cache=None):
     attrs = task["attributes"]
-    values = [attrs.get(key) for key in ("source_start_seconds", "source_end_seconds",
-                                        "target_start_seconds", "target_end_seconds")]
+    values = [attrs.get(key) for key in RANGE_FIELDS]
     if any(value is not None for value in values) and not all(value is not None for value in values):
-        raise AnalysisUnavailable("incomplete_declared_ranges", "Partial declared ranges are not silently completed.")
-    return (read_audio(task["source_path"], values[0], values[1], sample_rate),
-            read_audio(task["target_path"], values[2], values[3], sample_rate))
+        missing = ", ".join(key for key, value in zip(RANGE_FIELDS, values) if value is None)
+        raise AnalysisUnavailable("incomplete_declared_ranges",
+                                  "Partial declared ranges are not silently completed; missing: " + missing + ".")
+    source = read_audio(task["source_path"], values[0], values[1], sample_rate, cache)
+    try:
+        target = read_audio(task["target_path"], values[2], values[3], sample_rate, cache)
+    except AnalysisUnavailable as exc:
+        if exc.code == "invalid_analysis_range" and task.get("range_source") == "derived_from_declared_source_duration":
+            raise AnalysisUnavailable("derived_range_outside_target",
+                                      "The target end derived from the declared source duration lies outside "
+                                      "the target audio; declare target_end_seconds explicitly.") from None
+        raise
+    return source, target
 
 
 def ranges(source, target):

@@ -21,6 +21,7 @@ numpy==2.2.6
 packaging==26.3
 platformdirs==4.13.4
 pooch==1.9.0
+pyaaf2==1.7.1
 pycparser==3.11
 pypdf==6.19.0
 referencing==0.36.2

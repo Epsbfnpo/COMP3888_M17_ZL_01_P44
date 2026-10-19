@@ -52,9 +52,9 @@ def _repetitions(features, times, audio, parameters, librosa):
             features[:, a] @ features[:, b] >= parameters["candidate_cosine_similarity"]]
 
 
-def analyse(task, parameters):
+def analyse(task, parameters, context=None):
     import librosa
-    source, target = read_pair(task, parameters["sample_rate_hz"])
+    source, target = read_pair(task, parameters["sample_rate_hz"], (context or {}).get("audio_cache"))
     source_data, source_times = _features(source, parameters, librosa)
     target_data, target_times = _features(target, parameters, librosa)
     joined = np.concatenate((source_data[12:], target_data[12:]), axis=1)
@@ -63,29 +63,25 @@ def analyse(task, parameters):
     def normalize(data):
         return _unit(np.vstack((0.7 * _unit(data[:12]), 0.3 * _unit((data[12:] - mean) / scale))))
     source_features, target_features = normalize(source_data), normalize(target_data)
-    matches, best = [], []
-    for index in range(target_features.shape[1]):
-        similarities = np.clip(source_features.T @ target_features[:, index], -1, 1)
-        maximum = float(np.max(similarities))
-        best.append(maximum)
-        threshold = max(parameters["candidate_cosine_similarity"], maximum - parameters["ambiguity_margin"])
-        indices, _ = find_peaks(np.r_[-2, similarities, -2], height=threshold)
-        for source_index in indices - 1:
-            start_s = float(source_times[source_index] + source["range"][0])
-            start_t = float(target_times[index] + target["range"][0])
-            matches.append({"source_range_seconds": [start_s, min(source["range"][1], start_s + parameters["aggregation_seconds"])],
-                            "target_range_seconds": [start_t, min(target["range"][1], start_t + parameters["aggregation_seconds"])],
-                            "feature_cosine": float(similarities[source_index])})
+    # Cross-file frame correspondences are summarised, not listed: on real
+    # recordings unrelated material scored as high as related material, so
+    # individual "matches" would mislead. Version relationships are measured
+    # by the music_semantics provider instead.
+    with np.errstate(all="ignore"):  # Accelerate BLAS raises spurious FP flags
+        best = np.max(np.clip(source_features.T @ target_features, -1, 1), axis=0)
     value = result(task, "librosa")
     value.update(provider_version=librosa.__version__, analysis_complete=True,
-                 analysed_ranges=ranges(source, target), matches=matches, metrics={
+                 analysed_ranges=ranges(source, target), matches=[], metrics={
                      "source_sections_seconds": _sections(source_features, source_times, source),
                      "target_sections_seconds": _sections(target_features, target_times, target),
                      "source_repetition_candidates": _repetitions(source_features, source_times, source, parameters, librosa),
                      "target_repetition_candidates": _repetitions(target_features, target_times, target, parameters, librosa),
                      "mean_best_feature_cosine": float(np.mean(best)),
+                     "best_feature_cosine_quantiles": {str(q): float(np.quantile(best, q)) for q in (0.1, 0.5, 0.9)},
                      "source_aggregated_frames": int(source_features.shape[1]),
                      "target_aggregated_frames": int(target_features.shape[1]),
                  })
     value["limitations"].append("Abstract feature sections have no verse/chorus labels; similar music can have similar structure.")
+    value["limitations"].append("Cross-file feature similarity is summary context only; it did not separate related "
+                                "from unrelated recordings and lists no correspondences.")
     return value

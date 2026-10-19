@@ -355,4 +355,19 @@ class WorkflowCompletenessPass:
                 findings.append({"code": "WORKFLOW_EXPECTATION_" + item["status"].upper(),
                                  "severity": "medium" if item["status"] == "missing" else "low",
                                  "message": f"{item['rule_id']}: {item['reason']}"})
+        # Evidence the selected workflow does not describe is neither credit
+        # nor penalty: it is inconclusive for completeness, and said so.
+        described = set(workflow.get("allowed_final_types", [])) | set(workflow.get("optional", []))
+        for rule in ([*common.get("required_for_every_workflow", []), *common.get("optional_for_every_workflow", []),
+                      *workflow.get("required", []), *workflow.get("conditional", [])]):
+            described |= set(rule.get("artifact_types", []))
+        outside = [{"artefact_hash": node["artefact_hash"], "artefact_type": node["artefact_type"],
+                    "status": "inconclusive"}
+                   for node in nodes if node["artefact_hash"] != final_hash and node["artefact_type"] not in described]
+        if outside:
+            findings.append({"code": "WORKFLOW_EVIDENCE_OUTSIDE_POLICY", "severity": "info",
+                             "message": (f"{len(outside)} submitted artefact(s) are not described by workflow "
+                                         f"{workflow_id}; they are inconclusive for completeness and neither "
+                                         "raise nor lower it."),
+                             "artefacts": outside})
         return axis, assessment, findings

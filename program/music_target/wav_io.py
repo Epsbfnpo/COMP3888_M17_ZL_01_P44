@@ -82,6 +82,9 @@ class WavDescriptor:
     trailing_bytes: int = 0
     warnings: tuple[str, ...] = ()
     container_end: int = 0
+    # Where chunk walking stopped; earlier than container_end only when
+    # damaged metadata after complete fmt and data chunks was ignored.
+    chunks_end: int = 0
     mtime_ns: int = 0
     inode: int = 0
 
@@ -238,8 +241,14 @@ def inspect_wav(path: str | os.PathLike[str]) -> WavDescriptor:
         data_size = None
         seen: set[bytes] = set()
         chunk_count = 0
+        def mandatory_complete():
+            return fmt is not None and data_offset is not None
+
         while position < container_end:
             if container_end - position < 8:
+                if mandatory_complete():
+                    warnings.append(f"damaged_trailing_metadata_ignored:{position}")
+                    break
                 raise WavError("Truncated WAV chunk header.",
                                "truncated_chunk_header")
             handle.seek(position)
@@ -271,6 +280,12 @@ def inspect_wav(path: str | os.PathLike[str]) -> WavDescriptor:
             end = start + size
             padded_end = end + (size & 1)
             if end > container_end or padded_end > container_end + 1:
+                if chunk_id != b"data" and mandatory_complete():
+                    # Audio is complete; a writer damaged the metadata after
+                    # it (e.g. an odd-sized chunk without its pad byte). Keep
+                    # the audio and report the damage instead of rejecting it.
+                    warnings.append(f"damaged_trailing_metadata_ignored:{position}")
+                    break
                 reason = "data_truncated" if chunk_id == b"data" else "chunk_overflow"
                 raise WavError("WAV chunk exceeds the RIFF container.", reason)
             if chunk_id == b"fmt ":
@@ -317,6 +332,7 @@ def inspect_wav(path: str | os.PathLike[str]) -> WavDescriptor:
         trailing_bytes=trailing,
         warnings=tuple(warnings),
         container_end=container_end,
+        chunks_end=min(position, container_end),
         mtime_ns=stat.st_mtime_ns,
         inode=stat.st_ino,
     )
@@ -330,8 +346,9 @@ def iter_chunks(path: str | os.PathLike[str],
     with path.open("rb") as handle:
         position = 12
         count = 0
-        while position < descriptor.container_end:
-            if descriptor.container_end - position < 8:
+        end = descriptor.chunks_end or descriptor.container_end
+        while position < end:
+            if end - position < 8:
                 break
             handle.seek(position)
             header = _read_exact(handle, 8, "truncated_chunk_header",
