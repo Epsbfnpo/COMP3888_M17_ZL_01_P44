@@ -1,0 +1,1074 @@
+{
+  "schema_version": "0.2-candidate",
+  "run_id": "4b0f88c9-484d-4e86-8640-cb277e153eca",
+  "case_id": "LOCAL-GENERATED-VALID",
+  "asset_sha256": "0a2c29f42e0570d270f27d268062dab5ab30d86a0ed720b31f8b6735cd268190",
+  "system": {
+    "name": "COMP3888-music-baseline",
+    "version": "0.4.0",
+    "source_revision": "sha256:92f4e38dce57210d2c15d8492e9cba896aa46e0e6e10c2c398d9517404df6351"
+  },
+  "execution_status": "succeeded",
+  "axes": {
+    "completeness": {
+      "availability": "available",
+      "value": 0.7333333333333333,
+      "confidence": 1.0,
+      "reasoning": "Workflow multitrack_recording_mix_master: 5.5/7.5 assessed required/conditional weight satisfied. Optional evidence is excluded."
+    },
+    "integrity": {
+      "availability": "partial",
+      "value": 0.6666666666666666,
+      "confidence": 0.6,
+      "reasoning": "Integrity has 3/4 score-eligible evidence layers; missing evidence reduces availability and confidence but is never treated as contradiction. A numeric value is withheld without content reconstruction or independent CrossEvidence unless a contradiction exists. Structural validity and cryptographic attestation are reported separately and do not raise integrity. 0 Master/content corroboration result(s) were not scored as exact matches."
+    },
+    "attestation_strength": {
+      "availability": "available",
+      "value": 0.0,
+      "confidence": 0.9,
+      "reasoning": "C2PA SDK ran but found no active manifest."
+    },
+    "ai_disclosure": {
+      "availability": "available",
+      "value": 1.0,
+      "confidence": 0.8,
+      "reasoning": "Explicit creation_method declarations cover 4/4 audio artefacts; this is disclosure coverage, not AI detection."
+    }
+  },
+  "validation": {
+    "validation_state": "manifest_absent",
+    "signature_present": false,
+    "signature_valid": null,
+    "cryptographically_valid": null,
+    "credential_trusted": null,
+    "codes": [],
+    "reasons": [
+      "No active manifest found."
+    ]
+  },
+  "findings": [
+    {
+      "code": "WAV_OBSERVATION",
+      "severity": "info",
+      "message": "Measured WAV properties and extracted metadata.",
+      "evidence_hash": "0a2c29f42e0570d270f27d268062dab5ab30d86a0ed720b31f8b6735cd268190",
+      "observed": {
+        "duration_seconds": 178.05061224489796,
+        "sample_rate_hz": 44100,
+        "channels": 2,
+        "bit_depth": 16,
+        "format": "WAV",
+        "codec_subtype": "PCM",
+        "file_size_bytes": 31408242
+      },
+      "embedded_metadata": {
+        "core_format": {
+          "audio_format_code": 1,
+          "audio_format": "PCM",
+          "num_channels": 2,
+          "sample_rate_hz": 44100,
+          "byte_rate": 176400,
+          "block_align": 4,
+          "bits_per_sample": 16,
+          "data_size_bytes": 31408128,
+          "duration_seconds": 178.051
+        },
+        "info": {
+          "creation_date": "2013-05-29",
+          "software": "Lavf63.1.101",
+          "technician": "REAPER"
+        },
+        "broadcast_extension": null,
+        "cue_points": [],
+        "sampler": null,
+        "fact": null,
+        "id3": null,
+        "other_chunks": [],
+        "warnings": []
+      },
+      "claim_mismatches": []
+    },
+    {
+      "code": "WAV_OBSERVATION",
+      "severity": "info",
+      "message": "Measured WAV properties and extracted metadata.",
+      "evidence_hash": "50e40ffe2e928e74d937ca4eaeba9a35160800972eaf25adb71ce31e147ea129",
+      "observed": {
+        "duration_seconds": 179.26680272108842,
+        "sample_rate_hz": 44100,
+        "channels": 2,
+        "bit_depth": 16,
+        "format": "WAV",
+        "codec_subtype": "PCM",
+        "file_size_bytes": 31622778
+      },
+      "embedded_metadata": {
+        "core_format": {
+          "audio_format_code": 1,
+          "audio_format": "PCM",
+          "num_channels": 2,
+          "sample_rate_hz": 44100,
+          "byte_rate": 176400,
+          "block_align": 4,
+          "bits_per_sample": 16,
+          "data_size_bytes": 31622664,
+          "duration_seconds": 179.267
+        },
+        "info": {
+          "creation_date": "2013-05-29",
+          "software": "Lavf62.12.101",
+          "technician": "REAPER"
+        },
+        "broadcast_extension": null,
+        "cue_points": [],
+        "sampler": null,
+        "fact": null,
+        "id3": null,
+        "other_chunks": [],
+        "warnings": []
+      },
+      "claim_mismatches": []
+    },
+    {
+      "code": "WAV_OBSERVATION",
+      "severity": "info",
+      "message": "Measured WAV properties and extracted metadata.",
+      "evidence_hash": "945f4de7b584607c94a44a16f297ec3b6bf5f5f1e2624edb28eebcdcff60f744",
+      "observed": {
+        "duration_seconds": 179.26680272108842,
+        "sample_rate_hz": 44100,
+        "channels": 2,
+        "bit_depth": 16,
+        "format": "WAV",
+        "codec_subtype": "PCM",
+        "file_size_bytes": 31622778
+      },
+      "embedded_metadata": {
+        "core_format": {
+          "audio_format_code": 1,
+          "audio_format": "PCM",
+          "num_channels": 2,
+          "sample_rate_hz": 44100,
+          "byte_rate": 176400,
+          "block_align": 4,
+          "bits_per_sample": 16,
+          "data_size_bytes": 31622664,
+          "duration_seconds": 179.267
+        },
+        "info": {
+          "creation_date": "2013-05-29",
+          "software": "Lavf62.12.101",
+          "technician": "REAPER"
+        },
+        "broadcast_extension": null,
+        "cue_points": [],
+        "sampler": null,
+        "fact": null,
+        "id3": null,
+        "other_chunks": [],
+        "warnings": []
+      },
+      "claim_mismatches": []
+    },
+    {
+      "code": "WAV_OBSERVATION",
+      "severity": "info",
+      "message": "Measured WAV properties and extracted metadata.",
+      "evidence_hash": "133c934683b5f977ce77d1ead96ce4451162ad75e3bea2432bd6fbbe3f6e0c7b",
+      "observed": {
+        "duration_seconds": 179.58312925170068,
+        "sample_rate_hz": 44100,
+        "channels": 2,
+        "bit_depth": 16,
+        "format": "WAV",
+        "codec_subtype": "PCM",
+        "file_size_bytes": 31678578
+      },
+      "embedded_metadata": {
+        "core_format": {
+          "audio_format_code": 1,
+          "audio_format": "PCM",
+          "num_channels": 2,
+          "sample_rate_hz": 44100,
+          "byte_rate": 176400,
+          "block_align": 4,
+          "bits_per_sample": 16,
+          "data_size_bytes": 31678464,
+          "duration_seconds": 179.583
+        },
+        "info": {
+          "creation_date": "2013-05-29",
+          "software": "Lavf62.12.101",
+          "technician": "REAPER"
+        },
+        "broadcast_extension": null,
+        "cue_points": [],
+        "sampler": null,
+        "fact": null,
+        "id3": null,
+        "other_chunks": [],
+        "warnings": []
+      },
+      "claim_mismatches": []
+    },
+    {
+      "code": "RELATIONSHIP_OBSERVATION",
+      "severity": "info",
+      "message": "Relationship diagnostics; scoped edit, comp, stem and mix claims receive content analysis, while mastering receives continuity corroboration.",
+      "source_hash": "133c934683b5f977ce77d1ead96ce4451162ad75e3bea2432bd6fbbe3f6e0c7b",
+      "target_hash": "0a2c29f42e0570d270f27d268062dab5ab30d86a0ed720b31f8b6735cd268190",
+      "relationship": "mixed_from",
+      "content_relationship_verified": null,
+      "duration_delta_seconds": -1.5325170068027205
+    },
+    {
+      "code": "RELATIONSHIP_OBSERVATION",
+      "severity": "info",
+      "message": "Relationship diagnostics; scoped edit, comp, stem and mix claims receive content analysis, while mastering receives continuity corroboration.",
+      "source_hash": "945f4de7b584607c94a44a16f297ec3b6bf5f5f1e2624edb28eebcdcff60f744",
+      "target_hash": "0a2c29f42e0570d270f27d268062dab5ab30d86a0ed720b31f8b6735cd268190",
+      "relationship": "mixed_from",
+      "content_relationship_verified": null,
+      "duration_delta_seconds": -1.2161904761904623
+    },
+    {
+      "code": "RELATIONSHIP_OBSERVATION",
+      "severity": "info",
+      "message": "Relationship diagnostics; scoped edit, comp, stem and mix claims receive content analysis, while mastering receives continuity corroboration.",
+      "source_hash": "50e40ffe2e928e74d937ca4eaeba9a35160800972eaf25adb71ce31e147ea129",
+      "target_hash": "0a2c29f42e0570d270f27d268062dab5ab30d86a0ed720b31f8b6735cd268190",
+      "relationship": "mixed_from",
+      "content_relationship_verified": null,
+      "duration_delta_seconds": -1.2161904761904623
+    },
+    {
+      "code": "PARSER_OBSERVATION",
+      "severity": "info",
+      "message": "audio/stem: parsed",
+      "parser": "wav",
+      "parser_status": "parsed",
+      "parser_result": {
+        "observed": {
+          "duration_seconds": 179.58312925170068,
+          "sample_rate_hz": 44100,
+          "channels": 2,
+          "bit_depth": 16,
+          "format": "WAV",
+          "codec_subtype": "PCM",
+          "file_size_bytes": 31678578
+        },
+        "embedded_metadata": {
+          "core_format": {
+            "audio_format_code": 1,
+            "audio_format": "PCM",
+            "num_channels": 2,
+            "sample_rate_hz": 44100,
+            "byte_rate": 176400,
+            "block_align": 4,
+            "bits_per_sample": 16,
+            "data_size_bytes": 31678464,
+            "duration_seconds": 179.583
+          },
+          "info": {
+            "creation_date": "2013-05-29",
+            "software": "Lavf62.12.101",
+            "technician": "REAPER"
+          },
+          "broadcast_extension": null,
+          "cue_points": [],
+          "sampler": null,
+          "fact": null,
+          "id3": null,
+          "other_chunks": [],
+          "warnings": []
+        },
+        "claim_mismatches": []
+      },
+      "evidence_hash": "133c934683b5f977ce77d1ead96ce4451162ad75e3bea2432bd6fbbe3f6e0c7b"
+    },
+    {
+      "code": "PARSER_OBSERVATION",
+      "severity": "info",
+      "message": "audio/stem: parsed",
+      "parser": "wav",
+      "parser_status": "parsed",
+      "parser_result": {
+        "observed": {
+          "duration_seconds": 179.26680272108842,
+          "sample_rate_hz": 44100,
+          "channels": 2,
+          "bit_depth": 16,
+          "format": "WAV",
+          "codec_subtype": "PCM",
+          "file_size_bytes": 31622778
+        },
+        "embedded_metadata": {
+          "core_format": {
+            "audio_format_code": 1,
+            "audio_format": "PCM",
+            "num_channels": 2,
+            "sample_rate_hz": 44100,
+            "byte_rate": 176400,
+            "block_align": 4,
+            "bits_per_sample": 16,
+            "data_size_bytes": 31622664,
+            "duration_seconds": 179.267
+          },
+          "info": {
+            "creation_date": "2013-05-29",
+            "software": "Lavf62.12.101",
+            "technician": "REAPER"
+          },
+          "broadcast_extension": null,
+          "cue_points": [],
+          "sampler": null,
+          "fact": null,
+          "id3": null,
+          "other_chunks": [],
+          "warnings": []
+        },
+        "claim_mismatches": []
+      },
+      "evidence_hash": "945f4de7b584607c94a44a16f297ec3b6bf5f5f1e2624edb28eebcdcff60f744"
+    },
+    {
+      "code": "PARSER_OBSERVATION",
+      "severity": "info",
+      "message": "audio/stem: parsed",
+      "parser": "wav",
+      "parser_status": "parsed",
+      "parser_result": {
+        "observed": {
+          "duration_seconds": 179.26680272108842,
+          "sample_rate_hz": 44100,
+          "channels": 2,
+          "bit_depth": 16,
+          "format": "WAV",
+          "codec_subtype": "PCM",
+          "file_size_bytes": 31622778
+        },
+        "embedded_metadata": {
+          "core_format": {
+            "audio_format_code": 1,
+            "audio_format": "PCM",
+            "num_channels": 2,
+            "sample_rate_hz": 44100,
+            "byte_rate": 176400,
+            "block_align": 4,
+            "bits_per_sample": 16,
+            "data_size_bytes": 31622664,
+            "duration_seconds": 179.267
+          },
+          "info": {
+            "creation_date": "2013-05-29",
+            "software": "Lavf62.12.101",
+            "technician": "REAPER"
+          },
+          "broadcast_extension": null,
+          "cue_points": [],
+          "sampler": null,
+          "fact": null,
+          "id3": null,
+          "other_chunks": [],
+          "warnings": []
+        },
+        "claim_mismatches": []
+      },
+      "evidence_hash": "50e40ffe2e928e74d937ca4eaeba9a35160800972eaf25adb71ce31e147ea129"
+    },
+    {
+      "code": "PARSER_OBSERVATION",
+      "severity": "info",
+      "message": "audio/mix: parsed",
+      "parser": "wav",
+      "parser_status": "parsed",
+      "parser_result": {
+        "observed": {
+          "duration_seconds": 178.05061224489796,
+          "sample_rate_hz": 44100,
+          "channels": 2,
+          "bit_depth": 16,
+          "format": "WAV",
+          "codec_subtype": "PCM",
+          "file_size_bytes": 31408242
+        },
+        "embedded_metadata": {
+          "core_format": {
+            "audio_format_code": 1,
+            "audio_format": "PCM",
+            "num_channels": 2,
+            "sample_rate_hz": 44100,
+            "byte_rate": 176400,
+            "block_align": 4,
+            "bits_per_sample": 16,
+            "data_size_bytes": 31408128,
+            "duration_seconds": 178.051
+          },
+          "info": {
+            "creation_date": "2013-05-29",
+            "software": "Lavf63.1.101",
+            "technician": "REAPER"
+          },
+          "broadcast_extension": null,
+          "cue_points": [],
+          "sampler": null,
+          "fact": null,
+          "id3": null,
+          "other_chunks": [],
+          "warnings": []
+        },
+        "claim_mismatches": []
+      },
+      "evidence_hash": "0a2c29f42e0570d270f27d268062dab5ab30d86a0ed720b31f8b6735cd268190"
+    },
+    {
+      "code": "AUDIO_DERIVATION_CONTRADICTION",
+      "severity": "medium",
+      "message": "The submitted audio contradicts the scoped content-derivation model.",
+      "derivation_result": {
+        "rule": "audio_linear_mix_derivation",
+        "pass": "AudioDerivationPass",
+        "target_hash": "0a2c29f42e0570d270f27d268062dab5ab30d86a0ed720b31f8b6735cd268190",
+        "source_hashes": [
+          "133c934683b5f977ce77d1ead96ce4451162ad75e3bea2432bd6fbbe3f6e0c7b",
+          "50e40ffe2e928e74d937ca4eaeba9a35160800972eaf25adb71ce31e147ea129",
+          "945f4de7b584607c94a44a16f297ec3b6bf5f5f1e2624edb28eebcdcff60f744"
+        ],
+        "status": "contradicted",
+        "claim_status": "declared_contradicted",
+        "reason": "Held-out target blocks contradict the explicitly declared aligned constant-gain model.",
+        "verified_scope": "linear_mix",
+        "declared_gains": [
+          1.0,
+          1.0,
+          1.0
+        ],
+        "parameter_source": "submitter_declared",
+        "offsets_seconds": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "normalized_rmse": 1.012158,
+        "correlation": -0.000841,
+        "declaration_partition_normalized_rmse": 1.009579,
+        "declaration_partition_correlation": 0.017624,
+        "validation_normalized_rmse": 1.012158,
+        "validation_correlation": -0.000841,
+        "source_identifiability": 0.9992045,
+        "gain_estimation_performed": false,
+        "max_source_correlation": 0.027139,
+        "target_duration_seconds": 60.000136,
+        "covered_duration_seconds": 60.000136,
+        "coverage_ratio": 1.0,
+        "matched_duration_seconds": 0.0,
+        "matched_coverage_ratio": 0.0,
+        "alternative_source_locations": [],
+        "manual_review_reasons": [],
+        "content_match_is_provenance": false,
+        "analysis_sample_rate_hz": 2004.545
+      },
+      "evidence_hash": "0a2c29f42e0570d270f27d268062dab5ab30d86a0ed720b31f8b6735cd268190"
+    },
+    {
+      "code": "WORKFLOW_EXPECTATION_MISSING",
+      "severity": "medium",
+      "message": "multitrack.sources: Found 0 usable bound matching artefact(s); minimum is 2."
+    }
+  ],
+  "processing_ms": 8757.047000000966,
+  "resource_usage": {
+    "cpu_ms": 8507.679000000002,
+    "peak_rss_kib": null
+  },
+  "error": null,
+  "workflow_assessment": {
+    "policy_id": "comp3888-music-workflow-evidence",
+    "policy_version": "0.1.0-candidate",
+    "workflow_id": "multitrack_recording_mix_master",
+    "workflow_title": "Multitrack recording, mixing, and optional mastering",
+    "modifiers": [
+      "includes_mixing",
+      "includes_multitrack_recording",
+      "includes_recorded_performance"
+    ],
+    "allowed_final_type": true,
+    "summary": {
+      "applicable_rules": 6,
+      "assessed_rules": 6,
+      "satisfied_rules": 5,
+      "missing_rules": 1
+    },
+    "rule_results": [
+      {
+        "rule_id": "common.final_artefact",
+        "level": "required",
+        "kind": "artifact_presence",
+        "status": "satisfied",
+        "weight": 1.0,
+        "reason": "Found 1 usable bound matching artefact(s); minimum is 1.",
+        "matched_artefact_hashes": [
+          "0a2c29f42e0570d270f27d268062dab5ab30d86a0ed720b31f8b6735cd268190"
+        ],
+        "matched_relationships": []
+      },
+      {
+        "rule_id": "common.submitter_declaration",
+        "level": "required",
+        "kind": "declaration_presence",
+        "status": "satisfied",
+        "weight": 0.5,
+        "reason": "Declaration 'submitter_confirmation' is present.",
+        "matched_artefact_hashes": [],
+        "matched_relationships": []
+      },
+      {
+        "rule_id": "common.creation_method_disclosure",
+        "level": "required",
+        "kind": "declaration_presence",
+        "status": "satisfied",
+        "weight": 0.5,
+        "reason": "Declaration 'artefacts[].creation_method' is present.",
+        "matched_artefact_hashes": [],
+        "matched_relationships": []
+      },
+      {
+        "rule_id": "multitrack.sources",
+        "level": "required",
+        "kind": "artifact_presence",
+        "status": "missing",
+        "weight": 2.0,
+        "reason": "Found 0 usable bound matching artefact(s); minimum is 2.",
+        "matched_artefact_hashes": [],
+        "matched_relationships": []
+      },
+      {
+        "rule_id": "multitrack.mix_stage",
+        "level": "required",
+        "kind": "artifact_presence",
+        "status": "satisfied",
+        "weight": 1.5,
+        "reason": "Found 1 usable bound matching artefact(s); minimum is 1.",
+        "matched_artefact_hashes": [
+          "0a2c29f42e0570d270f27d268062dab5ab30d86a0ed720b31f8b6735cd268190"
+        ],
+        "matched_relationships": []
+      },
+      {
+        "rule_id": "multitrack.mixed_from",
+        "level": "required",
+        "kind": "relationship_presence",
+        "status": "satisfied",
+        "weight": 2.0,
+        "reason": "Found 3 matching bound relationship(s); minimum is 2.",
+        "matched_artefact_hashes": [],
+        "matched_relationships": [
+          {
+            "source_hash": "133c934683b5f977ce77d1ead96ce4451162ad75e3bea2432bd6fbbe3f6e0c7b",
+            "target_hash": "0a2c29f42e0570d270f27d268062dab5ab30d86a0ed720b31f8b6735cd268190",
+            "relationship_type": "mixed_from"
+          },
+          {
+            "source_hash": "945f4de7b584607c94a44a16f297ec3b6bf5f5f1e2624edb28eebcdcff60f744",
+            "target_hash": "0a2c29f42e0570d270f27d268062dab5ab30d86a0ed720b31f8b6735cd268190",
+            "relationship_type": "mixed_from"
+          },
+          {
+            "source_hash": "50e40ffe2e928e74d937ca4eaeba9a35160800972eaf25adb71ce31e147ea129",
+            "target_hash": "0a2c29f42e0570d270f27d268062dab5ab30d86a0ed720b31f8b6735cd268190",
+            "relationship_type": "mixed_from"
+          }
+        ]
+      },
+      {
+        "rule_id": "multitrack.mastering",
+        "level": "conditional",
+        "kind": "relationship_presence",
+        "status": "not_applicable",
+        "weight": 1.5,
+        "reason": "Trigger evaluated false: final.type == 'audio/master' or modifier.includes_mastering",
+        "matched_artefact_hashes": [],
+        "matched_relationships": []
+      },
+      {
+        "rule_id": "multitrack.stems",
+        "level": "conditional",
+        "kind": "artifact_presence",
+        "status": "not_applicable",
+        "weight": 1.0,
+        "reason": "Trigger evaluated false: modifier.includes_stem_export",
+        "matched_artefact_hashes": [],
+        "matched_relationships": []
+      },
+      {
+        "rule_id": "common.c2pa",
+        "level": "optional",
+        "kind": "artifact_presence",
+        "status": "missing",
+        "weight": null,
+        "reason": "Found 0 usable bound matching artefact(s); minimum is 1.",
+        "matched_artefact_hashes": [],
+        "matched_relationships": []
+      },
+      {
+        "rule_id": "common.rin",
+        "level": "optional",
+        "kind": "artifact_presence",
+        "status": "missing",
+        "weight": null,
+        "reason": "Found 0 usable bound matching artefact(s); minimum is 1.",
+        "matched_artefact_hashes": [],
+        "matched_relationships": []
+      },
+      {
+        "rule_id": "common.ern",
+        "level": "optional",
+        "kind": "artifact_presence",
+        "status": "missing",
+        "weight": null,
+        "reason": "Found 0 usable bound matching artefact(s); minimum is 1.",
+        "matched_artefact_hashes": [],
+        "matched_relationships": []
+      },
+      {
+        "rule_id": "common.session_log",
+        "level": "optional",
+        "kind": "artifact_presence",
+        "status": "missing",
+        "weight": null,
+        "reason": "Found 0 usable bound matching artefact(s); minimum is 1.",
+        "matched_artefact_hashes": [],
+        "matched_relationships": []
+      },
+      {
+        "rule_id": "multitrack_recording_mix_master.optional.1",
+        "level": "optional",
+        "kind": "artifact_presence",
+        "status": "missing",
+        "weight": null,
+        "reason": "Found 0 usable bound matching artefact(s); minimum is 1.",
+        "matched_artefact_hashes": [],
+        "matched_relationships": []
+      },
+      {
+        "rule_id": "multitrack_recording_mix_master.optional.2",
+        "level": "optional",
+        "kind": "artifact_presence",
+        "status": "missing",
+        "weight": null,
+        "reason": "Found 0 usable bound matching artefact(s); minimum is 1.",
+        "matched_artefact_hashes": [],
+        "matched_relationships": []
+      },
+      {
+        "rule_id": "multitrack_recording_mix_master.optional.3",
+        "level": "optional",
+        "kind": "artifact_presence",
+        "status": "missing",
+        "weight": null,
+        "reason": "Found 0 usable bound matching artefact(s); minimum is 1.",
+        "matched_artefact_hashes": [],
+        "matched_relationships": []
+      },
+      {
+        "rule_id": "multitrack_recording_mix_master.optional.4",
+        "level": "optional",
+        "kind": "artifact_presence",
+        "status": "missing",
+        "weight": null,
+        "reason": "Found 0 usable bound matching artefact(s); minimum is 1.",
+        "matched_artefact_hashes": [],
+        "matched_relationships": []
+      },
+      {
+        "rule_id": "multitrack_recording_mix_master.optional.5",
+        "level": "optional",
+        "kind": "artifact_presence",
+        "status": "missing",
+        "weight": null,
+        "reason": "Found 0 usable bound matching artefact(s); minimum is 1.",
+        "matched_artefact_hashes": [],
+        "matched_relationships": []
+      },
+      {
+        "rule_id": "multitrack_recording_mix_master.optional.6",
+        "level": "optional",
+        "kind": "artifact_presence",
+        "status": "missing",
+        "weight": null,
+        "reason": "Found 0 usable bound matching artefact(s); minimum is 1.",
+        "matched_artefact_hashes": [],
+        "matched_relationships": []
+      }
+    ]
+  },
+  "assessment_checks": {
+    "bound_file_integrity": [
+      {
+        "rule": "object_hash_bound",
+        "passed": true,
+        "evidence_hash": "133c934683b5f977ce77d1ead96ce4451162ad75e3bea2432bd6fbbe3f6e0c7b"
+      },
+      {
+        "rule": "object_hash_bound",
+        "passed": true,
+        "evidence_hash": "945f4de7b584607c94a44a16f297ec3b6bf5f5f1e2624edb28eebcdcff60f744"
+      },
+      {
+        "rule": "object_hash_bound",
+        "passed": true,
+        "evidence_hash": "50e40ffe2e928e74d937ca4eaeba9a35160800972eaf25adb71ce31e147ea129"
+      },
+      {
+        "rule": "object_hash_bound",
+        "passed": true,
+        "evidence_hash": "0a2c29f42e0570d270f27d268062dab5ab30d86a0ed720b31f8b6735cd268190"
+      }
+    ],
+    "structural_validity": [
+      {
+        "rule": "graph_loaded_without_cycle",
+        "passed": true
+      },
+      {
+        "rule": "all_nodes_connected_to_final",
+        "passed": true
+      },
+      {
+        "rule": "declared_hash_references_resolve",
+        "passed": true
+      },
+      {
+        "rule": "relationship_endpoint_roles_registered",
+        "passed": true,
+        "source_hash": "133c934683b5f977ce77d1ead96ce4451162ad75e3bea2432bd6fbbe3f6e0c7b",
+        "target_hash": "0a2c29f42e0570d270f27d268062dab5ab30d86a0ed720b31f8b6735cd268190",
+        "relationship_type": "mixed_from"
+      },
+      {
+        "rule": "relationship_endpoint_roles_registered",
+        "passed": true,
+        "source_hash": "945f4de7b584607c94a44a16f297ec3b6bf5f5f1e2624edb28eebcdcff60f744",
+        "target_hash": "0a2c29f42e0570d270f27d268062dab5ab30d86a0ed720b31f8b6735cd268190",
+        "relationship_type": "mixed_from"
+      },
+      {
+        "rule": "relationship_endpoint_roles_registered",
+        "passed": true,
+        "source_hash": "50e40ffe2e928e74d937ca4eaeba9a35160800972eaf25adb71ce31e147ea129",
+        "target_hash": "0a2c29f42e0570d270f27d268062dab5ab30d86a0ed720b31f8b6735cd268190",
+        "relationship_type": "mixed_from"
+      }
+    ],
+    "relationship_integrity": [
+      {
+        "rule": "technical.duration_seconds_matches_observed",
+        "passed": true,
+        "evidence_hash": "133c934683b5f977ce77d1ead96ce4451162ad75e3bea2432bd6fbbe3f6e0c7b",
+        "declared": 179.583129,
+        "observed": 179.58312925170068
+      },
+      {
+        "rule": "technical.sample_rate_hz_matches_observed",
+        "passed": true,
+        "evidence_hash": "133c934683b5f977ce77d1ead96ce4451162ad75e3bea2432bd6fbbe3f6e0c7b",
+        "declared": 44100,
+        "observed": 44100
+      },
+      {
+        "rule": "technical.channels_matches_observed",
+        "passed": true,
+        "evidence_hash": "133c934683b5f977ce77d1ead96ce4451162ad75e3bea2432bd6fbbe3f6e0c7b",
+        "declared": 2,
+        "observed": 2
+      },
+      {
+        "rule": "technical.bit_depth_matches_observed",
+        "passed": true,
+        "evidence_hash": "133c934683b5f977ce77d1ead96ce4451162ad75e3bea2432bd6fbbe3f6e0c7b",
+        "declared": 16,
+        "observed": 16
+      },
+      {
+        "rule": "technical.duration_seconds_matches_observed",
+        "passed": true,
+        "evidence_hash": "945f4de7b584607c94a44a16f297ec3b6bf5f5f1e2624edb28eebcdcff60f744",
+        "declared": 179.266803,
+        "observed": 179.26680272108842
+      },
+      {
+        "rule": "technical.sample_rate_hz_matches_observed",
+        "passed": true,
+        "evidence_hash": "945f4de7b584607c94a44a16f297ec3b6bf5f5f1e2624edb28eebcdcff60f744",
+        "declared": 44100,
+        "observed": 44100
+      },
+      {
+        "rule": "technical.channels_matches_observed",
+        "passed": true,
+        "evidence_hash": "945f4de7b584607c94a44a16f297ec3b6bf5f5f1e2624edb28eebcdcff60f744",
+        "declared": 2,
+        "observed": 2
+      },
+      {
+        "rule": "technical.bit_depth_matches_observed",
+        "passed": true,
+        "evidence_hash": "945f4de7b584607c94a44a16f297ec3b6bf5f5f1e2624edb28eebcdcff60f744",
+        "declared": 16,
+        "observed": 16
+      },
+      {
+        "rule": "technical.duration_seconds_matches_observed",
+        "passed": true,
+        "evidence_hash": "50e40ffe2e928e74d937ca4eaeba9a35160800972eaf25adb71ce31e147ea129",
+        "declared": 179.266803,
+        "observed": 179.26680272108842
+      },
+      {
+        "rule": "technical.sample_rate_hz_matches_observed",
+        "passed": true,
+        "evidence_hash": "50e40ffe2e928e74d937ca4eaeba9a35160800972eaf25adb71ce31e147ea129",
+        "declared": 44100,
+        "observed": 44100
+      },
+      {
+        "rule": "technical.channels_matches_observed",
+        "passed": true,
+        "evidence_hash": "50e40ffe2e928e74d937ca4eaeba9a35160800972eaf25adb71ce31e147ea129",
+        "declared": 2,
+        "observed": 2
+      },
+      {
+        "rule": "technical.bit_depth_matches_observed",
+        "passed": true,
+        "evidence_hash": "50e40ffe2e928e74d937ca4eaeba9a35160800972eaf25adb71ce31e147ea129",
+        "declared": 16,
+        "observed": 16
+      },
+      {
+        "rule": "technical.duration_seconds_matches_observed",
+        "passed": true,
+        "evidence_hash": "0a2c29f42e0570d270f27d268062dab5ab30d86a0ed720b31f8b6735cd268190",
+        "declared": 178.050612,
+        "observed": 178.05061224489796
+      },
+      {
+        "rule": "technical.sample_rate_hz_matches_observed",
+        "passed": true,
+        "evidence_hash": "0a2c29f42e0570d270f27d268062dab5ab30d86a0ed720b31f8b6735cd268190",
+        "declared": 44100,
+        "observed": 44100
+      },
+      {
+        "rule": "technical.channels_matches_observed",
+        "passed": true,
+        "evidence_hash": "0a2c29f42e0570d270f27d268062dab5ab30d86a0ed720b31f8b6735cd268190",
+        "declared": 2,
+        "observed": 2
+      },
+      {
+        "rule": "technical.bit_depth_matches_observed",
+        "passed": true,
+        "evidence_hash": "0a2c29f42e0570d270f27d268062dab5ab30d86a0ed720b31f8b6735cd268190",
+        "declared": 16,
+        "observed": 16
+      },
+      {
+        "rule": "source_time_order_valid",
+        "passed": true,
+        "source_hash": "133c934683b5f977ce77d1ead96ce4451162ad75e3bea2432bd6fbbe3f6e0c7b",
+        "target_hash": "0a2c29f42e0570d270f27d268062dab5ab30d86a0ed720b31f8b6735cd268190",
+        "relationship_type": "mixed_from"
+      },
+      {
+        "rule": "source_time_within_duration",
+        "passed": true,
+        "source_hash": "133c934683b5f977ce77d1ead96ce4451162ad75e3bea2432bd6fbbe3f6e0c7b",
+        "target_hash": "0a2c29f42e0570d270f27d268062dab5ab30d86a0ed720b31f8b6735cd268190",
+        "relationship_type": "mixed_from"
+      },
+      {
+        "rule": "target_time_within_duration",
+        "passed": true,
+        "source_hash": "133c934683b5f977ce77d1ead96ce4451162ad75e3bea2432bd6fbbe3f6e0c7b",
+        "target_hash": "0a2c29f42e0570d270f27d268062dab5ab30d86a0ed720b31f8b6735cd268190",
+        "relationship_type": "mixed_from"
+      },
+      {
+        "rule": "source_time_order_valid",
+        "passed": true,
+        "source_hash": "945f4de7b584607c94a44a16f297ec3b6bf5f5f1e2624edb28eebcdcff60f744",
+        "target_hash": "0a2c29f42e0570d270f27d268062dab5ab30d86a0ed720b31f8b6735cd268190",
+        "relationship_type": "mixed_from"
+      },
+      {
+        "rule": "source_time_within_duration",
+        "passed": true,
+        "source_hash": "945f4de7b584607c94a44a16f297ec3b6bf5f5f1e2624edb28eebcdcff60f744",
+        "target_hash": "0a2c29f42e0570d270f27d268062dab5ab30d86a0ed720b31f8b6735cd268190",
+        "relationship_type": "mixed_from"
+      },
+      {
+        "rule": "target_time_within_duration",
+        "passed": true,
+        "source_hash": "945f4de7b584607c94a44a16f297ec3b6bf5f5f1e2624edb28eebcdcff60f744",
+        "target_hash": "0a2c29f42e0570d270f27d268062dab5ab30d86a0ed720b31f8b6735cd268190",
+        "relationship_type": "mixed_from"
+      },
+      {
+        "rule": "source_time_order_valid",
+        "passed": true,
+        "source_hash": "50e40ffe2e928e74d937ca4eaeba9a35160800972eaf25adb71ce31e147ea129",
+        "target_hash": "0a2c29f42e0570d270f27d268062dab5ab30d86a0ed720b31f8b6735cd268190",
+        "relationship_type": "mixed_from"
+      },
+      {
+        "rule": "source_time_within_duration",
+        "passed": true,
+        "source_hash": "50e40ffe2e928e74d937ca4eaeba9a35160800972eaf25adb71ce31e147ea129",
+        "target_hash": "0a2c29f42e0570d270f27d268062dab5ab30d86a0ed720b31f8b6735cd268190",
+        "relationship_type": "mixed_from"
+      },
+      {
+        "rule": "target_time_within_duration",
+        "passed": true,
+        "source_hash": "50e40ffe2e928e74d937ca4eaeba9a35160800972eaf25adb71ce31e147ea129",
+        "target_hash": "0a2c29f42e0570d270f27d268062dab5ab30d86a0ed720b31f8b6735cd268190",
+        "relationship_type": "mixed_from"
+      }
+    ],
+    "integrity_layers": [
+      {
+        "layer": "file_integrity",
+        "status": "matched",
+        "value": 1.0,
+        "contributes_to_integrity": true,
+        "check_count": 4,
+        "reason": "SHA-256 binding and parser readability of submitted files.",
+        "manual_review_reasons": []
+      },
+      {
+        "layer": "structural_validity",
+        "status": "matched",
+        "value": 1.0,
+        "contributes_to_integrity": false,
+        "check_count": 6,
+        "reason": "Graph, references, cycles, connectivity, and endpoint roles passed before assessment; this is not content proof.",
+        "manual_review_reasons": []
+      },
+      {
+        "layer": "declaration_consistency",
+        "status": "matched",
+        "value": 1.0,
+        "contributes_to_integrity": true,
+        "check_count": 25,
+        "reason": "Submitted technical and relationship parameters compared with bound media observations.",
+        "manual_review_reasons": []
+      },
+      {
+        "layer": "content_reconstruction",
+        "status": "contradicted",
+        "value": 0.0,
+        "contributes_to_integrity": true,
+        "check_count": 1,
+        "reason": "Only submitter-declared ranges and gains are assessed. Missing parameters are unavailable, not adverse; Master continuity corroboration remains unscored.",
+        "manual_review_reasons": []
+      },
+      {
+        "layer": "cross_evidence_support",
+        "status": "unavailable",
+        "value": null,
+        "contributes_to_integrity": true,
+        "check_count": 0,
+        "reason": "Independent parser outputs compared with graph, declarations, and media.",
+        "manual_review_reasons": []
+      },
+      {
+        "layer": "cryptographic_attestation",
+        "status": "not_applicable",
+        "value": null,
+        "contributes_to_integrity": false,
+        "check_count": 1,
+        "reason": "C2PA remains in the separate attestation-strength axis and never inflates integrity.",
+        "manual_review_reasons": []
+      }
+    ],
+    "assessment_status_semantics": [
+      {
+        "status": "matched",
+        "meaning": "An exact, explicitly scoped check passed on independent validation data.",
+        "numeric_treatment": "1.0 when the layer is eligible for integrity scoring."
+      },
+      {
+        "status": "corroborated",
+        "meaning": "Independent evidence supports the claim but does not prove exact derivation.",
+        "numeric_treatment": "Reported separately; never silently scored as an exact match."
+      },
+      {
+        "status": "contradicted",
+        "meaning": "An applicable assessed claim conflicts with observed evidence.",
+        "numeric_treatment": "0.0 in its eligible layer and emits a contradiction finding."
+      },
+      {
+        "status": "not_applicable",
+        "meaning": "The check exists but the submitted transformation or evidence is outside its reliable scope.",
+        "numeric_treatment": "Excluded from the denominator; may request manual review."
+      },
+      {
+        "status": "unavailable",
+        "meaning": "The claim may be present, but required evidence or declared parameters were absent or unreadable, so the check did not run.",
+        "numeric_treatment": "Excluded from the denominator and never treated as zero."
+      }
+    ],
+    "cross_evidence": [],
+    "edit_derivation": [],
+    "comp_derivation": [],
+    "stem_derivation": [],
+    "audio_derivation": [
+      {
+        "rule": "audio_linear_mix_derivation",
+        "pass": "AudioDerivationPass",
+        "target_hash": "0a2c29f42e0570d270f27d268062dab5ab30d86a0ed720b31f8b6735cd268190",
+        "source_hashes": [
+          "133c934683b5f977ce77d1ead96ce4451162ad75e3bea2432bd6fbbe3f6e0c7b",
+          "50e40ffe2e928e74d937ca4eaeba9a35160800972eaf25adb71ce31e147ea129",
+          "945f4de7b584607c94a44a16f297ec3b6bf5f5f1e2624edb28eebcdcff60f744"
+        ],
+        "status": "contradicted",
+        "claim_status": "declared_contradicted",
+        "reason": "Held-out target blocks contradict the explicitly declared aligned constant-gain model.",
+        "verified_scope": "linear_mix",
+        "declared_gains": [
+          1.0,
+          1.0,
+          1.0
+        ],
+        "parameter_source": "submitter_declared",
+        "offsets_seconds": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "normalized_rmse": 1.012158,
+        "correlation": -0.000841,
+        "declaration_partition_normalized_rmse": 1.009579,
+        "declaration_partition_correlation": 0.017624,
+        "validation_normalized_rmse": 1.012158,
+        "validation_correlation": -0.000841,
+        "source_identifiability": 0.9992045,
+        "gain_estimation_performed": false,
+        "max_source_correlation": 0.027139,
+        "target_duration_seconds": 60.000136,
+        "covered_duration_seconds": 60.000136,
+        "coverage_ratio": 1.0,
+        "matched_duration_seconds": 0.0,
+        "matched_coverage_ratio": 0.0,
+        "alternative_source_locations": [],
+        "manual_review_reasons": [],
+        "content_match_is_provenance": false,
+        "analysis_sample_rate_hz": 2004.545
+      }
+    ],
+    "master_derivation": []
+  }
+}

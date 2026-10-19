@@ -1,8 +1,6 @@
-COMP3888 music target v0.6.0 with desktop builder integration
-Command: python -B -m unittest discover -s tests -v
+COMP3888 music target v0.7.0 phase 0
+Command: .venv/bin/python -B -m unittest discover -s tests -v
 Date: 2026-10-14
-Environment: CPython 3.12.10 on Windows
 
-Ran 139 tests in 19.0 seconds.
-OK (137 passed, 0 failures, 0 errors, 2 skipped)
-The two skipped tests require Windows symlink privileges not available in this environment.
+Ran 102 tests in approximately 3 seconds.
+OK (102 passed, 0 failures, 0 errors)
