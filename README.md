@@ -27,14 +27,14 @@ The runnable evaluator is in [`program/`](program/). Unless stated otherwise, fi
 4. [Sheet formats](program/docs/SHEET_FORMATS.md): supported CompSheet and CueSheet formats.
 5. [Future work](program/docs/NEXT_TASKS.md): consolidated P0-P3 roadmap and unresolved legacy items.
 6. [Verification results](program/reports/verification.md): historical core verification and remaining unverified areas.
-7. [Audio integration verification](program/reports/audio-diagnostics-verification.json): 149 passing tests and core-result invariance on the repeated-excerpt example.
+7. [Audio integration verification](program/reports/audio-diagnostics-verification.json): 189 passing tests and core-result invariance on the repeated-excerpt example.
 
 ## Current implementation
 
 - Includes a pinned copy of the library source reviewed for this release, with fixes for audio attributes, binary-file binding, and dictionary attribute checks.
 - Registers music audio, MIDI, DAW, RIN, ERN, C2PA, and text evidence types, plus constrained relationship types.
 - Uses one streaming RIFF/WAVE reader for structural inspection, metadata parsing, and bounded sample decoding. It supports integer PCM (8/16/24/32-bit), IEEE float (32/64-bit), and integer/float `WAVE_FORMAT_EXTENSIBLE` without loading the whole file.
-- Provides a bounded MIDI parser; the RIN, ERN, and C2PA parsers are connected to the production execution path.
+- Provides a bounded MIDI parser; the RIN, ERN, C2PA, sound report (`text/sound-report`) and AAF (`project/aaf`) parsers are connected to the production execution path.
 - The MIDI parser extracts channel and meta events, notes, tempo, time signatures, controllers, and duration in seconds when it can be calculated.
 - CompSheet and CueSheet parsers support strict JSON, CSV, delimited text, and PDF text extraction. See [`program/docs/SHEET_FORMATS.md`](program/docs/SHEET_FORMATS.md).
 - Runs file, relationship, and cross-evidence analysis through the actual `EvidenceChain` and `Pipeline` implementations.
@@ -196,9 +196,43 @@ policy is enabled with `--audio-analysis-policy policies/audio_analysis_policy.j
 The active profile is `policies/scoring_profile.json`. Integrity combines three
 available score-eligible layers: `file_integrity`, `declaration_consistency` and
 `cross_evidence_support`, each with default weight 1.0. With no assessed
-contradiction, the default withholding rule requires at least two populated
-layers and independent CrossEvidence before releasing a numeric value.
+contradiction, the default withholding rule (profile `default-v2`) requires at
+least two populated layers **and an assessed cross-evidence check from an
+evidence tier independent of the submitter** before releasing a numeric value.
 Confidence is `0.8 * populated_layers / 3`; it is not a probability of authorship.
+
+### Evidence tiers
+
+Every cross-evidence check records an `evidence_tier`:
+
+| Tier | Source | Releases a value on its own? |
+|---|---|---|
+| `signed_attestation` | A C2PA manifest whose signature validated (`Valid`/`Trusted`) | Yes |
+| `recorder_metadata` | Submitted documents compared with BWF `bext`/iXML metadata a field recorder wrote into a hash-bound WAV | Yes |
+| `submitter_document` | RIN, ERN, CompSheet, CueSheet, MIDI, DAW sessions, AAF, sound reports and unverified C2PA, compared with the graph, declarations or measured file properties | No |
+
+Submitter documents are declarations in another format: the submitter could
+export an AAF and build the graph from it, so agreement between the two proves
+nothing. They still contribute to the `cross_evidence_support` value and still
+reveal contradictions. They count as support only where they can be compared
+with something the submitter did not write. For example:
+
+- **Sound report vs recorder:** the sound report says `2T01.WAV` (18 Dec)
+  starts at `08:49:43:00`, and the take's `bext` time reference says the same.
+  This is checked by `sound_report_start_timecode_matches_recorder`.
+- **AAF vs recorder:** an AAF edit uses 4.6 s of tape `24Y12M17` from 14:04:59,
+  and `2T05.WAV`'s recorded span, 14:04:31 + 43 s, contains it. This is checked
+  by `aaf_source_range_within_recorded_timecode`.
+
+The cross layer reports `evidence_tier_counts`. A profile that omits
+`withholding_rule.substantive_support_tiers` keeps the original rule, in which
+any assessed cross-evidence check counts. Audio-content agreement is not a
+tier: diagnostics stay report-only until their thresholds are calibrated.
+
+On the Project Rock dataset the three episode chains (takes, both sound
+reports and the episode AAF) produced 0 recorder contradictions and
+Integrity 1.0. A copy of the sound report with one start timecode shifted by
+2 s failed exactly that one check.
 
 An assessed failure of a rule listed in `severe_contradiction_rules` caps an
 otherwise available weighted result with `min(weighted_mean, 0.25)`. The cap
@@ -210,6 +244,33 @@ triggering rule(s) and the uncapped weighted mean, and
 `weighted_mean`, `value` and `value_lowered`. The record is absent when no
 severe rule failed. Diagnostic threshold calibration is separate from weight
 calibration; this integration does not add a fourth scored layer.
+
+### Score explanations
+
+Every successful response carries `assessment_checks.score_explanations`, one
+entry per axis. The response schema is a shared contract, so it is not
+extended. The Integrity entry lists:
+
+- each contributing layer's value and weight;
+- the weighted mean, and whether a cap applied (`cap_applied`, `cap`) or the
+  value was withheld (`withheld`);
+- the evidence-tier counts;
+- every failed check as a sentence with the compared values.
+
+For example: *"Sound report start timecode for 2T01.WAV is 08:49:45:00, but
+the recorder wrote 08:49:43:00 into the file (2.00 s apart)."* The same
+sentences are appended to the Integrity `reasoning` after "Contradictions:".
+
+A timecode mismatch is an ordinary contradiction, not a severe one. Honest
+productions produce mismatches too: hand-typed reports, timecode drift, files
+re-exported with rewritten `bext`. So it lowers the cross-evidence layer and
+is named explicitly; it does not cap the score.
+
+The completeness entry also names any evidence the selected workflow does not
+describe. Such artefacts get one info finding,
+`WORKFLOW_EVIDENCE_OUTSIDE_POLICY`, with `status: "inconclusive"` per
+artefact, and they neither raise nor lower completeness.
+`include_reasoning: false` omits the explanations.
 
 ## Run the native example
 
@@ -286,6 +347,13 @@ The locations below are relative to `program/`.
 | `music_target/physical_audio_passes.py` | Deprecated physical-similarity implementation retained for later cleanup; not imported by assessment |
 | `music_target/midi_parser.py` | Size- and structure-bounded Standard MIDI File parser |
 | `music_target/sheet_parsers.py` | CompSheet/CueSheet JSON, CSV, TXT, and PDF parsers plus field normalisation |
+| `music_target/recorder_metadata.py` | Recorder-written BWF `bext`/iXML fields (tape, file name, scene/take, tracks, start timecode) from a bound WAV |
+| `music_target/production_documents.py` | Sound report CSV and AAF (pyaaf2) parsers, and their checks against recorder metadata |
+| `music_target/evidence_tiers.py` | Evidence tiers for cross-evidence checks and their counts |
+| `music_target/score_explanations.py` | Per-axis score explanations and plain-language statements of failed checks |
+| `music_target/daw_session.py` | Ableton Live session parser and its checks against the graph and MIDI |
+| `music_target/audio_diagnostics/providers/music_semantics.py` | Report-only key, tempo, chord and phrase-form comparison across versions |
+| `benchmarks/` | Public music dataset benchmark (Slakh/BabySlakh, MUSDB18-HQ) with true and control relationships |
 | `music_target/contract.py` | CSEC/native format adaptation, input validation, and version identification |
 | `policies/workflow_evidence_policy.json` | Candidate required, conditional, and optional evidence policy for 16 workflows |
 | `music_target/audio_diagnostics/` | Report-only task selection, verified snapshots, isolated workers, three provider adapters and result assembly |
@@ -296,7 +364,7 @@ The locations below are relative to `program/`.
 | `tests/test_audio_diagnostics.py` | Twenty provider, protocol and score-isolation tests |
 | `reports/audio-diagnostics-verification.json` | Current 144-test verification and real-provider example results |
 | `docs/AUDIO_DIAGNOSTICS.md` | Detailed audio setup, usage, output and interpretation |
-| `music_target/scoring_profile.py`, `policies/scoring_profile.json` | Validated three-layer Integrity weights, withholding, confidence and severe-contradiction cap |
+| `music_target/scoring_profile.py`, `policies/scoring_profile.json` | Validated three-layer Integrity weights, tier-aware withholding, confidence and severe-contradiction cap |
 | `run.py` | CSEC/local execution and explicit parent-side audio diagnostic orchestration |
 | `schemas/` | Original CSEC candidate schemas and local music schemas |
 | `schemas/ddex/` | Pinned RIN 2.1 and ERN 4.3 XSD files, source hashes, and licence reminder |

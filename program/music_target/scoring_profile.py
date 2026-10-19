@@ -44,7 +44,8 @@ DEFAULT_PROFILE_PATH = Path(__file__).resolve().parents[1] / "policies" / "scori
 _PROFILE_KEYS = {"profile_id", "profile_version", "description", "integrity"}
 _INTEGRITY_KEYS = {"layer_weights", "layer_weight_rationale", "withholding_rule", "confidence_formula",
                    "severe_contradiction_rules", "severe_contradiction_cap"}
-_WITHHOLDING_RULE_KEYS = {"min_components_for_substantive_mean", "require_substantive_support_or_contradiction"}
+_WITHHOLDING_RULE_KEYS = {"min_components_for_substantive_mean", "require_substantive_support_or_contradiction",
+                          "substantive_support_tiers"}
 _CONFIDENCE_FORMULA_KEYS = {"ceiling", "denominator_layers"}
 
 
@@ -148,6 +149,16 @@ def load_scoring_profile(path):
     if not isinstance(rule.get("require_substantive_support_or_contradiction"), bool):
         raise ScoringProfileError(
             "integrity.withholding_rule.require_substantive_support_or_contradiction must be a boolean.")
+    # Optional: which evidence tiers count as substantive support. Absent means
+    # every assessed cross-evidence check counts (the original rule).
+    tiers = rule.get("substantive_support_tiers")
+    if tiers is not None:
+        from music_target.evidence_tiers import TIERS
+        if (not isinstance(tiers, list) or not tiers or len(set(tiers)) != len(tiers)
+                or any(item not in TIERS for item in tiers)):
+            raise ScoringProfileError(
+                "integrity.withholding_rule.substantive_support_tiers must be a non-empty list of distinct "
+                "tiers from: " + ", ".join(TIERS) + ".")
 
     formula = integrity.get("confidence_formula")
     if not isinstance(formula, dict):

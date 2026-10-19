@@ -1,9 +1,9 @@
 {
- "date": "2026-10-18",
+ "date": "2026-10-19",
  "baseline_branch": "feature/dynamic-weighting-with-cap",
  "baseline_commit": "c6d36fd2feb221cdc5a68bb3f480c3160bf1e2c5",
  "test_suite": {
-  "passed": 149,
+  "passed": 189,
   "failed": 0,
   "skipped": 0,
   "command": "REQUIRE_AUDIO_BACKENDS=1 python -B -m unittest discover -s tests"
@@ -27,9 +27,9 @@
    ],
    "librosa": []
   },
-  "source_revision": "sha256:6c5fc5687af78a430a26b79deae6e922a54d1e0815da33a647a6d71b31b1d341"
+  "source_revision": "sha256:d96ac7bb6f29d6c40feb702d26c8c621c5fdc0e7647bf49687e3c3a9dc077133"
  },
- "scope": "Report-only diagnostics; no development caps added; original caller timeout and file validation retained; no LLM.",
+ "scope": "Audio diagnostics remain report-only. Integrity withholding now requires an assessed check from an independent evidence tier (signed_attestation or recorder_metadata); see README 'Evidence tiers'.",
  "accuracy_claim": "Synthetic engineering checks only; candidate thresholds remain uncalibrated.",
  "long_source_check": {
   "fixture": "Synthetic 180-second tone sequence; 20-second excerpt at 97.3 seconds.",
@@ -56,6 +56,62 @@
  "fixes": [
   "SpectroMap peak_search runs on fixed peak_window_seconds windows so peak density no longer falls with file length; peak pairs use exact bins and a 32-frame zone.",
   "A severe-contradiction cap is explained in Integrity reasoning and recorded in assessment_checks.severe_contradiction_cap.",
-  "Worker protocol violations become structured unavailability; crashed providers report a stderr tail; a worker start failure affects only its own task."
- ]
+  "Worker protocol violations become structured unavailability; crashed providers report a stderr tail; a worker start failure affects only its own task.",
+  "mean_votes_per_offset_bin is averaged over every feasible offset rather than only the voted span, which inflated it for narrow histograms (found on real data).",
+  "One worker per task runs every provider, decoding each file range once; rows finished before a timeout or crash are kept.",
+  "Fingerprint agreement: offsets where audfprint and SpectroMap both voted, including sub-threshold votes, with a Poisson chance estimate; report-only.",
+  "CompSheet selections without target_end_seconds copy the declared source span and are flagged range_source=derived_from_declared_source_duration.",
+  "AUDIO_DIAGNOSTIC_NOT_APPLICABLE info finding when no audio-to-audio relationship can be analysed.",
+  "Scoring profile default-v2: cross-evidence checks carry evidence_tier; only signed_attestation and recorder_metadata release Integrity without a contradiction.",
+  "Recorder BWF/iXML metadata, sound report CSV and AAF (pyaaf2) parsers with recorder_metadata cross-checks.",
+  "Score explanations: assessment_checks.score_explanations per axis; every failed check stated with its compared values (e.g. a 2.00 s timecode gap); timecode mismatches stay ordinary contradictions.",
+  "WAV files with complete audio but damaged trailing metadata are accepted with a damaged_trailing_metadata_ignored warning.",
+  "music_semantics provider: key, tempo, beat chords and 16-beat phrase form, compared across versions against a shuffled-harmony baseline; librosa cross-file matches demoted to summary statistics.",
+  "WORKFLOW_EVIDENCE_OUTSIDE_POLICY: evidence the workflow does not describe is reported as inconclusive and leaves completeness unchanged.",
+  "Ableton Live session parser with count-based source-audio, tempo and time-signature checks (submitter_document tier).",
+  "benchmarks/music_benchmark.py for Slakh/BabySlakh and MUSDB18-HQ with true and control stems (datasets not included)."
+ ],
+ "real_data_check": {
+  "dataset": "Local production dataset (251 WAV, sound reports, AAF edits); not distributed",
+  "per_task_worker_wall_seconds": {
+   "before": [
+    53.7,
+    42.1,
+    44.1
+   ],
+   "after": [
+    29.5,
+    24.8,
+    27.3
+   ],
+   "peak_rss_mb": 605
+  },
+  "fingerprint_agreement": {
+   "ground_truth_takes_in_masters": "2/29",
+   "unrelated_controls": "0/33",
+   "max_expected_chance_agreements_per_pair": 0.0003
+  },
+  "recorder_metadata_checks": {
+   "episode_chains": 3,
+   "contradictions_on_honest_documents": 0,
+   "integrity_value": 1.0,
+   "tampered_report_start_timecode_shift_seconds": 2,
+   "tampered_checks_failed": 1
+  }
+ },
+ "semantics_synthetic_check": {
+  "final_transposed_+2_at_112_bpm": {
+   "transposition": 2,
+   "tempo_ratio": 1.13,
+   "harmonic_z": 13.6,
+   "phrase_order": 1.0
+  },
+  "unrelated_song": {
+   "harmonic_z": -0.5,
+   "matched_phrases": 0
+  },
+  "reordered_sections": {
+   "phrase_order": 0.75
+  }
+ }
 }

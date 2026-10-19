@@ -9,7 +9,12 @@ from pathlib import Path
 from legacy_parsers.c2pa_parser import parse_c2pa_file
 from legacy_parsers.ern_parser import parse_ern_file
 from legacy_parsers.rin_parser import parse_rin_file
+from music_target.daw_session import DawSessionError, daw_session_checks, parse_ableton_session
 from music_target.midi_parser import parse_midi_file
+from music_target.production_documents import (aaf_checks, parse_aaf_file, parse_sound_report_file,
+                                               sound_report_checks)
+from music_target.evidence_tiers import TIERS, assign_default_tiers, c2pa_tier, tier_counts
+from music_target.score_explanations import describe_check
 from music_target.scoring_profile import load_default_scoring_profile
 from music_target.sheet_parsers import parse_comp_sheet_file, parse_cue_sheet_file
 
@@ -57,6 +62,24 @@ def parse_bound_artefacts(native, chain, wav_observations):
             elif kind == "text/comp-sheet":
                 result = parse_comp_sheet_file(path)
                 parsed = {"parser": "comp-sheet",
+                          "status": "partial" if result["warnings"] else "parsed", "data": result}
+            elif kind == "project/daw-session":
+                try:
+                    result = parse_ableton_session(path)
+                    parsed = {"parser": "daw-session",
+                              "status": "partial" if result["warnings"] else "parsed", "data": result}
+                except DawSessionError as exc:
+                    if not str(exc).startswith("Not an Ableton"):
+                        raise
+                    # Other DAW formats are not parsed yet; unchanged behaviour.
+                    parsed = {"parser": None, "status": "not_assessed", "data": None}
+            elif kind == "text/sound-report":
+                result = parse_sound_report_file(path)
+                parsed = {"parser": "sound-report",
+                          "status": "partial" if result["warnings"] else "parsed", "data": result}
+            elif kind == "project/aaf":
+                result = parse_aaf_file(path)
+                parsed = {"parser": "aaf",
                           "status": "partial" if result["warnings"] else "parsed", "data": result}
             elif kind == "text/cue-sheet":
                 result = parse_cue_sheet_file(path)
@@ -457,6 +480,12 @@ class ExpandedCrossEvidencePass:
                         checks.append({"rule": "cue_sheet_range_within_audio",
                                        "passed": cue["end_seconds"] <= duration,
                                        "cue_id": cue["cue_id"], "asset_hash": asset})
+            elif parser == "daw-session" and data:
+                checks.extend(daw_session_checks(data, owner_digest, native, wav_observations, parser_observations))
+            elif parser == "sound-report" and data:
+                checks.extend(sound_report_checks(data, owner_digest, wav_observations))
+            elif parser == "aaf" and data:
+                checks.extend(aaf_checks(data, owner_digest, wav_observations))
 
         compatible = {
             "parentof": {"derived_from", "edited_from", "mastered_from",
@@ -475,6 +504,9 @@ class ExpandedCrossEvidencePass:
                 "manifest_container_hash": container_hash,
                 "asset_hash": asset_hash,
                 "c2pa_source_kind": record["source_kind"],
+                # Only a manifest whose signature validated is independent of
+                # the submitter; an unverified manifest is another declaration.
+                "evidence_tier": c2pa_tier(c2pa),
             }
             if record["source_kind"] == "standalone":
                 checks.append({
@@ -536,6 +568,7 @@ class ExpandedCrossEvidencePass:
                     declared_ai.append(digest)
             checks.append({"rule": "workflow_ai_modifier_matches_audio_declarations",
                            "passed": bool(declared_ai), "audio_hashes": declared_ai})
+        assign_default_tiers(checks)
         eligible = [item for item in checks if isinstance(item.get("passed"), bool)]
         value = (sum(item["passed"] for item in eligible) / len(eligible)
                  if eligible else None)
@@ -896,7 +929,8 @@ def assess_axes(native, chain, bound_hashes, missing_hashes, wav_observations,
                "Legacy signal comparisons are disabled by policy and never contribute to integrity.",
                0),
         _layer("cross_evidence_support", cross_status, cross_layer_value, True,
-               "Independent parser outputs compared with graph, declarations, and media.",
+               "Parser outputs compared with the graph, declarations, media and recorder metadata; "
+               "each check records the evidence_tier that produced it.",
                len(cross_checks), weight=layer_weights["cross_evidence_support"]),
         _layer("cryptographic_attestation", cryptographic_status,
                (attestation.get("value")
@@ -910,7 +944,15 @@ def assess_axes(native, chain, bound_hashes, missing_hashes, wav_observations,
     contradiction_present = any(
         item["contributes_to_integrity"] and item["status"] == "contradicted"
         for item in layers)
-    substantive_support = cross_layer_value is not None
+    for item in layers:
+        if item["layer"] == "cross_evidence_support":
+            item["evidence_tier_counts"] = tier_counts(cross_checks)
+    # Substantive support means an assessed check from a tier the profile
+    # treats as independent of the submitter. A profile that names no tiers
+    # keeps the original rule: any assessed cross-evidence check.
+    support_tiers = tuple(withholding_rule.get("substantive_support_tiers") or TIERS)
+    substantive_support = any(isinstance(item.get("passed"), bool) and item["evidence_tier"] in support_tiers
+                              for item in cross_checks)
     min_components = withholding_rule["min_components_for_substantive_mean"]
     require_support = withholding_rule["require_substantive_support_or_contradiction"]
     denominator_layers = confidence_formula["denominator_layers"]
@@ -952,13 +994,22 @@ def assess_axes(native, chain, bound_hashes, missing_hashes, wav_observations,
     # other profile, state the configured rule and whether it permitted or
     # withheld a value for *this* assessment -- never why it should have,
     # since the score itself is computed above and unchanged by this text.
-    if min_components == 2 and require_support:
+    tiers_restricted = set(support_tiers) != set(TIERS)
+    if min_components == 2 and require_support and not tiers_restricted:
         withholding_clause = ("A numeric value is withheld "
             "without independent CrossEvidence unless a contradiction exists. ")
+    elif min_components == 2 and require_support:
+        withholding_clause = (
+            "A numeric value is withheld unless at least two layers are populated and an independent "
+            f"cross-evidence check ({', '.join(support_tiers)}) was assessed, or a contradiction exists; "
+            "submitter-provided documents corroborate but cannot release a value on their own. "
+            + ("Independent support was assessed for this submission. " if substantive_support else
+               "No independent cross-evidence was assessed for this submission. "))
     else:
         if require_support:
             rule_description = (f"requires at least {min_components} populated contributing layer(s) "
-                                "including independent CrossEvidence support")
+                                "including independent CrossEvidence support"
+                                + (f" ({', '.join(support_tiers)})" if tiers_restricted else ""))
         else:
             rule_description = f"requires at least {min_components} populated contributing layer(s)"
         outcome = "permitted" if integrity_value is not None else "withheld"
@@ -977,11 +1028,17 @@ def assess_axes(native, chain, bound_hashes, missing_hashes, wav_observations,
             cap_clause = (f"A severe contradiction ({rules}) was found, but the weighted mean "
                           f"{cap_record['weighted_mean']:.3f} was already at or below the "
                           f"{cap_record['cap']:g} cap, which therefore did not change it. ")
+    # Name every contradiction behind the value, with what was compared, so a
+    # reader can see exactly which check failed and by how much.
+    failed = [item for item in file_checks + rel_checks + cross_checks if item.get("passed") is False]
+    contradiction_clause = ("Contradictions: " + " ".join(describe_check(item) for item in failed) + " "
+                            if failed else "")
     integrity = _axis(
         integrity_availability, integrity_value, integrity_confidence,
         (f"Integrity has {len(components)}/{denominator_layers} score-eligible evidence layers; missing evidence reduces availability and confidence but is never treated as contradiction. "
          f"{withholding_clause}"
          f"{cap_clause}"
+         f"{contradiction_clause}"
          "Structural validity and cryptographic attestation are reported separately and do not raise integrity. "
          "Legacy signal comparisons are disabled by policy and do not produce findings or affect integrity."))
 

@@ -57,5 +57,28 @@ def build_tasks(native, response):
                 if selection:
                     variant["selection_id"] = selection["selection_id"]
                     variant["attributes"] = {key: selection.get(key) for key in RANGE_FIELDS}
+                variant["range_source"] = _range_source(variant["attributes"])
+                if variant["range_source"] == DERIVED and selection:
+                    attrs = variant["attributes"]
+                    # A comp selection without an end copies its declared source
+                    # span: the end is the submitter's own duration, flagged as
+                    # derived, never estimated from the audio.
+                    attrs["target_end_seconds"] = (attrs["target_start_seconds"] +
+                                                   attrs["source_end_seconds"] - attrs["source_start_seconds"])
+                elif variant["range_source"] == DERIVED:
+                    variant["range_source"] = "declared"
                 tasks.append(variant)
     return tasks
+
+
+DERIVED = "derived_from_declared_source_duration"
+
+
+def _range_source(attrs):
+    values = [attrs.get(key) for key in RANGE_FIELDS]
+    if all(value is None for value in values):
+        return "whole_file"
+    numbers = all(type(value) in (int, float) for value in values[:3])
+    if numbers and values[3] is None and values[1] > values[0]:
+        return DERIVED
+    return "declared"

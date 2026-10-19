@@ -15,6 +15,7 @@ DOCUMENT_TYPES = (
     "metadata/ddex-rin", "metadata/ddex-ern", "provenance/c2pa",
     "text/cue-sheet", "text/comp-sheet", "text/session-log",
     "text/license-clearance", "text/generation-record",
+    "text/sound-report", "project/aaf",
 )
 SUPPORTED_TYPES = {"audio", *AUDIO_TYPES, *DOCUMENT_TYPES}
 

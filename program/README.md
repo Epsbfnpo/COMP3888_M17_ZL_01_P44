@@ -30,7 +30,12 @@ The main approach is to reuse Ben's evidence graph and execution framework, conn
 - Includes a pinned copy of the library source reviewed for this release, with fixes for audio attributes, binary-file binding, and dictionary attribute checks.
 - Registers music audio, MIDI, DAW, RIN, ERN, C2PA, and text evidence types, plus constrained relationship types.
 - Uses one streaming RIFF/WAVE reader for structural inspection, metadata parsing, and bounded sample decoding. It supports integer PCM (8/16/24/32-bit), IEEE float (32/64-bit), and integer/float `WAVE_FORMAT_EXTENSIBLE` without loading the whole file.
-- Provides a bounded MIDI parser; the RIN, ERN, and C2PA parsers are connected to the production execution path.
+- Provides a bounded MIDI parser; the RIN, ERN, C2PA, sound report (`text/sound-report`) and AAF (`project/aaf`) parsers are connected to the production execution path.
+- Explains every score in `assessment_checks.score_explanations`: layers, weights, caps, withholding and each failed check in plain words with the compared values (for example a 2.00 s timecode gap). Evidence outside the selected workflow is reported as inconclusive, never penalised.
+- Parses Ableton Live sessions (`project/daw-session`) and checks that the session uses the declared source audio and agrees with MIDI tempo and time signature.
+- Adds report-only musical semantics (`music_semantics`): key, tempo, chords and phrase form, compared across versions with a shuffled-harmony baseline.
+- `benchmarks/music_benchmark.py` runs the evaluator on Slakh/BabySlakh or MUSDB18-HQ with true and control stems; see `benchmarks/README.md`.
+- Tags every cross-evidence check with an `evidence_tier`. Only `signed_attestation` (validated C2PA) and `recorder_metadata` (documents checked against BWF/iXML written by the recorder) release an Integrity value without a contradiction; submitter documents alone do not. See the repository README, "Evidence tiers".
 - The MIDI parser extracts channel and meta events, notes, tempo, time signatures, controllers, and duration in seconds when it can be calculated.
 - CompSheet and CueSheet parsers support strict JSON, CSV, delimited text, and PDF text extraction. See [`docs/SHEET_FORMATS.md`](docs/SHEET_FORMATS.md).
 - Runs file, relationship, and cross-evidence analysis through the actual `EvidenceChain` and `Pipeline` implementations.
@@ -219,6 +224,8 @@ reasoning and recorded in `assessment_checks.severe_contradiction_cap`. Audio te
 include a 3-minute long-source excerpt and length-independent SpectroMap peak density.
 Run them with `REQUIRE_AUDIO_BACKENDS=1` so that missing optional backends fail
 instead of being skipped.
+`tests/test_production_documents.py` covers recorder metadata, sound reports and
+AAF edits, including tampered timecodes and same-named takes from different days.
 
 ## Directory overview
 

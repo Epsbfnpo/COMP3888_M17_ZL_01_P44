@@ -5,12 +5,15 @@ import hashlib
 import json
 import os
 from pathlib import Path
+import queue
 import signal
 import subprocess
 import sys
 import tempfile
+import threading
 import time
 
+from .agreement import AGREEMENT, expected_rows
 from .contracts import NON_SCORING, unavailable, validate_result
 from .policy import load_policy
 from .tasks import build_tasks
@@ -40,38 +43,102 @@ def _snapshot(root, relative, digest, directory, deadline):
     return str(target)
 
 
-def _run_task(task, provider, parameters, deadline):
-    remaining = deadline - time.monotonic()
-    if remaining <= 0:
-        return unavailable(task, provider, "caller_timeout", "No caller time remains for this diagnostic.")
-    command = [sys.executable, "-B", str(Path(__file__).with_name("worker.py"))]
+def _kill(process):
+    try:
+        os.killpg(process.pid, signal.SIGKILL)
+    except (ProcessLookupError, PermissionError):
+        pass
+
+
+def _run_task(task, providers, parameters, deadline, command=None):
+    """Run every provider for one task in a single isolated worker process.
+
+    Returns one validated row per provider, in ``providers`` order, plus a
+    fingerprint-agreement row when both fingerprint providers run. Rows the
+    worker finished before a timeout or crash are kept; only the missing
+    providers become unavailable.
+    """
+    if deadline - time.monotonic() <= 0:
+        return [unavailable(task, name, "caller_timeout", "No caller time remains for this diagnostic.")
+                for name in providers]
+    command = command or [sys.executable, "-B", str(Path(__file__).with_name("worker.py"))]
     environment = dict(os.environ)
     # Let cold optional-library imports work without spawning unbounded BLAS
     # threads; this is not a file, frame, duration or task-count limit.
     environment.setdefault("OPENBLAS_NUM_THREADS", "1")
     environment.setdefault("OMP_NUM_THREADS", "1")
-    process, stderr = None, ""
     try:
         process = subprocess.Popen(command, stdin=subprocess.PIPE, stdout=subprocess.PIPE,
                                    stderr=subprocess.PIPE, text=True, start_new_session=True,
                                    env=environment)
-        stdout, stderr = process.communicate(json.dumps({"task": task, "provider": provider,
-                                                        "parameters": parameters}, allow_nan=False),
-                                              timeout=remaining)
-        if process.returncode:
-            raise ValueError("Provider process exited with code " + str(process.returncode))
-        value = json.loads(stdout)
-        return validate_result(value, task, provider)
-    except subprocess.TimeoutExpired:
-        os.killpg(process.pid, signal.SIGKILL)
-        process.communicate()
-        return unavailable(task, provider, "caller_timeout", "Provider exceeded the caller's remaining timeout; core scores were retained.")
     except Exception as exc:
-        if process is not None and process.poll() is None:
-            os.killpg(process.pid, signal.SIGKILL)
-            process.communicate()
-        reason = "provider_start_failed" if process is None else "invalid_provider_output"
-        return unavailable(task, provider, reason, str(exc) + _stderr_tail(stderr))
+        return [unavailable(task, name, "provider_start_failed", str(exc)) for name in providers]
+    lines, stderr_parts = queue.Queue(), []
+    # Drain both pipes concurrently so a verbose library cannot block the
+    # worker on a full stderr pipe while the parent waits for stdout.
+    readers = [threading.Thread(target=lambda: ([lines.put(line) for line in process.stdout], lines.put(None)),
+                                daemon=True),
+               threading.Thread(target=lambda: stderr_parts.append(process.stderr.read()), daemon=True)]
+    for reader in readers:
+        reader.start()
+    rows, failure, timed_out = {}, None, False
+    expected = expected_rows(providers)
+    try:
+        process.stdin.write(json.dumps({"task": task, "providers": list(providers),
+                                        "parameters": {name: parameters[name] for name in providers}},
+                                       allow_nan=False))
+        process.stdin.close()
+    except OSError as exc:
+        failure = exc
+    while True:
+        wait = deadline - time.monotonic()
+        if wait <= 0:
+            timed_out = True
+            break
+        try:
+            line = lines.get(timeout=wait)
+        except queue.Empty:
+            timed_out = True
+            break
+        if line is None:  # stdout closed: the worker finished or died
+            break
+        try:
+            value = json.loads(line)
+            name = value.get("provider") if isinstance(value, dict) else None
+            if name not in expected or name in rows:
+                raise ValueError("Unexpected or duplicate provider result.")
+            rows[name] = validate_result(value, task, name)
+        except Exception as exc:
+            failure = failure or exc
+    if not timed_out:
+        try:
+            process.wait(timeout=max(deadline - time.monotonic(), 0.1))
+        except subprocess.TimeoutExpired:
+            timed_out = True
+    if process.poll() is None:
+        _kill(process)
+    process.wait()
+    for reader in readers:
+        reader.join(timeout=5)
+    for stream in (process.stdin, process.stdout, process.stderr):
+        try:
+            stream.close()
+        except OSError:
+            pass
+    stderr = "".join(stderr_parts)
+    if failure is None and process.returncode and not timed_out:
+        failure = ValueError("Provider process exited with code " + str(process.returncode))
+    result = []
+    for name in expected:
+        if name in rows:
+            result.append(rows[name])
+        elif timed_out:
+            result.append(unavailable(task, name, "caller_timeout",
+                                      "Provider exceeded the caller's remaining timeout; core scores were retained."))
+        else:
+            result.append(unavailable(task, name, "invalid_provider_output",
+                                      str(failure or "Provider process ended without a result.") + _stderr_tail(stderr)))
+    return result
 
 
 def _stderr_tail(stderr):
@@ -87,15 +154,23 @@ def _attach(response, rows, summary):
     # Copy-on-append: do not feed any observations back through core assessors.
     combined = copy.deepcopy(response)
     checks = combined.setdefault("assessment_checks", {})
-    checks["audio_fingerprint"] = [row for row in rows if row["provider"] != "librosa"]
+    checks["audio_fingerprint"] = [row for row in rows if row["provider"] in ("audfprint", "spectromap")]
     checks["audio_structure"] = [row for row in rows if row["provider"] == "librosa"]
+    checks["audio_fingerprint_agreement"] = [row for row in rows if row["provider"] == AGREEMENT]
+    checks["audio_semantics"] = [row for row in rows if row["provider"] == "music_semantics"]
     checks["audio_diagnostic_summary"] = [summary]
+    detail_keys = {"librosa": "audio_structure", AGREEMENT: "audio_fingerprint_agreement",
+                   "music_semantics": "audio_semantics"}
+    observation_codes = {"librosa": "AUDIO_STRUCTURE_OBSERVATION",
+                         AGREEMENT: "AUDIO_FINGERPRINT_AGREEMENT_OBSERVATION",
+                         "music_semantics": "AUDIO_SEMANTIC_OBSERVATION"}
     for row in rows:
         code = ("AUDIO_DIAGNOSTIC_UNAVAILABLE" if row["status"] == "unavailable" else
-                "AUDIO_STRUCTURE_OBSERVATION" if row["provider"] == "librosa" else
-                "AUDIO_FINGERPRINT_OBSERVATION")
-        message = (row["provider"] + ": " + str(len(row["matches"])) +
-                   " content candidate(s) for " + row["relationship_type"] + ". " + row["message"])
+                observation_codes.get(row["provider"], "AUDIO_FINGERPRINT_OBSERVATION"))
+        counted = {AGREEMENT: " offset(s) where both fingerprint algorithms voted, for ",
+                   "music_semantics": " aligned phrase(s) for "}.get(row["provider"], " content candidate(s) for ")
+        message = (row["provider"] + ": " + str(len(row["matches"])) + counted +
+                   row["relationship_type"] + ". " + row["message"])
         combined["findings"].append({"code": code, "severity": "info", "message": message,
                                      "diagnostic_id": row["diagnostic_id"], "provider": row["provider"],
                                      "source_hash": row["source_hash"], "target_hash": row["target_hash"],
@@ -103,11 +178,18 @@ def _attach(response, rows, summary):
                                      "candidate_count": len(row["matches"]),
                                      "analysis_complete": row["analysis_complete"],
                                      "relationship_type": row["relationship_type"],
-                                     "detail_key": "audio_structure" if row["provider"] == "librosa" else "audio_fingerprint",
+                                     "detail_key": detail_keys.get(row["provider"], "audio_fingerprint"),
                                      **NON_SCORING})
     if summary.get("reason_code"):
         combined["findings"].append({"code": "AUDIO_DIAGNOSTIC_UNAVAILABLE", "severity": "info",
                                      "message": summary["message"], **NON_SCORING})
+    elif not summary["task_count"]:
+        # Analysis ran but the graph offers nothing to compare; say so rather
+        # than leaving the report silently empty.
+        combined["findings"].append({"code": "AUDIO_DIAGNOSTIC_NOT_APPLICABLE", "severity": "info",
+                                     "message": "No declared audio-to-audio relationships were retained for "
+                                                "analysis, so audio diagnostics produced no observations.",
+                                     "detail_key": "audio_diagnostic_summary", **NON_SCORING})
     return combined
 
 
@@ -148,11 +230,12 @@ def augment_response(response, request, root, mode, policy_path, deadline):
                                 failures[digest] = "input_changed_since_core"
                         problem = failures.get(digest)
                         task[role + "_path"] = snapshots.get(digest)
-                    for provider in policy["providers"]:
-                        if problem:
-                            value = unavailable(task, provider, problem, "Diagnostic unavailable: " + problem + "; no core score was changed.")
-                        else:
-                            value = _run_task(task, provider, policy["parameters"][provider], deadline)
+                    if problem:
+                        values = [unavailable(task, provider, problem, "Diagnostic unavailable: " + problem + "; no core score was changed.")
+                                  for provider in policy["providers"]]
+                    else:
+                        values = _run_task(task, policy["providers"], policy["parameters"], deadline)
+                    for value in values:
                         value.update({key: policy[key] for key in ("policy_id", "policy_version", "policy_sha256")})
                         rows.append(value)
     except Exception as exc:
