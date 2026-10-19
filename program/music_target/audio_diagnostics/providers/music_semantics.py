@@ -148,7 +148,9 @@ def _describe(audio, parameters, librosa):
     times = librosa.frames_to_time(frames, sr=rate, hop_length=hop) + audio["range"][0]
     bounds, labels = _phrases(beat_chroma, beat_timbre, parameters, librosa)
     return {"chroma": beat_chroma, "times": times, "chords": _chords(beat_chroma), "bounds": bounds,
-            "labels": labels, "tempo_bpm": float(np.atleast_1d(tempo)[0]), "key": _key(beat_chroma)}
+            "labels": labels, "tempo_bpm": float(np.atleast_1d(tempo)[0]), "key": _key(beat_chroma),
+            # Raw beat times, so beat tracking can be evaluated through this code path.
+            "beat_times": librosa.frames_to_time(beat_frames, sr=rate, hop_length=hop) + audio["range"][0]}
 
 
 def _summary(description):
