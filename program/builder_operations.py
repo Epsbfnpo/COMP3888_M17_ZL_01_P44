@@ -15,6 +15,7 @@ from threading import Event
 from typing import Callable
 
 import manifest_logic as L
+import relationship_modes as RM
 
 Progress = Callable[[str], None]
 
@@ -50,8 +51,8 @@ def inspect_files(paths: list[str], progress: Progress, cancel: Event) -> list[d
         progress(f"Reading file {n}/{len(paths)}: {path.name}")
         try:
             size = path.stat().st_size
-            if size > L.MAX_FILE_BYTES:
-                raise ValueError(f"File exceeds the {L.MAX_FILE_BYTES // 2**20} MiB limit.")
+            if size > RM.MAX_FILE_BYTES:
+                raise ValueError(f"File exceeds the {RM.MAX_FILE_BYTES // 2**20} MiB limit.")
             digest = verified_hash(path, cancel)
             technical = L.wav_technical(path) if path.suffix.lower() in (".wav", ".wave") else {}
             results.append({"path": str(path), "hash": digest, "technical": technical})
@@ -192,7 +193,7 @@ def _suffixed_object_path(relative: Path, digest: str, target_root: Path,
 
 
 def assess_manifest(manifest: dict, files: list[dict], progress: Progress,
-                    cancel: Event) -> dict:
+                    cancel: Event, audio_diagnostics: bool = False) -> dict:
     # Import the production entry point to use its dependency setup and contract.
     from run import validate
 
@@ -205,9 +206,13 @@ def assess_manifest(manifest: dict, files: list[dict], progress: Progress,
         export_bundle(staged_manifest, files, root / "submission.json", True, progress, cancel)
         check_cancel(cancel)
         progress("Running full assessment...")
-        timeout = min(manifest["options"]["timeout_seconds"], 60)
+        timeout = manifest["options"]["timeout_seconds"]  # v0.6.0: no 60 s cap
+        # Same early-stop reserve as run.run_isolated, so slow audio checks return partial results.
+        reserve = min(5.0, max(0.5, 0.1 * timeout))
+        deadline = time.time() + max(0.0, timeout - reserve)
         payload = json.dumps(
-            {"request": staged_manifest, "root": str(root), "mode": "native"},
+            {"request": staged_manifest, "root": str(root), "mode": "native",
+             "deadline": deadline, "allow_local_files": False},
             allow_nan=False)
         command = [sys.executable, "-B", str(Path(__file__).with_name("run.py")), "--worker"]
         process = subprocess.Popen(
@@ -229,8 +234,32 @@ def assess_manifest(manifest: dict, files: list[dict], progress: Progress,
                 raise ValueError(f"Evaluation worker failed: {stderr.strip() or 'no response available'}")
             response = json.loads(stdout)
             validate(response, "scoring-response.schema.json")
+            if audio_diagnostics:
+                response = _augment_audio(response, staged_manifest, root, timeout,
+                                          started, progress, cancel, validate)
             return response
         finally:
             if process.poll() is None:
                 process.kill()
             process.communicate()
+
+
+def _augment_audio(response, request, root, timeout, started, progress, cancel, validate):
+    """Optional report-only audfprint/SpectroMap/librosa observations (run.py --audio-analysis).
+
+    Never changes core scores. If the optional pieces are missing or fail, the core
+    response is returned with a note under "_builder_notes" (removed by the GUI).
+    """
+    check_cancel(cancel)
+    progress("Running optional audio diagnostics...")
+    try:
+        from music_target.audio_diagnostics.policy import DEFAULT_PATH
+        from music_target.audio_diagnostics.runner import augment_response
+        deadline = started + timeout
+        combined = augment_response(response, request, root, "native", DEFAULT_PATH, deadline)
+        validate(combined, "scoring-response.schema.json")
+        return combined
+    except Exception as exc:  # optional dependency missing, policy error, schema mismatch
+        response["_builder_notes"] = [
+            f"Audio diagnostics were not added: {type(exc).__name__}: {exc}"]
+        return response

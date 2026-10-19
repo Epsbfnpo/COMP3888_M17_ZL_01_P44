@@ -21,8 +21,10 @@ import tkinter as tk
 from tkinter import filedialog, messagebox, ttk
 
 import manifest_logic as L
+import relationship_modes as RM
 import builder_operations as operations
-from builder_results import attention_items, attention_workflow_results
+from builder_results import (
+    attention_items, attention_workflow_results, audio_diagnostic_lines)
 
 
 def parse_json_object(text: str, label: str) -> dict:
@@ -182,13 +184,16 @@ class RelDialog(Dialog):
         self.extra_text.insert("1.0", json.dumps(attrs, indent=2) if attrs else "")
         self.suggest = ttk.Button(self.body, text="Suggest ranges from file durations",
                                   command=self.suggest_ranges)
+        self.hint = ttk.Label(self.body, wraplength=380, justify="left",
+                              foreground="#555555")
         self.order = [  # (name, label, widget)
             ("target", "Target (derived)", ttk.Combobox(
                 self.body, textvariable=v["target"], values=ids, state="readonly")),
             ("type", "Relationship", self.type_box),
             ("source", "Source (origin)", ttk.Combobox(
                 self.body, textvariable=v["source"], values=ids, state="readonly")),
-            ("scope", "derivation_scope", self.scope_box),
+            ("hint", "", self.hint),
+            ("scope", "derivation_scope (legacy)", self.scope_box),
             ("ss", "source_start_seconds", ttk.Entry(self.body, textvariable=v["ss"])),
             ("se", "source_end_seconds", ttk.Entry(self.body, textvariable=v["se"])),
             ("ts", "target_start_seconds", ttk.Entry(self.body, textvariable=v["ts"])),
@@ -210,7 +215,6 @@ class RelDialog(Dialog):
         for name in ("target", "source"):
             self.widget(name).bind("<<ComboboxSelected>>", lambda _e: self.refresh_types())
         self.type_box.bind("<<ComboboxSelected>>", lambda _e: self.type_changed())
-        self.scope_box.configure(values=L.SCOPES.get(v["type"].get(), []))
         self.refresh_types()
         self.layout()
         self.finish(row=99)
@@ -219,23 +223,19 @@ class RelDialog(Dialog):
         return next(w for n, _l, w in self.order if n == name)
 
     def visible(self, name):
-        rtype = self.vars["type"].get()
-        if name in ("scope", "ss", "se", "ts", "te", "suggest"):
-            return rtype in L.SCOPES
-        if name == "gain":
-            return rtype in L.LINEAR_TYPES
-        if name in ("fi", "fo"):
-            return rtype == "edited_from"
-        return True
+        if name == "hint":
+            return True
+        return RM.visible(self.vars["type"].get(), name)
 
     def layout(self):
         for name, _label, widget in self.order:
             self.labels[name].grid_remove()
             widget.grid_remove()
         row = 0
+        self.hint.configure(text=RM.mode_help(self.vars["type"].get()))
         for name, _label, widget in self.order:
             if self.visible(name):
-                if name != "suggest":
+                if name not in ("suggest", "hint"):
                     self.labels[name].grid(row=row, column=0, sticky="nw", padx=(0, 8), pady=3)
                 widget.grid(row=row, column=1, sticky="ew", pady=3)
                 row += 1
@@ -249,25 +249,19 @@ class RelDialog(Dialog):
         self.type_box.configure(values=types)
 
     def type_changed(self):
-        options = L.SCOPES.get(self.vars["type"].get(), [])
-        self.scope_box.configure(values=options)
-        if options and self.vars["scope"].get() not in options:
-            self.vars["scope"].set(options[0])
         self.layout()
 
     def suggest_ranges(self):
         t = self.files.get(self.vars["target"].get())
         s = self.files.get(self.vars["source"].get())
-        td = ((t or {}).get("technical") or {}).get("duration_seconds")
-        sd = ((s or {}).get("technical") or {}).get("duration_seconds")
-        if td is None or sd is None:
+        span = RM.suggest_range(t, s)
+        if span is None:
             messagebox.showinfo("Ranges", "Choose target and source WAV files first.", parent=self)
             return
-        end = round(min(td, sd, L.MAX_SUGGESTED_RANGE_SECONDS), 3)
         for name in ("ss", "ts"):
-            self.vars[name].set("0")
+            self.vars[name].set(str(span[0]))
         for name in ("se", "te"):
-            self.vars[name].set(str(end))
+            self.vars[name].set(str(span[1]))
 
     def on_ok(self):
         try:
@@ -281,10 +275,10 @@ class RelDialog(Dialog):
                 attrs["assertion_origin"] = v["origin"]
             if self.confirmed.get():
                 attrs["confirmed_by_submitter"] = True
-            if self.visible("scope") and v["scope"]:
+            if v["scope"]:  # legacy value from an older manifest; kept, not offered
                 attrs["derivation_scope"] = v["scope"]
             for key, name in self.NUMERIC.items():
-                if self.visible(name) and v[name]:
+                if v[name]:
                     try:
                         attrs[key] = float(v[name])
                     except ValueError:
@@ -297,8 +291,8 @@ class RelDialog(Dialog):
                                                 "other attributes").items():
                 attrs.setdefault(key, value)
             rel = {"target": v["target"], "source": v["source"], "type": v["type"], "attrs": attrs}
-            errors, warnings = L.relationship_issues(
-                rel, self.files[v["target"]], self.files[v["source"]])
+            errors, warnings = RM.relationship_issues(
+                rel, self.files[v["target"]], self.files[v["source"]], L.endpoint_ok)
             if errors:
                 raise ValueError("\n".join(errors))
             if warnings and not messagebox.askyesno(
@@ -537,6 +531,10 @@ class App(tk.Tk):
         self.report_button = ttk.Button(bar, text="Save result JSON…", command=self.save_response,
                                         state="disabled")
         self.report_button.pack(side="left", padx=6)
+        self.audio_var = tk.BooleanVar(value=False)
+        ttk.Checkbutton(
+            bar, text="Include optional audio diagnostics (report-only, slower)",
+            variable=self.audio_var).pack(side="left", padx=6)
         self.assessment_label = ttk.Label(tab, text="No assessment run. Results describe a submission snapshot.")
         self.assessment_label.pack(fill="x", pady=4)
         self.axis_tree = ttk.Treeview(
@@ -630,11 +628,14 @@ class App(tk.Tk):
             messagebox.showerror("Cannot assess", str(exc), parent=self)
             return
         files = copy.deepcopy(self.files)
+        audio = self.audio_var.get()
         self._start_job(
-            lambda progress, cancel: operations.assess_manifest(manifest, files, progress, cancel),
+            lambda progress, cancel: operations.assess_manifest(
+                manifest, files, progress, cancel, audio),
             self.show_response)
 
     def show_response(self, response):
+        notes = response.pop("_builder_notes", [])
         self._response = response
         self.report_button.configure(state="normal")
         self.assessment_label.configure(
@@ -666,6 +667,11 @@ class App(tk.Tk):
                     f"\n{index}. {issue['status']} — {issue['affected']}\n"
                     f"   {issue['explanation']}\n"
                     f"   Suggested action: {issue['suggestion']}\n")
+        diagnostics = audio_diagnostic_lines(response, file_names)
+        if diagnostics:
+            explanation.append("\n" + "\n".join(diagnostics) + "\n")
+        for note in notes:
+            explanation.append(f"\nNote: {note}\n")
         explanation.append(
             "\nThe complete machine-readable response, including passed checks, is preserved "
             "and available with Save result JSON…")
@@ -950,7 +956,7 @@ class App(tk.Tk):
         except (ValueError, L.PolicyError) as exc:
             messagebox.showerror("Cannot build manifest", str(exc))
             return
-        notes = L.all_warnings(self.files, self.rels)
+        notes = RM.all_warnings(self.files, self.rels, L.endpoint_ok)
         if not result["allowed_final"]:
             notes.append("Final artefact type is not allowed by this workflow "
                          f"(allowed: {', '.join(result['allowed_final_types'])}).")

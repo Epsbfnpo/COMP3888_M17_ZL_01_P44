@@ -19,6 +19,7 @@ DERIVATION_STATUSES = {
     "matched": "success",
     "corroborated": "supportive",
     "contradicted": "issue",
+    "inconclusive": "unassessed",
     "unavailable": "unassessed",
     "not_applicable": "hide",
 }
@@ -27,6 +28,7 @@ LAYER_STATUSES = {
     "matched": "success",
     "corroborated": "supportive",
     "contradicted": "issue",
+    "inconclusive": "unassessed",
     "unavailable": "unassessed",
     "not_applicable": "hide",
 }
@@ -38,6 +40,7 @@ AUDIO_DIAGNOSTIC_STATUSES = {
     "contradicted": "issue",
     "not_supported": "issue",
     "suspected_decoy": "issue",
+    "inconclusive": "unassessed",
     "unavailable": "unassessed",
     "not_applicable": "hide",
 }
@@ -68,6 +71,17 @@ CHECK_COLLECTIONS = {
     "excerpted_from": AUDIO_DIAGNOSTIC_STATUSES,
     "decoy_source": AUDIO_DIAGNOSTIC_STATUSES,
 }
+# v0.6.0 comparison results carry a comparison_mode; any collection of such
+# items that is not listed above is still handled with the diagnostic mapping.
+MODE_LABELS = {
+    "pairwise_continuity": "Continuity comparison",
+    "excerpt_search": "Excerpt search",
+    "selection_timeline": "Comp selection timeline",
+    "multi_source_contribution": "Multi-source contribution",
+    "master_continuity": "Master continuity",
+    "unsupported_relationship": "Relationship comparison",
+}
+COMPARISON_NOTE = " A signal match supports or contradicts a claim; it is not proof of provenance."
 
 ATTENTION_FINDINGS = {
     "MISSING_OBJECT": ("Missing file", "Locate the original file; confirm its SHA-256 matches the manifest."),
@@ -142,6 +156,10 @@ def _suggestion_for_check(collection, item, status):
             "audio_alignment", "source_contribution", "comp_verification",
             "processed_audio_match", "stem_mix_residual", "mastering_derivation",
             "excerpted_from", "decoy_source"}:
+        if item.get("status") == "inconclusive":
+            return ("Declare source/target ranges (or add a comp sheet for comps) so "
+                    "the comparison has something to anchor on; heavy processing can "
+                    "also make a result inconclusive.")
         if status == "unassessed":
             return ("Provide readable source and target audio and complete declared ranges; "
                     "if the resource budget was reached, reduce the audio workload and retry.")
@@ -154,6 +172,10 @@ def _suggestion_for_check(collection, item, status):
 def _check_explanation(item):
     explanation = (item.get("reason") or item.get("explanation")
                    or item.get("rule", "The check needs attention."))
+    if item.get("analysis_complete") is False:
+        explanation += " The analysis did not complete (time or resource limit)."
+    if item.get("comparison_mode"):
+        explanation += COMPARISON_NOTE
     regions = item.get("local_mismatch_regions") or []
     if regions:
         intervals = ", ".join(
@@ -264,8 +286,15 @@ def attention_items(response, file_names=None, policy_rules=None):
         })
 
     checks = response.get("assessment_checks") or {}
-    for collection, mapping in CHECK_COLLECTIONS.items():
+    collections = dict(CHECK_COLLECTIONS)
+    for name, items in checks.items():
+        if (name not in collections and isinstance(items, list) and items
+                and all(isinstance(i, dict) and "comparison_mode" in i for i in items)):
+            collections[name] = AUDIO_DIAGNOSTIC_STATUSES
+    for collection, mapping in collections.items():
         for item in checks.get(collection, []):
+            if item.get("reason_code") == "disabled_by_policy":
+                continue  # policy-disabled placeholder: nothing for the artist to act on
             if collection == "integrity_layers":
                 disposition = mapping.get(item.get("status"), "unknown")
                 if item.get("status") == "unavailable" and not item.get(
@@ -285,8 +314,14 @@ def attention_items(response, file_names=None, policy_rules=None):
                 disposition = mapping.get(item.get("status"), "unknown")
             if disposition in {"success", "supportive", "hide"}:
                 continue
+            label = MODE_LABELS.get(item.get("comparison_mode"))
             if disposition == "issue":
                 title = "Contradiction" if item.get("status") == "contradicted" else "Check failed"
+            elif item.get("status") == "inconclusive":
+                title = f"{label or 'Comparison'} inconclusive"
+            elif item.get("status") == "unavailable" and item.get(
+                    "comparison_mode") == "unsupported_relationship":
+                continue  # nothing to act on: no comparison exists for this type
             elif disposition == "unassessed":
                 title = "Check not assessed"
             else:
@@ -348,3 +383,30 @@ def attention_items(response, file_names=None, policy_rules=None):
             "suggestion": suggestion,
         })
     return issues
+
+
+def audio_diagnostic_lines(response, file_names=None):
+    """Plain-language lines for the optional, report-only audio diagnostics.
+
+    These rows never affect scores and are not attention items. A candidate is a
+    content match found by a fingerprint/structure provider; it is not provenance.
+    """
+    names = file_names or {}
+    checks = response.get("assessment_checks") or {}
+    summary = (checks.get("audio_diagnostic_summary") or [None])[0]
+    if not summary:
+        return []
+    lines = ["Audio diagnostics (report-only; no effect on any score; a content match is not "
+             "proof of provenance):"]
+    if summary.get("reason_code"):
+        lines.append(f"  Not completed: {summary.get('message', summary['reason_code'])}")
+    lines.append(f"  {summary.get('completed_provider_tasks', 0)} provider task(s) completed, "
+                 f"{summary.get('unavailable_provider_tasks', 0)} unavailable.")
+    for row in (checks.get("audio_fingerprint") or []) + (checks.get("audio_structure") or []):
+        pair = f"{_hash_label(row.get('source_hash'), names)} → {_hash_label(row.get('target_hash'), names)}"
+        found = len(row.get("matches") or [])
+        state = row.get("status", "?")
+        detail = row.get("message", "")
+        lines.append(f"  - {row.get('provider', '?')} | {row.get('relationship_type', '?')} | {pair}: "
+                     f"{state}, {found} candidate(s). {detail}".rstrip())
+    return lines
