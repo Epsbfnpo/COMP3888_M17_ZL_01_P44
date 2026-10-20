@@ -361,7 +361,7 @@ def _suggest(name, known):
     return f"Did you mean '{close[0]}'?" if close else "Remove the field."
 
 
-def _mapping_issues(digest, objects, location_prefix):
+def _mapping_issues(digest, objects, location_prefix, local_file_references=False):
     """Hash-case and object-path problems for one node; nothing is corrected."""
     issues = []
     if not SHA256.fullmatch(digest):
@@ -383,6 +383,8 @@ def _mapping_issues(digest, objects, location_prefix):
                 submitted=alternatives[0],
                 suggestion="Use the same lower-case hash as the artefact declaration.",
                 affected="checks that use this artefact's file"))
+        return issues
+    if local_file_references:
         return issues
     path = Path(relative)
     extension = path.suffix[1:]
@@ -419,6 +421,8 @@ def _screen_input_format(request, chain):
     """
     chain = copy.deepcopy(chain)
     objects = request["objects"]
+    local_file_references = (
+        request.get("options", {}).get("local_file_references", False))
     nodes = chain["artefacts"]
     final_hash = chain["final_artefact_hash"]
     final_index = next((index for index, node in enumerate(nodes)
@@ -433,7 +437,8 @@ def _screen_input_format(request, chain):
         raise InputError(problem["message"], [problem])
     if final_index is not None:
         final_problems = _mapping_issues(
-            final_hash, objects, f"chain/artefacts/{final_index}/artefact_hash")
+            final_hash, objects, f"chain/artefacts/{final_index}/artefact_hash",
+            local_file_references)
         if final_problems:
             raise InputError(final_problems[0]["message"], final_problems)
 
@@ -449,7 +454,9 @@ def _screen_input_format(request, chain):
         digest = node["artefact_hash"]
         if digest == final_hash:
             continue
-        issues = _mapping_issues(digest, objects, f"chain/artefacts/{index}/artefact_hash")
+        issues = _mapping_issues(
+            digest, objects, f"chain/artefacts/{index}/artefact_hash",
+            local_file_references)
         if issues:
             findings.extend(issues)
             unbound[digest] = sorted({item["code"] for item in issues})
@@ -501,7 +508,17 @@ def _screen_input_format(request, chain):
     return chain, issues, findings
 
 
-def to_native(request, mode, include_report=False):
+def to_native(request, mode, include_report=False, allow_local_files=False):
+    if mode == "native":
+        local_file_references = (
+            request.get("options", {}).get("local_file_references", False))
+        if local_file_references != allow_local_files:
+            raise InputError(
+                "Native local file references require options.local_file_references=true "
+                "and the --allow-local-files command-line option.")
+    elif allow_local_files:
+        raise InputError("--allow-local-files is restricted to trusted native manifests.")
+
     validate(request, "native-request.schema.json" if mode == "native"
              else "scoring-request.schema.json")
     if mode == "native":

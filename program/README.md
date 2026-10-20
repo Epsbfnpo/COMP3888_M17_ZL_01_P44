@@ -205,6 +205,37 @@ This example uses the supplied CSEC candidate request format. It contains one WA
 python3 -B run.py --bundle /path/to/EVAL-case/bundle.json --root /path/to/EVAL-case
 ```
 
+## Desktop manifest builder
+
+Install `requirements.txt` and make sure Tkinter is available, then run:
+
+```bash
+python3 builder_gui.py
+```
+
+The builder imports and hashes files in the background, provides workflow
+preflight and full assessment, and can save the full machine-readable result.
+Full assessment uses a verified temporary snapshot and the same production
+worker as the command-line evaluator.
+
+Portable exports place files in `objects/` under content-addressed names
+(`objects/<sha256>.<extension>`) accepted by the evaluator. The source files
+are never renamed or overwritten. By default, saving a manifest can instead
+reference the selected originals without copying them; every save checks that
+each original still matches its declared SHA-256. These manifests set
+`options.local_file_references` and require explicit authorization for direct
+evaluation:
+
+```bash
+python3 -B run.py --native /path/to/submission.json \
+  --root /path/to/submission-folder --allow-local-files
+```
+
+Both the manifest option and the command-line flag are required. The flag is
+restricted to trusted native manifests and cannot authorize CSEC/public bundle
+paths. The builder's full-assessment action stages verified originals inside a
+temporary bundle root and does not need external-path authorization.
+
 ## Verification
 
 ```bash

@@ -1,0 +1,143 @@
+{
+  "run_id": "4b0f88c9-484d-4e86-8640-cb277e153eca",
+  "case_id": "LOCAL-GENERATED-VALID",
+  "profile": "music-native-v0.1",
+  "options": {
+    "include_reasoning": true,
+    "offline_only": false,
+    "timeout_seconds": 60
+  },
+  "workflow": {
+    "workflow_id": "multitrack_recording_mix_master",
+    "modifiers": [],
+    "description": "Stems",
+    "declarations": {
+      "submitter_confirmation": true,
+      "contributors": []
+    }
+  },
+  "chain": {
+    "schema_version": "0.0.3",
+    "hash_method": "sha256",
+    "final_artefact_hash": "0a2c29f42e0570d270f27d268062dab5ab30d86a0ed720b31f8b6735cd268190",
+    "artefacts": [
+      {
+        "artefact_hash": "133c934683b5f977ce77d1ead96ce4451162ad75e3bea2432bd6fbbe3f6e0c7b",
+        "artefact_type": "audio/stem",
+        "attributes": {
+          "creation_method": "recorded",
+          "production": {
+            "role": "source"
+          },
+          "technical": {
+            "duration_seconds": 179.583129,
+            "sample_rate_hz": 44100,
+            "channels": 2,
+            "bit_depth": 16
+          }
+        },
+        "evidence": []
+      },
+      {
+        "artefact_hash": "945f4de7b584607c94a44a16f297ec3b6bf5f5f1e2624edb28eebcdcff60f744",
+        "artefact_type": "audio/stem",
+        "attributes": {
+          "creation_method": "recorded",
+          "production": {
+            "role": "source"
+          },
+          "technical": {
+            "duration_seconds": 179.266803,
+            "sample_rate_hz": 44100,
+            "channels": 2,
+            "bit_depth": 16
+          }
+        },
+        "evidence": []
+      },
+      {
+        "artefact_hash": "50e40ffe2e928e74d937ca4eaeba9a35160800972eaf25adb71ce31e147ea129",
+        "artefact_type": "audio/stem",
+        "attributes": {
+          "creation_method": "recorded",
+          "production": {
+            "role": "source"
+          },
+          "technical": {
+            "duration_seconds": 179.266803,
+            "sample_rate_hz": 44100,
+            "channels": 2,
+            "bit_depth": 16
+          }
+        },
+        "evidence": []
+      },
+      {
+        "artefact_hash": "0a2c29f42e0570d270f27d268062dab5ab30d86a0ed720b31f8b6735cd268190",
+        "artefact_type": "audio/mix",
+        "attributes": {
+          "creation_method": "synthesised",
+          "production": {
+            "role": "pre_master"
+          },
+          "technical": {
+            "duration_seconds": 178.050612,
+            "sample_rate_hz": 44100,
+            "channels": 2,
+            "bit_depth": 16
+          }
+        },
+        "evidence": [
+          {
+            "hash": "133c934683b5f977ce77d1ead96ce4451162ad75e3bea2432bd6fbbe3f6e0c7b",
+            "relationship_type": "mixed_from",
+            "attributes": {
+              "assertion_origin": "submitter",
+              "confirmed_by_submitter": true,
+              "derivation_scope": "linear_mix",
+              "source_start_seconds": 0.0,
+              "source_end_seconds": 60.0,
+              "target_start_seconds": 0.0,
+              "target_end_seconds": 60.0,
+              "gain": 1.0
+            }
+          },
+          {
+            "hash": "945f4de7b584607c94a44a16f297ec3b6bf5f5f1e2624edb28eebcdcff60f744",
+            "relationship_type": "mixed_from",
+            "attributes": {
+              "assertion_origin": "submitter",
+              "confirmed_by_submitter": true,
+              "derivation_scope": "linear_mix",
+              "source_start_seconds": 0.0,
+              "source_end_seconds": 60.0,
+              "target_start_seconds": 0.0,
+              "target_end_seconds": 60.0,
+              "gain": 1.0
+            }
+          },
+          {
+            "hash": "50e40ffe2e928e74d937ca4eaeba9a35160800972eaf25adb71ce31e147ea129",
+            "relationship_type": "mixed_from",
+            "attributes": {
+              "assertion_origin": "submitter",
+              "confirmed_by_submitter": true,
+              "derivation_scope": "linear_mix",
+              "source_start_seconds": 0.0,
+              "source_end_seconds": 60.0,
+              "target_start_seconds": 0.0,
+              "target_end_seconds": 60.0,
+              "gain": 1.0
+            }
+          }
+        ]
+      }
+    ]
+  },
+  "objects": {
+    "133c934683b5f977ce77d1ead96ce4451162ad75e3bea2432bd6fbbe3f6e0c7b": "objects/133c934683b5f977ce77d1ead96ce4451162ad75e3bea2432bd6fbbe3f6e0c7b.wav",
+    "945f4de7b584607c94a44a16f297ec3b6bf5f5f1e2624edb28eebcdcff60f744": "objects/945f4de7b584607c94a44a16f297ec3b6bf5f5f1e2624edb28eebcdcff60f744.wav",
+    "50e40ffe2e928e74d937ca4eaeba9a35160800972eaf25adb71ce31e147ea129": "objects/50e40ffe2e928e74d937ca4eaeba9a35160800972eaf25adb71ce31e147ea129.wav",
+    "0a2c29f42e0570d270f27d268062dab5ab30d86a0ed720b31f8b6735cd268190": "objects/0a2c29f42e0570d270f27d268062dab5ab30d86a0ed720b31f8b6735cd268190.wav"
+  }
+}

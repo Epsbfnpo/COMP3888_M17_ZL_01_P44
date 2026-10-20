@@ -1,0 +1,90 @@
+{
+  "schema_version": "0.2-candidate",
+
+  "artefacts": [
+    {
+      "hash": "<SHA256_DRUM>",
+      "path": "obj_test/drum-stem.wav",
+      "artefact_type": "audio/stem",
+      "attributes": {
+        "creation_method": "recorded"
+      }
+    },
+
+    {
+      "hash": "<SHA256_VOCAL>",
+      "path": "obj_test/vocal-stem.wav",
+      "artefact_type": "audio/stem",
+      "attributes": {
+        "creation_method": "recorded"
+      }
+    },
+
+    {
+      "hash": "<SHA256_GUITAR>",
+      "path": "obj_test/good-stem.wav",
+      "artefact_type": "audio/stem",
+      "attributes": {
+        "creation_method": "recorded"
+      }
+    },
+
+    {
+      "hash": "<SHA256_FINAL>",
+      "path": "obj_test/final-song.wav",
+      "artefact_type": "audio/mix",
+      "final": true,
+      "attributes": {
+        "creation_method": "recorded"
+      }
+    }
+  ],
+
+  "relationships": [
+    {
+      "source_hash": "<SHA256_DRUM>",
+      "target_hash": "<SHA256_FINAL>",
+      "relationship_type": "mixed_from",
+      "attributes": {
+        "derivation_scope": "linear_mix",
+        "source_start_seconds": 0.0,
+        "source_end_seconds": 30.0,
+        "target_start_seconds": 0.0,
+        "target_end_seconds": 30.0,
+        "gain": 0.70
+      }
+    },
+
+    {
+      "source_hash": "<SHA256_VOCAL>",
+      "target_hash": "<SHA256_FINAL>",
+      "relationship_type": "mixed_from",
+      "attributes": {
+        "derivation_scope": "linear_mix",
+        "source_start_seconds": 0.0,
+        "source_end_seconds": 30.0,
+        "target_start_seconds": 0.0,
+        "target_end_seconds": 30.0,
+        "gain": 0.50
+      }
+    },
+
+    {
+      "source_hash": "<SHA256_GUITAR>",
+      "target_hash": "<SHA256_FINAL>",
+      "relationship_type": "mixed_from",
+      "attributes": {
+        "derivation_scope": "linear_mix",
+        "source_start_seconds": 0.0,
+        "source_end_seconds": 30.0,
+        "target_start_seconds": 0.0,
+        "target_end_seconds": 30.0,
+        "gain": 0.60
+      }
+    }
+  ],
+
+  "declarations": {
+    "submitter_confirmation": true
+  }
+}

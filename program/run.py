@@ -60,7 +60,8 @@ def _summarise_input_errors(response):
         assessment["reasoning"] = (assessment.get("reasoning") or "") + note
 
 
-def _evaluate_with_change_retry(native, request, root, input_report, deadline):
+def _evaluate_with_change_retry(native, request, root, input_report, deadline,
+                                allow_local_files):
     """Evaluate once; if non-final files changed meanwhile, re-run once with them isolated."""
     changed = {}
     for attempt in range(2):
@@ -68,7 +69,8 @@ def _evaluate_with_change_retry(native, request, root, input_report, deadline):
             return evaluate_chain(
                 copy.deepcopy(native), request["objects"], root, request.get("workflow"),
                 allow_disconnected=not input_report["coverage"]["complete"],
-                deadline=deadline, changed_objects=changed)
+                deadline=deadline, changed_objects=changed,
+                allow_external_objects=allow_local_files)
         except ObjectsChangedDuringEvaluation as exc:
             if attempt:
                 problems = list(changed.values()) + list(exc.changed.values())
@@ -77,14 +79,15 @@ def _evaluate_with_change_retry(native, request, root, input_report, deadline):
             changed.update(exc.changed)
 
 
-def evaluate(request, root, mode, deadline=None):
+def evaluate(request, root, mode, deadline=None, allow_local_files=False):
     response = response_shell(request, mode)
     started, cpu = time.perf_counter(), time.process_time()
     try:
-        native, input_report = to_native(request, mode, include_report=True)
+        native, input_report = to_native(
+            request, mode, include_report=True, allow_local_files=allow_local_files)
         (response["axes"], response["findings"], workflow_assessment,
          validation, assessment_checks) = _evaluate_with_change_retry(
-            native, request, root, input_report, deadline)
+            native, request, root, input_report, deadline, allow_local_files)
         response["coverage"] = input_report["coverage"]
         response["unknown_inputs"] = input_report["unknown_inputs"]
         response["findings"] = input_report["findings"] + response["findings"]
@@ -146,7 +149,9 @@ def effective_timeout(options):
     return DEFAULT_TIMEOUT_SECONDS
 
 
-def run_isolated(request, root, mode, command=None):
+def run_isolated(request, root, mode, command=None, allow_local_files=False):
+    if allow_local_files and mode != "native":
+        raise ValueError("--allow-local-files is restricted to trusted native manifests.")
     # A successful worker supplies its own source revision. Avoid hashing the
     # full source tree in the parent unless a parent-generated failure response
     # must be returned.
@@ -158,7 +163,8 @@ def run_isolated(request, root, mode, command=None):
     deadline = time.time() + max(0.0, timeout - reserve)
     command = command or [sys.executable, "-B", str(BASE / "run.py"), "--worker"]
     payload = json.dumps({"request": request, "root": str(root), "mode": mode,
-                          "deadline": deadline}, allow_nan=False)
+                          "deadline": deadline,
+                          "allow_local_files": allow_local_files}, allow_nan=False)
     started = time.perf_counter()
     try:
         result = subprocess.run(command, input=payload, text=True, capture_output=True, timeout=timeout)
@@ -199,11 +205,14 @@ def main():
         if args.worker:
             payload = json.load(sys.stdin)
             response = evaluate(payload["request"], payload["root"], payload["mode"],
-                                deadline=payload.get("deadline"))
+                                deadline=payload.get("deadline"),
+                                allow_local_files=payload.get("allow_local_files", False))
         else:
             selected = args.request or args.bundle or args.native
             if selected is None or args.root is None:
                 parser.error("one input option and --root are required")
+            if args.allow_local_files and not args.native:
+                raise InputError("--allow-local-files is restricted to trusted native manifests.")
             request = read_json(selected)
             if args.bundle:
                 request = public_bundle_request(request)

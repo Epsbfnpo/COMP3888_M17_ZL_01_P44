@@ -248,8 +248,7 @@
         "pattern": "^[0-9a-fA-F]{64}$"
       },
       "additionalProperties": {
-        "type": "string",
-        "pattern": "^objects/[0-9a-fA-F]{64}\\.[A-Za-z0-9]{1,8}$"
+        "type": "string"
       }
     },
     "options": {
@@ -270,8 +269,43 @@
         "timeout_seconds": {
           "type": "integer",
           "minimum": 1
+        },
+        "local_file_references": {
+          "type": "boolean"
         }
       }
     }
-  }
+  },
+  "allOf": [
+    {
+      "if": {
+        "required": ["options"],
+        "properties": {
+          "options": {
+            "required": ["local_file_references"],
+            "properties": {
+              "local_file_references": {"const": true}
+            }
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "objects": {
+            "additionalProperties": {"type": "string", "minLength": 1}
+          }
+        }
+      },
+      "else": {
+        "properties": {
+          "objects": {
+            "additionalProperties": {
+              "type": "string",
+              "pattern": "^objects/[0-9a-fA-F]{64}\\.[A-Za-z0-9]{1,8}$"
+            }
+          }
+        }
+      }
+    }
+  ]
 }

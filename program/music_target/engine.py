@@ -289,15 +289,18 @@ def _bind_verified(chain, digest, path):
     artefact._verified_file_hash = digest
 
 
-def _check_object(root, relative, digest, *, final, total_before=0):
+def _check_object(root, relative, digest, *, final, total_before=0,
+                  allow_external=False):
     """Return ``(problem_finding_or_None, size, resolved_path)`` for one object."""
     label = "final artefact" if final else "object"
     if relative is None:
         return (finding("MISSING_OBJECT", "The final artefact file is missing."
                         if final else "No file mapping was supplied.", digest, "medium"),
                 0, None)
-    path = (root / relative).resolve()
-    if not path.is_relative_to(root):
+    submitted_path = Path(relative)
+    path = (submitted_path if submitted_path.is_absolute()
+            else root / submitted_path).resolve()
+    if not allow_external and not path.is_relative_to(root):
         return (finding("OBJECT_PATH_INVALID",
                         f"Object path escapes the supplied bundle root ({label}); "
                         "the file was not opened.", digest, "high"), 0, None)
@@ -341,7 +344,7 @@ def _check_object(root, relative, digest, *, final, total_before=0):
 
 
 def evaluate_chain(native, objects, root, workflow=None, allow_disconnected=False,
-                   deadline=None, changed_objects=None):
+                   deadline=None, changed_objects=None, allow_external_objects=False):
     chain = EvidenceChain.from_dict(native)
     for artefact in chain.artefacts.values():
         artefact._evaluation_chain = chain
@@ -383,7 +386,8 @@ def evaluate_chain(native, objects, root, workflow=None, allow_disconnected=Fals
     # The final artefact is checked first. If its identity cannot be
     # confirmed, the whole assessment stops and only its problem is reported.
     problem, size, path = _check_object(root, objects.get(final_hash), final_hash,
-                                        final=True)
+                                        final=True,
+                                        allow_external=allow_external_objects)
     if problem is not None:
         exception = Unsupported if problem["code"] == "OBJECT_SIZE_LIMIT" else InputError
         raise exception(problem["message"], [problem])
@@ -402,7 +406,8 @@ def evaluate_chain(native, objects, root, workflow=None, allow_disconnected=Fals
             findings.append(finding("MISSING_OBJECT", "No file mapping was supplied.", digest, "medium"))
             continue
         problem, size, path = _check_object(root, relative, digest, final=False,
-                                            total_before=total)
+                                            total_before=total,
+                                            allow_external=allow_external_objects)
         if problem is not None:
             findings.append(problem)
             if problem["code"] == "MISSING_OBJECT":

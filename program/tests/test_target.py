@@ -16,6 +16,16 @@ from unittest import mock
 
 import numpy as np
 
+
+def create_symlink_or_skip(test_case, link, target):
+    try:
+        link.symlink_to(target)
+    except OSError as exc:
+        if getattr(exc, "winerror", None) == 1314:
+            test_case.skipTest("Creating symlinks requires Windows Developer Mode or elevation.")
+        raise
+
+
 BASE = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(BASE))
 import run
@@ -291,14 +301,15 @@ class TargetTests(unittest.TestCase):
 
     @staticmethod
     def _pcm16(samples, rate=8000):
-        with tempfile.NamedTemporaryFile(suffix=".wav") as temp:
-            with wave.open(temp.name, "wb") as handle:
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "test.wav"
+            with wave.open(str(path), "wb") as handle:
                 handle.setnchannels(1)
                 handle.setsampwidth(2)
                 handle.setframerate(rate)
                 handle.writeframes(b"".join(struct.pack("<h", max(-32768, min(32767, value)))
                                             for value in samples))
-            return Path(temp.name).read_bytes()
+            return path.read_bytes()
 
     @staticmethod
     def _wav_container(format_code, payload, *, rate=8000, channels=1,
@@ -1120,15 +1131,16 @@ class TargetTests(unittest.TestCase):
 
     @staticmethod
     def _pcm16_stereo(left, right, rate=8000):
-        with tempfile.NamedTemporaryFile(suffix=".wav") as temp:
-            with wave.open(temp.name, "wb") as handle:
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "test.wav"
+            with wave.open(str(path), "wb") as handle:
                 handle.setnchannels(2)
                 handle.setsampwidth(2)
                 handle.setframerate(rate)
                 handle.writeframes(b"".join(
                     struct.pack("<hh", *(max(-32768, min(32767, value)) for value in frame))
                     for frame in zip(left, right)))
-            return Path(temp.name).read_bytes()
+            return path.read_bytes()
 
     _FULL_SECOND = {"source_start_seconds": 0.0, "source_end_seconds": 1.0,
                     "target_start_seconds": 0.0, "target_end_seconds": 1.0}
@@ -2023,7 +2035,7 @@ class TargetTests(unittest.TestCase):
             root = Path(directory)
             (root / "objects").mkdir()
             for relative in self.template["objects"].values():
-                (root / relative).symlink_to(self.folder / relative)
+                create_symlink_or_skip(self, root / relative, self.folder / relative)
             self.assertIn("escapes", self.score(folder=root)["error"])
 
     def test_truncated_riff_not_accepted_as_valid_audio(self):
@@ -2610,7 +2622,7 @@ class InputValidationTests(unittest.TestCase):
             target = Path(outside) / "outside.wav"
             shutil.copy(root / self.template["objects"][raw], target)
             (root / self.template["objects"][raw]).unlink()
-            (root / self.template["objects"][raw]).symlink_to(target)
+            create_symlink_or_skip(self, root / self.template["objects"][raw], target)
             result = self.score(folder=root)
         self.assertEqual(result["execution_status"], "succeeded", result["error"])
         issue = next(item for item in result["findings"] if item["code"] == "OBJECT_PATH_INVALID")
