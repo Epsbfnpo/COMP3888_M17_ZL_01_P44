@@ -199,6 +199,8 @@ def main():
                         help="Append optional audfprint, SpectroMap and librosa observations; never changes scores")
     parser.add_argument("--audio-analysis-policy", type=Path,
                         help="Enable report-only audio analysis using a local policy JSON")
+    parser.add_argument("--allow-local-files", action="store_true",
+                        help="Allow external paths in a trusted native manifest that opts in")
     parser.add_argument("--worker", action="store_true", help=argparse.SUPPRESS)
     args = parser.parse_args()
     try:
@@ -219,7 +221,8 @@ def main():
             mode = "native" if args.native else "csec"
             started = time.monotonic()
             deadline = started + effective_timeout(request.get("options", {}))
-            response = run_isolated(request, args.root, mode)
+            response = run_isolated(request, args.root, mode,
+                                    allow_local_files=args.allow_local_files)
             if args.audio_analysis or args.audio_analysis_policy:
                 from music_target.audio_diagnostics.policy import DEFAULT_PATH
                 from music_target.audio_diagnostics.runner import augment_response
