@@ -8,7 +8,7 @@ from .contracts import PROVIDERS
 
 DEFAULT_PATH = Path(__file__).resolve().parents[2] / "policies/audio_analysis_policy.json"
 DEFAULTS = {
-    "audfprint": {"sample_rate_hz": 11025, "density": 20.0,
+    "audfprint": {"sample_rate_hz": 11025, "density": 40.0,
                  "offset_bin_seconds": 0.05, "minimum_candidate_matches": 5,
                  "support_window_seconds": 0.25},
     "spectromap": {"sample_rate_hz": 22050, "n_fft": 512, "noverlap": 64,
@@ -17,7 +17,9 @@ DEFAULTS = {
     "librosa": {"sample_rate_hz": 22050, "n_fft": 2048, "hop_length": 512,
                 "aggregation_seconds": 1.0, "candidate_cosine_similarity": 0.90},
     "music_semantics": {"sample_rate_hz": 22050, "hop_length": 512, "phrase_beats": 16,
-                        "label_similarity": 0.9, "baseline_shuffles": 20, "minimum_seconds": 8.0},
+                        "label_similarity": 0.9, "baseline_shuffles": 20, "minimum_seconds": 8.0, "alignment_grid_seconds": 0.25,
+                        "section_aggregation_seconds": 0.5, "section_context_seconds": 12.0,
+                        "section_minimum_seconds": 6.0, "section_prominence": 0.03},
 }
 
 

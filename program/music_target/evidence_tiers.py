@@ -1,16 +1,11 @@
-"""Who produced the evidence behind each cross-evidence check.
+"""Evidence categories for consistency scoring, not authenticated origin.
 
-A check's tier records how hard its evidence is to fabricate, not whether it
-passed. Submitter-provided documents (RIN, ERN, CompSheet, CueSheet, MIDI,
-AAF, sound reports, unverified C2PA manifests) are declarations in another
-format: they corroborate, and they can reveal a contradiction, but agreeing
-with the submitted graph cannot by itself release an Integrity value. Two
-tiers are independent of the submitter's own documents:
-
-- ``signed_attestation``: a C2PA manifest whose signature validated;
-- ``recorder_metadata``: comparisons against BWF/iXML metadata a recorder
-  wrote into a hash-bound audio file. It can be forged, but only by also
-  rewriting the bound audio file consistently.
+The default policy permits assessed ``signed_attestation`` and
+``recorder_metadata`` checks to qualify numeric Integrity release.
+``recorder_metadata`` means fields read from a hash-bound WAV; it does not
+establish who wrote them. A non-scoring finding records that limitation.
+Submitter documents alone do not qualify release. Neither a successful
+comparison nor signature validity establishes authorship or historical origin.
 """
 
 SIGNED_ATTESTATION = "signed_attestation"

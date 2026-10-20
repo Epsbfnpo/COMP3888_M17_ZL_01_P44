@@ -85,7 +85,7 @@ python3 -B run.py --request /path/to/request.json --root /path/to/case-root
 | completeness | Native submissions evaluate applicable workflow expectations; public WAV-only requests retain limited declared-object availability. |
 | integrity | Separately reports file binding, structural validity, declaration consistency, CrossEvidence, cryptographic attestation, and a policy-disabled physical diagnostic layer. Signal results never contribute to integrity; structural validity and C2PA attestation also do not raise it. The claim-ledger scoring redesign is future work. |
 | attestation_strength | C2PA manifest/validation/trust levels when the optional SDK assesses them; otherwise unavailable. |
-| ai_disclosure | Explicit `creation_method` disclosure coverage, not AI-content detection. |
+| ai_disclosure | Wire key retained; display Creation-method disclosure coverage. Structured counts in `assessment_checks.ai_disclosure_coverage`; no content AI detection or declaration-truth verification. |
 
 All unsupported axes have null value and confidence. Confidence is also null for the limited completeness metric because no confidence model is defined.
 Provenance validation fields are null, not false. No C2PA absence, validity or trust claim is inferred from an unperformed check.
@@ -127,3 +127,18 @@ No private oracle, expected decision or attack label was used. See `reports/publ
 5. If binary classification is later desired, provide a named/versioned target decision policy and appropriate evaluation ground truth.
 
 The user-provided CSEC message requests revision, install/run command, supported types, one output, timeout and any existing policy preferably by Friday 11 September 2026; then a runnable revision plus honest and invalid/unsupported samples by Sunday 13 September 2026.
+
+## Scoring remediation (2026-10-20)
+
+The default profile is now default-v4. Cross-evidence scores one rule/subject
+fact once, with any failure retaining a contradiction; raw checks and source
+document hashes remain available. An ordinary contradiction cannot release an
+otherwise withheld Integrity value. Read `axes.integrity.status` or
+`assessment_checks.integrity_decision` for status and release reason. A severe
+contradiction releases min(weighted mean, 0.25) even without qualifying evidence.
+
+Recorder metadata comparisons remain scored and release-eligible. The
+`RECORDER_METADATA_ORIGIN_NOT_AUTHENTICATED` informational finding has no
+score effect and does not claim the recording origin was verified. Confidence
+formulas and layer weights are unchanged. See
+[the scoring repair record](SCORING_REMEDIATION_2026-10-20.md).

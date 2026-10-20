@@ -71,14 +71,14 @@ Every record has `scoring_eligible: false`, `integrity_contribution: null`, and
 change these fields. No diagnostics are fed into parser observations, cross
 evidence, the scored boolean checks, or integrity layers.
 
-The three providers have different roles:
+The four providers have different roles:
 
 | Provider | Measurements |
 |---|---|
 | audfprint | Pinned upstream landmark extraction; local deterministic offset voting; multiple repeated-source positions; supported time windows |
 | SpectroMap | Upstream peak detection run on fixed-duration time windows; exact local peak-pair vocabulary and offset voting; records the frequency/time grid, overlap, peak window and pair zone |
 | librosa | Chroma, MFCC and energy features; time aggregation; candidate boundaries and repetitions within each file. Cross-file similarity is a summary only (`best_feature_cosine_quantiles`), because on real recordings unrelated material scored as high as related material |
-| music_semantics | librosa beat tracking, CQT chroma and DTW: key, tempo, a triad chord per beat, 16-beat phrase form; across versions: transposition, tempo ratio, harmonic similarity against a beat-shuffled baseline, chord-sequence similarity and phrase order |
+| music_semantics | Per-file chroma/MFCC novelty boundaries; beat-chroma DTW across all 12 transpositions, a best-of-12 shuffled reference, independent time-grid tempo verification and bounded support/abstention. Fixed-phrase form remains a legacy diagnostic |
 
 The upstream audfprint extraction files are vendored unmodified with their
 MIT notice and original source notices. The integration passes sample arrays
@@ -128,40 +128,79 @@ crashes, the diagnostic message includes the tail of its stderr (at most 2000
 characters). If a worker cannot be started, that one task and provider is
 `unavailable` with `provider_start_failed`, and the remaining tasks still run.
 
-All matching thresholds are **exploratory candidate thresholds**. Until
-representative data are used for calibration, completed analyses use
-`inconclusive`, even when matches exist. `unavailable` means analysis could not
-run. Neither state affects scores. Matching is evidence of content
-correspondence, not authorship or historical direction. The providers are
-never averaged into a provenance score.
+Completed diagnostics remain `inconclusive`; `unavailable` means analysis could not
+run. Neither state affects scores. The audfprint and music_semantics adapters
+now have **bounded experimental calibration**, documented in
+[AUDIO_CALIBRATION_2026-10-20.md](AUDIO_CALIBRATION_2026-10-20.md).
+Other adapters and local correspondence candidates remain exploratory. Support
+within the frozen profile is not a probability, authorship claim, or provenance
+verdict. Providers are never averaged into a provenance score.
 
-**Musical semantics.** A demo, a mid-production mix and a final master
-legitimately differ as signals, so fingerprints miss their relationship.
-Harmony and form usually persist, so `music_semantics` reports, for each
-file, key, tempo, a chord per beat and its form. The form is built from
-16-beat phrases (4 bars in 4/4) labelled A, B, C… by aligning their beat
-chords, for example `A×2 B A B`. The phrase grid is the bar-aligned offset on
-which repeats line up best, so an intro becomes a pickup. Across versions it
-reports:
+**Musical semantics (adapter 1.2).** Per-file CQT chroma and robustly scaled MFCCs
+are pooled in time, independently of beats and comparison targets. Multiscale
+local self-similarity novelty supplies `sections_seconds`, acoustic boundaries
+with strengths, and `segmentation_method: multiscale_feature_novelty`.
+The frozen development selection uses 12-second context, 6-second minimum
+spacing, 0.03 prominence and 0.5-second pooling. These are inferred boundaries;
+there are no verse/chorus names (`section_labels_available: false`). The `librosa`
+provider retains its separate per-file feature-section algorithm.
 
-- `transposition_semitones` and `tempo_ratio`;
-- `harmonic_similarity`: the key-shifted chroma, aligned by DTW, compared with
-  `harmonic_similarity_shuffled_mean/std` and `harmonic_similarity_z`. The
-  baseline uses the same chords in shuffled beat order, so a high z means the
-  same *sequence*, not merely the same chord vocabulary;
-- `chord_sequence_similarity`;
-- each target phrase located in the source independently, with
-  `phrase_order_preserved_fraction` over the phrases that genuinely match.
+The old `form`, `phrases`, and phrase-order fields remain compatibility
+observations, explicitly marked `legacy_form_method: fixed_beat_phrases` and
+`phrase_order_basis: legacy_fixed_beat_phrases_not_detected_sections`. They are
+not used as detected boundaries. `section_matches` locates detected target
+sections independently; local paths remain candidates even when their geometry
+passes, because local relationship thresholds have not been separately calibrated.
 
-On synthetic songs, a final transposed +2 at 112 instead of 100 BPM with
-another timbre and an added intro gave transposition +2, tempo ratio 1.13,
-z = 13.6 and order 1.0. An unrelated song gave z = −0.5 and no matched
-phrases; a version with reordered sections gave order 0.75. Fixed phrases
-stand in for detected section boundaries: detection fragmented songs whose
-sections differ mainly in chord order, and its accuracy can only be judged on
-annotated recordings (see `benchmarks/`). Shared harmony is common across
-unrelated songs, so similarity indicates musical relatedness, never copying,
-direction or authorship. The observation is report-only.
+Across versions:
+
+- All 12 transpositions are searched by sequence alignment. Every shuffled
+  reference also searches all 12, avoiding a selected-shift advantage. The
+  `harmonic_similarity_z` is a diagnostic against this reference, never a
+  probability. All raw candidates remain visible.
+- `correspondence_assessment` is `supported_within_profile` or `abstained`, with
+  reasons and a frozen profile digest. Support requires similarity >= 0.90,
+  shuffled z >= 4, pitch margin >= 0.02, temporal variation >= 0.05, duration
+  and aligned speed ratios in [0.5, 2], >= 8 aligned seconds on both sides,
+  >= 0.8 query coverage, >= 0.6 diagonal steps, <= 4 repeated mappings and
+  normalized timing residual <= 0.04. The observed speed calibration range
+  was 0.8–1.35; the wider geometric guard is not evidence of validated accuracy
+  throughout [0.5, 2]. Custom feature parameters outside the frozen signature
+  cause abstention.
+- `transposition_semitones` is null on abstention. The best raw candidate is
+  separately available as `best_transposition_candidate_semitones`, so a tie,
+  constant tone or independent control does not force a reported shift.
+  Chroma cannot identify octave shifts.
+- `tempo_ratio` now uses a robust slope of aligned source seconds against target
+  seconds on an independent 0.25-second chroma raster. Beat-aligned and raster
+  estimates must agree within 5%, both paths must pass the geometric gates,
+  and both files must have tracked beats. Unsupported estimates are null.
+  The old BPM quotient is retained as `beat_tracker_tempo_ratio`; the old
+  beat-aligned fit is `beat_aligned_tempo_candidate`. This changes the
+  meaning of `tempo_ratio`, and consumers must inspect its method/status.
+- Independent local phrase locations never use the preceding phrase to break
+  ties. Distinct near-equal locations are still reported using the existing
+  mean-cost margin 0.01 and IoU grouping 0.5. These location heuristics are not
+  calibrated relationship decisions. Ambiguous or geometrically rejected
+  locations cannot release `phrase_order_preserved_fraction`; the separately
+  marked candidate order remains exploratory.
+- A low beat count uses a time grid for sections but abstains from the
+  calibrated tempo/pitch result, rather than dividing missing BPM values.
+
+**Fingerprint sensitivity (audfprint adapter 1.2).** The pinned upstream extractor
+is unchanged. Default density increases from 20 to 40; the existing five-vote
+floor is retained. Raw offset candidates also receive `support_assessment`:
+profile support needs at least 1 second of token-neighbourhood windows and a
+peak >= 10 times the mean feasible-bin background. The 1-second support
+requirement does not certify continuous audio or imply accuracy for short clips.
+Profile support applies only to the tested extraction/window/bin parameters.
+No candidate does not establish source absence. Weak mixture components can
+still be hidden. Two algorithms reading the same audio do not become independent
+sources of provenance evidence.
+
+The audio policy is `audio-observations-bounded-v2`, version 2. All three
+non-scoring fields remain fixed. `librosa` is adapter 1.2: sections and repetitions use per-file feature scaling, while `mean_best_feature_cosine` uses a joint pair scale. Historical example
+responses retain their old meanings and are not current expected outputs.
 
 **Fingerprint agreement.** audfprint (landmark hashes) and SpectroMap (peak
 pairs) tokenise the same audio differently, so their chance collisions mostly

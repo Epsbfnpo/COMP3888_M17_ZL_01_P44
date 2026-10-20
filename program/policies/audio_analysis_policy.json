@@ -1,6 +1,6 @@
 {
-  "policy_id": "audio-observations-experimental-v1",
-  "policy_version": 1,
+  "policy_id": "audio-observations-bounded-v2",
+  "policy_version": 2,
   "providers": [
     "audfprint",
     "spectromap",

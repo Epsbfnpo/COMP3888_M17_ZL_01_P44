@@ -214,6 +214,8 @@ def segment_scores(reference, estimate):
     start = float(ref_intervals[0, 0])
     est_intervals, est_labels = mir_eval.util.adjust_intervals(np.asarray(est_intervals, float), list(est_labels),
                                                                t_min=start, t_max=end)
+    ref_intervals = np.asarray(ref_intervals, float) - start
+    est_intervals = np.asarray(est_intervals, float) - start
     scores = {"segments_estimated": int(len(est_intervals)), "segments_reference": int(len(ref_intervals))}
     for window in (0.5, 3.0):
         _, _, f = mir_eval.segment.detection(ref_intervals, est_intervals, window=window, trim=True)
@@ -227,7 +229,7 @@ def run_salami(data, out, limit=None, msaf_python=None):
     data, out = Path(data), Path(out)
     root = next(data.glob("salami-data-public-*"))
     audio = _audio_files(data / "salami-audio")[:limit]
-    methods = {"fixed_phrases": None, "librosa_laplacian": None}
+    methods = {"fixed_phrases": None, "acoustic_novelty": None, "librosa_laplacian": None}
     if msaf_python:
         methods.update({f"msaf_{b}" + (f"+{l}" if l else ""): (b, l) for b, l in MSAF_ALGORITHMS})
     rows = []
@@ -241,6 +243,9 @@ def run_salami(data, out, limit=None, msaf_python=None):
             try:
                 if method == "fixed_phrases":
                     estimate = fixed_phrases(samples)
+                elif method == "acoustic_novelty":
+                    intervals = describe(samples)["sections"]
+                    estimate = (intervals, [f"S{i}" for i in range(len(intervals))])
                 elif method == "librosa_laplacian":
                     estimate = laplacian_segments(samples)
                 else:

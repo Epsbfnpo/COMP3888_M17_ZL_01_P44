@@ -65,7 +65,7 @@ class StructureBenchmarkTests(unittest.TestCase):
     def test_salami_mode_scores_every_method_and_compares_to_fixed_phrases(self):
         summary = self.bench.run_salami(self.data, Path(self.temp.name) / "out")
         methods = summary["methods"]
-        self.assertEqual(set(methods), {"fixed_phrases", "librosa_laplacian"})
+        self.assertEqual(set(methods), {"fixed_phrases", "acoustic_novelty", "librosa_laplacian"})
         fixed = methods["fixed_phrases"]
         self.assertEqual(fixed["evaluated"], 1)
         # Phrases land on the true 16-beat section starts of this song.
@@ -80,6 +80,12 @@ class StructureBenchmarkTests(unittest.TestCase):
         self.assertGreater(summary["chord_majmin"], 0.6)
         self.assertEqual(summary["key_score"], 1.0)
         self.assertEqual(summary["tempo_within_4pct_octave"], 1.0)
+
+    def test_boundary_scoring_handles_leading_silence(self):
+        reference = (np.array([[2., 10.], [10., 20.]]), ["A", "B"])
+        estimate = (np.array([[0., 10.], [10., 21.]]), ["S0", "S1"])
+        scores = self.bench.segment_scores(reference, estimate)
+        self.assertEqual(scores["boundary_f_0.5s"], 1.)
 
     def test_bootstrap_interval(self):
         result = self.bench.bootstrap_difference([0.8, 0.9, 0.7], [0.5, 0.6, 0.4])
