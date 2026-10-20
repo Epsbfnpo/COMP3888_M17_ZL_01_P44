@@ -4,6 +4,7 @@ import copy
 import difflib
 import hashlib
 import json
+import math
 import re
 import uuid
 from functools import lru_cache
@@ -43,10 +44,28 @@ def read_json(path):
     def invalid_number(value):
         raise InputError("Non-finite JSON numbers are not permitted.")
 
-    return json.loads(path.read_text(), object_pairs_hook=pairs, parse_constant=invalid_number)
+    def finite_float(value):
+        number = float(value)
+        if not math.isfinite(number):
+            invalid_number(value)
+        return number
+
+    return json.loads(path.read_text(), object_pairs_hook=pairs,
+                      parse_constant=invalid_number, parse_float=finite_float)
 
 
 def validate(document, schema_name):
+    # Direct Python callers do not necessarily pass through read_json().
+    def check_numbers(value):
+        if isinstance(value, float) and not math.isfinite(value):
+            raise InputError("Non-finite JSON numbers are not permitted.")
+        if isinstance(value, dict):
+            for item in value.values():
+                check_numbers(item)
+        elif isinstance(value, list):
+            for item in value:
+                check_numbers(item)
+    check_numbers(document)
     schema = json.loads((BASE / "schemas" / schema_name).read_text())
     validator = Draft202012Validator(schema, format_checker=FormatChecker())
     error = next(validator.iter_errors(document), None)

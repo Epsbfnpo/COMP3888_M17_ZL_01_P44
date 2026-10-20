@@ -1,6 +1,6 @@
 {
   "policy_id": "comp3888-music-workflow-evidence",
-  "policy_version": "0.1.0-candidate",
+  "policy_version": "0.1.1-candidate",
   "format_version": "1.0.0",
   "status": "candidate_for_team_and_client_review",
   "domain": "music_production",
@@ -1157,14 +1157,14 @@
           "trigger": "workflow.client_requires_generation_record == true",
           "kind": "artifact_presence",
           "artifact_types": [
-            "metadata/generation-record"
+            "text/generation-record"
           ],
           "min_count": 1,
           "weight": 1.0
         }
       ],
       "optional": [
-        "metadata/generation-record",
+        "text/generation-record",
         "project/daw-session",
         "text/session-log",
         "provenance/c2pa"
@@ -1452,7 +1452,7 @@
         "text/comp-sheet",
         "metadata/ddex-rin",
         "metadata/ddex-ern",
-        "metadata/generation-record",
+        "text/generation-record",
         "provenance/c2pa"
       ],
       "assessment_note": "Use availability=partial unless a reviewer confirms the custom expectation set. Do not compare this score directly with a predefined workflow score."

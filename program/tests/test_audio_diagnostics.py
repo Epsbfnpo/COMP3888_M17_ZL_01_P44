@@ -387,7 +387,10 @@ class MusicSemanticsTests(unittest.TestCase):
         self.assertEqual((metrics["source"]["key"]["tonic"], metrics["target"]["key"]["tonic"]), ("C", "D"))
         self.assertEqual(metrics["source"]["form"], "A×2 B A B")
         self.assertGreater(metrics["harmonic_similarity_z"], 5)
-        self.assertEqual(metrics["phrase_order_preserved_fraction"], 1.0)
+        # Repeated A/B phrases have multiple plausible source locations.
+        # They cannot establish order, even for a known synthetic version.
+        self.assertIsNone(metrics["phrase_order_preserved_fraction"])
+        self.assertEqual(metrics["phrase_order_status"], "ambiguous_locations")
         self.assertLess(metrics["matched_phrases"], metrics["target_phrases"])  # added intro and new section
 
     def test_unrelated_song_is_not_better_than_shuffled_harmony(self):
@@ -399,7 +402,9 @@ class MusicSemanticsTests(unittest.TestCase):
     def test_reordered_form_is_visible(self):
         metrics = self.analyse(self.reordered)
         self.assertEqual(metrics["target"]["form"], "A B A B×2")
-        self.assertLess(metrics["phrase_order_preserved_fraction"], 1.0)
+        self.assertLess(metrics["candidate_phrase_order_fraction"], 1.0)
+        self.assertIsNone(metrics["phrase_order_preserved_fraction"])
+        self.assertEqual(metrics["phrase_order_status"], "ambiguous_locations")
 
 
 class NonFinalVersionTests(unittest.TestCase):

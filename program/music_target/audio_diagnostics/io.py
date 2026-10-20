@@ -5,6 +5,7 @@ from pathlib import Path
 
 import numpy as np
 from music_target.wav_io import inspect_wav, read_frames
+from music_target.time_ranges import content_range_checks
 
 
 class AnalysisUnavailable(ValueError):
@@ -17,10 +18,10 @@ def _decode_mono(path, start, end):
     descriptor = inspect_wav(Path(path))
     start = 0.0 if start is None else start
     end = descriptor.duration_seconds if end is None else end
-    if (type(start) not in (int, float) or type(end) not in (int, float) or
-            not math.isfinite(start) or not math.isfinite(end) or
-            not 0 <= start < end <= descriptor.duration_seconds + 1e-9):
+    checks = content_range_checks(start, end, descriptor.duration_seconds, descriptor.sample_rate)
+    if any(not check["passed"] for check in checks):
         raise AnalysisUnavailable("invalid_analysis_range", "Declared time range is outside the submitted audio.")
+    end = min(end, descriptor.duration_seconds)
     first = round(start * descriptor.sample_rate)
     last = min(descriptor.frame_count, round(end * descriptor.sample_rate))
     chunks = [block for _, block in read_frames(path, descriptor, first, last)]

@@ -3,9 +3,10 @@
 Field recorders write scene, take, tape, track names and start timecode into
 the file at record time (iXML is the cross-vendor standard; Sound Devices
 also mirrors fields as ``sKEY=value`` lines in the bext description). These
-are observations of the bound file, not submission claims, and are the
-``recorder_metadata`` evidence tier that production documents are checked
-against.
+are observations of the bound file, classified as ``recorder_metadata``
+for production-document consistency checks. The file does not authenticate
+who wrote those fields; the evaluator reports that limitation without
+penalising the score.
 """
 
 import xml.etree.ElementTree as ElementTree

@@ -1,5 +1,55 @@
 # Music benchmark
 
+For the October pilot remediation status, remaining decisions and changed
+observation semantics, see [the remediation record](../docs/REMEDIATION_2026-10-20.md).
+Structure benchmark evaluation additionally needs `requirements-benchmark.txt`
+(`mir_eval`); install it alongside the runtime and audio dependencies.
+
+## Calibration manifest checks
+
+`python -B benchmarks/audio_dataset.py /path/to/manifest.json` validates the
+offline manifest described below. It never accesses Lumina or spends credits.
+Keep originals and every derivative in the same source family and partition.
+Mixtures must list every parent family. Identical audio hashes cannot appear
+across development, validation and test, even under different family IDs.
+
+```json
+{
+  "schema_version": "1.0",
+  "cases": [{
+    "case_id": "song01-original",
+    "family_ids": ["song01"],
+    "partition": "development",
+    "audio_sha256": "<64 lowercase hex digits from the downloaded file>",
+    "parent_case_ids": [],
+    "requested_properties": {"tempo_bpm": 120, "form": "ABA"},
+    "verified_labels": [],
+    "generation": {
+      "status": "succeeded",
+      "submitted_prompt_text": "The exact final text actually submitted to Lumina",
+      "charged_credits": 8,
+      "refund_status": "unknown"
+    }
+  }]
+}
+```
+
+Replace the illustrative hash before validation. `requested_properties` are
+requests, never ground truth. Add `verified_labels` only after verification,
+with `property`, `value`, `method` and `annotator_or_tool`. Allowed methods are
+`manual_review`, `deterministic_transform`, `independent_measurement` and
+`dataset_annotation`. For example a known time-stretch can label its exact
+factor, but does not establish verse/chorus labels. Record the transform/tool
+version and parameters in the label as additional metadata. The analyzer under
+test cannot validate its own labels. The validator checks recorded provenance,
+not annotation correctness. Failed generation rows use `status: failed` and
+`audio_sha256: null`. Local/external dataset rows may omit `generation`.
+Use `refund_status: unknown` when the refund is unverified; do not invent
+an actual prompt or assume a failure was refunded. A row whose actual submitted
+prompt is unknown cannot yet pass this schema and must be repaired from logs.
+Refund states: `unknown`, `not_applicable`, `pending`, `refunded`, `not_refunded`.
+The five pilot families still require independent labels and more families.
+
 `music_benchmark.py` runs the evaluator, with audio analysis, on public music
 datasets whose metadata states which stems make each mix. That metadata is the
 ground truth. For every track it declares the true stems as `mixed_from` the

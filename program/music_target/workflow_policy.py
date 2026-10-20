@@ -11,6 +11,8 @@ import ast
 import json
 from pathlib import Path
 
+from .domain import SUPPORTED_TYPES
+
 
 class WorkflowPolicyError(ValueError):
     pass
@@ -49,6 +51,19 @@ def load_workflow_policy(path):
                 raise WorkflowPolicyError("Rule weights must be positive numbers.")
     if len(rule_ids) != len(set(rule_ids)):
         raise WorkflowPolicyError("Rule IDs must be unique.")
+    def check_types(value):
+        if isinstance(value, dict):
+            for key, item in value.items():
+                if key in {"artifact_types", "allowed_final_types", "source_types", "target_types", "optional"}:
+                    if isinstance(item, list) and all(isinstance(name, str) for name in item):
+                        unknown = set(item) - SUPPORTED_TYPES
+                        if unknown:
+                            raise WorkflowPolicyError("Unsupported policy artefact type(s): " + ", ".join(sorted(unknown)))
+                check_types(item)
+        elif isinstance(value, list):
+            for item in value:
+                check_types(item)
+    check_types(policy)
     return policy
 
 

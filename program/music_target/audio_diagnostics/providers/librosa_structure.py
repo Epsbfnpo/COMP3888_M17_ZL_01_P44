@@ -57,21 +57,30 @@ def analyse(task, parameters, context=None):
     source, target = read_pair(task, parameters["sample_rate_hz"], (context or {}).get("audio_cache"))
     source_data, source_times = _features(source, parameters, librosa)
     target_data, target_times = _features(target, parameters, librosa)
-    joined = np.concatenate((source_data[12:], target_data[12:]), axis=1)
-    mean = np.mean(joined, axis=1, keepdims=True)
-    scale = np.maximum(np.std(joined, axis=1, keepdims=True), 1e-5)
-    def normalize(data):
+    def statistics(data):
+        return (np.mean(data, axis=1, keepdims=True),
+                np.maximum(np.std(data, axis=1, keepdims=True), 1e-5))
+
+    def normalize(data, mean, scale):
         return _unit(np.vstack((0.7 * _unit(data[:12]), 0.3 * _unit((data[12:] - mean) / scale))))
-    source_features, target_features = normalize(source_data), normalize(target_data)
+    # Per-file descriptors must not change when another target is chosen.
+    source_features = normalize(source_data, *statistics(source_data[12:]))
+    target_features = normalize(target_data, *statistics(target_data[12:]))
+    # Cross-file similarity keeps one shared scale, so overall timbre and
+    # level differences between the two files still lower the cosine.
+    joint = statistics(np.concatenate((source_data[12:], target_data[12:]), axis=1))
+    source_joint, target_joint = normalize(source_data, *joint), normalize(target_data, *joint)
     # Cross-file frame correspondences are summarised, not listed: on real
     # recordings unrelated material scored as high as related material, so
     # individual "matches" would mislead. Version relationships are measured
     # by the music_semantics provider instead.
     with np.errstate(all="ignore"):  # Accelerate BLAS raises spurious FP flags
-        best = np.max(np.clip(source_features.T @ target_features, -1, 1), axis=0)
+        best = np.max(np.clip(source_joint.T @ target_joint, -1, 1), axis=0)
     value = result(task, "librosa")
-    value.update(provider_version=librosa.__version__, analysis_complete=True,
+    value.update(provider_version=librosa.__version__, adapter_version="1.2", analysis_complete=True,
                  analysed_ranges=ranges(source, target), matches=[], metrics={
+                     "feature_normalization": {"sections_and_repetitions": "per_file",
+                                               "cross_file_similarity": "joint_pair"},
                      "source_sections_seconds": _sections(source_features, source_times, source),
                      "target_sections_seconds": _sections(target_features, target_times, target),
                      "source_repetition_candidates": _repetitions(source_features, source_times, source, parameters, librosa),

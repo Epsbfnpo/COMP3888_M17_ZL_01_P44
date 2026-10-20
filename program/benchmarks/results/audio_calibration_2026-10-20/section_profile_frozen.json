@@ -1,0 +1,31 @@
+{
+  "profile_id": "salami16-lumina11-2026-10-20",
+  "fit_partition": "development",
+  "selection_metric": "macro boundary F at 3 seconds",
+  "parameters": {
+    "section_context_seconds": 12.0,
+    "section_minimum_seconds": 6.0,
+    "section_prominence": 0.03
+  },
+  "development_ids": [
+    "1454",
+    "1213",
+    "1391",
+    "1347",
+    "1181",
+    "1295",
+    "1018",
+    "992"
+  ],
+  "test_ids": [
+    "1459",
+    "1012",
+    "1111",
+    "1027",
+    "1004",
+    "1219",
+    "1120",
+    "1125"
+  ],
+  "freeze_sha256": "bc2a2411af2076fc823ea556b5b5bbd06cb82fe72e17ec2ec136df248bf1d67f"
+}

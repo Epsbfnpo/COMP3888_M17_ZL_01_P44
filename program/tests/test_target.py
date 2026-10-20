@@ -1584,7 +1584,7 @@ class TargetTests(unittest.TestCase):
         for name in ("structural_validity", "physical_similarity", "cryptographic_attestation"):
             self.assertIsNone(layers[name]["weight"])
         profile = result["assessment_checks"]["scoring_profile"][0]
-        self.assertEqual(profile, {"profile_id": "default-v2", "profile_version": 2})
+        self.assertEqual(profile, {"profile_id": "default-v4", "profile_version": 4})
         # No severe rule failed, so no cap record or cap sentence appears.
         self.assertNotIn("severe_contradiction_cap", result["assessment_checks"])
         self.assertNotIn("severe contradiction", result["axes"]["integrity"]["reasoning"])
@@ -1604,7 +1604,7 @@ class TargetTests(unittest.TestCase):
         integrity, _, _, _, checks, _ = assess_axes(
             native, chain, {final_hash}, set(), wav_observations, [], parser_observations, workflow_input)
         self.assertIsNone(integrity["value"])
-        self.assertIn("No independent cross-evidence was assessed", integrity["reasoning"])
+        self.assertIn("No qualifying cross-evidence was assessed", integrity["reasoning"])
         self.assertEqual({item["evidence_tier"] for item in checks["cross_evidence"]}, {"submitter_document"})
         layer = next(item for item in checks["integrity_layers"] if item["layer"] == "cross_evidence_support")
         self.assertEqual(layer["evidence_tier_counts"]["submitter_document"], {"assessed": 1, "passed": 1})
@@ -1645,9 +1645,11 @@ class TargetTests(unittest.TestCase):
         workflow_input = {"declarations": {"contributors": ["Jane Doe"]}}
         chain = types.SimpleNamespace(artefacts={final_hash: types.SimpleNamespace()})
 
+        eligible_profile = copy.deepcopy(load_default_scoring_profile())
+        del eligible_profile["integrity"]["withholding_rule"]["substantive_support_tiers"]
         default_integrity, *_ = assess_axes(
             native, chain, {final_hash}, set(), wav_observations, [],
-            parser_observations, workflow_input)
+            parser_observations, workflow_input, scoring_profile=eligible_profile)
         # file_integrity: 1 of 2 checks passes (0.5); cross_evidence_support:
         # the one rin-overlap check passes (1.0); declaration_consistency has
         # no checks and stays unavailable. Equal default weights reproduce
@@ -1691,9 +1693,13 @@ class TargetTests(unittest.TestCase):
         workflow_input = {"declarations": {"contributors": ["Jane Doe"]}}
         chain = types.SimpleNamespace(artefacts={final_hash: types.SimpleNamespace()})
 
+        # Qualify these arithmetic fixtures explicitly; default-v4 release
+        # without qualifying evidence is covered by separate regression tests.
+        eligible_profile = copy.deepcopy(load_default_scoring_profile())
+        del eligible_profile["integrity"]["withholding_rule"]["substantive_support_tiers"]
         integrity, _, _, _, checks, _ = assess_axes(
             native, chain, set(), set(), wav_observations, [],
-            parser_observations, workflow_input)
+            parser_observations, workflow_input, scoring_profile=eligible_profile)
         # file_integrity = 0.5 (1 of 2 checks), cross_evidence_support = 1.0;
         # the plain weighted mean would be 0.75, but object_hash_bound is on
         # the default profile's severe list, so it is capped at 0.25 instead.
@@ -1730,9 +1736,13 @@ class TargetTests(unittest.TestCase):
         workflow_input = {"declarations": {"contributors": ["Someone Else"]}}
         chain = types.SimpleNamespace(artefacts={final_hash: types.SimpleNamespace()})
 
+        # Qualify these arithmetic fixtures explicitly; default-v4 release
+        # without qualifying evidence is covered by separate regression tests.
+        eligible_profile = copy.deepcopy(load_default_scoring_profile())
+        del eligible_profile["integrity"]["withholding_rule"]["substantive_support_tiers"]
         integrity, _, _, _, checks, _ = assess_axes(
             native, chain, set(), set(), wav_observations, [],
-            parser_observations, workflow_input)
+            parser_observations, workflow_input, scoring_profile=eligible_profile)
         # The weighted mean (0.0) is already below the 0.25 cap. A ceiling
         # only pulls a value down toward it; it must never raise a lower
         # value up to meet it.
@@ -2809,7 +2819,7 @@ class ScoringProfileTests(unittest.TestCase):
 
     def test_default_profile_loads_and_validates(self):
         profile = load_default_scoring_profile()
-        self.assertEqual(profile["profile_id"], "default-v2")
+        self.assertEqual(profile["profile_id"], "default-v4")
         self.assertEqual(profile["integrity"]["layer_weights"],
                          {"file_integrity": 1.0, "declaration_consistency": 1.0,
                           "cross_evidence_support": 1.0})

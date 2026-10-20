@@ -1,0 +1,81 @@
+{
+  "profile_id": "bounded-audio-2026-10-20-v1",
+  "scope": "Controlled DSP derivatives of Lumina originals; SALAMI acoustic boundaries. Not a probability or provenance verdict.",
+  "feature_parameters": {
+    "sample_rate_hz": 22050,
+    "hop_length": 512,
+    "baseline_shuffles": 20
+  },
+  "sections": {
+    "profile_id": "salami16-lumina11-2026-10-20",
+    "fit_partition": "development",
+    "selection_metric": "macro boundary F at 3 seconds",
+    "parameters": {
+      "section_context_seconds": 12.0,
+      "section_minimum_seconds": 6.0,
+      "section_prominence": 0.03
+    },
+    "development_ids": [
+      "1454",
+      "1213",
+      "1391",
+      "1347",
+      "1181",
+      "1295",
+      "1018",
+      "992"
+    ],
+    "test_ids": [
+      "1459",
+      "1012",
+      "1111",
+      "1027",
+      "1004",
+      "1219",
+      "1120",
+      "1125"
+    ],
+    "freeze_sha256": "bc2a2411af2076fc823ea556b5b5bbd06cb82fe72e17ec2ec136df248bf1d67f"
+  },
+  "semantics": {
+    "minimum_similarity": 0.9,
+    "minimum_shuffle_z": 4.0,
+    "minimum_pitch_margin": 0.02,
+    "minimum_temporal_information": 0.05,
+    "minimum_duration_ratio": 0.5,
+    "maximum_duration_ratio": 2.0,
+    "minimum_diagonal_fraction": 0.6,
+    "maximum_repeat": 4,
+    "maximum_residual_fraction": 0.04,
+    "minimum_aligned_seconds": 8.0,
+    "minimum_query_coverage": 0.8
+  },
+  "fingerprint": {
+    "density": 40.0,
+    "minimum_candidate_matches": 5,
+    "minimum_supported_seconds": 1.0,
+    "minimum_peak_background_ratio": 10.0
+  },
+  "development_families": [
+    "old_A",
+    "old_B",
+    "old_C",
+    "old_F",
+    "old_G",
+    "N05",
+    "N11"
+  ],
+  "test_families": [
+    "N02",
+    "N04",
+    "N06",
+    "N08"
+  ],
+  "development_inputs_sha256": {
+    "semantic_raw_development.json": "b61d122763b9e22fbe11f4cac9083b5bc0d5222bc98a1977e72aab5de91303be",
+    "fingerprint_raw_development.json": "895cf8d85955a640149ebc88a1d092c164803fba38faaa2be53ca081d3580a65",
+    "section_profile_frozen.json": "0494da86e06af4843f85a9fb9a46ad48d1b6446a859c9ede49a4f382180f6a35"
+  },
+  "selection_notes": "Sections: dev grid maximizes macro boundary F3. Semantics: conservative geometry limits and rounded dev separation; 0.02 pitch margin keeps all unambiguous dev pitch cases. Fingerprint: minimum tested density improving dev recall, existing 5-vote floor, plus 1s support and 10x background guard. Held-out results not used to set these values.",
+  "freeze_sha256": "f708ffec8c8d6b1e9bc9522f7be25945ae248dcf1b32fed78fc148c6c3baf9c6"
+}

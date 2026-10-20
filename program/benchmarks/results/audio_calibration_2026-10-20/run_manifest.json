@@ -1,0 +1,138 @@
+{
+  "experiment_id": "lumina-audio-repair-2026-10-20",
+  "authorization": {
+    "credit_limit": 200,
+    "subscription_changes_allowed": false,
+    "top_ups_allowed": false
+  },
+  "starting_balance": 39045,
+  "minimum_allowed_balance": 38845,
+  "generation_requests": [
+    {
+      "id": "N01",
+      "partition": "development",
+      "status": "failed",
+      "submitted_prompt_text": "Original instrumental chamber piano with cello, 40 seconds. A lyrical opening, a contrasting rhythmic middle and a return to the opening theme. Clear acoustic recording, no speech or singing.",
+      "task_id": "7698542067189809157",
+      "refund_status": "unknown",
+      "prompt": "Original instrumental chamber piano with cello, 40 seconds. A lyrical opening, a contrasting rhythmic middle and a return to the opening theme. Clear acoustic recording, no speech or singing.",
+      "balance_after": 39044
+    },
+    {
+      "id": "N02",
+      "partition": "test",
+      "status": "succeeded",
+      "submitted_prompt_text": "Original acoustic guitar instrumental, 40 seconds. Steady gentle folk rhythm, clear plucked melody and contrasting middle passage.",
+      "refund_status": "unknown",
+      "file": "originals/N02.wav",
+      "sha256": "46664bd93150f2bfc2d6c896852899c54a6f8a7726565c233365ba84689a6f20",
+      "prompt": "Original acoustic guitar instrumental, 40 seconds. Steady gentle folk rhythm, clear plucked melody and contrasting middle passage."
+    },
+    {
+      "id": "N03",
+      "partition": "development",
+      "status": "failed",
+      "submitted_prompt_text": "Original electronic instrumental, 40 seconds. Synth arpeggio, bass and a steady dance beat, with a quiet contrasting middle passage.",
+      "task_id": "7698541797928239157",
+      "refund_status": "unknown",
+      "prompt": "Original electronic instrumental, 40 seconds. Synth arpeggio, bass and a steady dance beat, with a quiet contrasting middle passage."
+    },
+    {
+      "id": "N04",
+      "partition": "test",
+      "status": "succeeded",
+      "submitted_prompt_text": "Original instrumental funk, 40 seconds. Electric piano, bass guitar and dry drums, with two contrasting musical themes.",
+      "refund_status": "unknown",
+      "file": "originals/N04.wav",
+      "sha256": "ffb6c3d8815741f48456faa3b9bb1fc155acfb2c2fe7ed4f6fc1b0d12a99fa51",
+      "prompt": "Original instrumental funk, 40 seconds. Electric piano, bass guitar and dry drums, with two contrasting musical themes."
+    },
+    {
+      "id": "N05",
+      "partition": "development",
+      "prompt": "Original solo piano waltz, 40 seconds. Flowing minor-key melody, expressive dynamics and a contrasting middle theme.",
+      "status": "succeeded",
+      "refund_status": "unknown",
+      "submitted_prompt_text": "Original solo piano waltz, 40 seconds. Flowing minor-key melody, expressive dynamics and a contrasting middle theme.",
+      "download_path": "/Users/hongjiedeng/Downloads/watermark-c2pa-Seed-Audio_642446090372659814_0_0.wav",
+      "file": "originals/N05.wav",
+      "sha256": "87e0223bde43b1e0b7ec0bf985bec90c9a090a01cf19f8b13ef5f70576c1c7cb"
+    },
+    {
+      "id": "N06",
+      "partition": "test",
+      "prompt": "Original jazz trio instrumental, 40 seconds. Swing drums, walking bass and electric piano with a clear repeating theme.",
+      "status": "succeeded",
+      "refund_status": "unknown",
+      "download_path": "/Users/hongjiedeng/Downloads/2026-10-20_11-52-49_Lumina.wav",
+      "submitted_prompt_text": "Original jazz trio instrumental, 40 seconds. Swing drums, walking bass and electric piano with a clear repeating theme.",
+      "file": "originals/N06.wav",
+      "sha256": "20c9295f66ae3628dcd33d160454b21f2f10aa6e49b773e814cdc05ca3512231"
+    },
+    {
+      "id": "N07",
+      "partition": "development",
+      "prompt": "Original orchestral instrumental, 40 seconds. Soft strings and woodwinds, slow flowing harmony and a contrasting dramatic middle.",
+      "status": "failed",
+      "refund_status": "unknown",
+      "submitted_prompt_text": "Original orchestral instrumental, 40 seconds. Soft strings and woodwinds, slow flowing harmony and a contrasting dramatic middle.",
+      "task_id": "7698545097108881413"
+    },
+    {
+      "id": "N08",
+      "partition": "test",
+      "prompt": "Original rock instrumental, 40 seconds. Distorted guitar, electric bass and energetic drums with a memorable riff and quieter middle.",
+      "status": "succeeded",
+      "refund_status": "unknown",
+      "download_path": "/Users/hongjiedeng/Downloads/2026-10-20_11-52-57_Lumina.wav",
+      "submitted_prompt_text": "Original rock instrumental, 40 seconds. Distorted guitar, electric bass and energetic drums with a memorable riff and quieter middle.",
+      "file": "originals/N08.wav",
+      "sha256": "bda0dd6adc22e4605adf0ea5a2256197ea36080909b3ef29a79c530b369e6092"
+    },
+    {
+      "id": "N09",
+      "partition": "development",
+      "prompt": "Original ambient harp instrumental, 40 seconds. Gentle plucked patterns, soft low strings and an expressive contrasting middle.",
+      "status": "failed",
+      "submitted_prompt_text": "Original ambient harp instrumental, 40 seconds. Gentle plucked patterns, soft low strings and an expressive contrasting middle.",
+      "refund_status": "unknown",
+      "task_id": "7698544995619536901"
+    },
+    {
+      "id": "N10",
+      "partition": "test",
+      "prompt": "Original marimba and percussion instrumental, 40 seconds. A clear repeating rhythmic motif with a quieter contrasting passage.",
+      "status": "failed",
+      "submitted_prompt_text": "Original marimba and percussion instrumental, 40 seconds. A clear repeating rhythmic motif with a quieter contrasting passage.",
+      "refund_status": "unknown",
+      "task_id": "7698544995619602437"
+    },
+    {
+      "id": "N11",
+      "partition": "development",
+      "prompt": "Original bossa nova guitar instrumental, 40 seconds. Nylon guitar, double bass and light percussion with two contrasting melodies.",
+      "status": "succeeded",
+      "submitted_prompt_text": "Original bossa nova guitar instrumental, 40 seconds. Nylon guitar, double bass and light percussion with two contrasting melodies.",
+      "refund_status": "unknown",
+      "download_path": "/Users/hongjiedeng/Downloads/watermark-c2pa-Seed-Audio_642446415951336410_0_0.wav",
+      "file": "originals/N11.wav",
+      "sha256": "f73818e9bfec6455f9a560d2876b4a63f954be411aea03e12529090c914300ff"
+    },
+    {
+      "id": "N12",
+      "partition": "test",
+      "prompt": "Original brass band instrumental, 40 seconds. Bright trumpet melody, tuba bass and marching percussion with a contrasting middle.",
+      "status": "failed",
+      "submitted_prompt_text": "Original brass band instrumental, 40 seconds. Bright trumpet melody, tuba bass and marching percussion with a contrasting middle.",
+      "refund_status": "unknown",
+      "task_id": "7698544995619667973"
+    }
+  ],
+  "status": "in_progress",
+  "ground_truth_policy": "Prompts are requests, not labels; controlled DSP/assemblies provide exact transform labels; natural verse/chorus labels unavailable.",
+  "final_balance": 38985,
+  "observed_net_credits_spent": 60,
+  "remaining_authorized_credits": 140,
+  "balance_source": "Lumina header after fresh navigation on 2026-10-20; screenshot lumina_final.png",
+  "individual_refund_status": "unknown; no per-task refund ledger exposed/inspected"
+}

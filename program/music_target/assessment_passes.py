@@ -6,6 +6,8 @@ import dataclasses
 import math
 from pathlib import Path
 
+from music_target.evidence_audit import audit_cross_evidence, aggregate_cross_evidence
+
 from legacy_parsers.c2pa_parser import parse_c2pa_file
 from legacy_parsers.ern_parser import parse_ern_file
 from legacy_parsers.rin_parser import parse_rin_file
@@ -330,6 +332,7 @@ class ExpandedCrossEvidencePass:
                       if relation == "comped_from"}
         checks = []
         for owner_digest, parsed in parser_observations.items():
+            first_check = len(checks)
             data = parsed.get("data")
             parser = parsed.get("parser")
             if parser == "rin" and data:
@@ -487,6 +490,11 @@ class ExpandedCrossEvidencePass:
             elif parser == "aaf" and data:
                 checks.extend(aaf_checks(data, owner_digest, wav_observations))
 
+            for check in checks[first_check:]:
+                check.setdefault("evidence_hash", owner_digest)
+                if parser == "midi" and targets:
+                    check.setdefault("target_hashes", sorted(targets))
+
         compatible = {
             "parentof": {"derived_from", "edited_from", "mastered_from",
                          "rendered_from", "stemmed_from", "mixed_from", "comped_from"},
@@ -569,7 +577,8 @@ class ExpandedCrossEvidencePass:
             checks.append({"rule": "workflow_ai_modifier_matches_audio_declarations",
                            "passed": bool(declared_ai), "audio_hashes": declared_ai})
         assign_default_tiers(checks)
-        eligible = [item for item in checks if isinstance(item.get("passed"), bool)]
+        facts = aggregate_cross_evidence(checks)
+        eligible = [item for item in facts if isinstance(item.get("passed"), bool)]
         value = (sum(item["passed"] for item in eligible) / len(eligible)
                  if eligible else None)
         findings = [] if value in (None, 1.0) else [
@@ -702,37 +711,53 @@ class AIDisclosurePass:
     """Measure explicit disclosure coverage; never detect AI from content."""
 
     @staticmethod
-    def evaluate(native):
+    def summary(native):
         flagged = (native.get("_input_issues") or {}).get("declaration_nodes") or {}
-        all_audio = [node for node in native["artefacts"] if node["artefact_type"].startswith("audio/")
-                     or node["artefact_type"] == "audio"]
-        # Declarations with unrecognised fields are not corrected; those nodes
-        # are left out of disclosure coverage instead of counting as undisclosed.
-        audio = [node for node in all_audio if node["artefact_hash"] not in flagged]
-        excluded = len(all_audio) - len(audio)
-        if not audio:
+        audio = [node for node in native["artefacts"] if node["artefact_type"].startswith("audio/")
+                 or node["artefact_type"] == "audio"]
+        assessed = [node for node in audio if node["artefact_hash"] not in flagged]
+        declared = [node for node in assessed
+                    if (node.get("attributes") or {}).get("creation_method") not in (None, "", [], {})]
+        return {"axis_key": "ai_disclosure", "display_name": "Creation-method disclosure coverage",
+                "metric_semantics": "declaration_coverage", "applicable_audio_count": len(audio),
+                "assessed_audio_count": len(assessed), "declared_audio_count": len(declared),
+                "excluded_input_error_count": len(audio) - len(assessed),
+                "content_ai_detection_performed": False, "ai_generated_probability": None,
+                "declaration_truth_verified": False}
+
+    @staticmethod
+    def evaluate(native):
+        summary = AIDisclosurePass.summary(native)
+        total, declared, excluded = (summary[key] for key in
+                                    ("assessed_audio_count", "declared_audio_count", "excluded_input_error_count"))
+        if not total:
             return _axis(reasoning="No applicable audio artefacts were submitted."
                          if not excluded else
                          "Every audio declaration has input errors; disclosure coverage was not assessed."), []
-        declared = [node for node in audio
-                    if (node.get("attributes") or {}).get("creation_method") not in (None, "", [], {})]
-        value = len(declared) / len(audio)
+        value = declared / total
         availability = "available" if declared else "unavailable"
         axis = _axis(availability, value if declared else None, 0.8 if declared else None,
-                     f"Explicit creation_method declarations cover {len(declared)}/{len(audio)} audio artefacts; this is disclosure coverage, not AI detection."
+                     f"Creation-method disclosure coverage: explicit declarations cover {declared}/{total} audio artefacts. "
+                     "This measures whether declarations were supplied, not whether they are true, "
+                     "the amount of AI audio, or the probability of AI generation; no content AI detector ran."
                      + (f" {excluded} audio artefact(s) with declaration input errors were not assessed." if excluded else ""))
-        findings = [] if len(declared) == len(audio) else [
-            _finding("AI_DISCLOSURE_MISSING", "One or more audio artefacts lack creation_method disclosure.", severity="medium")]
+        findings = [_finding("AI_DISCLOSURE_IS_DECLARATION_COVERAGE",
+                             "The AI disclosure axis measures creation-method declaration coverage only. "
+                             "It does not detect AI audio or verify the truth of the declarations.",
+                             scoring_eligible=False, integrity_contribution=None)]
+        if declared != total:
+            findings.append(_finding("AI_DISCLOSURE_MISSING", "One or more audio artefacts lack creation_method disclosure.",
+                                     severity="medium"))
         return axis, findings
 
 
 ASSESSMENT_STATUS_SEMANTICS = [
     {"status": "corroborated",
-     "meaning": "Independent evidence clearly supports content consistency, but does not prove provenance direction or authorship.",
+     "meaning": "The assessed check or fact is consistent with the compared fields; origin, direction and authorship are not authenticated.",
      "numeric_treatment": "1.0 in an eligible evidence layer."},
     {"status": "contradicted",
      "meaning": "An applicable assessed claim conflicts with observed evidence.",
-     "numeric_treatment": "0.0 in its eligible layer and emits a contradiction finding."},
+     "numeric_treatment": "0.0 for that eligible check or fact; other facts may still contribute to the layer mean. Emits a contradiction finding."},
     {"status": "inconclusive",
      "meaning": "The check ran, but the evidence did not reach either reliable endpoint.",
      "numeric_treatment": "Excluded from the denominator and reported as a finding."},
@@ -903,7 +928,8 @@ def assess_axes(native, chain, bound_hashes, missing_hashes, wav_observations,
 
     file_status, file_layer_value = _boolean_status(file_checks)
     declaration_status, declaration_layer_value = _boolean_status(rel_checks)
-    cross_status, cross_layer_value = _boolean_status(cross_checks)
+    cross_facts = aggregate_cross_evidence(cross_checks)
+    cross_status, cross_layer_value = _boolean_status(cross_facts)
     crypto = validation.get("cryptographically_valid")
     if crypto is False:
         cryptographic_status = "contradicted"
@@ -929,9 +955,10 @@ def assess_axes(native, chain, bound_hashes, missing_hashes, wav_observations,
                "Legacy signal comparisons are disabled by policy and never contribute to integrity.",
                0),
         _layer("cross_evidence_support", cross_status, cross_layer_value, True,
-               "Parser outputs compared with the graph, declarations, media and recorder metadata; "
-               "each check records the evidence_tier that produced it.",
-               len(cross_checks), weight=layer_weights["cross_evidence_support"]),
+               "One vote per cross-evidence rule and subject; any assessed failure keeps that fact failed. "
+               "Recorder-metadata agreement is consistency evidence, not origin authentication.",
+               sum(isinstance(item.get("passed"), bool) for item in cross_facts),
+               weight=layer_weights["cross_evidence_support"]),
         _layer("cryptographic_attestation", cryptographic_status,
                (attestation.get("value")
                 if cryptographic_status in {"corroborated", "contradicted"} else None), False,
@@ -947,15 +974,29 @@ def assess_axes(native, chain, bound_hashes, missing_hashes, wav_observations,
     for item in layers:
         if item["layer"] == "cross_evidence_support":
             item["evidence_tier_counts"] = tier_counts(cross_checks)
-    # Substantive support means an assessed check from a tier the profile
-    # treats as independent of the submitter. A profile that names no tiers
-    # keeps the original rule: any assessed cross-evidence check.
+            item["raw_check_count"] = len(cross_checks)
+            item["aggregation_method"] = "one_vote_per_rule_subject_any_failure"
+            item["fact_count"] = len(cross_facts)
+            item["scored_fact_count"] = item["check_count"]
+    # Qualifying support means an assessed fact from a tier allowed by the
+    # release policy; this does not authenticate embedded-field origins. A
+    # profile that names no tiers allows any assessed cross-evidence fact.
     support_tiers = tuple(withholding_rule.get("substantive_support_tiers") or TIERS)
-    substantive_support = any(isinstance(item.get("passed"), bool) and item["evidence_tier"] in support_tiers
-                              for item in cross_checks)
+    substantive_support = any(isinstance(item.get("passed"), bool) and
+                              set(item["assessed_evidence_tiers"]) & set(support_tiers) for item in cross_facts)
     min_components = withholding_rule["min_components_for_substantive_mean"]
-    require_support = withholding_rule["require_substantive_support_or_contradiction"]
+    require_support = withholding_rule.get("require_substantive_support",
+                                           withholding_rule.get("require_substantive_support_or_contradiction"))
     denominator_layers = confidence_formula["denominator_layers"]
+    # Support needs independent evidence because agreement can be fabricated;
+    # a severe failure is computed by the evaluator itself and needs none, so
+    # (when the profile enables it) it releases a value no higher than the cap.
+    severe_release = withholding_rule.get("release_capped_value_on_severe_contradiction", False)
+    triggered = (sorted({item["rule"] for item in file_checks + rel_checks + cross_checks
+                         if item.get("passed") is False and item["rule"] in severe_contradiction_rules})
+                 if severe_contradiction_rules and severe_contradiction_cap is not None else [])
+    threshold_met = (len(components) >= min_components and
+                     (substantive_support or not require_support))
     cap_record = None
     if not components:
         integrity_availability, integrity_value, integrity_confidence = "unavailable", None, None
@@ -963,59 +1004,61 @@ def assess_axes(native, chain, bound_hashes, missing_hashes, wav_observations,
         integrity_availability = ("available" if len(components) == denominator_layers
                                   else "partial")
         # File/declaration consistency alone would create a misleading perfect-
-        # looking score without content or independent cross-evidence support.
-        threshold_met = (len(components) >= min_components and
-                         (substantive_support or not require_support))
-        if threshold_met or contradiction_present:
+        # looking score without assessed qualifying cross-evidence.
+        if threshold_met or (triggered and severe_release):
             weight_total = sum(item["weight"] for item in scored_layers)
             integrity_value = (sum(item["value"] * item["weight"] for item in scored_layers)
                                / weight_total)
             # A severe contradiction is a ceiling, not an override: it only
             # pulls the weighted mean down toward the cap, never below where
             # it already was, and never raises a lower mean up to meet it.
-            if severe_contradiction_rules and severe_contradiction_cap is not None:
-                triggered = sorted({
-                    item["rule"] for item in file_checks + rel_checks + cross_checks
-                    if item.get("passed") is False and item["rule"] in severe_contradiction_rules})
-                if triggered:
-                    weighted_mean = integrity_value
-                    integrity_value = min(integrity_value, severe_contradiction_cap)
-                    cap_record = {"cap": severe_contradiction_cap, "triggered_rules": triggered,
-                                  "weighted_mean": weighted_mean, "value": integrity_value,
-                                  "value_lowered": integrity_value < weighted_mean}
+            if triggered:
+                weighted_mean = integrity_value
+                integrity_value = min(integrity_value, severe_contradiction_cap)
+                cap_record = {"cap": severe_contradiction_cap, "triggered_rules": triggered,
+                              "weighted_mean": weighted_mean, "value": integrity_value,
+                              "value_lowered": integrity_value < weighted_mean}
         else:
             integrity_value = None
         integrity_confidence = round(
             confidence_formula["ceiling"] * len(components) / denominator_layers, 3)
-    # Describe the withholding rule that actually ran, not a fixed assumption
-    # about it. At the shipped default (min_components=2, require_support=
-    # True) this reproduces the original fixed sentence verbatim, so a
-    # response scored under the default profile is unaffected. Under any
-    # other profile, state the configured rule and whether it permitted or
-    # withheld a value for *this* assessment -- never why it should have,
-    # since the score itself is computed above and unchanged by this text.
+    # An ordinary contradiction is a finding and a status, never permission to
+    # release an otherwise withheld numeric score.
     tiers_restricted = set(support_tiers) != set(TIERS)
-    if min_components == 2 and require_support and not tiers_restricted:
-        withholding_clause = ("A numeric value is withheld "
-            "without independent CrossEvidence unless a contradiction exists. ")
-    elif min_components == 2 and require_support:
-        withholding_clause = (
-            "A numeric value is withheld unless at least two layers are populated and an independent "
-            f"cross-evidence check ({', '.join(support_tiers)}) was assessed, or a contradiction exists; "
-            "submitter-provided documents corroborate but cannot release a value on their own. "
-            + ("Independent support was assessed for this submission. " if substantive_support else
-               "No independent cross-evidence was assessed for this submission. "))
+    rule_description = f"at least {min_components} populated contributing layer(s)"
+    if require_support:
+        rule_description += " and an assessed qualifying cross-evidence fact"
+        if tiers_restricted:
+            rule_description += f" ({', '.join(support_tiers)})"
+    if not components:
+        release_reason = "no_assessed_layers"
+    elif threshold_met:
+        release_reason = "qualifying_cross_evidence" if require_support else "configured_layer_coverage"
+    elif triggered and severe_release:
+        release_reason = "severe_contradiction_cap"
+    elif len(components) < min_components:
+        release_reason = "insufficient_assessed_layers"
     else:
-        if require_support:
-            rule_description = (f"requires at least {min_components} populated contributing layer(s) "
-                                "including independent CrossEvidence support"
-                                + (f" ({', '.join(support_tiers)})" if tiers_restricted else ""))
-        else:
-            rule_description = f"requires at least {min_components} populated contributing layer(s)"
-        outcome = "permitted" if integrity_value is not None else "withheld"
-        withholding_clause = (
-            f"The active scoring profile's withholding rule {rule_description}, unless a contradiction "
-            f"exists; it {outcome} a numeric value for this assessment. ")
+        release_reason = "insufficient_qualifying_cross_evidence"
+    decision = {"status": ("contradicted" if contradiction_present else
+                           "consistent" if integrity_value is not None else "insufficient_evidence"),
+                "contradiction_present": contradiction_present,
+                "severe_contradiction_present": bool(triggered),
+                "numeric_release": "released" if integrity_value is not None else "withheld",
+                "release_reason": release_reason,
+                "qualifying_cross_evidence_assessed": substantive_support,
+                "ordinary_contradiction_release_allowed": False,
+                "severe_contradiction_release": "capped_value" if severe_release else "disabled",
+                "score_semantics": "assessed_check_consistency_not_provenance_authentication"}
+    withholding_clause = (f"Numeric release requires {rule_description}; "
+                          + ("the rule permitted this value. " if threshold_met and integrity_value is not None else
+                             "a severe contradiction released a value no higher than the cap. "
+                             if integrity_value is not None else
+                             f"the value is withheld ({release_reason}). ")
+                          + ("An ordinary contradiction never releases a value. " if severe_release
+                             else "A contradiction alone never releases a value. ")
+                          + ("Qualifying cross-evidence was assessed for this submission. " if substantive_support else
+                             "No qualifying cross-evidence was assessed for this submission. "))
     # A capped value must say so; otherwise a reader sees the cap value with
     # no indication that a severe contradiction, not the mean, produced it.
     cap_clause = ""
@@ -1030,7 +1073,8 @@ def assess_axes(native, chain, bound_hashes, missing_hashes, wav_observations,
                           f"{cap_record['cap']:g} cap, which therefore did not change it. ")
     # Name every contradiction behind the value, with what was compared, so a
     # reader can see exactly which check failed and by how much.
-    failed = [item for item in file_checks + rel_checks + cross_checks if item.get("passed") is False]
+    failed = [item for item in file_checks + rel_checks +
+              [fact["representative_check"] for fact in cross_facts] if item.get("passed") is False]
     contradiction_clause = ("Contradictions: " + " ".join(describe_check(item) for item in failed) + " "
                             if failed else "")
     integrity = _axis(
@@ -1041,7 +1085,20 @@ def assess_axes(native, chain, bound_hashes, missing_hashes, wav_observations,
          f"{contradiction_clause}"
          "Structural validity and cryptographic attestation are reported separately and do not raise integrity. "
          "Legacy signal comparisons are disabled by policy and do not produce findings or affect integrity."))
+    # Lets a reader of axes alone tell a contradicted submission from one
+    # that merely lacks evidence when both withhold the value.
+    integrity["status"] = decision["status"]
 
+    metadata_findings = [
+        _finding("RECORDER_METADATA_ORIGIN_NOT_AUTHENTICATED",
+                 "Embedded BWF/iXML metadata can be rewritten with the audio file. "
+                 "Field agreement does not authenticate a recorder, recording event, author or historical origin. "
+                 "Metadata consistency checks may still score and qualify Integrity for release; this finding has no score effect.",
+                 digest, "info", scoring_eligible=False, integrity_contribution=None,
+                 recorder_origin_authenticated=None,
+                 metadata_sources=(observation.get("recorder_metadata") or {}).get("sources", []))
+        for digest, observation in wav_observations.items()
+        if digest in bound_hashes and (observation.get("recorder_metadata") or {}).get("present") is True]
     sample_data_findings = []
     for node in native["artefacts"]:
         digest = node["artefact_hash"]
@@ -1064,9 +1121,15 @@ def assess_axes(native, chain, bound_hashes, missing_hashes, wav_observations,
         "bound_file_integrity": file_checks,
         "structural_validity": structural_checks,
         "relationship_integrity": rel_checks,
+        "relationship_range_validation": [dict(check) for observation in relationship_observations
+                                           for check in observation.get("range_validation_details", [])],
         "integrity_layers": layers,
+        "integrity_decision": [decision],
+        "ai_disclosure_coverage": [AIDisclosurePass.summary(native)],
         "assessment_status_semantics": ASSESSMENT_STATUS_SEMANTICS,
         "cross_evidence": cross_checks,
+        "cross_evidence_scored_facts": cross_facts,
+        "cross_evidence_audit": audit_cross_evidence(cross_checks),
         "c2pa_attestation_records": c2pa_attestation_records,
         "physical_similarity": physical_similarity,
         "physical_similarity_summary": [physical_summary],
@@ -1074,6 +1137,6 @@ def assess_axes(native, chain, bound_hashes, missing_hashes, wav_observations,
     if cap_record:
         checks["severe_contradiction_cap"] = [cap_record]
     findings = (file_findings + rel_findings + cross_findings +
-                sample_data_findings +
+                sample_data_findings + metadata_findings +
                 attestation_findings + ai_findings)
     return integrity, attestation, ai, validation, checks, findings

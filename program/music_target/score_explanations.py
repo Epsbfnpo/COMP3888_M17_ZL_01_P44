@@ -61,7 +61,11 @@ def describe_check(check):
 def contradictions(assessment_checks):
     rows = []
     for layer, key in LAYER_CHECKS.items():
-        for check in assessment_checks.get(key) or []:
+        if layer == "cross_evidence_support" and "cross_evidence_scored_facts" in assessment_checks:
+            checks = [fact["representative_check"] for fact in assessment_checks["cross_evidence_scored_facts"]]
+        else:
+            checks = assessment_checks.get(key) or []
+        for check in checks:
             if check.get("passed") is False:
                 rows.append({"layer": layer, "rule": check.get("rule"),
                              "evidence_tier": check.get("evidence_tier"), "statement": describe_check(check)})
@@ -93,7 +97,8 @@ def _integrity(axis, checks):
             "cap_applied": bool(cap and cap["value_lowered"]), "cap": cap,
             "withheld": axis["value"] is None and bool(populated),
             "evidence_tier_counts": cross.get("evidence_tier_counts"),
-            "contradictions": found, "statements": statements}
+            "contradictions": found, "statements": statements,
+            "decision": (checks.get("integrity_decision") or [None])[0]}
 
 
 def build(response):
@@ -107,6 +112,11 @@ def build(response):
             row.update(_integrity(axis, checks))
         else:
             row["statements"] = [axis["reasoning"]] if axis.get("reasoning") else []
+            if name == "ai_disclosure":
+                row["display_name"] = "Creation-method disclosure coverage"
+                row["metric_semantics"] = "declaration_coverage"
+                row["content_ai_detection_performed"] = False
+                row["coverage"] = (checks.get("ai_disclosure_coverage") or [None])[0]
             if name == "completeness":
                 row["statements"] += [item["message"] for item in response.get("findings", [])
                                       if item.get("code") in ("WORKFLOW_FINAL_TYPE_MISMATCH",
