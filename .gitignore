@@ -1,7 +1,8 @@
-__pycache__/
+*__pycache__/
 *.py[cod]
 .DS_Store
 .Rhistory
+
 
 # Local real-data test material; never commit (8.4 GB, client production files)
 certivina_audio_domain/
