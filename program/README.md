@@ -33,9 +33,11 @@ The main approach is to reuse Ben's evidence graph and execution framework, conn
 - Provides a bounded MIDI parser; the RIN, ERN, C2PA, sound report (`text/sound-report`) and AAF (`project/aaf`) parsers are connected to the production execution path.
 - Explains every score in `assessment_checks.score_explanations`: layers, weights, caps, withholding and each failed check in plain words with the compared values (for example a 2.00 s timecode gap). Evidence outside the selected workflow is reported as inconclusive, never penalised.
 - Parses Ableton Live sessions (`project/daw-session`) and checks that the session uses the declared source audio and agrees with MIDI tempo and time signature.
-- Adds report-only musical semantics (`music_semantics`): key, tempo, chords and phrase form, compared across versions with a shuffled-harmony baseline.
+- Adds report-only musical semantics (`music_semantics`): per-file acoustic boundaries, key/chords and bounded transposition/tempo observations with explicit abstention. See `docs/AUDIO_CALIBRATION_2026-10-20.md`.
 - `benchmarks/music_benchmark.py` runs the evaluator on Slakh/BabySlakh or MUSDB18-HQ with true and control stems; see `benchmarks/README.md`.
-- Tags every cross-evidence check with an `evidence_tier`. Only `signed_attestation` (validated C2PA) and `recorder_metadata` (documents checked against BWF/iXML written by the recorder) release an Integrity value without a contradiction; submitter documents alone do not. See the repository README, "Evidence tiers".
+- Scores cross-evidence once per rule and subject, with any assessed failure keeping the fact failed; cosmetic copies cannot add support or penalties. Raw observations remain available.
+- The `default-v4` release gate requires qualifying assessed evidence and layer coverage; an ordinary contradiction never releases a number, while a severe contradiction releases at most the 0.25 cap. `axes.integrity.status` and `integrity_decision` report status separately from the number.
+- Recorder metadata consistency can score and qualify release; its origin-not-authenticated finding is informational and has no Integrity effect. See the repository README, "Evidence tiers".
 - The MIDI parser extracts channel and meta events, notes, tempo, time signatures, controllers, and duration in seconds when it can be calculated.
 - CompSheet and CueSheet parsers support strict JSON, CSV, delimited text, and PDF text extraction. See [`docs/SHEET_FORMATS.md`](docs/SHEET_FORMATS.md).
 - Runs file, relationship, and cross-evidence analysis through the actual `EvidenceChain` and `Pipeline` implementations.
@@ -69,7 +71,7 @@ The four dimensions respect separate evidence boundaries:
 - `completeness` assesses applicable expectations for the selected workflow;
 - `integrity` assesses consistency across files, declared parameters, relationship parameters, and available cross-evidence;
 - `attestation_strength` assesses the available C2PA reading and validation level; and
-- `ai_disclosure` assesses explicit `creation_method` declaration coverage.
+- `ai_disclosure` keeps its wire key but is displayed as **Creation-method disclosure coverage**. Its structured counts and finding explicitly state that no content AI detector ran and declaration truth was not verified.
 
 A `null` value means not assessed and must not be interpreted as zero. The system intentionally does not produce an overall score, an acceptance/rejection decision, or a human-versus-AI creator classification. Those omissions are design boundaries, not unfinished functionality.
 

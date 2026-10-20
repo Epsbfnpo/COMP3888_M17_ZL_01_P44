@@ -15,6 +15,7 @@ from music_target.wav_io import UnsupportedWav, WavError, inspect_wav
 from music_target.recorder_metadata import recorder_fields
 from music_target.wav_parser import parse_wav_file
 from music_target.workflow_policy import WorkflowCompletenessPass, load_workflow_policy
+from music_target.time_ranges import content_range_checks
 
 MAX_FILE_BYTES = 512 * 1024 * 1024
 MAX_TOTAL_BYTES = 1024 * 1024 * 1024
@@ -209,21 +210,19 @@ class RelationshipIntegrityPass(EvidencePass):
         target_observed = (target_result or {}).get("observed", {})
         attrs = evidence._attributes
         checks = []
-
-        if (attrs.get("source_start_seconds") is not None and
-                attrs.get("source_end_seconds") is not None):
-            checks.append({"rule": "source_time_order_valid",
-                           "passed": attrs["source_end_seconds"] >= attrs["source_start_seconds"]})
-        if (attrs.get("source_end_seconds") is not None and
-                source_observed.get("duration_seconds") is not None):
-            checks.append({"rule": "source_time_within_duration",
-                           "passed": attrs["source_end_seconds"] <=
-                                     source_observed["duration_seconds"]})
-        if (attrs.get("target_end_seconds") is not None and
-                target_observed.get("duration_seconds") is not None):
-            checks.append({"rule": "target_time_within_duration",
-                           "passed": attrs["target_end_seconds"] <=
-                                     target_observed["duration_seconds"]})
+        range_details = []
+        for role, observed in (("source", source_observed), ("target", target_observed)):
+            range_details.extend(content_range_checks(
+                attrs.get(role + "_start_seconds"), attrs.get(role + "_end_seconds"),
+                observed.get("duration_seconds"), observed.get("sample_rate_hz"), role))
+        # Keep the existing scoring inputs for already-valid declarations.
+        # Extra successful validation details are not additional support and
+        # must not dilute an existing failure. Newly detected failures still
+        # enter the existing contradiction path; policy weights are unchanged.
+        legacy_range_rules = {"source_time_order_valid", "source_time_within_duration",
+                              "target_time_within_duration"}
+        checks.extend(check for check in range_details
+                      if check["rule"] in legacy_range_rules or check["passed"] is False)
         for attr, observed, key in (
                 ("input_sample_rate_hz", source_observed, "sample_rate_hz"),
                 ("output_sample_rate_hz", target_observed, "sample_rate_hz"),
@@ -234,7 +233,7 @@ class RelationshipIntegrityPass(EvidencePass):
                                "passed": attrs[attr] == observed[key],
                                "declared": attrs[attr], "observed": observed[key]})
 
-        for check in checks:
+        for check in checks + range_details:
             check.update({"source_hash": source.artefact_hash,
                           "target_hash": target.artefact_hash,
                           "relationship_type":
@@ -249,7 +248,8 @@ class RelationshipIntegrityPass(EvidencePass):
                   "content_relationship_verified": None,
                   "value": (sum(item["passed"] for item in checks) / len(checks)
                             if checks else None),
-                  "checks": checks}
+                  "checks": checks,
+                  "range_validation_details": range_details}
         if (source_observed.get("duration_seconds") is not None and
                 target_observed.get("duration_seconds") is not None):
             result["duration_delta_seconds"] = (

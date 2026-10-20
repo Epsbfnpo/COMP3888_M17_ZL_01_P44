@@ -234,7 +234,7 @@ class ProductionDocumentTests(unittest.TestCase):
         recorder = [item for item in cross if item["evidence_tier"] == "recorder_metadata"]
         self.assertTrue(recorder and all(item["passed"] for item in recorder), recorder)
         self.assertIsNotNone(response["axes"]["integrity"]["value"])
-        self.assertIn("Independent support was assessed", response["axes"]["integrity"]["reasoning"])
+        self.assertIn("Qualifying cross-evidence was assessed", response["axes"]["integrity"]["reasoning"])
 
     def test_timecode_mismatch_is_explained_not_capped(self):
         report = store(self.folder, sound_report("18/12/24", [

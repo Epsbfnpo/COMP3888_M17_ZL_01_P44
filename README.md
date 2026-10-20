@@ -64,7 +64,12 @@ The four dimensions respect separate evidence boundaries:
 - `completeness` assesses applicable expectations for the selected workflow;
 - `integrity` assesses consistency across files, declared parameters, relationship parameters, and available cross-evidence;
 - `attestation_strength` assesses the available C2PA reading and validation level; and
-- `ai_disclosure` assesses explicit `creation_method` declaration coverage.
+- `ai_disclosure` retains its wire key for compatibility and is displayed as
+  **Creation-method disclosure coverage**. The structured
+  `ai_disclosure_coverage` record reports declared/assessed/excluded counts,
+  `content_ai_detection_performed: false`, and no AI probability. Complete
+  "recorded" and complete "ai-generated" declarations both give coverage 1.0;
+  neither verifies whether those declarations are true.
 
 A `null` value means not assessed and must not be interpreted as zero. The system intentionally does not produce an overall score, an acceptance/rejection decision, or a human-versus-AI creator classification. Those omissions are design boundaries, not unfinished functionality.
 
@@ -176,8 +181,10 @@ Findings use the `AUDIO_*` prefix and link to details by `diagnostic_id`. Each
 observation has `scoring_eligible: false`, `integrity_contribution: null` and
 `content_match_is_provenance: false`.
 
-Candidate thresholds remain uncalibrated: completed observations are
-`inconclusive`, even when candidates exist; analyses that cannot run are
+Audfprint and music_semantics now have bounded experimental support/abstention gates
+(see `program/docs/AUDIO_CALIBRATION_2026-10-20.md`); the other adapters and local
+correspondences remain exploratory. Completed observations stay
+`inconclusive`, even when profile support exists; analyses that cannot run are
 `unavailable`. Missing dependencies, invalid local policies, provider failures,
 silence, changed inputs and exhausted caller time do not alter the completed
 core result. A crashed provider's diagnostic includes the tail of its stderr. The synthetic example yields fingerprint candidates near source
@@ -195,27 +202,36 @@ policy is enabled with `--audio-analysis-policy policies/audio_analysis_policy.j
 
 The active profile is `policies/scoring_profile.json`. Integrity combines three
 available score-eligible layers: `file_integrity`, `declaration_consistency` and
-`cross_evidence_support`, each with default weight 1.0. With no assessed
-contradiction, the default withholding rule (profile `default-v2`) requires at
-least two populated layers **and an assessed cross-evidence check from an
-evidence tier independent of the submitter** before releasing a numeric value.
+`cross_evidence_support`, each with default weight 1.0. The default withholding
+rule (`default-v4`) requires at least two populated layers and an assessed
+cross-evidence fact from an allowed tier (`signed_attestation` or
+`recorder_metadata`). An ordinary contradiction never releases a number; it is
+reported and sets `axes.integrity.status` and `integrity_decision.status` to
+`contradicted`, and without qualifying support Integrity stays null. A severe
+contradiction is computed by the evaluator and needs no independent support, so
+it releases `min(weighted mean, 0.25)` with `release_reason`
+`severe_contradiction_cap`.
 Confidence is `0.8 * populated_layers / 3`; it is not a probability of authorship.
 
 ### Evidence tiers
 
 Every cross-evidence check records an `evidence_tier`:
 
-| Tier | Source | Releases a value on its own? |
+| Tier | Source | Qualifies release with the required layer coverage? |
 |---|---|---|
 | `signed_attestation` | A C2PA manifest whose signature validated (`Valid`/`Trusted`) | Yes |
-| `recorder_metadata` | Submitted documents compared with BWF `bext`/iXML metadata a field recorder wrote into a hash-bound WAV | Yes |
+| `recorder_metadata` | Submitted documents compared with BWF `bext`/iXML fields observed in a hash-bound WAV; their writer is not authenticated | Yes |
 | `submitter_document` | RIN, ERN, CompSheet, CueSheet, MIDI, DAW sessions, AAF, sound reports and unverified C2PA, compared with the graph, declarations or measured file properties | No |
 
 Submitter documents are declarations in another format: the submitter could
 export an AAF and build the graph from it, so agreement between the two proves
 nothing. They still contribute to the `cross_evidence_support` value and still
-reveal contradictions. They count as support only where they can be compared
-with something the submitter did not write. For example:
+reveal contradictions. The policy permits metadata consistency to qualify
+release even though embedded fields can be rewritten. Every bound WAV with
+BWF/iXML metadata receives `RECORDER_METADATA_ORIGIN_NOT_AUTHENTICATED`, an
+informational finding with `scoring_eligible: false` and no Integrity
+contribution. It neither lowers nor raises the score; the metadata consistency
+checks still score and may release the value. For example:
 
 - **Sound report vs recorder:** the sound report says `2T01.WAV` (18 Dec)
   starts at `08:49:43:00`, and the take's `bext` time reference says the same.
@@ -224,10 +240,24 @@ with something the submitter did not write. For example:
   and `2T05.WAV`'s recorded span, 14:04:31 + 43 s, contains it. This is checked
   by `aaf_source_range_within_recorded_timecode`.
 
+The cross layer scores `cross_evidence_scored_facts`, one vote per rule and
+subject, not per document. A failed observation keeps its fact failed even
+when many agreeing reports are supplied; repeating a failed report cannot add
+another penalty either. Local cue/selection/mob labels do not add votes.
+Multiple range claims about the same recording and property must all pass.
+Raw rows remain in `cross_evidence`; `evidence_tier_counts` counts those raw
+rows, while `check_count`/`scored_fact_count` counts eligible facts. Document
+hash counts are not independent-witness counts. The decision's release reason
+and contradiction status are separate from the consistency number.
+
 The cross layer reports `evidence_tier_counts`. A profile that omits
 `withholding_rule.substantive_support_tiers` keeps the original rule, in which
 any assessed cross-evidence check counts. Audio-content agreement is not a
-tier: diagnostics stay report-only until their thresholds are calibrated.
+tier: diagnostics remain report-only; bounded threshold calibration does not authorize scoring integration.
+The canonical profile key is now `require_substantive_support`. The old
+`require_substantive_support_or_contradiction` spelling remains readable as an
+alias, but no longer enables a contradiction-only bypass; specifying both is
+an error. Weights, confidence formulas and the 0.25 severe ceiling are unchanged.
 
 On the Project Rock dataset the three episode chains (takes, both sound
 reports and the episode AAF) produced 0 recorder contradictions and

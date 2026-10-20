@@ -2,10 +2,11 @@
 
 Externalises the per-layer weights, withholding rule, and confidence
 formula that ``assess_axes()`` applies when combining the Integrity axis.
-The shipped default profile at ``policies/scoring_profile.json`` reproduces
-``assess_axes()``'s former hardcoded weighting behaviour bit-for-bit for the
-weighted mean itself; any other profile is an explicit, reviewable
-configuration choice, not a silent behaviour change.
+The shipped default-v4 profile retains the existing layer weights and
+confidence formula. It aggregates cross-evidence by fact and keeps the
+release gate for ordinary contradictions; a severe contradiction releases a
+value no higher than the cap. Other profiles are explicit,
+reviewable configuration choices.
 
 ``physical_similarity`` is intentionally not a weightable layer here: it is
 policy-disabled (``contributes_to_integrity=False`` in ``assess_axes()``),
@@ -45,7 +46,8 @@ _PROFILE_KEYS = {"profile_id", "profile_version", "description", "integrity"}
 _INTEGRITY_KEYS = {"layer_weights", "layer_weight_rationale", "withholding_rule", "confidence_formula",
                    "severe_contradiction_rules", "severe_contradiction_cap"}
 _WITHHOLDING_RULE_KEYS = {"min_components_for_substantive_mean", "require_substantive_support_or_contradiction",
-                          "substantive_support_tiers"}
+                          "substantive_support_tiers", "require_substantive_support",
+                          "release_capped_value_on_severe_contradiction"}
 _CONFIDENCE_FORMULA_KEYS = {"ceiling", "denominator_layers"}
 
 
@@ -146,9 +148,18 @@ def load_scoring_profile(path):
     if type(minimum) is not int or isinstance(minimum, bool) or minimum < 1:
         raise ScoringProfileError(
             "integrity.withholding_rule.min_components_for_substantive_mean must be a positive integer.")
-    if not isinstance(rule.get("require_substantive_support_or_contradiction"), bool):
+    support_keys = [key for key in ("require_substantive_support", "require_substantive_support_or_contradiction")
+                    if key in rule]
+    if len(support_keys) != 1 or not isinstance(rule[support_keys[0]], bool):
         raise ScoringProfileError(
-            "integrity.withholding_rule.require_substantive_support_or_contradiction must be a boolean.")
+            "withholding_rule requires exactly one boolean require_substantive_support "
+            "(legacy require_substantive_support_or_contradiction is accepted as an alias).")
+    # Legacy key spelling is readable for existing profiles, but no longer
+    # enables a contradiction-only exception to numeric release.
+    # Optional and off when absent, so earlier profiles reproduce their results.
+    if not isinstance(rule.get("release_capped_value_on_severe_contradiction", False), bool):
+        raise ScoringProfileError(
+            "integrity.withholding_rule.release_capped_value_on_severe_contradiction must be a boolean.")
     # Optional: which evidence tiers count as substantive support. Absent means
     # every assessed cross-evidence check counts (the original rule).
     tiers = rule.get("substantive_support_tiers")

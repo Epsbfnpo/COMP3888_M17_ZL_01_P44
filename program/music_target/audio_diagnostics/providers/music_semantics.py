@@ -17,6 +17,8 @@ import numpy as np
 
 from ..contracts import result
 from ..io import AnalysisUnavailable, read_pair, ranges
+from .structure import section_features, detect_sections
+from .calibration import qualify_comparison, path_rejections
 
 NOTES = ("C", "C#", "D", "Eb", "E", "F", "F#", "G", "Ab", "A", "Bb", "B")
 # Krumhansl–Kessler key profiles.
@@ -86,13 +88,10 @@ def _sequence_similarity(first, second, librosa):
 def _phrases(chroma, timbre, parameters, librosa):
     """Fixed phrases of ``phrase_beats`` beats, labelled by aligned harmony.
 
-    Detected section boundaries fragment music whose sections differ mainly
-    in chord order, and their accuracy can only be judged against annotated
-    recordings; fixed phrases (4 bars in 4/4 by default) are explainable and
-    still expose repeats and form. A short final remainder joins the last
-    phrase. Phrases share a label when their beat-by-beat harmony aligns,
-    not when their average chroma is similar: a verse and chorus built from
-    the same chords in another order have near-identical averages.
+    Legacy compatibility form, distinct from the acoustic sections now inferred
+    from per-file novelty. Labels group aligned harmony, not verse/chorus roles.
+    A short final remainder joins the last phrase. Grid offsets are retained
+    only for these legacy summaries and do not select acoustic boundaries.
     """
     beats, length = chroma.shape[1], parameters["phrase_beats"]
     unit = _unit(chroma)
@@ -140,15 +139,31 @@ def _describe(audio, parameters, librosa):
     tempo, beat_frames = librosa.beat.beat_track(y=y, sr=rate, hop_length=hop)
     chroma = librosa.feature.chroma_cqt(y=y, sr=rate, hop_length=hop)
     timbre = librosa.feature.mfcc(y=y, sr=rate, hop_length=hop, n_mfcc=13)[1:]
-    if len(beat_frames) < 8:
-        raise AnalysisUnavailable("insufficient_beats", "Too few beats were detected for beat-level harmony.")
-    frames = librosa.util.fix_frames(beat_frames, x_min=0, x_max=chroma.shape[1])
+    beat_status = "tracked" if len(beat_frames) >= 8 else "insufficient_beats_using_time_grid"
+    if len(beat_frames) >= 8:
+        frames = librosa.util.fix_frames(beat_frames, x_min=0, x_max=chroma.shape[1])
+    else:
+        # Acoustic sections can still be measured in rubato/ambient material.
+        grid = max(1, round(0.5 * rate / hop))
+        frames = librosa.util.fix_frames(np.arange(0, chroma.shape[1], grid), x_min=0, x_max=chroma.shape[1])
     beat_chroma = librosa.util.sync(chroma, frames, aggregate=np.median)
     beat_timbre = librosa.util.sync(timbre, frames)
-    times = librosa.frames_to_time(frames, sr=rate, hop_length=hop) + audio["range"][0]
+    times = np.minimum(librosa.frames_to_time(frames, sr=rate, hop_length=hop) + audio["range"][0],
+                       audio["range"][1])
+    grid_stride = max(1, round(parameters["alignment_grid_seconds"] * rate / hop))
+    grid_frames = librosa.util.fix_frames(np.arange(0, chroma.shape[1], grid_stride), x_min=0, x_max=chroma.shape[1])
+    grid_chroma = librosa.util.sync(chroma, grid_frames, aggregate=np.median)
+    grid_times = np.minimum(librosa.frames_to_time(grid_frames, sr=rate, hop_length=hop) + audio["range"][0], audio["range"][1])
     bounds, labels = _phrases(beat_chroma, beat_timbre, parameters, librosa)
-    return {"chroma": beat_chroma, "times": times, "chords": _chords(beat_chroma), "bounds": bounds,
-            "labels": labels, "tempo_bpm": float(np.atleast_1d(tempo)[0]), "key": _key(beat_chroma)}
+    structural, section_times = section_features(chroma, timbre, hop / rate, audio["range"],
+                                               parameters.get("section_aggregation_seconds", 0.5))
+    sections, section_details = detect_sections(structural, section_times, audio["range"], parameters)
+    return {"grid_chroma": grid_chroma, "grid_times": grid_times, "sections": sections, "section_details": section_details,
+            "section_features": structural, "section_times": section_times, "beat_tracking_status": beat_status,
+            "audio_range": audio["range"], "chroma": beat_chroma, "times": times, "chords": _chords(beat_chroma), "bounds": bounds,
+            "labels": labels, "tempo_bpm": float(np.atleast_1d(tempo)[0]) if len(beat_frames) >= 8 else None, "key": _key(beat_chroma),
+            # Raw beat times, so beat tracking can be evaluated through this code path.
+            "beat_times": librosa.frames_to_time(beat_frames, sr=rate, hop_length=hop) + audio["range"][0]}
 
 
 def _summary(description):
@@ -156,6 +171,12 @@ def _summary(description):
             "beats": int(description["chroma"].shape[1]),
             "chords": [[_chord_name(label), count] for label, count in _run_length(description["chords"])],
             "form": _form(description["labels"]),
+            "segmentation_method": "multiscale_feature_novelty",
+            "section_labels_available": False,
+            "sections_seconds": description["sections"],
+            "section_detection": description["section_details"],
+            "beat_tracking_status": description["beat_tracking_status"],
+            "legacy_form_method": "fixed_beat_phrases",
             "phrases": [{"label": label, "range_seconds": [float(description["times"][first]),
                                                            float(description["times"][last])]}
                         for (first, last), label in zip(description["bounds"], description["labels"])]}
@@ -170,79 +191,246 @@ def _alignment(query, reference, librosa):
     return similarity, path
 
 
-def _locate(segment, reference, previous_end, librosa):
-    """Best place for a phrase in the reference; among near-equal places,
-    the one nearest after the previous phrase (repeated choruses tie)."""
-    with np.errstate(all="ignore"):  # Accelerate BLAS raises spurious FP flags
+def _locate_candidates(segment, reference, librosa):
+    """Independent best position plus distinct near-equal alternatives.
+
+    Never use the preceding phrase to break ties: doing so would assume the
+    very order that the downstream order metric is intended to measure.
+    Overlapping paths describing the same location are grouped together.
+    """
+    with np.errstate(all="ignore"):
         cost, steps = librosa.sequence.dtw(X=segment, Y=reference, metric="cosine", subseq=True,
                                            backtrack=False, return_steps=True)
         final = cost[-1] / segment.shape[1]
         near = np.flatnonzero(final <= final.min() + 0.01)
-        end = int(min(near, key=lambda index: (index < previous_end, abs(index - previous_end))))
-        path = np.asarray(librosa.sequence.dtw_backtracking(steps, subseq=True, start=end))[::-1]
-        cosine = float(np.mean(np.sum(segment[:, path[:, 0]] * reference[:, path[:, 1]], axis=0)))
+        alternatives = []
+        best = None
+        for end in sorted(near, key=lambda index: (final[index], index)):
+            path = np.asarray(librosa.sequence.dtw_backtracking(steps, subseq=True, start=int(end)))[::-1]
+            cosine = float(np.mean(np.sum(segment[:, path[:, 0]] * reference[:, path[:, 1]], axis=0)))
+            if best is None:
+                best = (cosine, path)
+            start, stop = int(path[:, 1].min()), int(path[:, 1].max()) + 1
+            if any(max(0, min(stop, other["end_beat"]) - max(start, other["start_beat"])) /
+                   (max(stop, other["end_beat"]) - min(start, other["start_beat"])) >= 0.5
+                   for other in alternatives):
+                continue
+            alternatives.append({"start_beat": start, "end_beat": stop,
+                                 "mean_dtw_cost": float(final[end]), "harmonic_similarity": cosine})
+    return best[0], best[1], alternatives
+
+
+def _locate(segment, reference, previous_end, librosa):
+    """Compatibility wrapper; previous_end no longer influences the match."""
+    cosine, path, _ = _locate_candidates(segment, reference, librosa)
     return cosine, path[:, 1]
+
+
+def _path_quality(path, source, target):
+    source_indices, target_indices = path[:, 0], path[:, 1]
+    def span(description, indices):
+        return float(description["times"][int(indices.max()) + 1] -
+                     description["times"][int(indices.min())])
+    source_span, target_span = span(source, source_indices), span(target, target_indices)
+    return {"source_span_seconds": source_span, "target_span_seconds": target_span,
+            "source_to_target_duration_ratio": source_span / target_span if target_span > 0 else None,
+            "source_unique_beats": len(set(map(int, source_indices))),
+            "source_beat_coverage_fraction": len(set(map(int, source_indices))) / source["chroma"].shape[1],
+            "target_beat_coverage_fraction": len(set(map(int, target_indices))) / target["chroma"].shape[1],
+            "target_unique_beats": len(set(map(int, target_indices))),
+            "max_target_beats_per_source_beat": int(np.bincount(source_indices).max()),
+            "max_source_beats_per_target_beat": int(np.bincount(target_indices).max()),
+            "diagonal_step_fraction": (float(np.mean(np.all(np.diff(path, axis=0) > 0, axis=1)))
+                                       if len(path) > 1 else 0.0),
+            "acceptance_status": "not_calibrated"}
+
+
+def _aligned_tempo_candidate(path, source, target):
+    """Robust source-seconds per target-second; release requires profile gates."""
+    x, y = target["times"][path[:, 1]], source["times"][path[:, 0]]
+    # Collapse DTW repetitions before fitting so a stretched path cannot
+    # multiply one target timestamp's influence on the estimate.
+    times = np.unique(x)
+    values = np.array([np.median(y[x == time]) for time in times])
+    if len(times) < 3 or np.ptp(times) <= 0:
+        return {"ratio": None, "residual_seconds": None, "status": "insufficient_alignment"}
+    design = np.column_stack((times - times.mean(), np.ones(len(times))))
+    weights = np.ones(len(times))
+    for _ in range(4):
+        fit = np.linalg.lstsq(design * np.sqrt(weights[:, None]), values * np.sqrt(weights), rcond=None)[0]
+        residuals = values - design @ fit
+        scale = max(float(np.median(np.abs(residuals - np.median(residuals)))) * 1.4826, 1e-6)
+        weights = np.minimum(1.0, 1.345 * scale / np.maximum(np.abs(residuals), 1e-12))
+    return {"ratio": float(fit[0]), "residual_seconds": float(np.sqrt(np.mean(residuals ** 2))),
+            "status": "candidate_not_calibrated", "method": "robust_aligned_source_seconds_per_target_second"}
+
+
+def _comparison(source, target, parameters, librosa):
+    """All 12 pitch candidates and an identically searched shuffled reference."""
+    source_unit, target_unit = _unit(source["chroma"]), _unit(target["chroma"])
+    target_is_query = target_unit.shape[1] <= source_unit.shape[1]
+    candidates, paths = [], []
+    for step in range(12):
+        shifted = np.roll(source_unit, step, axis=0)
+        query, reference = (target_unit, shifted) if target_is_query else (shifted, target_unit)
+        cosine, path = _alignment(query, reference, librosa)
+        absolute = path[:, [1, 0]] if target_is_query else path
+        quality = _path_quality(absolute, source, target)
+        aligned = _aligned_tempo_candidate(absolute, source, target)
+        candidates.append({"transposition_semitones": step if step <= 6 else step - 12,
+                           "harmonic_similarity": cosine, "alignment_quality": quality,
+                           "aligned_tempo_candidate": aligned})
+        paths.append(absolute)
+    rng = np.random.default_rng(0)
+    baseline = []
+    for _ in range(parameters["baseline_shuffles"]):
+        permutation = rng.permutation(min(source_unit.shape[1], target_unit.shape[1]))
+        trials = []
+        for step in range(12):
+            shifted = np.roll(source_unit, step, axis=0)
+            query, reference = (target_unit, shifted) if target_is_query else (shifted, target_unit)
+            trials.append(_alignment(query[:, permutation], reference, librosa)[0])
+        baseline.append(max(trials))
+    mean, spread = float(np.mean(baseline)), float(np.std(baseline))
+    for item in candidates:
+        item["harmonic_similarity_z"] = (item["harmonic_similarity"] - mean) / max(spread, 1e-6)
+        quality = item["alignment_quality"]
+        target_span = quality["target_span_seconds"]
+        item["alignment_residual_fraction"] = (item["aligned_tempo_candidate"]["residual_seconds"] / target_span
+                                               if target_span > 0 and item["aligned_tempo_candidate"]["residual_seconds"] is not None else None)
+    # An independent fixed-time raster checks tempo without inheriting beat-count/octave errors.
+    best = max(candidates, key=lambda c: c["harmonic_similarity"])
+    grid_source = {"chroma": source["grid_chroma"], "times": source["grid_times"]}
+    grid_target = {"chroma": target["grid_chroma"], "times": target["grid_times"]}
+    first = _unit(np.roll(grid_source["chroma"], best["transposition_semitones"], axis=0))
+    second = _unit(grid_target["chroma"])
+    target_query = second.shape[1] <= first.shape[1]
+    _, raster_path = _alignment(second if target_query else first, first if target_query else second, librosa)
+    raster_path = raster_path[:, [1, 0]] if target_query else raster_path
+    raster_tempo = _aligned_tempo_candidate(raster_path, grid_source, grid_target)
+    raster_quality = _path_quality(raster_path, grid_source, grid_target)
+    raster_residual = (raster_tempo["residual_seconds"] / raster_quality["target_span_seconds"]
+                       if raster_tempo["residual_seconds"] is not None and raster_quality["target_span_seconds"] > 0 else None)
+    information = min(float(np.mean(np.linalg.norm(np.diff(unit, axis=1), axis=0)))
+                      for unit in (source_unit, target_unit))
+    return {"candidates": candidates, "paths": paths, "shuffled_mean": mean, "shuffled_std": spread,
+            "temporal_information": information, "target_is_query": target_is_query,
+            "time_grid_tempo": raster_tempo, "time_grid_quality": raster_quality, "time_grid_residual_fraction": raster_residual}
+
+
+def _local_match(source, target, first, last, shifted, target_unit, librosa):
+    cosine, path, alternatives = _locate_candidates(target_unit[:, first:last], shifted, librosa)
+    mapped = path[:, 1]
+    absolute = np.column_stack((mapped, path[:, 0] + first))
+    quality = _path_quality(absolute, source, target)
+    quality["query_beat_coverage_fraction"] = len(set(map(int, path[:, 0]))) / (last - first)
+    aligned = _aligned_tempo_candidate(absolute, source, target)
+    residual = (aligned["residual_seconds"] / quality["target_span_seconds"]
+                if aligned["residual_seconds"] is not None and quality["target_span_seconds"] > 0 else None)
+    reasons = path_rejections(quality, aligned, residual)
+    quality["acceptance_status"] = "rejected" if reasons else "geometry_within_profile"
+    quality["rejection_reasons"] = reasons
+    return {"target_range_seconds": [float(target["times"][first]), float(target["times"][last])],
+            "source_range_seconds": [float(source["times"][mapped.min()]), float(source["times"][mapped.max() + 1])],
+            "harmonic_similarity": cosine,
+            # Local paths lack an independently calibrated local null reference.
+            "match_status": "rejected_path_quality" if reasons else "candidate_only",
+            "location_ambiguous": len(alternatives) > 1,
+            "alternative_source_ranges_seconds": [[float(source["times"][a["start_beat"]]),
+                                                    float(source["times"][a["end_beat"]])] for a in alternatives],
+            "alignment_quality": quality}, mapped
 
 
 def analyse(task, parameters, context=None):
     import librosa
     source_audio, target_audio = read_pair(task, parameters["sample_rate_hz"], (context or {}).get("audio_cache"))
     source, target = _describe(source_audio, parameters, librosa), _describe(target_audio, parameters, librosa)
-    source_mean, target_mean = _unit(source["chroma"].mean(axis=1)), _unit(target["chroma"].mean(axis=1))
-    # Target relative to source: rolling the source up by `shift` semitones best matches the target.
-    shift = int(np.argmax([float(np.roll(source_mean, step) @ target_mean) for step in range(12)]))
-    shifted = _unit(np.roll(source["chroma"], shift, axis=0))
-    target_unit = _unit(target["chroma"])
-    # Align the shorter version inside the longer one (an excerpt, or a full
-    # version with added intro/outro), then measure along that path.
-    target_is_query = target_unit.shape[1] <= shifted.shape[1]
-    query, reference = (target_unit, shifted) if target_is_query else (shifted, target_unit)
-    similarity, path = _alignment(query, reference, librosa)
-    rng = np.random.default_rng(0)
-    baseline = [_alignment(query[:, rng.permutation(query.shape[1])], reference, librosa)[0]
-                for _ in range(parameters["baseline_shuffles"])]
-    # Each target phrase is located in the source on its own, so a phrase
-    # moved to another place in the form is visible (a single global path
-    # would be monotonic by construction).
-    matches, previous_end = [], 0
+    comparison = _comparison(source, target, parameters, librosa)
+    best_index = max(range(12), key=lambda i: comparison["candidates"][i]["harmonic_similarity"])
+    best = comparison["candidates"][best_index]
+    assessment = qualify_comparison(comparison, parameters)
+    # A fallback time grid is useful for sections but was not the tempo calibration population.
+    if any(d["beat_tracking_status"] != "tracked" for d in (source, target)):
+        assessment["status"] = "abstained"
+        assessment["rejection_reasons"].append("insufficient_tracked_beats")
+    supported = assessment["status"] == "supported_within_profile"
+    shift = best["transposition_semitones"]
+    shifted, target_unit = _unit(np.roll(source["chroma"], shift, axis=0)), _unit(target["chroma"])
+    matches = []
+    # Legacy beat phrases remain explicit compatibility diagnostics, never section boundaries.
     for (first, last), label in zip(target["bounds"], target["labels"]):
-        cosine, mapped = _locate(target_unit[:, first:last], shifted, previous_end, librosa)
-        previous_end = int(mapped.max()) + 1
-        covered = sorted({source["labels"][index] for index, (a, b) in enumerate(source["bounds"])
-                          if ((mapped >= a) & (mapped < b)).any()})
-        matches.append({"target_range_seconds": [float(target["times"][first]), float(target["times"][last])],
-                        "source_range_seconds": [float(source["times"][mapped.min()]),
-                                                 float(source["times"][min(mapped.max() + 1, len(source["times"]) - 1)])],
-                        "target_phrase_label": label, "source_phrase_labels": covered,
-                        "harmonic_similarity": cosine})
-    # Order is judged only over phrases that genuinely match where they were
-    # placed; new material (an added intro or bridge) has no true location.
-    starts = [row["source_range_seconds"][0] for row in matches
-              if row["harmonic_similarity"] >= parameters["label_similarity"]]
+        row, mapped = _local_match(source, target, first, last, shifted, target_unit, librosa)
+        row.update(target_phrase_label=label, source_phrase_labels=sorted({
+            source["labels"][i] for i, (a, b) in enumerate(source["bounds"])
+            if ((mapped >= a) & (mapped < b)).any()}))
+        matches.append(row)
+    section_matches = []
+    for section in target["sections"]:
+        first = min(int(np.searchsorted(target["times"], section[0], side="right") - 1), target_unit.shape[1] - 1)
+        last = min(max(first + 1, int(np.searchsorted(target["times"], section[1]))), target_unit.shape[1])
+        row, _ = _local_match(source, target, max(0, first), last, shifted, target_unit, librosa)
+        row["detected_target_section_seconds"] = section
+        section_matches.append(row)
+    qualifying = [row for row in matches if row["harmonic_similarity"] >= parameters["label_similarity"]
+                  and row["match_status"] != "rejected_path_quality"]
+    order_candidates = [row for row in matches if row["harmonic_similarity"] >= parameters["label_similarity"]]
+    starts = [row["source_range_seconds"][0] for row in order_candidates]
+    order_ambiguous = any(row["location_ambiguous"] for row in order_candidates)
+    order_rejected = any(row["match_status"] == "rejected_path_quality" for row in order_candidates)
+    candidate_order = (sum(b >= a for a, b in zip(starts, starts[1:])) / (len(starts) - 1)
+                       if len(starts) > 1 else None)
+    aligned_tempo = dict(comparison["time_grid_tempo"])
+    aligned_tempo["status"] = assessment["status"]
+    quality = dict(best["alignment_quality"])
+    quality.update(acceptance_status=assessment["status"], rejection_reasons=assessment["rejection_reasons"])
     transposed = [None if chord is None else ((chord[0] + shift) % 12, chord[1]) for chord in source["chords"]]
     chord_similarity = difflib.SequenceMatcher(
         None, [label for label, _ in _run_length(transposed)],
         [label for label, _ in _run_length(target["chords"])], autojunk=False).ratio()
-    spread = float(np.std(baseline)) if baseline else 0.0
-    value = result(task, "music_semantics")
-    value.update(provider_version=librosa.__version__, analysis_complete=True,
+    bpm_ratio = target["tempo_bpm"] / source["tempo_bpm"] if source["tempo_bpm"] and target["tempo_bpm"] else None
+    value = result(task, "music_semantics", "bounded_music_observation",
+                   "Musical correspondence observations with bounded calibration and explicit abstention; no provenance verdict.")
+    value.update(provider_version=librosa.__version__, adapter_version="1.2", analysis_complete=True,
                  analysed_ranges=ranges(source_audio, target_audio), matches=matches, metrics={
                      "source": _summary(source), "target": _summary(target),
-                     "transposition_semitones": shift if shift <= 6 else shift - 12,
-                     "tempo_ratio": target["tempo_bpm"] / source["tempo_bpm"] if source["tempo_bpm"] else None,
-                     "harmonic_similarity": similarity,
-                     "harmonic_similarity_shuffled_mean": float(np.mean(baseline)) if baseline else None,
-                     "harmonic_similarity_shuffled_std": spread,
-                     "harmonic_similarity_z": ((similarity - float(np.mean(baseline))) / max(spread, 1e-6)
-                                               if baseline else None),
+                     "correspondence_assessment": assessment,
+                     "transposition_semitones": shift if supported else None,
+                     "transposition_status": assessment["status"],
+                     "best_transposition_candidate_semitones": shift,
+                     "transposition_candidate_scores": [c["harmonic_similarity"] for c in comparison["candidates"]],
+                     "transposition_candidates": comparison["candidates"],
+                     "segmentation_phrase_beats": parameters["phrase_beats"],
+                     "section_matches": section_matches,
+                     "tempo_ratio_method": "fixed_time_grid_alignment_confirmed_by_beat_alignment_with_profile_gates",
+                     "aligned_tempo_candidate": aligned_tempo,
+                     "beat_aligned_tempo_candidate": best["aligned_tempo_candidate"],
+                     "time_grid_alignment_quality": comparison["time_grid_quality"],
+                     "alignment_quality": quality,
+                     "shuffled_baseline_scope": "best_of_12_transpositions_for_each_beat_shuffle",
+                     "beat_tracker_tempo_ratio": bpm_ratio,
+                     "tempo_ratio": aligned_tempo["ratio"] if supported else None,
+                     "harmonic_similarity": best["harmonic_similarity"],
+                     "harmonic_similarity_shuffled_mean": comparison["shuffled_mean"],
+                     "harmonic_similarity_shuffled_std": comparison["shuffled_std"],
+                     "harmonic_similarity_z": best["harmonic_similarity_z"],
+                     "temporal_information": comparison["temporal_information"],
                      "chord_sequence_similarity": chord_similarity,
-                     "matched_phrases": len(starts), "target_phrases": len(matches),
-                     "phrase_order_preserved_fraction": (
-                         sum(b >= a for a, b in zip(starts, starts[1:])) / (len(starts) - 1)
-                         if len(starts) > 1 else None),
-                     "aligned_version": "target_within_source" if target_is_query else "source_within_target",
+                     "matched_phrases": len(qualifying), "target_phrases": len(matches),
+                     "phrase_order_preserved_fraction": None if order_ambiguous or order_rejected else candidate_order,
+                     "candidate_phrase_order_fraction": candidate_order,
+                     "phrase_order_status": ("ambiguous_locations" if order_ambiguous else
+                                             "path_quality_rejected" if order_rejected else
+                                             "candidate_only" if candidate_order is not None else "insufficient_matches"),
+                     "phrase_order_basis": "legacy_fixed_beat_phrases_not_detected_sections",
+                     "aligned_version": "target_within_source" if comparison["target_is_query"] else "source_within_target",
                  })
-    value["limitations"].append(
-        "Shared harmony and form are common across unrelated songs; similarity indicates musical relatedness, "
-        "not copying, direction or authorship. Chords are triad templates on beat-level chroma.")
+    value["limitations"] = [
+        "Content correspondence does not establish authorship, historical direction or provenance.",
+        "Acoustic-change sections are inferred from per-file chroma/MFCC novelty, not named verses or choruses; boundaries can be missed or fragmented.",
+        "Legacy form/phrases and phrase-order fields use fixed beat phrases for compatibility; use sections_seconds for detected boundaries.",
+        "Profile support is bounded to the documented controlled DSP and annotated-audio experiment; it is not a probability or general accuracy claim.",
+        "Local section/phrase locations remain candidates; geometry passing alone does not establish correspondence.",
+        "Shared chords, repeated material and unsupported timing can cause abstention; beat-shuffled z is not a relatedness probability.",
+        "Chroma transposition is modulo 12 semitones and cannot identify octave shifts; chord templates cover major/minor triads.",
+    ]
     return value

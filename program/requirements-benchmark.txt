@@ -1,0 +1,2 @@
+# Separate from runtime/audio dependency locks. Dataset evaluation only.
+mir_eval==0.8.2

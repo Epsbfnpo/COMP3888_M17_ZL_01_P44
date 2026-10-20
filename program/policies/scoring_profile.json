@@ -1,7 +1,7 @@
 {
-  "profile_id": "default-v2",
-  "profile_version": 2,
-  "description": "The layer_weights and confidence_formula values below reproduce assess_axes()'s former hardcoded Integrity weighting. Version 2 restricts substantive support to evidence tiers independent of the submitter: a cross-evidence check from a signature-validated C2PA manifest or from recorder-written BWF/iXML metadata. Submitter-provided documents (RIN, ERN, CompSheet, CueSheet, MIDI, AAF, sound reports, unverified C2PA) still contribute to the cross_evidence_support value and can reveal contradictions, but cannot release a numeric Integrity value on their own. severe_contradiction_rules/severe_contradiction_cap cap the weighted mean when a severe, near-impossible-to-fake-honestly contradiction is found.",
+  "profile_id": "default-v4",
+  "profile_version": 4,
+  "description": "Version 4 aggregates cross-evidence by rule and subject (one failed observation keeps the fact failed). Numeric release requires the configured layer count and qualifying assessed cross-evidence; an ordinary contradiction never releases a value. A severe contradiction is computed by the evaluator and needs no independent support, so it releases min(weighted mean, cap) even when the value would otherwise be withheld (version 3 withheld it). Recorder metadata remains eligible for consistency scoring and release, with a non-scoring origin-not-authenticated finding. Integrity is check consistency, not authenticated provenance. Layer weights, confidence formula and severe-contradiction ceiling are unchanged.",
   "integrity": {
     "layer_weights": {
       "file_integrity": 1.0,
@@ -10,16 +10,17 @@
     },
     "layer_weight_rationale": {
       "file_integrity": "Hash binding and parser success are the hardest evidence to fabricate convincingly; baseline weight.",
-      "declaration_consistency": "Requires matching declared fields to a file the submitter does not control; baseline weight.",
-      "cross_evidence_support": "Corroboration from parsed evidence. Each check carries an evidence_tier: signed_attestation (validated C2PA), recorder_metadata (BWF/iXML written into a hash-bound recording) or submitter_document (RIN, ERN, CompSheet, CueSheet, MIDI, AAF, sound reports, unverified C2PA). Baseline weight. physical_similarity is not weightable here because it is policy-disabled (see docs/PHYSICAL_SIMILARITY.md) and never contributes to integrity."
+      "declaration_consistency": "Declared relationship parameters compared against hash-bound submitted files; this measures consistency, not independent origin authentication.",
+      "cross_evidence_support": "One vote per rule and subject; any assessed failure keeps the fact failed. Assessed signed-attestation and recorder-metadata checks qualify for numeric release. Embedded metadata origin is not authenticated by field agreement; its informational finding has no score effect."
     },
     "withholding_rule": {
       "min_components_for_substantive_mean": 2,
-      "require_substantive_support_or_contradiction": true,
       "substantive_support_tiers": [
         "signed_attestation",
         "recorder_metadata"
-      ]
+      ],
+      "require_substantive_support": true,
+      "release_capped_value_on_severe_contradiction": true
     },
     "confidence_formula": {
       "ceiling": 0.8,

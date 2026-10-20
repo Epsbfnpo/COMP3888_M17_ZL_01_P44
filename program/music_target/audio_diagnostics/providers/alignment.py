@@ -57,6 +57,7 @@ def align_tokens(source_tokens, target_tokens, step, source, target, parameters)
                                     for time, _ in entries)
         if not intervals:
             continue
+        supported_seconds = sum(b - a for a, b in intervals)
         matches.append({
             "source_minus_target_offset_seconds": offset + source["range"][0] - target["range"][0],
             "matched_token_pairs": len(entries),
@@ -64,7 +65,11 @@ def align_tokens(source_tokens, target_tokens, step, source, target, parameters)
                                                    for a, b in intervals],
             "source_supported_windows_seconds": [[a + offset + source["range"][0], b + offset + source["range"][0]]
                                                    for a, b in intervals],
-            "target_supported_window_duration_seconds": sum(b - a for a, b in intervals),
+            "target_supported_window_duration_seconds": supported_seconds,
+            "source_supported_window_duration_seconds": supported_seconds,
+            "source_supported_fraction": supported_seconds / source_duration if source_duration else None,
+            "target_supported_fraction": supported_seconds / target_duration if target_duration else None,
+            "support_semantics": "token_neighbourhood_windows_not_verified_continuous_audio",
         })
     return matches, {"source_tokens": len(source_tokens), "target_tokens": len(target_tokens),
                      "raw_token_pair_matches": sum(votes.values()), "candidate_offsets": len(matches),
