@@ -4,12 +4,19 @@ This directory contains an implemented baseline for assessing evidence from musi
 
 The main approach is to reuse Ben's evidence graph and execution framework, connect the music parsers and checks, and expose a runnable interface for CSEC.
 
-The current local branch is `feature/dynamic-weighting-with-cap`, based on commit
-`c6d36fd`, with optional report-only audfprint, SpectroMap and librosa diagnostics
-added on 18 October 2026. These diagnostics do not change any score, weight,
-confidence, withholding rule or cap. LLM integration is outside this update.
+The current version is **0.8.0** on `main` (base commit `2128cc4`, 21 October
+2026). It focuses on C2PA provenance: pinned trust lists, asymmetric trust and a
+plain-language finding for every state of the final artefact's C2PA manifest
+(see [C2PA provenance and trust](#c2pa-provenance-and-trust)). Optional
+report-only audio diagnostics now carry their calibration status and the
+results of a first false-match benchmark. Audio diagnostics do not change any
+score, weight, confidence, withholding rule or cap. LLM integration is outside
+this update.
 
-The runnable evaluator is in [`program/`](program/). Unless stated otherwise, file locations and commands below are relative to that directory.
+The [technical manual](Manual_layout_check.docx) describes the whole program;
+its Section 8 covers the C2PA work in detail. The runnable evaluator is in
+[`program/`](program/). Unless stated otherwise, file locations and commands
+below are relative to that directory.
 
 ## Team responsibilities
 
@@ -21,13 +28,16 @@ The runnable evaluator is in [`program/`](program/). Unless stated otherwise, fi
 
 ## Recommended reading order
 
-1. [CSEC handoff](program/docs/03_CSEC_HANDOFF.md): integration instructions and supported boundaries.
-2. [Physical diagnostic policy](program/docs/PHYSICAL_SIMILARITY.md): disabled legacy signal checks and the separate non-scoring boundary.
-3. [Audio diagnostics](program/docs/AUDIO_DIAGNOSTICS.md): optional dependencies, execution, providers and output fields.
-4. [Sheet formats](program/docs/SHEET_FORMATS.md): supported CompSheet and CueSheet formats.
-5. [Future work](program/docs/NEXT_TASKS.md): consolidated P0-P3 roadmap and unresolved legacy items.
-6. [Verification results](program/reports/verification.md): historical core verification and remaining unverified areas.
-7. [Audio integration verification](program/reports/audio-diagnostics-verification.json): 189 passing tests and core-result invariance on the repeated-excerpt example.
+1. [Technical manual](Manual_layout_check.docx): the complete program description; Section 8 covers C2PA provenance, trust and findings.
+2. [CSEC handoff](program/docs/03_CSEC_HANDOFF.md): integration instructions and supported boundaries.
+3. [C2PA trust lists](program/policies/c2pa_trust/README.md): pinned lists, known AI signers and the update procedure.
+4. [Physical diagnostic policy](program/docs/PHYSICAL_SIMILARITY.md): disabled legacy signal checks and the separate non-scoring boundary.
+5. [Audio diagnostics](program/docs/AUDIO_DIAGNOSTICS.md): optional dependencies, execution, providers and output fields.
+6. [False-match benchmark](program/docs/FALSE_MATCH_BENCHMARK_2026-10-21.md): unrelated-but-similar Lumina pairs and their results.
+7. [Sheet formats](program/docs/SHEET_FORMATS.md): supported CompSheet and CueSheet formats.
+8. [Future work](program/docs/NEXT_TASKS.md): consolidated P0-P3 roadmap and unresolved legacy items.
+9. [Verification results](program/reports/verification.md): historical core verification and remaining unverified areas.
+10. [Audio integration verification](program/reports/audio-diagnostics-verification.json): historical record of 189 passing tests (19 October 2026) and core-result invariance on the repeated-excerpt example.
 
 ## Current implementation
 
@@ -198,6 +208,117 @@ frames were not added. Existing file validation and the caller's
 caller time and do not silently truncate a file. A custom local parameter
 policy is enabled with `--audio-analysis-policy policies/audio_analysis_policy.json`.
 
+**Calibration status.** Every audio row carries a `calibration` object from
+`policies/audio_calibration_status.json`: `bounded_calibration` for audfprint
+and music_semantics, `exploratory_uncalibrated` for SpectroMap, librosa and
+fingerprint agreement, with case counts, transforms tested and not tested, and
+false-match counts. The frozen `audio_calibration_profile.json` is unchanged,
+so this explains results without changing them. A provider that ran but had too
+little audio to compare (silence, too few landmarks, peaks or frames, channel
+cancellation) reports `AUDIO_INSUFFICIENT_SUPPORT` (outcome
+`insufficient_support`) instead of an apparent non-match;
+`AUDIO_DIAGNOSTIC_UNAVAILABLE` (outcome `not_run`) remains for providers that
+did not run.
+
+**False-match benchmark.** `benchmarks/false_match.py` runs unrelated but
+similar pairs through the real evaluator. The 21 October 2026 run
+([results](program/docs/FALSE_MATCH_BENCHMARK_2026-10-21.md)) used 23 pairs
+from 25 SHA-256-pinned Lumina clips:
+
+| Category | Pairs | Result |
+|---|---|---|
+| Same genre, tempo and key | 5 | No fingerprint, agreement or semantics match |
+| Same-prompt regeneration | 4 | No match |
+| Cover prompts (melody unverified) | 6 | No fingerprint match; semantics 0/6, left unclassified |
+| Shared drum loop, gain 0.5 / 1.0 | 4 / 4 | Loop detected 1/4 / 4/4 at the inserted offset; semantics 0/8 |
+
+A shared loop is real shared audio, so detecting it is correct but does not
+show derivation. These are case counts on a small sample, not population
+false-positive rates; real covers remain untested.
+
+## C2PA provenance and trust
+
+Version 0.8.0 separates four questions that one "valid" flag used to mix:
+whether the content still matches the signed hash (binding), whether the
+signature verifies, whether the signer is known (identity), and whether the
+certificate was revoked. The first three are checked. Revocation is never
+checked because validation runs offline, so `revocation_status` is always
+`not_checked`. Full details are in Section 8 of the
+[technical manual](Manual_layout_check.docx).
+
+**Pinned trust lists.** Signer trust comes only from lists stored in
+`policies/c2pa_trust/` (see its [README](program/policies/c2pa_trust/README.md)), each
+pinned by source commit SHA and file SHA-256 in `trust_lists.json`. The
+evaluator refuses to run if a pinned file changes, and every result records
+the list versions in `assessment_checks.c2pa_trust_configuration`.
+
+| List | Pin | Use |
+|---|---|---|
+| C2PA Trust List | `c2pa-org/conformance-public` @ `47009ee` (2026-10-17) | Trust anchors; a signer chaining to them is `trusted_c2pa` |
+| C2PA TSA Trust List | same commit | Pinned and recorded only; c2pa-python 0.37.10 has no time-stamp authority setting |
+| Interim Trust List (legacy, frozen) | `contentauth/verify-site` @ `83b2e30`; frozen 2026-01-01 | `trusted_legacy_itl` only when the SDK reports a signing time before the freeze |
+| Known AI signers | `known_ai_signers.json` (BytePlus Lumina certificate, valid until 2028-03-16) | Not a trust list: identifies AI generators whose AI labels are accepted |
+
+**Attestation strength** is ordered by what was verified:
+
+| Final manifest state | Attestation strength | Meaning |
+|---|---|---|
+| `trusted_c2pa` | 1.0 | Binding and signature verify; signer on the C2PA Trust List |
+| `trusted_legacy_itl` | 0.9 | Signer on the frozen ITL and signed before 2026-01-01 |
+| `untrusted` | 0.3, partial | Binding and signature verify, signer unknown (anyone can make such a certificate) |
+| unclear | 0.25 with a signature, else 0.1, partial | Readable but nothing verified |
+| `invalid` | 0.0 | Binding, signature or another check failed |
+| absent | 0.0 | No manifest; not evidence against the submission |
+| unreadable | null, partial | A `C2PA` chunk exists but no manifest could be read |
+| not checked | unavailable | The required SDK is not installed |
+
+Across several final manifests, `invalid` wins, then the strongest trust found.
+The `validation` object records `trust_status`, `trust_source`,
+`revocation_status` and `signer`; these are optional schema fields, so
+`schema_version` stays `0.2-candidate` for CSEC.
+
+**Asymmetric trust.** A self-made certificate still produces a valid
+signature, so a valid signature alone identifies no accountable signer.
+Evidence that lowers the human share of a work (an AI-generation source type,
+or any manifest signed by a certificate in `known_ai_signers.json`, even an
+invalid one) is accepted as `signed_attestation`: nobody gains by forging a
+claim that only hurts their own assessment. Such manifests report
+`C2PA_KNOWN_AI_SIGNER` when the signer is listed, at medium severity if the
+artefact was not declared `ai-generated`. A manifest that supports human
+authorship needs a trusted signer; a valid but untrusted one is a submitter
+document, cannot qualify Integrity for release, and reports
+`C2PA_SIGNER_UNTRUSTED`. A trusted signature identifies who signed, not that
+the claims are true. Known-signer fingerprints are base64 SHA-256 digests of
+the signing certificate; the C2PA SDK ignores other formats silently.
+
+**Findings.** Every assessment reports the final artefact's C2PA state in one
+`C2PA_FINAL_ATTESTATION` finding (`final_c2pa_state`: `not_checked`, `absent`,
+`unreadable`, `invalid`, `untrusted`, `trusted_c2pa`, `trusted_legacy_itl` or
+`unclear`) that states what was found, what it means and its effect on each
+score. An invalid manifest also reports `C2PA_CONTENT_BINDING_FAILED` (for
+example audio edited after signing), `C2PA_SIGNATURE_INVALID` or
+`C2PA_VALIDATION_FAILED`, with every SDK failure code explained in plain
+language. These are medium severity for the final artefact and low for
+supporting artefacts.
+
+**The C2PA chunk precondition.** A reader failure counts as an unreadable
+manifest only when the WAV parser found a `C2PA` chunk; without one the file
+simply has no manifest. A `C2PA` chunk with no readable manifest is unreadable
+rather than absent.
+
+**Effects on Integrity.** An invalid final manifest fails the ordinary rule
+`final_c2pa_manifest_validates`: Integrity is marked contradicted, but the
+severe cap is not applied. If the final artefact's own manifest cannot be read,
+Integrity is withheld (`release_reason: final_attestation_unreadable`) even
+when other files carry qualifying evidence; an absent manifest withholds
+nothing. `integrity_decision.qualifying_facts` lists the facts that released a
+value.
+
+Tested on BytePlus Lumina output (20-21 October 2026): unmodified files are
+valid but untrusted (0.3) with an accepted AI label; files edited after signing
+are invalid with `C2PA_CONTENT_BINDING_FAILED`, and the AI label is still
+accepted. Lumina is one vendor; this does not validate other signers.
+
 ## Integrity weighting and cap
 
 The active profile is `policies/scoring_profile.json`. Integrity combines three
@@ -219,23 +340,12 @@ Every cross-evidence check records an `evidence_tier`:
 
 | Tier | Source | Qualifies release with the required layer coverage? |
 |---|---|---|
-| `signed_attestation` | A C2PA manifest from a trusted signer (`Trusted`); or an AI-generation label from any valid signature or from a known AI generation signer (see below) | Yes |
+| `signed_attestation` | A C2PA manifest from a signer on a pinned trust list (`trusted_c2pa` or `trusted_legacy_itl`); or an AI-generation label from any valid signature or from a known AI generation signer (see below) | Yes |
 | `recorder_metadata` | Submitted documents compared with BWF `bext`/iXML fields observed in a hash-bound WAV; their writer is not authenticated | Yes |
 | `submitter_document` | RIN, ERN, CompSheet, CueSheet, MIDI, DAW sessions, AAF, sound reports and unverified C2PA, compared with the graph, declarations or measured file properties | No |
 
-C2PA trust is asymmetric. A self-made certificate still produces a `Valid`
-signature, so a valid signature alone identifies no accountable signer.
-Evidence that lowers the human share of a work (an AI-generation source type,
-or any manifest signed by a certificate in
-`policies/c2pa_trust/known_ai_signers.json`) is accepted: nobody gains by
-forging a claim that only hurts their own assessment. Such manifests report
-`C2PA_KNOWN_AI_SIGNER` when the signer is listed, at medium severity if the
-artefact was not declared `ai-generated`. A manifest that supports human
-authorship needs a `Trusted` signer; a valid but untrusted one is a submitter
-document, cannot qualify Integrity for release, and reports
-`C2PA_SIGNER_UNTRUSTED`. A trusted signature identifies who signed, not that
-the claims are true. Known-signer fingerprints are base64 SHA-256 digests of the
-signing certificate; the C2PA SDK ignores other formats silently.
+C2PA evidence is classified by asymmetric trust; see
+[C2PA provenance and trust](#c2pa-provenance-and-trust).
 
 Submitter documents are declarations in another format: the submitter could
 export an AAF and build the graph from it, so agreement between the two proves
@@ -350,6 +460,37 @@ This example uses the supplied CSEC candidate request format. It contains one WA
 python3 -B run.py --bundle /path/to/EVAL-case/bundle.json --root /path/to/EVAL-case
 ```
 
+## Desktop manifest builder
+
+From `program/`, install `requirements.txt` and make sure Tkinter is available, then run:
+
+```bash
+python3 builder_gui.py
+```
+
+The builder imports and hashes files in the background, provides workflow
+preflight and full assessment, and can save the full machine-readable result.
+Full assessment uses a verified temporary snapshot and the same production
+worker as the command-line evaluator.
+
+Portable exports place files in `objects/` under content-addressed names
+(`objects/<sha256>.<extension>`) accepted by the evaluator. The source files
+are never renamed or overwritten. By default, saving a manifest can instead
+reference the selected originals without copying them; every save checks that
+each original still matches its declared SHA-256. These manifests set
+`options.local_file_references` and require explicit authorization for direct
+evaluation:
+
+```bash
+python3 -B run.py --native /path/to/submission.json \
+  --root /path/to/submission-folder --allow-local-files
+```
+
+Both the manifest option and the command-line flag are required. The flag is
+restricted to trusted native manifests and cannot authorize CSEC/public bundle
+paths. The builder's full-assessment action stages verified originals inside a
+temporary bundle root and does not need external-path authorization.
+
 ## Verification
 
 ```bash
@@ -358,11 +499,14 @@ python3 -B check_public.py /path/to/public-bundles
 ```
 
 The second command writes results to `reports/`. Both commands operate locally and do not transmit data.
-The 18 October 2026 verification passed 144 tests with no failures or skips:
-124 core tests and 20 new diagnostic tests. It exercised the real installed
-providers and verified unchanged axes and original findings when diagnostics
-were enabled. The synthetic tests are engineering checks, not real-session
-accuracy calibration. Run the full dependency-required suite with
+On 21 October 2026 (version 0.8.0) discovery found 312 tests. The 308 non-GUI
+tests gave 303 passed and 5 skipped: the structure-benchmark cases need the
+benchmark-only `mir_eval` package, and 3 of them fail if they are forced to run
+without it. The four GUI tests each passed when run in a separate process; run
+them that way, because they can hang inside the full suite on macOS Tk. The
+24 C2PA tests cover pinned-list hashes, trust status, asymmetric trust, known AI
+signers, the C2PA chunk precondition and every final state. The synthetic tests
+are engineering checks, not real-session accuracy calibration. Run the full dependency-required suite with
 `REQUIRE_AUDIO_BACKENDS=1 python3 -B -m unittest discover -s tests -v`.
 Core tests include coverage for non-final
 input isolation and final-first stopping, unknown-field suggestions, audio
@@ -385,33 +529,36 @@ The locations below are relative to `program/`.
 | `music_target/wav_parser.py` | Local copy of the supplied WAV parser |
 | `music_target/engine.py` | File binding, `WavMetadataPass`, `RelationshipIntegrityPass`, library pipeline, and assessment-stage orchestration |
 | `music_target/workflow_policy.py` | Safe policy loading, condition evaluation, and per-expectation workflow completeness |
-| `music_target/assessment_passes.py` | Cached file and relationship result aggregation, CrossEvidence, C2PA, and AI disclosure assessment logic |
+| `music_target/assessment_passes.py` | Cached file and relationship result aggregation, CrossEvidence, C2PA attestation with pinned trust and final-state findings, and AI disclosure assessment logic |
 | `music_target/audio_derivation.py` | Deprecated signal helpers and exact-reconstruction code retained for later cleanup; not executed by assessment |
 | `music_target/physical_audio_passes.py` | Deprecated physical-similarity implementation retained for later cleanup; not imported by assessment |
 | `music_target/midi_parser.py` | Size- and structure-bounded Standard MIDI File parser |
 | `music_target/sheet_parsers.py` | CompSheet/CueSheet JSON, CSV, TXT, and PDF parsers plus field normalisation |
 | `music_target/recorder_metadata.py` | Recorder-written BWF `bext`/iXML fields (tape, file name, scene/take, tracks, start timecode) from a bound WAV |
 | `music_target/production_documents.py` | Sound report CSV and AAF (pyaaf2) parsers, and their checks against recorder metadata |
-| `music_target/evidence_tiers.py` | Evidence tiers for cross-evidence checks and their counts |
+| `music_target/evidence_tiers.py` | Evidence tiers for cross-evidence checks and their counts, including the asymmetric C2PA tier |
 | `music_target/score_explanations.py` | Per-axis score explanations and plain-language statements of failed checks |
 | `music_target/daw_session.py` | Ableton Live session parser and its checks against the graph and MIDI |
 | `music_target/audio_diagnostics/providers/music_semantics.py` | Report-only key, tempo, chord and phrase-form comparison across versions |
-| `benchmarks/` | Public music dataset benchmark (Slakh/BabySlakh, MUSDB18-HQ) with true and control relationships |
+| `benchmarks/` | Public music dataset benchmark (Slakh/BabySlakh, MUSDB18-HQ) with true and control relationships; `false_match.py` and its pinned Lumina manifest for the false-match benchmark |
 | `music_target/contract.py` | CSEC/native format adaptation, input validation, and version identification |
 | `policies/workflow_evidence_policy.json` | Candidate required, conditional, and optional evidence policy for 16 workflows |
-| `music_target/audio_diagnostics/` | Report-only task selection, verified snapshots, isolated workers, three provider adapters and result assembly |
+| `music_target/audio_diagnostics/` | Report-only task selection, verified snapshots, isolated workers, audfprint, SpectroMap, librosa and music_semantics adapters, fingerprint agreement, calibration status and result assembly |
 | `policies/audio_analysis_policy.json` | Local provider and candidate-parameter configuration; no scoring controls or proposed development caps |
+| `policies/audio_calibration_status.json` | Per-provider calibration status and false-match counts attached to every audio row; does not change scoring |
+| `policies/c2pa_trust/` | Pinned C2PA Trust List, TSA list and frozen legacy ITL (`trust_lists.json` with commits and SHA-256), `known_ai_signers.json` and the update procedure |
 | `schemas/audio-diagnostic.schema.json` | Diagnostic result validation and fixed non-scoring fields |
 | `requirements-audio.txt`, `requirements-audio-lock.txt` | Optional audio dependencies and the tested environment |
 | `make_audio_diagnostic_example.py`, `examples/audio-diagnostics/` | Reproducible repeated-excerpt example, request and core/audio reports |
-| `tests/test_audio_diagnostics.py` | Twenty provider, protocol and score-isolation tests |
-| `reports/audio-diagnostics-verification.json` | Current 144-test verification and real-provider example results |
+| `tests/test_audio_diagnostics.py` | 41 provider, protocol, score-isolation, insufficient-support and calibration-status tests |
+| `tests/test_c2pa_integrity.py` | 24 C2PA tests: runtime-signed fixtures, pinned lists, trust status, asymmetric trust, known AI signers, the C2PA chunk precondition and every final state |
+| `reports/audio-diagnostics-verification.json` | Historical 19 October 2026 verification and real-provider example results |
 | `docs/AUDIO_DIAGNOSTICS.md` | Detailed audio setup, usage, output and interpretation |
 | `music_target/scoring_profile.py`, `policies/scoring_profile.json` | Validated three-layer Integrity weights, tier-aware withholding, confidence and severe-contradiction cap |
 | `run.py` | CSEC/local execution and explicit parent-side audio diagnostic orchestration |
 | `schemas/` | Original CSEC candidate schemas and local music schemas |
 | `schemas/ddex/` | Pinned RIN 2.1 and ERN 4.3 XSD files, source hashes, and licence reminder |
-| `legacy_parsers/` | RIN, ERN, and C2PA parsers used by the production path, plus XSD validation and XML helpers |
+| `legacy_parsers/` | RIN, ERN, and C2PA parsers used by the production path, plus XSD validation and XML helpers; the C2PA parser verifies the pinned trust lists and matches known AI signers |
 | `examples/` | Runnable requests, fixture files, and generated responses |
 | `reports/source_inventory.json` | Source files reviewed for this release and their SHA-256 values |
 
@@ -421,5 +568,7 @@ The locations below are relative to `program/`.
 2. Resolve whether stems and raw takes are universally required, as one PDF suggests, or conditional by workflow, as the profile specifies.
 3. Obtain genuine successful-creation fixtures; the generated teaching fixture is not validated human-creation ground truth.
 4. Confirm that the internal weighting and interpretation of integrity checks match customer expectations. The project keeps the four dimensions separate and does not add a decision policy.
+5. Agree with CSEC whether the new optional C2PA `validation` fields (`trust_status`, `trust_source`, `revocation_status`, `signer`) need a new response `schema_version`; it currently stays `0.2-candidate`.
+6. Confirm the BytePlus Lumina signing certificate with BytePlus, decide which other AI generators to add to the known AI signer list, and agree how often the pinned C2PA trust lists are reviewed.
 
 These decisions do not block the local executable baseline, but the directory must not yet be described as a complete music-authenticity assessment system.

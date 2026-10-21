@@ -8,14 +8,14 @@ from pathlib import Path
 
 from music_target.evidence_audit import audit_cross_evidence, aggregate_cross_evidence
 
-from legacy_parsers.c2pa_parser import parse_c2pa_file
+from legacy_parsers.c2pa_parser import parse_c2pa_file, trust_configuration_record
 from legacy_parsers.ern_parser import parse_ern_file
 from legacy_parsers.rin_parser import parse_rin_file
 from music_target.daw_session import DawSessionError, daw_session_checks, parse_ableton_session
 from music_target.midi_parser import parse_midi_file
 from music_target.production_documents import (aaf_checks, parse_aaf_file, parse_sound_report_file,
                                                sound_report_checks)
-from music_target.evidence_tiers import TIERS, assign_default_tiers, c2pa_tier, tier_counts
+from music_target.evidence_tiers import TIERS, assign_default_tiers, c2pa_signer_trusted, c2pa_tier, tier_counts
 from music_target.score_explanations import describe_check
 from music_target.scoring_profile import load_default_scoring_profile
 from music_target.sheet_parsers import parse_comp_sheet_file, parse_cue_sheet_file
@@ -54,7 +54,7 @@ def parse_bound_artefacts(native, chain, wav_observations):
                           "data": wav_result}
                 # C2PA may be embedded in the media itself. Attempt once per
                 # audio file; absence never makes completeness fail.
-                c2pa = dataclasses.asdict(parse_c2pa_file(str(path)))
+                c2pa = _reconcile_with_c2pa_chunk(dataclasses.asdict(parse_c2pa_file(str(path))), wav_result)
                 parsed["c2pa"] = c2pa
                 c2pa_attempted = True
             elif kind == "project/midi":
@@ -274,6 +274,56 @@ def _unavailable_check(rule, reason, **extra):
     """Represent one failed comparison without failing unrelated checks."""
     return {"rule": rule, "status": "unavailable", "passed": None,
             "reason": reason, **extra}
+
+
+def _reconcile_with_c2pa_chunk(c2pa, wav_result):
+    """Use the WAV parser's chunk list as ground truth for whether a manifest exists.
+
+    A reader failure means a damaged manifest only when the file really carries a
+    C2PA chunk; otherwise the SDK failed for another reason and there is simply no
+    manifest. A C2PA chunk the SDK finds no manifest in is unreadable, not absent.
+    """
+    metadata = (wav_result or {}).get("embedded_metadata")
+    if not c2pa.get("sdk_available") or not isinstance(metadata, dict):
+        return c2pa  # chunk list unknown (WAV parser failed): keep the SDK result
+    has_chunk = any(item.get("chunk_id") == "C2PA" for item in metadata.get("other_chunks") or [])
+    c2pa["c2pa_chunk_present"] = has_chunk
+    warnings = list(c2pa.get("warnings") or [])
+    if not c2pa.get("reader_succeeded") and not has_chunk:
+        c2pa.update(reader_succeeded=True, present=False)
+        warnings.append("The C2PA SDK could not read this file, but it has no C2PA chunk; "
+                        "treated as having no manifest.")
+    elif c2pa.get("reader_succeeded") and not c2pa.get("present") and has_chunk:
+        c2pa["reader_succeeded"] = False
+        warnings.append("The file has a C2PA chunk, but the SDK found no readable manifest in it.")
+    c2pa["warnings"] = warnings
+    return c2pa
+
+
+# Plain-language meaning of SDK failure codes, matched by prefix.
+_C2PA_CODE_EXPLANATIONS = (
+    ("assertion.dataHash.mismatch", "the audio no longer matches the content hash recorded when it was signed "
+                                    "(the file was edited after signing, or the manifest was copied from another file)"),
+    ("assertion.bmffHash.mismatch", "the media no longer matches the content hash recorded when it was signed"),
+    ("assertion.boxesHash.mismatch", "the media no longer matches the content hash recorded when it was signed"),
+    ("assertion.collectionHash.mismatch", "a file in the signed collection no longer matches its recorded hash"),
+    ("assertion.hashedURI.mismatch", "an assertion inside the manifest was changed after signing"),
+    ("assertion.", "an assertion in the manifest failed validation"),
+    ("claimSignature.mismatch", "the claim signature does not verify, so the manifest was altered after signing"),
+    ("claimSignature.outsideValidity", "the manifest was signed outside the certificate's validity period"),
+    ("claimSignature.", "the claim signature failed validation"),
+    ("signingCredential.revoked", "the signing certificate was revoked"),
+    ("signingCredential.expired", "the signing certificate had expired"),
+    ("signingCredential.", "the signing certificate is not valid for signing"),
+    ("timeStamp.", "the signing time stamp failed validation"),
+)
+
+
+def _c2pa_code_explanation(code):
+    for prefix, text in _C2PA_CODE_EXPLANATIONS:
+        if code.startswith(prefix):
+            return f"{text} ({code})"
+    return code
 
 
 # SDK codes that report signer trust, not tampering; trust is assessed separately.
@@ -712,6 +762,9 @@ class C2PAAttestationPass:
             "manifest_present": present,
             "signature_present": bool(manifest.get("signature_info")) if present else False,
             "validation_state": reported_state,
+            "trust_status": manifest.get("trust_status") if present else None,
+            "revocation_status": manifest.get("revocation_status") if present else None,
+            "signer": _c2pa_signer_label(manifest) if present else None,
             "known_ai_signer": (manifest.get("known_ai_signer") or {}).get("name"),
             "validation_codes": sorted(set(
                 C2PAAttestationPass._collect_codes(
@@ -730,6 +783,8 @@ class C2PAAttestationPass:
             code = _c2pa_failure_finding_code(failures)
             final = record["asset_hash"] == final_hash
             message = _C2PA_FAILURE_MESSAGES[code]
+            if failures:
+                message += " Validation found that " + "; ".join(_c2pa_code_explanation(item) for item in failures) + "."
             if not final:
                 message = "Supporting artefact: " + message
             findings.append(_finding(code, message, record["asset_hash"], "medium" if final else "low",
@@ -763,16 +818,90 @@ class C2PAAttestationPass:
                 findings.append(_finding("C2PA_KNOWN_AI_SIGNER", message, record["asset_hash"],
                                          "medium" if undeclared else "info", scope=scope,
                                          known_ai_signer=known["name"], signer=signer))
-            elif state == "valid" and not _c2pa_reduces_human_share(manifest):
-                message = (f"The C2PA signature is valid but its signer ({signer}) is not on a configured trust "
-                           "list. A signature identifies who signed, not that the claims are true; this manifest "
-                           "is treated as a submitter-supplied document and cannot qualify Integrity for release.")
+            elif (state in ("valid", "trusted") and not c2pa_signer_trusted(manifest)
+                  and not _c2pa_reduces_human_share(manifest)):
+                message = (f"The C2PA signature is valid but its signer ({signer}) is not on the pinned C2PA "
+                           "Trust List or, for content signed before its freeze, the legacy Interim Trust List. "
+                           "A signature identifies who signed, not that the claims are true; this manifest is "
+                           "treated as a submitter-supplied document and cannot qualify Integrity for release.")
+                if manifest.get("trust_note"):
+                    message += " " + manifest["trust_note"]
                 findings.append(_finding("C2PA_SIGNER_UNTRUSTED", message, record["asset_hash"],
                                          "medium" if final else "low", scope=scope, signer=signer))
         return findings
 
     @staticmethod
     def evaluate(native, parser_observations):
+        axis, validation, findings, reports = C2PAAttestationPass._evaluate(native, parser_observations)
+        findings.append(C2PAAttestationPass._final_state_finding(native, parser_observations, axis, validation))
+        return axis, validation, findings, reports
+
+    @staticmethod
+    def _final_state_finding(native, parser_observations, axis, validation):
+        """State, meaning and score effects of the final artefact's C2PA, for every state."""
+        final_hash = native["final_artefact_hash"]
+        manifests = [record["manifest"] for record in _c2pa_records(native, parser_observations)
+                     if record["asset_hash"] == final_hash]
+        present = [item for item in manifests if item.get("present")]
+        known = next((item["known_ai_signer"]["name"] for item in present if item.get("known_ai_signer")), None)
+        state = validation.get("validation_state")
+        trust = validation.get("trust_status")
+        signer = validation.get("signer") or "unknown signer"
+        value = axis.get("value")
+        boundary = ("A signature identifies who signed the manifest; it does not show that its claims are true. "
+                    "Revocation was not checked (offline validation).")
+        if not validation:
+            key, severity = "not_checked", "medium"
+            message = ("The final artefact's C2PA was not checked because the required c2pa-python SDK is not "
+                       "installed. Attestation strength is unavailable, and no C2PA claim was compared with the "
+                       "declarations.")
+        elif state == "manifest_absent":
+            key, severity = "absent", "info"
+            message = ("The final artefact has no C2PA manifest. Many tools do not write C2PA yet, so this is not "
+                       "evidence against the submission. Attestation strength is 0.0 because there is nothing to "
+                       "verify; Integrity is not affected.")
+        elif state == "manifest_not_read":
+            key, severity = "unreadable", "medium"
+            reasons = "; ".join(warning for item in manifests for warning in item.get("warnings") or []) or "no reason reported"
+            message = ("The final artefact carries a C2PA chunk, but the SDK could not read a manifest from it "
+                       f"({reasons}). Its claims are unknown, so they cannot be compared with the declarations. "
+                       "Attestation strength is not assessed, and Integrity is withheld "
+                       "(final_attestation_unreadable) unless a severe contradiction caps it.")
+        elif trust == "invalid":
+            key, severity = "invalid", "medium"
+            failures = sorted({code for item in present if _c2pa_is_invalid(item) for code in _c2pa_failure_codes(item)})
+            meaning = "; ".join(_c2pa_code_explanation(code) for code in failures) or "the SDK reported no failure code"
+            message = (f"The final artefact's C2PA manifest, signed by {signer}, is INVALID: {meaning}. "
+                       "Its claims and ingredient relationships cannot be relied on. Effects: attestation strength "
+                       "is 0.0; Integrity records the ordinary contradiction final_c2pa_manifest_validates "
+                       "(not the severe cap), and a value is still released only under the normal rule.")
+            if known:
+                message += (f" The signing certificate belongs to a known AI generation signer ({known}), so its "
+                            "AI-generation label is still accepted as evidence that lowers the human share.")
+        elif trust in ("trusted_c2pa", "trusted_legacy_itl"):
+            key, severity = trust, "info"
+            message = (f"The final artefact's C2PA manifest is valid and signed by {signer}, trusted through "
+                       f"{validation.get('trust_source')}. Attestation strength is {value:g}. {boundary}")
+        elif trust == "untrusted":
+            key, severity = "untrusted", "low"
+            message = (f"The final artefact's C2PA manifest is intact (content binding and signature verify), but "
+                       f"its signer ({signer}) is not on the pinned C2PA Trust List or, for content signed before "
+                       "its freeze, the legacy Interim Trust List. Anyone can create such a signature, so attestation "
+                       "strength is 0.3 (partial) and a claim supporting human authorship cannot release Integrity. "
+                       f"{boundary}")
+            if known:
+                message += (f" The signer is a known AI generation signer ({known}); its AI-generation label is "
+                            "accepted as evidence that lowers the human share.")
+        else:
+            key, severity = "unclear", "low"
+            message = (f"A C2PA manifest was read from the final artefact, but its validation state is unclear. "
+                       f"Attestation strength is {value:g} (partial) and its claims are treated as submitter "
+                       f"documents. {boundary}")
+        return _finding("C2PA_FINAL_ATTESTATION", message, final_hash, severity, final_c2pa_state=key,
+                        attestation_value=value, trust_status=trust, known_ai_signer=known)
+
+    @staticmethod
+    def _evaluate(native, parser_observations):
         records = _c2pa_records(native, parser_observations)
         final_hash = native["final_artefact_hash"]
         reports = [C2PAAttestationPass._report(record, final_hash)
@@ -817,33 +946,63 @@ class C2PAAttestationPass:
         codes = sorted(set(code for item in manifests
                            for code in C2PAAttestationPass._collect_codes(
                                item.get("validation_results"))))
-        state = ("Invalid" if "invalid" in normalized else
-                 "Trusted" if "trusted" in normalized else
-                 "Valid" if "valid" in normalized else "manifest_parsed")
-        if state == "Invalid":
+        statuses = {item.get("trust_status") for item in manifests}
+        # Invalid takes precedence, then the strongest trust found among final manifests.
+        if "invalid" in normalized or "invalid" in statuses:
+            trust_status, chosen = "invalid", None
+        else:
+            trust_status = next((status for status in ("trusted_c2pa", "trusted_legacy_itl", "untrusted")
+                                 if status in statuses), None)
+            if trust_status is None and "trusted" in normalized:
+                trust_status = "trusted_c2pa"
+            elif trust_status is None and "valid" in normalized:
+                trust_status = "untrusted"
+            chosen = next((item for item in manifests if item.get("trust_status") == trust_status), manifests[0])
+        state = ("Invalid" if trust_status == "invalid" else
+                 "Trusted" if trust_status in ("trusted_c2pa", "trusted_legacy_itl") else
+                 "Valid" if trust_status == "untrusted" else "manifest_parsed")
+        signer = _c2pa_signer_label(chosen) if chosen else _c2pa_signer_label(manifests[0])
+        source = (chosen or {}).get("trust_source") or {}
+        listed = f"{source.get('label')} @ {str(source.get('commit') or '')[:7]}" if source else None
+        # Ordered by what was verified: content binding, signature, signer identity.
+        # Revocation is never checked offline, so no state reaches a verified revocation.
+        if trust_status == "invalid":
             value, availability, confidence = 0.0, "available", 0.9
             crypto, trusted = False, False
-        elif state == "Trusted":
+        elif trust_status == "trusted_c2pa":
             value, availability, confidence = 1.0, "available", 0.9
             crypto, trusted = True, True
-        elif state == "Valid":
-            value, availability, confidence = 0.8, "available", 0.9
+        elif trust_status == "trusted_legacy_itl":
+            value, availability, confidence = 0.9, "available", 0.9
+            crypto, trusted = True, True
+        elif trust_status == "untrusted":
+            # A self-made certificate also validates, so the signer is unknown:
+            # binding and signature verified, identity not.
+            value, availability, confidence = 0.3, "partial", 0.9
             crypto, trusted = True, False
         else:
-            value, availability, confidence = (0.5 if signature else 0.25), "partial", 0.6
+            value, availability, confidence = (0.25 if signature else 0.1), "partial", 0.6
             crypto = trusted = None
-        if state == "Invalid":
+        boundary = ("A trusted signature identifies who signed the manifest; it does not verify that its "
+                    "claims are true. Revocation was not checked (offline validation).")
+        if trust_status == "invalid":
             failures = sorted({code for item in manifests if _c2pa_is_invalid(item)
                                for code in _c2pa_failure_codes(item)})
             reason = ("Active C2PA manifest for the final artefact failed SDK validation "
                       f"({', '.join(failures) or 'no failure code reported'}). "
                       "Its claims and ingredient relationships cannot be relied on.")
+        elif trust_status in ("trusted_c2pa", "trusted_legacy_itl"):
+            reason = f"Signed by {signer} (trusted: {listed}). {boundary}"
+        elif trust_status == "untrusted":
+            reason = (f"Signed by {signer}, who is not on the pinned C2PA Trust List or the legacy Interim "
+                      f"Trust List; the signature is intact but the signer is unknown. {boundary}")
         else:
-            reason = (f"Active C2PA manifest for the final artefact parsed; SDK validation state={state}. "
-                      "Manifest claims and ingredient relationships remain claims even when content binding is valid.")
+            reason = f"A C2PA manifest was read but its validation state is unclear. {boundary}"
         validation = {"validation_state": state, "signature_present": signature,
                       "signature_valid": crypto, "cryptographically_valid": crypto,
-                      "credential_trusted": trusted, "codes": codes, "reasons": [reason]}
+                      "credential_trusted": trusted, "codes": codes, "reasons": [reason],
+                      "trust_status": trust_status, "trust_source": listed,
+                      "revocation_status": "not_checked", "signer": signer}
         return _axis(availability, value, confidence, reason), validation, findings, reports
 
 
@@ -1135,8 +1294,15 @@ def assess_axes(native, chain, bound_hashes, missing_hashes, wav_observations,
     triggered = (sorted({item["rule"] for item in file_checks + rel_checks + cross_checks
                          if item.get("passed") is False and item["rule"] in severe_contradiction_rules})
                  if severe_contradiction_rules and severe_contradiction_cap is not None else [])
+    # A final manifest the SDK could not read cannot be checked against the file,
+    # so evidence about other nodes must not release a number for the final.
+    final_attestation_unreadable = validation.get("validation_state") == "manifest_not_read"
     threshold_met = (len(components) >= min_components and
-                     (substantive_support or not require_support))
+                     (substantive_support or not require_support) and not final_attestation_unreadable)
+    qualifying_facts = [{"rule": item["rule"], "identity": item["identity"],
+                         "evidence_tiers": sorted(set(item["assessed_evidence_tiers"]) & set(support_tiers))}
+                        for item in cross_facts if isinstance(item.get("passed"), bool)
+                        and set(item["assessed_evidence_tiers"]) & set(support_tiers)]
     cap_record = None
     if not components:
         integrity_availability, integrity_value, integrity_confidence = "unavailable", None, None
@@ -1176,6 +1342,8 @@ def assess_axes(native, chain, bound_hashes, missing_hashes, wav_observations,
         release_reason = "qualifying_cross_evidence" if require_support else "configured_layer_coverage"
     elif triggered and severe_release:
         release_reason = "severe_contradiction_cap"
+    elif final_attestation_unreadable:
+        release_reason = "final_attestation_unreadable"
     elif len(components) < min_components:
         release_reason = "insufficient_assessed_layers"
     else:
@@ -1187,6 +1355,7 @@ def assess_axes(native, chain, bound_hashes, missing_hashes, wav_observations,
                 "numeric_release": "released" if integrity_value is not None else "withheld",
                 "release_reason": release_reason,
                 "qualifying_cross_evidence_assessed": substantive_support,
+                "qualifying_facts": qualifying_facts,
                 "ordinary_contradiction_release_allowed": False,
                 "severe_contradiction_release": "capped_value" if severe_release else "disabled",
                 "score_semantics": "assessed_check_consistency_not_provenance_authentication"}
@@ -1195,6 +1364,8 @@ def assess_axes(native, chain, bound_hashes, missing_hashes, wav_observations,
                              "a severe contradiction released a value no higher than the cap. "
                              if integrity_value is not None else
                              f"the value is withheld ({release_reason}). ")
+                          + ("The final artefact's C2PA manifest could not be read, so evidence about other "
+                             "files does not release a value for it. " if final_attestation_unreadable else "")
                           + ("An ordinary contradiction never releases a value. " if severe_release
                              else "A contradiction alone never releases a value. ")
                           + ("Qualifying cross-evidence was assessed for this submission. " if substantive_support else
@@ -1271,6 +1442,8 @@ def assess_axes(native, chain, bound_hashes, missing_hashes, wav_observations,
         "cross_evidence_scored_facts": cross_facts,
         "cross_evidence_audit": audit_cross_evidence(cross_checks),
         "c2pa_attestation_records": c2pa_attestation_records,
+        # Pinned trust list versions, so every result can be reproduced and explained.
+        "c2pa_trust_configuration": [trust_configuration_record()],
         "physical_similarity": physical_similarity,
         "physical_similarity_summary": [physical_summary],
     }

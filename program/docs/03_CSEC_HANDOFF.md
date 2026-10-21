@@ -90,6 +90,8 @@ python3 -B run.py --request /path/to/request.json --root /path/to/case-root
 All unsupported axes have null value and confidence. Confidence is also null for the limited completeness metric because no confidence model is defined.
 Provenance validation fields are null, not false. No C2PA absence, validity or trust claim is inferred from an unperformed check.
 
+From system version 0.8.0, `validation` may also carry `trust_status` (`trusted_c2pa`, `trusted_legacy_itl`, `untrusted`, `invalid`), `trust_source` (pinned list and commit), `revocation_status` (`not_checked`) and `signer`. These are optional schema properties, so `schema_version` remains `0.2-candidate`; changing the shared contract version needs agreement with CSEC.
+
 There is **no target-owned authorship decision policy**. `decision` and `overall_score` are omitted.
 Execution status must not be converted into accepted/rejected. Please report execution and available axis observations only; false-accept/false-reject rates are not supported.
 

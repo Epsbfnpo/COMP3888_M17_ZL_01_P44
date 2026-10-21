@@ -73,7 +73,11 @@
         "cryptographically_valid": { "type": ["boolean", "null"] },
         "credential_trusted": { "type": ["boolean", "null"] },
         "codes": { "type": "array", "items": { "type": "string" } },
-        "reasons": { "type": "array", "items": { "type": "string" } }
+        "reasons": { "type": "array", "items": { "type": "string" } },
+        "trust_status": { "enum": ["trusted_c2pa", "trusted_legacy_itl", "untrusted", "invalid", null] },
+        "trust_source": { "type": ["string", "null"] },
+        "revocation_status": { "enum": ["not_checked", null] },
+        "signer": { "type": ["string", "null"] }
       }
     },
     "decision": {

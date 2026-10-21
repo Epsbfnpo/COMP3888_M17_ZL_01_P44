@@ -5,7 +5,8 @@ from pathlib import Path
 BASE = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(BASE))
 
-from builder_results import attention_items, attention_workflow_results
+from builder_results import (INSUFFICIENT_SUPPORT_LABEL, attention_items, attention_workflow_results,
+                             audio_diagnostic_lines, music_semantics_lines)
 
 
 class AttentionDisplayTests(unittest.TestCase):
@@ -166,3 +167,114 @@ class AttentionDisplayTests(unittest.TestCase):
                             or "incomplete" in issue["status"].lower()
                             for issue in issues))
         self.assertTrue(all(issue["suggestion"] for issue in issues))
+
+
+SOURCE, TARGET = "1" * 64, "2" * 64
+
+
+def _row(provider, **extra):
+    row = {"provider": provider, "relation_id": "r1", "selection_id": None, "source_hash": SOURCE,
+           "target_hash": TARGET, "relationship_type": "excerpted_from", "status": "inconclusive",
+           "reason_code": "bounded_observation", "message": "Observation.", "matches": [], "metrics": {}}
+    row.update(extra)
+    return row
+
+
+class AudioSummaryTests(unittest.TestCase):
+    """The GUI summaries read the arrays the evaluator actually emits."""
+
+    names = {SOURCE: "source.wav", TARGET: "target.wav"}
+
+    def response(self, **checks):
+        base = {"audio_diagnostic_summary": [{"completed_provider_tasks": 4, "unavailable_provider_tasks": 0}]}
+        return {"assessment_checks": {**base, **checks}}
+
+    def test_music_semantics_are_read_from_audio_semantics(self):
+        row = _row("music_semantics", metrics={
+            "correspondence_assessment": {"status": "supported_within_profile", "rejection_reasons": []},
+            "transposition_semitones": 2, "tempo_ratio": 1.0983, "harmonic_similarity_z": 30.38,
+            "source": {"key": {"tonic": "C#", "mode": "major"}, "tempo_bpm": 136.0},
+            "target": {"key": {"tonic": "C", "mode": "minor"}, "tempo_bpm": 143.6}})
+        text = "\n".join(music_semantics_lines(self.response(audio_semantics=[row]), self.names))
+        self.assertIn("source.wav → target.wav [excerpted_from]", text)
+        self.assertIn("Correspondence: supported within profile", text)
+        self.assertIn("+2 semitone(s)", text)
+        self.assertIn("tempo ratio 1.098", text)
+        self.assertIn("Source C# major, 136 BPM → target C minor, 144 BPM", text)
+
+    def test_abstained_semantics_show_their_reasons(self):
+        row = _row("music_semantics", metrics={"correspondence_assessment": {
+            "status": "abstained", "rejection_reasons": ["low_harmonic_similarity", "a", "b", "c"]}})
+        text = "\n".join(music_semantics_lines(self.response(audio_semantics=[row]), self.names))
+        self.assertIn("Correspondence: abstained (low harmonic similarity, a, b, +1 more)", text)
+
+    def test_fingerprints_show_the_strongest_offset_and_agreement(self):
+        audfprint = _row("audfprint", matches=[
+            {"source_minus_target_offset_seconds": 25.008, "matched_token_pairs": 33,
+             "support_assessment": {"status": "supported_within_profile"}}])
+        spectromap = _row("spectromap", matches=[
+            {"source_minus_target_offset_seconds": 32.1, "matched_token_pairs": 13},
+            {"source_minus_target_offset_seconds": 24.99, "matched_token_pairs": 34}])
+        agreement = _row("fingerprint_agreement", matches=[
+            {"source_minus_target_offset_seconds": 24.995, "audfprint_votes": 33, "spectromap_votes": 34}],
+            metrics={"expected_chance_agreements": 0.27})
+        text = "\n".join(audio_diagnostic_lines(self.response(
+            audio_fingerprint=[audfprint, spectromap], audio_fingerprint_agreement=[agreement]), self.names))
+        self.assertIn("audfprint: strongest offset source − target = 25.01 s (33 matching token pairs; "
+                      "supported within profile)", text)
+        self.assertIn("spectromap: strongest offset source − target = 24.99 s", text)
+        self.assertIn("1 weaker candidate offset(s)", text)
+        self.assertIn("both algorithms agree at source − target = 25.00 s", text)
+        self.assertIn("expected by chance ≈ 0.27", text)
+
+    def test_insufficient_signal_is_labelled_as_a_normal_outcome(self):
+        silent = dict(status="unavailable", reason_code="silent_signal", message="Selected audio is silent.")
+        rows = [_row("audfprint", **silent), _row("spectromap", **silent)]
+        agreement = _row("fingerprint_agreement", status="unavailable", reason_code="provider_inputs_unavailable",
+                         message="Agreement needs both analyses.")
+        failed = _row("librosa", status="unavailable", reason_code="provider_failed", message="IndexError")
+        lines = audio_diagnostic_lines(self.response(audio_fingerprint=rows, audio_fingerprint_agreement=[agreement],
+                                                     audio_structure=[failed]), self.names)
+        muted = [line for line in lines if INSUFFICIENT_SUPPORT_LABEL in line]
+        self.assertEqual(len(muted), 3)  # both fingerprints and their agreement
+        self.assertIn("    - librosa: not run (provider_failed): IndexError", lines)
+
+
+class FinalC2paAttentionTests(unittest.TestCase):
+    final = "3" * 64
+
+    def items(self, state, severity, extra=()):
+        findings = [{"code": "C2PA_FINAL_ATTESTATION", "severity": severity, "evidence_hash": self.final,
+                     "final_c2pa_state": state, "message": f"State {state}."}, *extra]
+        return attention_items({"findings": findings, "assessment_checks": {}}, {})
+
+    def test_invalid_final_c2pa_is_one_attention_item(self):
+        detail = {"code": "C2PA_CONTENT_BINDING_FAILED", "severity": "medium", "evidence_hash": self.final,
+                  "scope": "final", "message": "Detail."}
+        items = self.items("invalid", "medium", [detail])
+        self.assertEqual([item["status"] for item in items], ["Final file's C2PA is invalid"])
+
+    def test_absent_or_trusted_final_c2pa_needs_no_attention(self):
+        self.assertEqual(self.items("absent", "info"), [])
+        self.assertEqual(self.items("trusted_c2pa", "info"), [])
+
+    def test_supporting_c2pa_failures_are_still_listed(self):
+        detail = {"code": "C2PA_CONTENT_BINDING_FAILED", "severity": "low", "evidence_hash": "4" * 64,
+                  "scope": "supporting", "message": "Supporting detail."}
+        statuses = [item["status"] for item in self.items("absent", "info", [detail])]
+        self.assertEqual(len(statuses), 1)
+
+
+class CalibrationLineTests(unittest.TestCase):
+    def test_calibration_is_listed_once_per_provider(self):
+        calibration = {"status": "bounded_calibration", "transforms_tested": ["excerpt"],
+                       "not_tested": ["covers"], "false_match_rates": {"categories": {
+                           "same_prompt_regeneration": {"pairs": 4, "false_matches": 0}}}}
+        rows = [_row("audfprint", calibration=calibration), _row("spectromap", calibration={
+            "status": "exploratory_uncalibrated", "transforms_tested": [], "not_tested": ["all"]})]
+        lines = audio_diagnostic_lines({"assessment_checks": {
+            "audio_diagnostic_summary": [{"completed_provider_tasks": 2}], "audio_fingerprint": rows}}, {})
+        text = "\n".join(lines)
+        self.assertIn("- audfprint: bounded calibration; tested: excerpt; not tested: covers; "
+                      "benchmark: same prompt regeneration 0/4 false", text)
+        self.assertIn("- spectromap: exploratory uncalibrated", text)

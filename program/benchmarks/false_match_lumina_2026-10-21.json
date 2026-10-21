@@ -1,0 +1,442 @@
+{
+  "benchmark_id": "false_match_lumina_2026-10-21",
+  "date": "2026-10-21",
+  "description": "Unrelated-but-similar pairs generated with Lumina (Seed Audio 1.0, 20-second clips, 48 kHz stereo WAV). Prompts request tempo and key; the generator does not always follow them, so prompts are not measured labels. Audio is not stored in the repository; clips are matched by SHA-256.",
+  "categories": {
+    "same_genre_tempo_key": {
+      "description": "Different prompts with the same genre, tempo and key, different lead instrument.",
+      "expected_match": []
+    },
+    "same_prompt_regeneration": {
+      "description": "The same prompt generated twice.",
+      "expected_match": []
+    },
+    "cover_prompts_melody_unverified": {
+      "description": "Prompts asking for the same public-domain melody (Ode to Joy, Twinkle Twinkle Little Star) in different styles. A pitch-tracking check found the requested melodies were not recognisably performed (best interval-template agreement 3/9 and 1/7), so these are NOT verified covers.",
+      "expected_match": [],
+      "unclassified": [
+        "music_semantics"
+      ],
+      "unclassified_reason": "Whether these clips share a composition is unverified, so musical correspondence is reported without classifying it as true or false."
+    },
+    "shared_loop": {
+      "description": "Two different songs that each contain the same drum loop at 5 s, mixed at loop gain 0.5.",
+      "expected_match": [
+        "audfprint",
+        "fingerprint_agreement"
+      ],
+      "expected_reason": "The loop is real shared audio; a fingerprint match does not mean one song derives from the other."
+    },
+    "shared_loop_full_gain": {
+      "description": "As shared_loop, with the loop mixed at gain 1.0.",
+      "expected_match": [
+        "audfprint",
+        "fingerprint_agreement"
+      ],
+      "expected_reason": "The loop is real shared audio; a fingerprint match does not mean one song derives from the other."
+    }
+  },
+  "clips": [
+    {
+      "id": "CVODE_electronic",
+      "file": "CVODE_electronic.wav",
+      "sha256": "a6712b05c7a32aa9e0575e3b64a2cba29ae84a6c11cb9f91fb87280596b8aa8d",
+      "prompt": "Instrumental performance of the public-domain melody Ode to Joy by Beethoven, 20 seconds, as an upbeat electronic version with synths and drums. No singing.",
+      "category": "covers",
+      "generated": "2026-10-21 (Lumina, Seed Audio 1.0)"
+    },
+    {
+      "id": "CVODE_piano",
+      "file": "CVODE_piano.wav",
+      "sha256": "5fc9ba26f4ac2c5309b7c1fbba2918c62d00ff36e2946c57b66160100e532b3a",
+      "prompt": "Instrumental performance of the public-domain melody Ode to Joy by Beethoven, 20 seconds, played on solo piano. No singing.",
+      "category": "covers",
+      "generated": "2026-10-21 (Lumina, Seed Audio 1.0)"
+    },
+    {
+      "id": "CVODE_strings",
+      "file": "CVODE_strings.wav",
+      "sha256": "6b6c914ecc8dbf1a855ecfc7a8e52484e7938afb54bb8c9b6d8f72c70e4045f6",
+      "prompt": "Instrumental performance of the public-domain melody Ode to Joy by Beethoven, 20 seconds, played by a string quartet. No singing.",
+      "category": "covers",
+      "generated": "2026-10-21 (Lumina, Seed Audio 1.0)"
+    },
+    {
+      "id": "CVTW_guitar",
+      "file": "CVTW_guitar.wav",
+      "sha256": "66e48e0a0c66b3258751fc51090deb9755cebccb4f44c524a49ba6d0a72e74b7",
+      "prompt": "Instrumental performance of the public-domain melody Twinkle Twinkle Little Star, 20 seconds, played on acoustic guitar. No singing.",
+      "category": "covers",
+      "generated": "2026-10-21 (Lumina, Seed Audio 1.0)"
+    },
+    {
+      "id": "CVTW_jazz",
+      "file": "CVTW_jazz.wav",
+      "sha256": "469b3baec6f5904eadef924157ff4dc48f8c007f6a43129ef9bddff7a9e61392",
+      "prompt": "Instrumental performance of the public-domain melody Twinkle Twinkle Little Star, 20 seconds, as a jazz piano trio. No singing.",
+      "category": "covers",
+      "generated": "2026-10-21 (Lumina, Seed Audio 1.0)"
+    },
+    {
+      "id": "CVTW_musicbox",
+      "file": "CVTW_musicbox.wav",
+      "sha256": "ae1444cd26c724710bc864091366b1cf0e3ad3819ab239f2d8811d1d0cf04bdf",
+      "prompt": "Instrumental performance of the public-domain melody Twinkle Twinkle Little Star, 20 seconds, played on a music box. No singing.",
+      "category": "covers",
+      "generated": "2026-10-21 (Lumina, Seed Audio 1.0)"
+    },
+    {
+      "id": "LOOP_drums",
+      "file": "LOOP_drums.wav",
+      "sha256": "1a7020566621be9681015438e6e5df9c5e2da28e62b12636fd1664e898996c7b",
+      "prompt": "Original drum loop, 10 seconds, 128 BPM. Kick, snare and hi-hat only. No singing.",
+      "category": "loop_source",
+      "generated": "2026-10-21 earlier session (Lumina, Seed Audio 1.0)"
+    },
+    {
+      "id": "SG1a",
+      "file": "SG1a.wav",
+      "sha256": "ef4686629c2e9bb573a94eecc08da385a9960d8bc4f2a40f6d7641d814dbcd44",
+      "prompt": "Original upbeat pop instrumental, 20 seconds, 100 BPM in C major. Bright piano chords lead, with bass and drums. No singing.",
+      "category": "same_genre_tempo_key",
+      "generated": "2026-10-21 (Lumina, Seed Audio 1.0)"
+    },
+    {
+      "id": "SG1b",
+      "file": "SG1b.wav",
+      "sha256": "902e143f6688d089d906f5673aa11e44782d4e7ca41c88b58c7691d7ba9b64a5",
+      "prompt": "Original upbeat pop instrumental, 20 seconds, 100 BPM in C major. Strummed electric guitar leads, with bass and drums. No singing.",
+      "category": "same_genre_tempo_key",
+      "generated": "2026-10-21 (Lumina, Seed Audio 1.0)"
+    },
+    {
+      "id": "SG2a",
+      "file": "SG2a.wav",
+      "sha256": "c61abe543766acf58ae941461ddbef1c5647c1398177df540df7165cad24f28f",
+      "prompt": "Original lo-fi hip hop instrumental, 20 seconds, 85 BPM in A minor. Mellow electric piano leads, with soft drums. No singing.",
+      "category": "same_genre_tempo_key",
+      "generated": "2026-10-21 (Lumina, Seed Audio 1.0)"
+    },
+    {
+      "id": "SG2b",
+      "file": "SG2b.wav",
+      "sha256": "cc1c956914a7ef9bd4378de2527a63440c1a3127261a1a8a9f475ba1e15b6704",
+      "prompt": "Original lo-fi hip hop instrumental, 20 seconds, 85 BPM in A minor. Muted jazz guitar leads, with soft drums. No singing.",
+      "category": "same_genre_tempo_key",
+      "generated": "2026-10-21 (Lumina, Seed Audio 1.0)"
+    },
+    {
+      "id": "SG3a",
+      "file": "SG3a.wav",
+      "sha256": "afe694a77589f9169761cbd0489b2533c11e93e55f497a3a02c8e4b3e4fb2aeb",
+      "prompt": "Original rock instrumental, 20 seconds, 120 BPM in E minor. Distorted guitar riff, bass and drums. No singing.",
+      "category": "same_genre_tempo_key",
+      "generated": "2026-10-21 (Lumina, Seed Audio 1.0)"
+    },
+    {
+      "id": "SG3b",
+      "file": "SG3b.wav",
+      "sha256": "6a9e7a28371894e66fbeda6e9e2f60db1e4d8712b8538d415c14830bb642b981",
+      "prompt": "Original rock instrumental, 20 seconds, 120 BPM in E minor. Organ melody over bass and drums. No singing.",
+      "category": "same_genre_tempo_key",
+      "generated": "2026-10-21 (Lumina, Seed Audio 1.0)"
+    },
+    {
+      "id": "SG4a",
+      "file": "SG4a.wav",
+      "sha256": "f171395b4da529beec42c3f63066bc0c9f14956ee9fa49e3f7b6d62be39a28a1",
+      "prompt": "Original bossa nova instrumental, 20 seconds, 95 BPM in D major. Nylon guitar leads, with light percussion. No singing.",
+      "category": "same_genre_tempo_key",
+      "generated": "2026-10-21 (Lumina, Seed Audio 1.0)"
+    },
+    {
+      "id": "SG4b",
+      "file": "SG4b.wav",
+      "sha256": "bc89a58e64b07f821dad1c3060000dfcaf8b45adb376753d71cfc4692f3ab647",
+      "prompt": "Original bossa nova instrumental, 20 seconds, 95 BPM in D major. Flute melody leads, with light percussion. No singing.",
+      "category": "same_genre_tempo_key",
+      "generated": "2026-10-21 (Lumina, Seed Audio 1.0)"
+    },
+    {
+      "id": "SG5a",
+      "file": "SG5a.wav",
+      "sha256": "ed6c3ec45628c43edbfcf016e23b6002bbd0b251db7fff8ac31819c2c998e4d6",
+      "prompt": "Original electronic dance instrumental, 20 seconds, 124 BPM in F minor. Saw synth lead over a steady kick. No singing.",
+      "category": "same_genre_tempo_key",
+      "generated": "2026-10-21 (Lumina, Seed Audio 1.0)"
+    },
+    {
+      "id": "SG5b",
+      "file": "SG5b.wav",
+      "sha256": "4e50ed662b24564c1b3c6a279a400be2d83c8abc9e1e1d6bbfb887c911a9a0b0",
+      "prompt": "Original electronic dance instrumental, 20 seconds, 124 BPM in F minor. Plucked synth lead over a steady kick. No singing.",
+      "category": "same_genre_tempo_key",
+      "generated": "2026-10-21 (Lumina, Seed Audio 1.0)"
+    },
+    {
+      "id": "SP1_1",
+      "file": "SP1_1.wav",
+      "sha256": "a26b3a205d06dbb7e444c4133a3b832e1108da7e025494d0e3c47b042ae631b8",
+      "prompt": "Original calm acoustic guitar instrumental, 20 seconds, 90 BPM. Fingerpicked melody. No singing.",
+      "category": "same_prompt_regeneration",
+      "generated": "2026-10-21 (Lumina, Seed Audio 1.0)"
+    },
+    {
+      "id": "SP1_2",
+      "file": "SP1_2.wav",
+      "sha256": "c8505974ba3c0476c305e29d9c07cd324a58c6fe9027a96aad5feb2214217125",
+      "prompt": "Original calm acoustic guitar instrumental, 20 seconds, 90 BPM. Fingerpicked melody. No singing.",
+      "category": "same_prompt_regeneration",
+      "generated": "2026-10-21 (Lumina, Seed Audio 1.0)"
+    },
+    {
+      "id": "SP2_1",
+      "file": "SP2_1.wav",
+      "sha256": "926047c435048d9acadff5863ad73299ce870f32d0a16304a8cb5f393d46c19e",
+      "prompt": "Original funk instrumental, 20 seconds, 105 BPM. Slap bass and tight drums. No singing.",
+      "category": "same_prompt_regeneration",
+      "generated": "2026-10-21 (Lumina, Seed Audio 1.0)"
+    },
+    {
+      "id": "SP2_2",
+      "file": "SP2_2.wav",
+      "sha256": "ebb6eee4413fc34c3d6a458c600a6d2a56d8c6b7f756713d5a90acae6a6007f3",
+      "prompt": "Original funk instrumental, 20 seconds, 105 BPM. Slap bass and tight drums. No singing.",
+      "category": "same_prompt_regeneration",
+      "generated": "2026-10-21 (Lumina, Seed Audio 1.0)"
+    },
+    {
+      "id": "SP3_1",
+      "file": "SP3_1.wav",
+      "sha256": "e04a5b996dd7ae88a2d4694e910b9b6cdc1171db192a0c4183907c6eb68c2faa",
+      "prompt": "Original ambient piano instrumental, 20 seconds, slow and gentle. No singing.",
+      "category": "same_prompt_regeneration",
+      "generated": "2026-10-21 (Lumina, Seed Audio 1.0)"
+    },
+    {
+      "id": "SP3_2",
+      "file": "SP3_2.wav",
+      "sha256": "cf3518baca95bf21a95a448e710ee6b08849e62fba1af18aa1c19244863fbbf2",
+      "prompt": "Original ambient piano instrumental, 20 seconds, slow and gentle. No singing.",
+      "category": "same_prompt_regeneration",
+      "generated": "2026-10-21 (Lumina, Seed Audio 1.0)"
+    },
+    {
+      "id": "SP4_1",
+      "file": "SP4_1.wav",
+      "sha256": "ea4b839fe487c68f88ac5001154728a8484ebc74c5027fef013436e669286e19",
+      "prompt": "Original country instrumental, 20 seconds, 110 BPM. Banjo and fiddle. No singing.",
+      "category": "same_prompt_regeneration",
+      "generated": "2026-10-21 (Lumina, Seed Audio 1.0)"
+    },
+    {
+      "id": "SP4_2",
+      "file": "SP4_2.wav",
+      "sha256": "1700f00f17ca4bdb8f04ec43c4cd78cf17c6eb7bb2ff2a79d8f464356dfc3df7",
+      "prompt": "Original country instrumental, 20 seconds, 110 BPM. Banjo and fiddle. No singing.",
+      "category": "same_prompt_regeneration",
+      "generated": "2026-10-21 (Lumina, Seed Audio 1.0)"
+    }
+  ],
+  "derived": [
+    {
+      "id": "SL_SG1a",
+      "base": "SG1a.wav",
+      "loop": "LOOP_drums.wav",
+      "offset_seconds": 5.0,
+      "loop_gain": 0.5
+    },
+    {
+      "id": "SL_SG2a",
+      "base": "SG2a.wav",
+      "loop": "LOOP_drums.wav",
+      "offset_seconds": 5.0,
+      "loop_gain": 0.5
+    },
+    {
+      "id": "SL_SG3a",
+      "base": "SG3a.wav",
+      "loop": "LOOP_drums.wav",
+      "offset_seconds": 5.0,
+      "loop_gain": 0.5
+    },
+    {
+      "id": "SL_SG4a",
+      "base": "SG4a.wav",
+      "loop": "LOOP_drums.wav",
+      "offset_seconds": 5.0,
+      "loop_gain": 0.5
+    },
+    {
+      "id": "SLF_SG1a",
+      "base": "SG1a.wav",
+      "loop": "LOOP_drums.wav",
+      "offset_seconds": 5.0,
+      "loop_gain": 1.0
+    },
+    {
+      "id": "SLF_SG2a",
+      "base": "SG2a.wav",
+      "loop": "LOOP_drums.wav",
+      "offset_seconds": 5.0,
+      "loop_gain": 1.0
+    },
+    {
+      "id": "SLF_SG3a",
+      "base": "SG3a.wav",
+      "loop": "LOOP_drums.wav",
+      "offset_seconds": 5.0,
+      "loop_gain": 1.0
+    },
+    {
+      "id": "SLF_SG4a",
+      "base": "SG4a.wav",
+      "loop": "LOOP_drums.wav",
+      "offset_seconds": 5.0,
+      "loop_gain": 1.0
+    }
+  ],
+  "pairs": [
+    {
+      "pair_id": "SG1",
+      "category": "same_genre_tempo_key",
+      "source": "SG1a",
+      "target": "SG1b"
+    },
+    {
+      "pair_id": "SG2",
+      "category": "same_genre_tempo_key",
+      "source": "SG2a",
+      "target": "SG2b"
+    },
+    {
+      "pair_id": "SG3",
+      "category": "same_genre_tempo_key",
+      "source": "SG3a",
+      "target": "SG3b"
+    },
+    {
+      "pair_id": "SG4",
+      "category": "same_genre_tempo_key",
+      "source": "SG4a",
+      "target": "SG4b"
+    },
+    {
+      "pair_id": "SG5",
+      "category": "same_genre_tempo_key",
+      "source": "SG5a",
+      "target": "SG5b"
+    },
+    {
+      "pair_id": "SP1",
+      "category": "same_prompt_regeneration",
+      "source": "SP1_1",
+      "target": "SP1_2"
+    },
+    {
+      "pair_id": "SP2",
+      "category": "same_prompt_regeneration",
+      "source": "SP2_1",
+      "target": "SP2_2"
+    },
+    {
+      "pair_id": "SP3",
+      "category": "same_prompt_regeneration",
+      "source": "SP3_1",
+      "target": "SP3_2"
+    },
+    {
+      "pair_id": "SP4",
+      "category": "same_prompt_regeneration",
+      "source": "SP4_1",
+      "target": "SP4_2"
+    },
+    {
+      "pair_id": "CVODE_piano_strings",
+      "category": "cover_prompts_melody_unverified",
+      "source": "CVODE_piano",
+      "target": "CVODE_strings"
+    },
+    {
+      "pair_id": "CVODE_piano_electronic",
+      "category": "cover_prompts_melody_unverified",
+      "source": "CVODE_piano",
+      "target": "CVODE_electronic"
+    },
+    {
+      "pair_id": "CVODE_strings_electronic",
+      "category": "cover_prompts_melody_unverified",
+      "source": "CVODE_strings",
+      "target": "CVODE_electronic"
+    },
+    {
+      "pair_id": "CVTW_musicbox_guitar",
+      "category": "cover_prompts_melody_unverified",
+      "source": "CVTW_musicbox",
+      "target": "CVTW_guitar"
+    },
+    {
+      "pair_id": "CVTW_musicbox_jazz",
+      "category": "cover_prompts_melody_unverified",
+      "source": "CVTW_musicbox",
+      "target": "CVTW_jazz"
+    },
+    {
+      "pair_id": "CVTW_guitar_jazz",
+      "category": "cover_prompts_melody_unverified",
+      "source": "CVTW_guitar",
+      "target": "CVTW_jazz"
+    },
+    {
+      "pair_id": "SL_SG1a_SG2a",
+      "category": "shared_loop",
+      "source": "SL_SG1a",
+      "target": "SL_SG2a"
+    },
+    {
+      "pair_id": "SL_SG3a_SG4a",
+      "category": "shared_loop",
+      "source": "SL_SG3a",
+      "target": "SL_SG4a"
+    },
+    {
+      "pair_id": "SL_SG1a_SG3a",
+      "category": "shared_loop",
+      "source": "SL_SG1a",
+      "target": "SL_SG3a"
+    },
+    {
+      "pair_id": "SL_SG2a_SG4a",
+      "category": "shared_loop",
+      "source": "SL_SG2a",
+      "target": "SL_SG4a"
+    },
+    {
+      "pair_id": "SLF_SG1a_SG2a",
+      "category": "shared_loop_full_gain",
+      "source": "SLF_SG1a",
+      "target": "SLF_SG2a"
+    },
+    {
+      "pair_id": "SLF_SG3a_SG4a",
+      "category": "shared_loop_full_gain",
+      "source": "SLF_SG3a",
+      "target": "SLF_SG4a"
+    },
+    {
+      "pair_id": "SLF_SG1a_SG3a",
+      "category": "shared_loop_full_gain",
+      "source": "SLF_SG1a",
+      "target": "SLF_SG3a"
+    },
+    {
+      "pair_id": "SLF_SG2a_SG4a",
+      "category": "shared_loop_full_gain",
+      "source": "SLF_SG2a",
+      "target": "SLF_SG4a"
+    }
+  ],
+  "verification_notes": [
+    "Cover prompts: pyin melody tracking (fmin 110 Hz, fmax 1400 Hz, voiced probability > 0.5, notes of at least 3 frames, repeated notes merged) compared each clip's interval sequence with the Ode to Joy and Twinkle Twinkle templates; no clip matched more than 3 of 9 (Ode) or 1 of 7 (Twinkle) intervals. Polyphonic pitch tracking is imperfect, so this shows the melodies are not clearly present, not that they are absent."
+  ]
+}

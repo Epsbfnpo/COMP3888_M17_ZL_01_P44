@@ -132,6 +132,15 @@ kept for diagnostics that could not run, such as `provider_failed`,
 Completed observations carry `outcome: completed`; a completed non-match or an
 abstained musical comparison is already a normal inconclusive observation.
 
+Every row also carries a `calibration` object from
+`policies/audio_calibration_status.json`: `status` (`bounded_calibration` for
+audfprint and music_semantics; `exploratory_uncalibrated` for SpectroMap,
+librosa and fingerprint agreement), a summary with case counts, `sample`,
+`transforms_tested`, `not_tested` and `false_match_rates` from
+`benchmarks/false_match.py` (see `FALSE_MATCH_BENCHMARK_2026-10-21.md`). The
+frozen gate profile is unchanged. The summary records the status file's
+SHA-256 as `calibration_status_sha256`.
+
 Provider failures stay structured. A result that breaks the protocol inside
 the worker, for example a non-finite metric or a changed identity field,
 becomes `unavailable` with `invalid_provider_output`. If a worker process

@@ -32,7 +32,19 @@ def c2pa_tier(manifest, reduces_human_share=False):
     state = str(manifest.get("validation_state") or "").casefold()
     if reduces_human_share and (state in SIGNATURE_VALID_C2PA_STATES or manifest.get("known_ai_signer")):
         return SIGNED_ATTESTATION
-    return SIGNED_ATTESTATION if state in VERIFIED_C2PA_STATES else SUBMITTER_DOCUMENT
+    return SIGNED_ATTESTATION if c2pa_signer_trusted(manifest) else SUBMITTER_DOCUMENT
+
+
+# Signers on the pinned C2PA Trust List, or on the frozen legacy ITL for content
+# signed before its freeze date.
+TRUSTED_SIGNER_STATUSES = {"trusted_c2pa", "trusted_legacy_itl"}
+
+
+def c2pa_signer_trusted(manifest):
+    status = (manifest or {}).get("trust_status")
+    if status is not None:
+        return status in TRUSTED_SIGNER_STATUSES
+    return str((manifest or {}).get("validation_state") or "").casefold() in VERIFIED_C2PA_STATES
 
 
 def assign_default_tiers(checks):

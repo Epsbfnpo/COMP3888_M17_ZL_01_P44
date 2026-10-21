@@ -502,6 +502,30 @@ class InsufficientSupportFindingTests(unittest.TestCase):
         self.assertTrue(all("normal outcome, not an error" in message for message in silent_messages))
 
 
+class CalibrationStatusTests(unittest.TestCase):
+    """Every diagnostic row carries its provider's calibration evidence."""
+
+    def test_rows_carry_calibration_and_uncalibrated_providers_say_so(self):
+        from music_target.audio_diagnostics.agreement import AGREEMENT
+        from music_target.audio_diagnostics.contracts import result
+        from music_target.audio_diagnostics.runner import _attach
+        task = InsufficientSupportFindingTests.task("pair")
+        providers = ["audfprint", "spectromap", "librosa", "music_semantics", AGREEMENT]
+        response = _attach({"findings": [], "assessment_checks": {}}, [result(task, name) for name in providers],
+                           {"task_count": 1, "completed_provider_tasks": 5, "unavailable_provider_tasks": 0})
+        checks = response["assessment_checks"]
+        rows = (checks["audio_fingerprint"] + checks["audio_structure"] + checks["audio_semantics"]
+                + checks["audio_fingerprint_agreement"])
+        status = {row["provider"]: row["calibration"]["status"] for row in rows}
+        self.assertEqual(status, {"audfprint": "bounded_calibration", "music_semantics": "bounded_calibration",
+                                  "spectromap": "exploratory_uncalibrated", "librosa": "exploratory_uncalibrated",
+                                  AGREEMENT: "exploratory_uncalibrated"})
+        semantics = checks["audio_semantics"][0]["calibration"]
+        self.assertIn("covers", semantics["not_tested"])
+        self.assertEqual(semantics["sample"]["validation_cases"], 72)
+        self.assertTrue(checks["audio_diagnostic_summary"][0]["calibration_status_sha256"])
+
+
 class FingerprintAgreementTests(unittest.TestCase):
     task = {"task_id": "a:0", "relation_id": "a", "source_hash": "1" * 64, "target_hash": "2" * 64,
             "relationship_type": "derived_from"}

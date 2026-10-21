@@ -83,6 +83,16 @@ MODE_LABELS = {
 }
 COMPARISON_NOTE = " A signal match supports or contradicts a claim; it is not proof of provenance."
 
+FINAL_C2PA_DETAIL_FINDINGS = frozenset({
+    "C2PA_CONTENT_BINDING_FAILED", "C2PA_SIGNATURE_INVALID", "C2PA_VALIDATION_FAILED",
+    "C2PA_READ_FAILED", "C2PA_SIGNER_UNTRUSTED", "C2PA_PARSER_UNAVAILABLE"})
+FINAL_C2PA_ATTENTION = {
+    "invalid": ("Final file's C2PA is invalid", "Submit the file exactly as signed, or declare and document the edits made after signing."),
+    "unreadable": ("Final file's C2PA cannot be read", "Re-export the file from the tool that signed it, or remove the damaged C2PA chunk and explain why."),
+    "untrusted": ("Final file's C2PA signer is not trusted", "Provide a manifest from a signer on the C2PA Trust List if the signature is meant to support the claims."),
+    "not_checked": ("Final file's C2PA not checked", "Install the required C2PA dependency (pip install -r requirements.txt), then rerun the assessment."),
+    "unclear": ("Final file's C2PA state unclear", "Check the manifest with the issuing tool, then resubmit."),
+}
 ATTENTION_FINDINGS = {
     "MISSING_OBJECT": ("Missing file", "Locate the original file; confirm its SHA-256 matches the manifest."),
     "PARSER_FAILED": ("Invalid evidence", "Replace or repair the file so its declared format can be parsed."),
@@ -357,9 +367,16 @@ def attention_items(response, file_names=None, policy_rules=None):
         and finding.get("parser_status") == "failed"
         and finding.get("evidence_hash")
     }
+    # The final artefact's C2PA state is summarised once; its detailed findings
+    # would repeat the same problem.
+    final_c2pa = next((item for item in findings if item.get("code") == "C2PA_FINAL_ATTESTATION"), None)
     for finding in findings:
         code = finding.get("code")
         if code in skip_findings:
+            continue
+        if (final_c2pa and code in FINAL_C2PA_DETAIL_FINDINGS
+                and finding.get("evidence_hash", final_c2pa.get("evidence_hash")) == final_c2pa.get("evidence_hash")
+                and finding.get("scope", "final") == "final"):
             continue
         if code == "PARSER_FAILED" and finding.get("evidence_hash") in failed_parser_hashes:
             continue
@@ -377,6 +394,11 @@ def attention_items(response, file_names=None, policy_rules=None):
                 "Review parser warnings and provide a complete supported evidence file."
                 if disposition == "unassessed" else
                 "Review this parser status; it was not assumed to pass or fail.")
+        elif code == "C2PA_FINAL_ATTESTATION":
+            state = finding.get("final_c2pa_state")
+            if state not in FINAL_C2PA_ATTENTION:
+                continue  # absent or trusted: nothing to act on
+            title, suggestion = FINAL_C2PA_ATTENTION[state]
         elif code in ATTENTION_FINDINGS:
             title, suggestion = ATTENTION_FINDINGS[code]
         else:
@@ -394,13 +416,81 @@ def attention_items(response, file_names=None, policy_rules=None):
 INSUFFICIENT_SUPPORT_REASONS = frozenset({
     "silent_signal", "insufficient_signal", "insufficient_landmarks", "insufficient_peaks",
     "insufficient_spectral_frames", "channel_cancellation"})
+# The GUI greys out lines containing this marker: a normal outcome, not an error.
+INSUFFICIENT_SUPPORT_LABEL = "insufficient support (normal outcome)"
+
+
+def _seconds(value):
+    return f"{value:.2f} s" if isinstance(value, (int, float)) else "?"
+
+
+def _not_completed(row):
+    """Text for a row that has no observation, or None when the row completed."""
+    if row.get("status") != "unavailable":
+        return None
+    if row.get("reason_code") in INSUFFICIENT_SUPPORT_REASONS:
+        return f"{INSUFFICIENT_SUPPORT_LABEL}: {row.get('message', '')}".rstrip()
+    if row.get("reason_code") == "provider_inputs_unavailable":
+        return f"not run: {row.get('message', '')}".rstrip()
+    return f"not run ({row.get('reason_code')}): {row.get('message', '')}".rstrip()
+
+
+def _pairs(rows, names):
+    """Group diagnostic rows by declared relationship, keeping submission order."""
+    groups = {}
+    for row in rows:
+        key = (row.get("relation_id"), row.get("selection_id"))
+        if key not in groups:
+            heading = (f"  {_hash_label(row.get('source_hash'), names)} → "
+                       f"{_hash_label(row.get('target_hash'), names)} [{row.get('relationship_type', '?')}]")
+            groups[key] = (heading, [])
+        groups[key][1].append(row)
+    return groups.values()
+
+
+def _fingerprint_line(row):
+    provider = row.get("provider", "?")
+    unavailable = _not_completed(row)
+    if unavailable:
+        return f"    - {provider}: {unavailable}"
+    matches = row.get("matches") or []
+    if not matches:
+        return f"    - {provider}: no shared passage found (absence is not evidence of independence)"
+    top = max(matches, key=lambda match: match.get("matched_token_pairs") or 0)
+    support = (top.get("support_assessment") or {}).get("status") if isinstance(top.get("support_assessment"), dict) else None
+    detail = f"{top.get('matched_token_pairs', '?')} matching token pairs"
+    detail += f"; {support.replace('_', ' ')}" if support else "; uncalibrated"
+    others = f"; {len(matches) - 1} weaker candidate offset(s)" if len(matches) > 1 else ""
+    return (f"    - {provider}: strongest offset source − target = "
+            f"{_seconds(top.get('source_minus_target_offset_seconds'))} ({detail}{others})")
+
+
+def _agreement_line(row, group):
+    unavailable = _not_completed(row)
+    inputs = [item for item in group if item.get("provider") in ("audfprint", "spectromap")
+              and item.get("status") == "unavailable"]
+    if (row.get("reason_code") == "provider_inputs_unavailable" and inputs
+            and all(item.get("reason_code") in INSUFFICIENT_SUPPORT_REASONS for item in inputs)):
+        # Agreement inherits the outcome of the fingerprint rows it needs.
+        unavailable = f"{INSUFFICIENT_SUPPORT_LABEL}: {row.get('message', '')}".rstrip()
+    if unavailable:
+        return f"    - both algorithms: {unavailable}"
+    matches = row.get("matches") or []
+    if not matches:
+        return "    - both algorithms: no offset where both voted"
+    top = max(matches, key=lambda match: min(match.get("audfprint_votes") or 0, match.get("spectromap_votes") or 0))
+    chance = (row.get("metrics") or {}).get("expected_chance_agreements")
+    chance_text = f"; agreements expected by chance ≈ {chance:.2g}" if isinstance(chance, (int, float)) else ""
+    return (f"    - both algorithms agree at source − target = "
+            f"{_seconds(top.get('source_minus_target_offset_seconds'))} "
+            f"(audfprint {top.get('audfprint_votes')} / SpectroMap {top.get('spectromap_votes')} votes{chance_text})")
 
 
 def audio_diagnostic_lines(response, file_names=None):
-    """Plain-language lines for the optional, report-only audio diagnostics.
+    """Plain-language fingerprint and structure lines for the report-only audio diagnostics.
 
-    These rows never affect scores and are not attention items. A candidate is a
-    content match found by a fingerprint/structure provider; it is not provenance.
+    These rows never affect scores and are not attention items. A shared offset is a
+    content match; it is not provenance.
     """
     names = file_names or {}
     checks = response.get("assessment_checks") or {}
@@ -413,89 +503,112 @@ def audio_diagnostic_lines(response, file_names=None):
         lines.append(f"  Not completed: {summary.get('message', summary['reason_code'])}")
     lines.append(f"  {summary.get('completed_provider_tasks', 0)} provider task(s) completed, "
                  f"{summary.get('unavailable_provider_tasks', 0)} unavailable.")
-    for row in (checks.get("audio_fingerprint") or []) + (checks.get("audio_structure") or []):
-        pair = f"{_hash_label(row.get('source_hash'), names)} → {_hash_label(row.get('target_hash'), names)}"
-        found = len(row.get("matches") or [])
-        state = row.get("status", "?")
-        if state == "unavailable" and row.get("reason_code") in INSUFFICIENT_SUPPORT_REASONS:
-            state = "insufficient support (normal outcome)"
-        detail = row.get("message", "")
-        lines.append(f"  - {row.get('provider', '?')} | {row.get('relationship_type', '?')} | {pair}: "
-                     f"{state}, {found} candidate(s). {detail}".rstrip())
+    rows = ((checks.get("audio_fingerprint") or []) + (checks.get("audio_fingerprint_agreement") or [])
+            + (checks.get("audio_structure") or []))
+    lines.extend(calibration_lines(rows + (checks.get("audio_semantics") or [])))
+    for heading, group in _pairs(rows, names):
+        lines.append(heading)
+        for row in group:
+            provider = row.get("provider")
+            if provider in ("audfprint", "spectromap"):
+                lines.append(_fingerprint_line(row))
+            elif provider == "fingerprint_agreement":
+                lines.append(_agreement_line(row, group))
+            else:
+                unavailable = _not_completed(row)
+                metrics = row.get("metrics") or {}
+                lines.append(f"    - {provider}: " + (unavailable or (
+                    f"{len(metrics.get('source_sections_seconds') or [])} source / "
+                    f"{len(metrics.get('target_sections_seconds') or [])} target acoustic sections "
+                    "(structure observation; uncalibrated)")))
     return lines
 
 
-_SEMANTIC_PRIORITY = ("tempo", "transpos", "pitch", "support", "status", "reason")
+def _plain_list(values):
+    return ", ".join(str(value).replace("_", " ") for value in values or []) or "none"
 
 
-def _plain(value, depth=0):
-    if isinstance(value, bool) or value is None:
-        return {True: "yes", False: "no", None: "n/a"}[value]
-    if isinstance(value, float):
-        return f"{value:.4g}"
-    if isinstance(value, (int, str)):
-        return str(value)
-    if isinstance(value, list):
-        if not value:
-            return "none"
-        if all(isinstance(v, (int, float, str, bool)) for v in value) and len(value) <= 6:
-            return ", ".join(_plain(v) for v in value)
-        return f"{len(value)} item(s)"
-    if isinstance(value, dict) and depth < 1:
-        return "; ".join(f"{k.replace('_', ' ')}: {_plain(v, depth + 1)}"
-                         for k, v in value.items())
-    return f"{len(value)} field(s)"
+def calibration_lines(rows):
+    """One line per provider: how far its results have been calibrated, and on what."""
+    seen, lines = {}, []
+    for row in rows:
+        if row.get("provider") not in seen and isinstance(row.get("calibration"), dict):
+            seen[row["provider"]] = row["calibration"]
+    if not seen:
+        return lines
+    lines.append("  Calibration (case counts on limited samples, not probabilities):")
+    for provider, record in seen.items():
+        status = str(record.get("status") or "unknown").replace("_", " ")
+        text = f"    - {provider}: {status}"
+        if record.get("transforms_tested"):
+            text += f"; tested: {_plain_list(record['transforms_tested'])}"
+        if record.get("not_tested") and record.get("not_tested") != ["all"]:
+            text += f"; not tested: {_plain_list(record['not_tested'])}"
+        rates = record.get("false_match_rates")
+        if isinstance(rates, dict) and rates.get("categories"):
+            parts = []
+            for name, item in rates["categories"].items():
+                label = name.replace("_", " ")
+                if "false_matches" in item:
+                    parts.append(f"{label} {item['false_matches']}/{item['pairs']} false")
+                elif "detected" in item:
+                    parts.append(f"{label} {item['detected']}/{item['pairs']} detected")
+                else:
+                    parts.append(f"{label} {item.get('supported')}/{item['pairs']} supported (unverified)")
+            text += "; benchmark: " + ", ".join(parts)
+        lines.append(text)
+    return lines
 
 
-def _find_semantics(node, context, found):
-    if isinstance(node, dict):
-        here = {key: node[key] for key in ("source_hash", "target_hash", "relationship_type",
-                                           "provider") if key in node} or context
-        for key, value in node.items():
-            if key == "music_semantics":
-                found.append((here, value))
-            else:
-                _find_semantics(value, here, found)
-    elif isinstance(node, list):
-        for item in node:
-            _find_semantics(item, context, found)
+def _reasons(assessment):
+    reasons = [str(item).replace("_", " ") for item in assessment.get("rejection_reasons") or []]
+    if len(reasons) > 3:
+        return ", ".join(reasons[:3]) + f", +{len(reasons) - 3} more"
+    return ", ".join(reasons)
+
+
+def _describe_file(description):
+    key = description.get("key") or {}
+    tonic = f"{key.get('tonic')} {key.get('mode')}" if key.get("tonic") else "key ?"
+    tempo = description.get("tempo_bpm")
+    return f"{tonic}, {tempo:.0f} BPM" if isinstance(tempo, (int, float)) else f"{tonic}, tempo not tracked"
 
 
 def music_semantics_lines(response, file_names=None):
-    """Summarise every ``music_semantics`` block (tempo scaling, transposition, support status).
+    """Summarise assessment_checks.audio_semantics: correspondence, transposition and tempo.
 
-    The block is located wherever it occurs in the response and shown without
-    interpretation: tempo/transposition/support/status/reason fields first, then the
-    remaining scalar fields. Nothing here affects scores.
+    Report-only: a musical correspondence indicates relatedness, never copying,
+    direction or authorship, and never changes a score.
     """
     names = file_names or {}
-    found = []
-    _find_semantics(response, {}, found)
-    if not found:
+    rows = (response.get("assessment_checks") or {}).get("audio_semantics") or []
+    if not rows:
         return []
-    lines = ["Music semantics (tempo scaling, transposition and support status; "
-             "report-only, a musical match is not proof of provenance):"]
-    for context, block in found:
-        entries = block if isinstance(block, list) else [block]
-        for entry in entries:
-            if not isinstance(entry, dict):
-                lines.append(f"  - {_plain(entry)}")
+    lines = ["Music semantics (report-only; a musical match is not proof of provenance):"]
+    for heading, group in _pairs(rows, names):
+        lines.append(heading)
+        for row in group:
+            unavailable = _not_completed(row)
+            if unavailable:
+                lines.append(f"    {unavailable}")
                 continue
-            where = []
-            if context.get("source_hash") or context.get("target_hash"):
-                where.append(f"{_hash_label(context.get('source_hash'), names) or '?'} → "
-                             f"{_hash_label(context.get('target_hash'), names) or '?'}")
-            for key in ("relationship_type", "provider"):
-                if context.get(key):
-                    where.append(str(context[key]))
-            lines.append("  - " + (" | ".join(where) if where else "music_semantics"))
-            keys = list(entry)
-            ordered = [k for p in _SEMANTIC_PRIORITY for k in keys
-                       if p in k.lower() and k not in ()]
-            ordered = list(dict.fromkeys(ordered))
-            rest = [k for k in keys if k not in ordered]
-            for key in ordered + rest[:8]:
-                lines.append(f"      {key.replace('_', ' ')}: {_plain(entry[key])}")
-            if len(rest) > 8:
-                lines.append(f"      … {len(rest) - 8} more field(s) in the saved JSON")
+            metrics = row.get("metrics") or {}
+            assessment = metrics.get("correspondence_assessment") or {}
+            status = str(assessment.get("status") or "not assessed")
+            reasons = _reasons(assessment)
+            lines.append(f"    Correspondence: {status.replace('_', ' ')}" + (f" ({reasons})" if reasons else ""))
+            shift, ratio, z = (metrics.get("transposition_semitones"), metrics.get("tempo_ratio"),
+                               metrics.get("harmonic_similarity_z"))
+            if shift is not None or ratio is not None:
+                parts = []
+                if shift is not None:
+                    parts.append(f"transposition {shift:+d} semitone(s)")
+                if isinstance(ratio, (int, float)):
+                    parts.append(f"tempo ratio {ratio:.3f}")
+                if isinstance(z, (int, float)):
+                    parts.append(f"harmonic z {z:.1f}")
+                lines.append("    " + "; ".join(parts).capitalize())
+            if metrics.get("source") and metrics.get("target"):
+                lines.append(f"    Source {_describe_file(metrics['source'])} → "
+                             f"target {_describe_file(metrics['target'])}")
     return lines

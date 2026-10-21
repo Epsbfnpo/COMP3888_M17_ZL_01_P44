@@ -169,9 +169,34 @@ def _stderr_tail(stderr):
     return " Provider stderr (tail): " + text[-STDERR_TAIL_CHARACTERS:]
 
 
+CALIBRATION_STATUS_PATH = Path(__file__).resolve().parents[2] / "policies" / "audio_calibration_status.json"
+
+
+def _calibration_status():
+    """Per-provider calibration evidence; providers without a record are exploratory."""
+    try:
+        raw = CALIBRATION_STATUS_PATH.read_bytes()
+        value = json.loads(raw)
+        return value, hashlib.sha256(raw).hexdigest()
+    except (OSError, ValueError):
+        return {"providers": {}}, None
+
+
+def _calibration(provider, status):
+    record = (status.get("providers") or {}).get(provider)
+    if record is None:
+        return {"status": "exploratory_uncalibrated", "summary": "No calibration record for this provider.",
+                "sample": None, "transforms_tested": [], "not_tested": ["all"], "false_match_rates": None}
+    return {"profile_id": status.get("profile_id"), **copy.deepcopy(record)}
+
+
 def _attach(response, rows, summary):
     # Copy-on-append: do not feed any observations back through core assessors.
     combined = copy.deepcopy(response)
+    status, status_sha256 = _calibration_status()
+    # Every row states how far its provider has been calibrated, beside the result.
+    rows = [{**row, "calibration": _calibration(row["provider"], status)} for row in rows]
+    summary = {**summary, "calibration_status_sha256": status_sha256}
     checks = combined.setdefault("assessment_checks", {})
     checks["audio_fingerprint"] = [row for row in rows if row["provider"] in ("audfprint", "spectromap")]
     checks["audio_structure"] = [row for row in rows if row["provider"] == "librosa"]

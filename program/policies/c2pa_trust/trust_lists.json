@@ -1,0 +1,48 @@
+{
+  "description": "Pinned C2PA trust configuration. Every file is pinned by the commit SHA of its source repository and by its own SHA-256; the evaluator refuses to run if a file does not match. A trusted signature identifies who signed a manifest, not that its claims are true. Revocation is not checked because validation runs offline.",
+  "official": {
+    "label": "C2PA Trust List",
+    "source": "https://github.com/c2pa-org/conformance-public",
+    "commit": "47009eedfe6721edd0ce3e69b89c1101cd6f03e5",
+    "commit_date": "2026-10-17",
+    "retrieved": "2026-10-21",
+    "files": {
+      "trust_anchors": {
+        "path": "official/C2PA-TRUST-LIST.pem",
+        "source_path": "trust-list/C2PA-TRUST-LIST.pem",
+        "sha256": "b3949271a07b007e92ef1d18050b55388f5e0d2686a16fd864176c48421af8ae"
+      },
+      "tsa_trust_anchors": {
+        "path": "official/C2PA-TSA-TRUST-LIST.pem",
+        "source_path": "trust-list/C2PA-TSA-TRUST-LIST.pem",
+        "sha256": "7182cb227c02701be0eebd67ab635fca7f85431c32796fb53b267c657cd2c675",
+        "note": "Pinned and recorded for reproducibility. c2pa-python 0.37.10 has no separate time-stamp authority anchor setting, so this list is not passed to the SDK."
+      }
+    }
+  },
+  "legacy_itl": {
+    "label": "Interim Trust List (legacy, frozen)",
+    "source": "https://github.com/contentauth/verify-site",
+    "commit": "83b2e30684086a62e132f5d4c148abd0151e9486",
+    "commit_date": "2026-04-21",
+    "retrieved": "2026-10-21",
+    "frozen_on": "2026-01-01",
+    "files": {
+      "trust_anchors": {
+        "path": "itl/anchors.pem",
+        "source_path": "static/trust/anchors.pem",
+        "sha256": "db57e50b9bd4e4c786cbb91f38fd85e2af6a9d5412438a8cddcc42688df07ae5"
+      },
+      "allowed_list": {
+        "path": "itl/allowed.pem",
+        "source_path": "static/trust/allowed.pem",
+        "sha256": "dfe328032e56f98b83f27f48a3642314124568b9f71ff471dffabf9b307c65d5"
+      },
+      "trust_config": {
+        "path": "itl/store.cfg",
+        "source_path": "static/trust/store.cfg",
+        "sha256": "1044c30a906b0c9cbe28b4a4c0002ca56a718f0ae22b9af83238543a07d0e718"
+      }
+    }
+  }
+}

@@ -37,6 +37,8 @@ from __future__ import annotations
 
 import argparse
 import dataclasses
+import datetime
+import hashlib
 import json
 import re
 import sys
@@ -94,6 +96,12 @@ class C2paParseResult:
     # Set when the signing certificate is on the local known-AI-generation-signer
     # list. This identifies the signer only; it is not a trust decision.
     known_ai_signer: Optional[dict] = None
+    # trusted_c2pa, trusted_legacy_itl, untrusted or invalid, from the pinned
+    # trust lists; None when no manifest was validated.
+    trust_status: Optional[str] = None
+    trust_source: Optional[dict] = None
+    trust_note: Optional[str] = None
+    revocation_status: Optional[str] = None
     warnings: List[str] = field(default_factory=list)
 
 
@@ -154,7 +162,115 @@ def _parse_signature_info(raw: Optional[dict]) -> Optional[C2paSignatureInfo]:
                              cert_serial_number=raw.get("cert_serial_number"))
 
 
-KNOWN_AI_SIGNERS_PATH = Path(__file__).resolve().parents[1] / "policies" / "c2pa_trust" / "known_ai_signers.json"
+TRUST_DIRECTORY = Path(__file__).resolve().parents[1] / "policies" / "c2pa_trust"
+TRUST_LISTS_PATH = TRUST_DIRECTORY / "trust_lists.json"
+KNOWN_AI_SIGNERS_PATH = TRUST_DIRECTORY / "known_ai_signers.json"
+_TRUST_CACHE: dict = {}
+
+
+class TrustListIntegrityError(RuntimeError):
+    """A pinned trust file is missing or differs from its recorded SHA-256."""
+
+
+def load_trust_configuration(path=None) -> dict:
+    """Load the pinned trust lists, refusing any file whose SHA-256 differs from the pin."""
+    path = Path(path or TRUST_LISTS_PATH)
+    key = str(path.resolve())
+    if key in _TRUST_CACHE:
+        return _TRUST_CACHE[key]
+    try:
+        raw = path.read_bytes()
+        manifest = json.loads(raw)
+        lists = {}
+        for list_id in ("official", "legacy_itl"):
+            entry = manifest[list_id]
+            contents, digests = {}, {}
+            for role, item in entry["files"].items():
+                data = (path.parent / item["path"]).read_bytes()
+                if hashlib.sha256(data).hexdigest() != item["sha256"]:
+                    raise TrustListIntegrityError(
+                        f"C2PA trust file {item['path']} does not match its pinned SHA-256; "
+                        "refusing to assess attestation with an unverified trust list.")
+                contents[role] = data.decode("utf-8")
+                digests[item["path"]] = item["sha256"]
+            lists[list_id] = {"label": entry["label"], "source": entry["source"], "commit": entry["commit"],
+                              "frozen_on": entry.get("frozen_on"), "contents": contents, "file_sha256": digests}
+    except TrustListIntegrityError:
+        raise
+    except (OSError, ValueError, KeyError) as exc:
+        raise TrustListIntegrityError(f"C2PA trust configuration {path} could not be loaded: {exc}") from exc
+    config = {"manifest_sha256": hashlib.sha256(raw).hexdigest(), "lists": lists}
+    _TRUST_CACHE[key] = config
+    return config
+
+
+def trust_configuration_record(path=None) -> dict:
+    """The pinned trust list versions, for recording in every result (no file contents)."""
+    config = load_trust_configuration(path)
+    return {"trust_lists_manifest_sha256": config["manifest_sha256"],
+            "revocation_status": "not_checked",
+            "lists": {list_id: {key: value for key, value in item.items() if key != "contents"}
+                      for list_id, item in config["lists"].items()}}
+
+
+def _trust_settings(trust_list=None) -> dict:
+    settings = {"verify": {"remote_manifest_fetch": False, "ocsp_fetch": False,
+                           "verify_trust": trust_list is not None}}
+    if trust_list is not None:
+        # No SDK setting exists for TSA anchors; an empty value is rejected by the SDK.
+        settings["trust"] = {role: text for role, text in trust_list["contents"].items()
+                             if role != "tsa_trust_anchors" and text.strip()}
+    return settings
+
+
+def _source(trust_list) -> dict:
+    return {"label": trust_list["label"], "source": trust_list["source"], "commit": trust_list["commit"]}
+
+
+def _signed_before(signature: Optional[dict], frozen_on: Optional[str]) -> bool:
+    """True only when the SDK reports a signing time earlier than the ITL freeze date."""
+    signed = (signature or {}).get("time")
+    if not signed or not frozen_on:
+        return False
+    try:
+        when = datetime.datetime.fromisoformat(str(signed).replace("Z", "+00:00"))
+        if when.tzinfo is None:
+            when = when.replace(tzinfo=datetime.timezone.utc)
+        return when < datetime.datetime.fromisoformat(frozen_on).replace(tzinfo=datetime.timezone.utc)
+    except ValueError:
+        return False
+
+
+def _trust_status(path: str, state: Optional[str], signature: Optional[dict], trust: dict):
+    """Classify the signer against the official list first, then the frozen legacy ITL."""
+    official, legacy = trust["lists"]["official"], trust["lists"]["legacy_itl"]
+    normalized = str(state or "").casefold()
+    if normalized == "invalid":
+        return "invalid", None, None
+    if normalized == "trusted":
+        return "trusted_c2pa", _source(official), None
+    context = None
+    try:
+        context = c2pa.Context.from_dict(_trust_settings(legacy))
+        reader = c2pa.Reader.try_create(path, context=context)
+        if reader is None:
+            return "untrusted", None, None
+        with reader:
+            legacy_state = str(reader.get_validation_state() or "").casefold()
+    except Exception:
+        return "untrusted", None, None
+    finally:
+        if context is not None:
+            context.close()
+    if legacy_state != "trusted":
+        return "untrusted", None, None
+    if _signed_before(signature, legacy["frozen_on"]):
+        return "trusted_legacy_itl", _source(legacy), None
+    return "untrusted", None, (
+        "The signer chains to the legacy Interim Trust List, but no signing time before its "
+        f"{legacy['frozen_on']} freeze was reported, so it is not treated as trusted.")
+
+
 _FINGERPRINT = re.compile(r"^[A-Za-z0-9+/]{43}=$")
 
 
@@ -238,11 +354,11 @@ def parse_c2pa_file(path: str) -> C2paParseResult:
             ],
         )
 
+    # Raises TrustListIntegrityError (not caught here) when a pinned file was changed.
+    trust = load_trust_configuration()
     context = None
     try:
-        context = c2pa.Context.from_dict({
-            "verify": {"remote_manifest_fetch": False, "ocsp_fetch": False}
-        })
+        context = c2pa.Context.from_dict(_trust_settings(trust["lists"]["official"]))
         reader = c2pa.Reader.try_create(path, context=context)
         if reader is None:
             return C2paParseResult(source_path=path, sdk_available=True,
@@ -284,6 +400,8 @@ def parse_c2pa_file(path: str) -> C2paParseResult:
             warnings=["manifest store read but no active manifest found"],
         )
 
+    trust_status, trust_source, trust_note = _trust_status(
+        path, validation_state, manifest.get("signature_info"), trust)
     return C2paParseResult(
         source_path=path,
         sdk_available=True,
@@ -300,6 +418,10 @@ def parse_c2pa_file(path: str) -> C2paParseResult:
         embedded=embedded,
         remote_url=remote_url,
         known_ai_signer=_known_ai_signer(path, manifest.get("signature_info")),
+        trust_status=trust_status,
+        trust_source=trust_source,
+        trust_note=trust_note,
+        revocation_status="not_checked",
     )
 
 

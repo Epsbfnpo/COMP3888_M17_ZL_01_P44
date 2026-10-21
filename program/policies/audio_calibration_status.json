@@ -1,0 +1,183 @@
+{
+  "description": "Calibration evidence attached to every audio diagnostic row. Figures are case counts from docs/AUDIO_CALIBRATION_2026-10-20.md and docs/AUDIO_DIAGNOSTICS.md, not probabilities. The frozen gate profile (audio_calibration_profile.json) is unchanged. false_match_rates are filled by benchmarks/false_match.py.",
+  "profile_id": "bounded-audio-2026-10-20-v2",
+  "providers": {
+    "audfprint": {
+      "status": "bounded_calibration",
+      "summary": "Excerpt and mixture-component offsets (error <= 0.1 s): development 26/28 found at density 40; held-out 15/16 found; 0/6 controls supported. Lumina false-match benchmark (2026-10-21): 0/5 same-genre and 0/4 same-prompt pairs matched; a shared drum loop was detected in 1/4 pairs at loop gain 0.5 and 4/4 at gain 1.0, at the correct offset.",
+      "sample": {
+        "development_cases": 28,
+        "held_out_cases": 16,
+        "controls": 6
+      },
+      "transforms_tested": [
+        "excerpt",
+        "mixture_component",
+        "unrelated_same_genre_tempo_key",
+        "same_prompt_regeneration",
+        "shared_loop_gain_0.5_and_1.0"
+      ],
+      "not_tested": [
+        "covers",
+        "pitch_shift",
+        "time_stretch",
+        "alternate_takes"
+      ],
+      "false_match_rates": {
+        "benchmark": "false_match_lumina_2026-10-21",
+        "definition": "a candidate offset whose support_assessment is supported_within_profile",
+        "date": "2026-10-21",
+        "categories": {
+          "same_genre_tempo_key": {
+            "pairs": 5,
+            "false_matches": 0
+          },
+          "same_prompt_regeneration": {
+            "pairs": 4,
+            "false_matches": 0
+          },
+          "cover_prompts_melody_unverified": {
+            "pairs": 6,
+            "false_matches": 0
+          },
+          "shared_loop": {
+            "pairs": 4,
+            "detected": 1,
+            "note": "The loop is real shared audio; a fingerprint match does not mean one song derives from the other."
+          },
+          "shared_loop_full_gain": {
+            "pairs": 4,
+            "detected": 4,
+            "note": "The loop is real shared audio; a fingerprint match does not mean one song derives from the other."
+          }
+        },
+        "scope": "Case counts on a small Lumina sample; not a population false-positive rate."
+      }
+    },
+    "music_semantics": {
+      "status": "bounded_calibration",
+      "summary": "Known DSP derivatives: development 7 Lumina families, 63 cases (59 supported, 4 abstained, transposition correct in 59/59, max tempo error 1.76%); validation 8 SALAMI families, 72 cases (57 supported, 15 abstained, 57/57 correct, max tempo error 1.27%). Controls: 0/22 and 0/29 supported. Sections: 16 SALAMI recordings, held-out boundary F@3s 0.538. Lumina false-match benchmark (2026-10-21): 0/5 same-genre, 0/4 same-prompt and 0/8 shared-loop pairs supported. Requested covers could not be verified as covers, so covers remain untested.",
+      "sample": {
+        "development_families": 7,
+        "development_cases": 63,
+        "validation_families": 8,
+        "validation_cases": 72,
+        "controls": 51,
+        "section_recordings": 16
+      },
+      "transforms_tested": [
+        "pitch_shift",
+        "time_stretch_0.8_to_1.35",
+        "excerpt",
+        "added_noise",
+        "mixture",
+        "unrelated_same_genre_tempo_key",
+        "same_prompt_regeneration",
+        "shared_loop_between_different_songs"
+      ],
+      "not_tested": [
+        "covers",
+        "reorchestrations",
+        "nonuniform_speed_changes",
+        "alternate_takes"
+      ],
+      "false_match_rates": {
+        "benchmark": "false_match_lumina_2026-10-21",
+        "definition": "correspondence_assessment.status is supported_within_profile",
+        "date": "2026-10-21",
+        "categories": {
+          "same_genre_tempo_key": {
+            "pairs": 5,
+            "false_matches": 0
+          },
+          "same_prompt_regeneration": {
+            "pairs": 4,
+            "false_matches": 0
+          },
+          "cover_prompts_melody_unverified": {
+            "pairs": 6,
+            "supported": 0,
+            "note": "Whether these clips share a composition is unverified, so musical correspondence is reported without classifying it as true or false."
+          },
+          "shared_loop": {
+            "pairs": 4,
+            "false_matches": 0
+          },
+          "shared_loop_full_gain": {
+            "pairs": 4,
+            "false_matches": 0
+          }
+        },
+        "scope": "Case counts on a small Lumina sample; not a population false-positive rate."
+      }
+    },
+    "spectromap": {
+      "status": "exploratory_uncalibrated",
+      "summary": "Upstream peak pairing on fixed windows; no thresholds have been calibrated. Candidate offsets are observations only.",
+      "sample": null,
+      "transforms_tested": [],
+      "not_tested": [
+        "all"
+      ],
+      "false_match_rates": null
+    },
+    "librosa": {
+      "status": "exploratory_uncalibrated",
+      "summary": "Per-file feature sections and repetitions; cross-file similarity is a summary only because unrelated material scored as high as related material on real recordings.",
+      "sample": null,
+      "transforms_tested": [],
+      "not_tested": [
+        "all"
+      ],
+      "false_match_rates": null
+    },
+    "fingerprint_agreement": {
+      "status": "exploratory_uncalibrated",
+      "summary": "Offsets where audfprint and SpectroMap both voted. On the Project Rock data it found 2 of 29 true takes inside final masters and 0 of 33 controls; both algorithms read the same audio, so agreement is not independent evidence.",
+      "sample": {
+        "true_takes": 29,
+        "controls": 33
+      },
+      "transforms_tested": [
+        "take_inside_final_master",
+        "unrelated_same_genre_tempo_key",
+        "same_prompt_regeneration",
+        "shared_loop_gain_0.5_and_1.0"
+      ],
+      "not_tested": [
+        "covers"
+      ],
+      "false_match_rates": {
+        "benchmark": "false_match_lumina_2026-10-21",
+        "definition": "an offset where audfprint and SpectroMap each cast at least 5 votes",
+        "date": "2026-10-21",
+        "categories": {
+          "same_genre_tempo_key": {
+            "pairs": 5,
+            "false_matches": 0
+          },
+          "same_prompt_regeneration": {
+            "pairs": 4,
+            "false_matches": 0
+          },
+          "cover_prompts_melody_unverified": {
+            "pairs": 6,
+            "false_matches": 0
+          },
+          "shared_loop": {
+            "pairs": 4,
+            "detected": 1,
+            "note": "The loop is real shared audio; a fingerprint match does not mean one song derives from the other."
+          },
+          "shared_loop_full_gain": {
+            "pairs": 4,
+            "detected": 4,
+            "note": "The loop is real shared audio; a fingerprint match does not mean one song derives from the other."
+          }
+        },
+        "scope": "Case counts on a small Lumina sample; not a population false-positive rate."
+      }
+    }
+  },
+  "false_match_updated": "2026-10-21"
+}

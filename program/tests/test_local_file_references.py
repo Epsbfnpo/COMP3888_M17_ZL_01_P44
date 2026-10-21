@@ -22,13 +22,13 @@ class LocalFileReferenceTests(unittest.TestCase):
         self.temp = tempfile.TemporaryDirectory()
         self.addCleanup(self.temp.cleanup)
         self.root = Path(self.temp.name)
-        self.source_dir = self.root / "Original audio – 音乐"
+        self.source_dir = self.root / "Original audio – Música"
         self.source_dir.mkdir()
-        self.bundle = self.root / "Submission folder – 提交"
+        self.bundle = self.root / "Submission folder – Envío"
         self.bundle.mkdir()
         existing = BASE / "examples" / "valid-generated" / "objects"
         sample = next(existing.glob("*.wav")).read_bytes()
-        self.source = self.source_dir / "Track one – 夜.wav"
+        self.source = self.source_dir / "Track one – Nuit d’été.wav"
         self.source.write_bytes(sample)
         self.digest = hashlib.sha256(sample).hexdigest()
         template_path = BASE / "examples" / "valid-generated" / "request.json"
@@ -57,7 +57,7 @@ class LocalFileReferenceTests(unittest.TestCase):
         self.assertEqual(
             (self.bundle / mapping[self.digest]).resolve(), self.source.resolve())
         self.assertIn("Original audio", mapping[self.digest])
-        self.assertIn("音乐", mapping[self.digest])
+        self.assertIn("Música", mapping[self.digest])
         self.assertTrue(Path(mapping[self.digest]).is_relative_to(".."))
 
     def test_reference_export_writes_no_object_and_verifies_identity(self):

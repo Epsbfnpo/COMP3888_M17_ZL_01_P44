@@ -25,7 +25,7 @@ import relationship_modes as RM
 import wav_probe
 import builder_operations as operations
 from builder_results import (
-    attention_items, attention_workflow_results, audio_diagnostic_lines,
+    INSUFFICIENT_SUPPORT_LABEL, attention_items, attention_workflow_results, audio_diagnostic_lines,
     music_semantics_lines)
 
 
@@ -683,6 +683,15 @@ class App(tk.Tk):
         self.assessment_text.configure(state="normal")
         self.assessment_text.delete("1.0", "end")
         self.assessment_text.insert("1.0", "\n".join(explanation))
+        # Too little signal is a normal outcome, so it is shown muted rather than as an error.
+        self.assessment_text.tag_configure("muted", foreground="gray")
+        position = "1.0"
+        while True:
+            position = self.assessment_text.search(INSUFFICIENT_SUPPORT_LABEL, position, stopindex="end")
+            if not position:
+                break
+            self.assessment_text.tag_add("muted", f"{position} linestart", f"{position} lineend")
+            position = f"{position} lineend"
         self.assessment_text.configure(state="disabled")
 
     def save_response(self):
