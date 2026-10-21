@@ -7,3 +7,15 @@ pypdf==6.19.0
 xmlschema==4.3.2
 numpy==2.2.6
 pyaaf2==1.7.1
+# C2PA verification is required: without it, signed AI-generation labels in
+# submitted audio cannot be checked against the submitter's declarations.
+c2pa-python==0.37.10
+cryptography==50.0.2
+cffi==2.1.1
+pycparser==3.11
+requests==2.34.2
+certifi==2026.7.22
+charset-normalizer==3.5.2
+idna==3.20
+urllib3==2.8.0
+toml==0.10.2

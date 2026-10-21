@@ -176,9 +176,8 @@ No offset, gain, channel matrix, or other signal parameter is estimated.
 From this directory, use Python 3.11 or later:
 
 ```bash
+# Includes the required C2PA SDK (c2pa-python) used for attestation checks:
 python3 -m pip install -r requirements.txt
-# Install the optional dependency only when C2PA SDK verification is required:
-python3 -m pip install -r requirements-c2pa.txt
 python3 -B run.py --native examples/valid-generated/submission.json --root examples/valid-generated
 ```
 

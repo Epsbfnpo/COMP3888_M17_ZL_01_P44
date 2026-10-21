@@ -369,6 +369,8 @@ class MusicSemanticsTests(unittest.TestCase):
                                                        intro_beats=8))
         cls.unrelated = task("unrelated", demo, synthetic_song(OTHER, "AABAB", seed=2))
         cls.reordered = task("reordered", demo, synthetic_song(POP, "BABAA", seed=3))
+        # A one-phrase loop used inside a longer song (e.g. a sample or stem in a mix).
+        cls.short_source = task("short_source", synthetic_song(POP, "A", seed=4), demo)
 
     @classmethod
     def tearDownClass(cls):
@@ -398,6 +400,19 @@ class MusicSemanticsTests(unittest.TestCase):
         self.assertLess(metrics["harmonic_similarity_z"], 2)
         self.assertEqual(metrics["matched_phrases"], 0)
         self.assertIsNone(metrics["phrase_order_preserved_fraction"])
+
+    def test_source_shorter_than_target_sections_does_not_fail_the_provider(self):
+        value = execute(self.short_source, "music_semantics", DEFAULTS["music_semantics"])
+        self.assertEqual(value["status"], "inconclusive", value.get("message"))
+        self.assertTrue(value["analysis_complete"])
+        rows = value["matches"] + value["metrics"]["section_matches"]
+        statuses = {row["match_status"] for row in rows}
+        self.assertIn("not_assessed_query_longer_than_source", statuses)
+        self.assertNotIn("not_assessed_local_match_failed", statuses)
+        for row in rows:
+            if row["match_status"] == "not_assessed_query_longer_than_source":
+                self.assertIsNone(row["harmonic_similarity"])
+                self.assertIsNone(row["source_range_seconds"])
 
     def test_reordered_form_is_visible(self):
         metrics = self.analyse(self.reordered)

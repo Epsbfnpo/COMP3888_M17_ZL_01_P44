@@ -120,8 +120,12 @@ def parse_bound_artefacts(native, chain, wav_observations):
                        if isinstance(item.get("c2pa"), dict)
                        and any("not installed" in warning for warning in item["c2pa"].get("warnings", []))]
         if unavailable:
+            # A missing required dependency silently disables the check that a
+            # signed AI-generation label agrees with the declared creation method.
             findings.append(_finding("C2PA_PARSER_UNAVAILABLE",
-                                     "c2pa-python is not installed; C2PA attestation was not assessed.", severity="low"))
+                                     "c2pa-python, a required dependency, is not installed; C2PA attestation "
+                                     "and C2PA cross-evidence checks were not assessed. Install it with "
+                                     "pip install -r requirements.txt.", severity="medium"))
     return observations, findings
 
 
@@ -270,6 +274,52 @@ def _unavailable_check(rule, reason, **extra):
     """Represent one failed comparison without failing unrelated checks."""
     return {"rule": rule, "status": "unavailable", "passed": None,
             "reason": reason, **extra}
+
+
+# SDK codes that report signer trust, not tampering; trust is assessed separately.
+_C2PA_TRUST_CODES = {"signingCredential.trusted", "signingCredential.untrusted"}
+_C2PA_CONTENT_BINDING_ASSERTIONS = ("assertion.dataHash.", "assertion.bmffHash.",
+                                    "assertion.boxesHash.", "assertion.collectionHash.")
+_C2PA_FAILURE_MESSAGES = {
+    "C2PA_CONTENT_BINDING_FAILED": (
+        "The C2PA manifest's content hash does not match this file: the audio changed after "
+        "signing, or the manifest was copied from another file. Its claims cannot be relied on."),
+    "C2PA_SIGNATURE_INVALID": (
+        "The C2PA claim signature or signing credential failed validation; the manifest may have "
+        "been altered after signing. Its claims cannot be relied on."),
+    "C2PA_VALIDATION_FAILED": "The C2PA manifest failed SDK validation; its claims cannot be relied on.",
+}
+
+
+def _c2pa_is_invalid(manifest):
+    return bool(manifest.get("present")) and str(manifest.get("validation_state") or "").casefold() == "invalid"
+
+
+def _c2pa_failure_codes(manifest):
+    """SDK failure codes for one manifest, excluding signer-trust status."""
+    codes = []
+
+    def walk(value, in_failure):
+        if isinstance(value, dict):
+            for key, item in value.items():
+                if key == "code" and in_failure and isinstance(item, str):
+                    codes.append(item)
+                else:
+                    walk(item, in_failure or key == "failure")
+        elif isinstance(value, list):
+            for item in value:
+                walk(item, in_failure)
+
+    walk(manifest.get("validation_results"), False)
+    return sorted(set(codes) - _C2PA_TRUST_CODES)
+
+
+def _c2pa_failure_finding_code(failures):
+    if any(code.startswith(_C2PA_CONTENT_BINDING_ASSERTIONS) for code in failures):
+        return "C2PA_CONTENT_BINDING_FAILED"
+    if any(code.startswith(("claimSignature.", "signingCredential.")) for code in failures):
+        return "C2PA_SIGNATURE_INVALID"
+    return "C2PA_VALIDATION_FAILED"
 
 
 def _c2pa_records(native, parser_observations):
@@ -516,6 +566,16 @@ class ExpandedCrossEvidencePass:
                 # the submitter; an unverified manifest is another declaration.
                 "evidence_tier": c2pa_tier(c2pa),
             }
+            if asset_hash == native.get("final_artefact_hash") and _c2pa_is_invalid(c2pa):
+                # The submitted final file is not the content the manifest signed,
+                # including a file edited after signing that kept the old manifest.
+                # This is an ordinary contradiction, not a severe-cap rule.
+                checks.append({
+                    "rule": "final_c2pa_manifest_validates",
+                    "passed": False,
+                    "validation_codes": _c2pa_failure_codes(c2pa),
+                    **common,
+                })
             if record["source_kind"] == "standalone":
                 checks.append({
                     "rule": "c2pa_standalone_manifest_bound_to_graph_asset",
@@ -641,42 +701,62 @@ class C2PAAttestationPass:
         }
 
     @staticmethod
+    def _failure_findings(records, final_hash):
+        """A failed manifest must be visible, not only a 0.0 that looks like absence."""
+        findings = []
+        for record in records:
+            manifest = record["manifest"]
+            if not _c2pa_is_invalid(manifest):
+                continue
+            failures = _c2pa_failure_codes(manifest)
+            code = _c2pa_failure_finding_code(failures)
+            final = record["asset_hash"] == final_hash
+            message = _C2PA_FAILURE_MESSAGES[code]
+            if not final:
+                message = "Supporting artefact: " + message
+            findings.append(_finding(code, message, record["asset_hash"], "medium" if final else "low",
+                                     scope="final" if final else "supporting",
+                                     source_kind=record["source_kind"], validation_codes=failures))
+        return findings
+
+    @staticmethod
     def evaluate(native, parser_observations):
         records = _c2pa_records(native, parser_observations)
         final_hash = native["final_artefact_hash"]
         reports = [C2PAAttestationPass._report(record, final_hash)
                    for record in records]
+        findings = C2PAAttestationPass._failure_findings(records, final_hash)
         final_records = [record["manifest"] for record in records
                          if record["asset_hash"] == final_hash]
         if not final_records:
             reason = "No C2PA parser record is bound to the final artefact. Supporting-node attestations do not raise the final attestation axis."
             installed = any(record["manifest"].get("sdk_available") for record in records)
             if not installed:
-                return _axis(reasoning=reason), {}, [], reports
+                return _axis(reasoning=reason), {}, findings, reports
             return _axis("available", 0.0, 0.9, reason), {
                 "validation_state": "manifest_absent", "signature_present": False,
                 "signature_valid": None, "cryptographically_valid": None,
-                "credential_trusted": None, "codes": [], "reasons": [reason]}, [], reports
+                "credential_trusted": None, "codes": [], "reasons": [reason]}, findings, reports
 
         installed = any(item.get("sdk_available") for item in final_records)
         reader_succeeded = any(item.get("reader_succeeded") for item in final_records)
         manifests = [item for item in final_records if item.get("present")]
         if not installed:
             reason = "C2PA SDK is unavailable for the final artefact, so no cryptographic attestation was assessed."
-            return _axis(reasoning=reason), {}, [], reports
+            return _axis(reasoning=reason), {}, findings, reports
         if not reader_succeeded:
             reason = "C2PA SDK was available, but it could not read the final artefact; absence and read failure cannot be conflated."
             return _axis("partial", None, 0.3, reason), {
                 "validation_state": "manifest_not_read", "signature_present": None,
                 "signature_valid": None, "cryptographically_valid": None,
                 "credential_trusted": None, "codes": [], "reasons": [reason]}, [
-                    _finding("C2PA_READ_FAILED", reason, final_hash, "low")], reports
+                    _finding("C2PA_READ_FAILED", reason, final_hash, "low")] + findings, reports
         if not manifests:
             reason = "C2PA SDK ran but found no active manifest associated with the final artefact."
             return _axis("available", 0.0, 0.9, reason), {
                 "validation_state": "manifest_absent", "signature_present": False,
                 "signature_valid": None, "cryptographically_valid": None,
-                "credential_trusted": None, "codes": [], "reasons": [reason]}, [], reports
+                "credential_trusted": None, "codes": [], "reasons": [reason]}, findings, reports
         signature = any(item.get("signature_info") for item in manifests)
         states = [str(item.get("validation_state")) for item in manifests
                   if item.get("validation_state") is not None]
@@ -699,12 +779,19 @@ class C2PAAttestationPass:
         else:
             value, availability, confidence = (0.5 if signature else 0.25), "partial", 0.6
             crypto = trusted = None
-        reason = (f"Active C2PA manifest for the final artefact parsed; SDK validation state={state}. "
-                  "Manifest claims and ingredient relationships remain claims even when content binding is valid.")
+        if state == "Invalid":
+            failures = sorted({code for item in manifests if _c2pa_is_invalid(item)
+                               for code in _c2pa_failure_codes(item)})
+            reason = ("Active C2PA manifest for the final artefact failed SDK validation "
+                      f"({', '.join(failures) or 'no failure code reported'}). "
+                      "Its claims and ingredient relationships cannot be relied on.")
+        else:
+            reason = (f"Active C2PA manifest for the final artefact parsed; SDK validation state={state}. "
+                      "Manifest claims and ingredient relationships remain claims even when content binding is valid.")
         validation = {"validation_state": state, "signature_present": signature,
                       "signature_valid": crypto, "cryptographically_valid": crypto,
                       "credential_trusted": trusted, "codes": codes, "reasons": [reason]}
-        return _axis(availability, value, confidence, reason), validation, [], reports
+        return _axis(availability, value, confidence, reason), validation, findings, reports
 
 
 class AIDisclosurePass:

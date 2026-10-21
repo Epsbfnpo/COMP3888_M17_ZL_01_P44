@@ -318,7 +318,22 @@ def _comparison(source, target, parameters, librosa):
             "time_grid_tempo": raster_tempo, "time_grid_quality": raster_quality, "time_grid_residual_fraction": raster_residual}
 
 
+def _unassessed_local_match(target, first, last, status, error=None):
+    """A local location that could not be searched; never a match or a rejection."""
+    row = {"target_range_seconds": [float(target["times"][first]), float(target["times"][last])],
+           "source_range_seconds": None, "harmonic_similarity": None, "match_status": status,
+           "location_ambiguous": False, "alternative_source_ranges_seconds": [], "alignment_quality": None}
+    if error is not None:
+        row["error"] = f"{type(error).__name__}: {error}"
+    return row, np.array([], dtype=int)
+
+
 def _local_match(source, target, first, last, shifted, target_unit, librosa):
+    # Subsequence DTW needs the query to fit inside the reference. When it does
+    # not, librosa transposes the cost matrix internally and the manual
+    # backtracking below would return swapped indices, so do not search.
+    if last - first > shifted.shape[1]:
+        return _unassessed_local_match(target, first, last, "not_assessed_query_longer_than_source")
     cosine, path, alternatives = _locate_candidates(target_unit[:, first:last], shifted, librosa)
     mapped = path[:, 1]
     absolute = np.column_stack((mapped, path[:, 0] + first))
@@ -356,10 +371,17 @@ def analyse(task, parameters, context=None):
     supported = assessment["status"] == "supported_within_profile"
     shift = best["transposition_semitones"]
     shifted, target_unit = _unit(np.roll(source["chroma"], shift, axis=0)), _unit(target["chroma"])
+    def local_match(first, last):
+        # One unsearchable location must not discard every other observation.
+        try:
+            return _local_match(source, target, first, last, shifted, target_unit, librosa)
+        except Exception as exc:
+            return _unassessed_local_match(target, first, last, "not_assessed_local_match_failed", exc)
+
     matches = []
     # Legacy beat phrases remain explicit compatibility diagnostics, never section boundaries.
     for (first, last), label in zip(target["bounds"], target["labels"]):
-        row, mapped = _local_match(source, target, first, last, shifted, target_unit, librosa)
+        row, mapped = local_match(first, last)
         row.update(target_phrase_label=label, source_phrase_labels=sorted({
             source["labels"][i] for i, (a, b) in enumerate(source["bounds"])
             if ((mapped >= a) & (mapped < b)).any()}))
@@ -368,12 +390,13 @@ def analyse(task, parameters, context=None):
     for section in target["sections"]:
         first = min(int(np.searchsorted(target["times"], section[0], side="right") - 1), target_unit.shape[1] - 1)
         last = min(max(first + 1, int(np.searchsorted(target["times"], section[1]))), target_unit.shape[1])
-        row, _ = _local_match(source, target, max(0, first), last, shifted, target_unit, librosa)
+        row, _ = local_match(max(0, first), last)
         row["detected_target_section_seconds"] = section
         section_matches.append(row)
-    qualifying = [row for row in matches if row["harmonic_similarity"] >= parameters["label_similarity"]
+    searched = [row for row in matches if row["harmonic_similarity"] is not None]
+    qualifying = [row for row in searched if row["harmonic_similarity"] >= parameters["label_similarity"]
                   and row["match_status"] != "rejected_path_quality"]
-    order_candidates = [row for row in matches if row["harmonic_similarity"] >= parameters["label_similarity"]]
+    order_candidates = [row for row in searched if row["harmonic_similarity"] >= parameters["label_similarity"]]
     starts = [row["source_range_seconds"][0] for row in order_candidates]
     order_ambiguous = any(row["location_ambiguous"] for row in order_candidates)
     order_rejected = any(row["match_status"] == "rejected_path_quality" for row in order_candidates)

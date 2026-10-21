@@ -112,7 +112,7 @@ For **every** response in the matrix, check automatically:
 
 A test that hand-writes `"trust": "Trusted"` into a fixture is **not** a C2PA integration test. For C2PA:
 
-- Install `requirements-c2pa.txt` (pinned `c2pa-python==0.37.10`).
+- Install `requirements.txt`, which pins the required `c2pa-python==0.37.10`.
 - Use real signed files: one valid, one with the asset modified after signing, one with an untrusted certificate.
 - Expected: valid → attestation available; modified → validation failure reported; untrusted → not reported as trusted.
 - Run the same three files **without** the SDK installed: attestation must be `unavailable` with

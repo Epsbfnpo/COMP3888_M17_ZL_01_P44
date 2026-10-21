@@ -84,7 +84,7 @@ python3 -B run.py --request /path/to/request.json --root /path/to/case-root
 |---|---|
 | completeness | Native submissions evaluate applicable workflow expectations; public WAV-only requests retain limited declared-object availability. |
 | integrity | Separately reports file binding, structural validity, declaration consistency, CrossEvidence, cryptographic attestation, and a policy-disabled physical diagnostic layer. Signal results never contribute to integrity; structural validity and C2PA attestation also do not raise it. The claim-ledger scoring redesign is future work. |
-| attestation_strength | C2PA manifest/validation/trust levels when the optional SDK assesses them; otherwise unavailable. |
+| attestation_strength | C2PA manifest/validation/trust levels assessed by the C2PA SDK (a required dependency); unavailable only if the installation is incomplete. |
 | ai_disclosure | Wire key retained; display Creation-method disclosure coverage. Structured counts in `assessment_checks.ai_disclosure_coverage`; no content AI detection or declaration-truth verification. |
 
 All unsupported axes have null value and confidence. Confidence is also null for the limited completeness metric because no confidence model is defined.

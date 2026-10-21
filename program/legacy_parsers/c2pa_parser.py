@@ -20,10 +20,10 @@ Scope (small baseline -- see parser/README.md):
   output, just a best-effort baseline extraction.
 - Does NOT re-evaluate, score, or trust-judge validation results --
   `validation_status` is passed through as-is, unexamined.
-- `c2pa-python` is an OPTIONAL dependency (see parser/pyproject.toml's
-  `c2pa` extra). If it isn't installed, parsing degrades to a clear,
-  actionable warning instead of a crash, so rin_parser.py/ern_parser.py
-  remain usable standalone.
+- `c2pa-python` is a required dependency of the evaluator (pinned in
+  program/requirements.txt). The import is still guarded so that a broken
+  installation degrades to a clear, actionable warning instead of a crash,
+  and rin_parser.py/ern_parser.py remain usable standalone.
 - No C2PA test fixture is bundled with this baseline -- see parser/README.md
   limitations.
 
@@ -46,7 +46,7 @@ from typing import Any, List, Optional
 try:
     import c2pa  # type: ignore
 except ImportError:
-    c2pa = None  # optional dependency; see module docstring
+    c2pa = None  # required dependency missing; see module docstring
 
 
 @dataclass
@@ -157,8 +157,8 @@ def parse_c2pa_file(path: str) -> C2paParseResult:
             source_path=path,
             sdk_available=False,
             warnings=[
-                "c2pa-python is not installed; install the optional extra with "
-                "pip install -r requirements-c2pa.txt to enable C2PA parsing."
+                "c2pa-python is not installed; it is a required dependency. "
+                "Install it with pip install -r requirements.txt to enable C2PA parsing."
             ],
         )
 
