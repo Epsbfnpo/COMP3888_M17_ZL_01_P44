@@ -1627,12 +1627,17 @@ class TargetTests(unittest.TestCase):
                                    parser_observations, workflow_input, scoring_profile=legacy)
         self.assertAlmostEqual(released["value"], 1.0)
 
-    def test_only_a_validated_c2pa_manifest_is_a_signed_tier(self):
+    def test_c2pa_tier_is_asymmetric(self):
         from music_target.evidence_tiers import c2pa_tier
-        self.assertEqual(c2pa_tier({"validation_state": "Valid"}), "signed_attestation")
+        # Supporting human authorship needs a trusted signer; a valid self-made signature is not enough.
         self.assertEqual(c2pa_tier({"validation_state": "Trusted"}), "signed_attestation")
-        for state in ("Invalid", None, "manifest_parsed"):
+        for state in ("Valid", "Invalid", None, "manifest_parsed"):
             self.assertEqual(c2pa_tier({"validation_state": state}), "submitter_document")
+        # An AI label is believed from any valid signature or a known AI generation signer.
+        self.assertEqual(c2pa_tier({"validation_state": "Valid"}, reduces_human_share=True), "signed_attestation")
+        self.assertEqual(c2pa_tier({"validation_state": "Invalid", "known_ai_signer": {"name": "Tool"}},
+                                   reduces_human_share=True), "signed_attestation")
+        self.assertEqual(c2pa_tier({"validation_state": "Invalid"}, reduces_human_share=True), "submitter_document")
 
     def test_unknown_support_tier_is_rejected(self):
         with tempfile.TemporaryDirectory() as directory:

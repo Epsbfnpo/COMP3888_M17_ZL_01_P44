@@ -41,6 +41,7 @@ import json
 import re
 import sys
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import Any, List, Optional
 
 try:
@@ -70,6 +71,8 @@ class C2paSignatureInfo:
     issuer: Optional[str] = None
     time: Optional[str] = None
     alg: Optional[str] = None
+    common_name: Optional[str] = None
+    cert_serial_number: Optional[str] = None
 
 
 @dataclass
@@ -88,6 +91,9 @@ class C2paParseResult:
     validation_results: Any = None
     embedded: Optional[bool] = None
     remote_url: Optional[str] = None
+    # Set when the signing certificate is on the local known-AI-generation-signer
+    # list. This identifies the signer only; it is not a trust decision.
+    known_ai_signer: Optional[dict] = None
     warnings: List[str] = field(default_factory=list)
 
 
@@ -143,7 +149,77 @@ def _parse_ingredient(raw: dict) -> C2paIngredient:
 def _parse_signature_info(raw: Optional[dict]) -> Optional[C2paSignatureInfo]:
     if not raw:
         return None
-    return C2paSignatureInfo(issuer=raw.get("issuer"), time=raw.get("time"), alg=raw.get("alg"))
+    return C2paSignatureInfo(issuer=raw.get("issuer"), time=raw.get("time"), alg=raw.get("alg"),
+                             common_name=raw.get("common_name"),
+                             cert_serial_number=raw.get("cert_serial_number"))
+
+
+KNOWN_AI_SIGNERS_PATH = Path(__file__).resolve().parents[1] / "policies" / "c2pa_trust" / "known_ai_signers.json"
+_FINGERPRINT = re.compile(r"^[A-Za-z0-9+/]{43}=$")
+
+
+def load_known_ai_signers(path=None) -> List[dict]:
+    """Signing certificates of known AI generation tools, matched by SHA-256 fingerprint.
+
+    The SDK only accepts base64-encoded SHA-256 fingerprints in an allowed list;
+    a hex value would be ignored silently, so the format is checked here.
+    """
+    path = Path(path or KNOWN_AI_SIGNERS_PATH)
+    if not path.exists():
+        return []
+    signers = json.loads(path.read_text(encoding="utf-8")).get("signers") or []
+    for signer in signers:
+        if not str(signer.get("name") or "").strip():
+            raise ValueError(f"{path}: every known AI signer needs a name.")
+        if not _FINGERPRINT.match(str(signer.get("fingerprint_sha256_base64") or "")):
+            raise ValueError(f"{path}: {signer['name']} needs a base64 SHA-256 certificate fingerprint.")
+    return signers
+
+
+def _codes(value) -> List[str]:
+    if isinstance(value, dict):
+        return [item for key, child in value.items()
+                for item in ([child] if key == "code" and isinstance(child, str) else _codes(child))]
+    if isinstance(value, list):
+        return [item for child in value for item in _codes(child)]
+    return []
+
+
+def _known_ai_signer(path: str, signature: Optional[dict]) -> Optional[dict]:
+    """Match the signing certificate against the known-AI-signer list.
+
+    The SDK compares certificate fingerprints when they are supplied as an
+    allowed list, so the file is read once more with only that list. A match is
+    reported even when the manifest itself is invalid (for example the audio was
+    edited after signing): it still identifies who signed the AI label.
+    """
+    signers = load_known_ai_signers()
+    if not signers:
+        return None
+    allowed = "\n".join(signer["fingerprint_sha256_base64"] for signer in signers) + "\n"
+    context = c2pa.Context.from_dict({
+        "verify": {"remote_manifest_fetch": False, "ocsp_fetch": False, "verify_trust": True},
+        "trust": {"allowed_list": allowed},
+    })
+    try:
+        reader = c2pa.Reader.try_create(path, context=context)
+        if reader is None:
+            return None
+        with reader:
+            codes = _codes(reader.get_validation_results())
+    except Exception:
+        return None
+    finally:
+        context.close()
+    if "signingCredential.trusted" not in codes:
+        return None
+    serial = (signature or {}).get("cert_serial_number")
+    matches = [signer for signer in signers
+               if serial and str(signer.get("certificate_serial_number")) == str(serial)]
+    entry = matches[0] if len(matches) == 1 else None
+    return {"name": entry["name"] if entry else "Unidentified entry on the known AI signer list",
+            "fingerprint_sha256_base64": entry["fingerprint_sha256_base64"] if entry else None,
+            "match_method": "sdk_allowed_list_certificate_fingerprint"}
 
 
 def parse_c2pa_file(path: str) -> C2paParseResult:
@@ -223,6 +299,7 @@ def parse_c2pa_file(path: str) -> C2paParseResult:
         validation_results=validation_results,
         embedded=embedded,
         remote_url=remote_url,
+        known_ai_signer=_known_ai_signer(path, manifest.get("signature_info")),
     )
 
 

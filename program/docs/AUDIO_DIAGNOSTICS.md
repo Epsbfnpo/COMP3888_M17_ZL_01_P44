@@ -121,6 +121,17 @@ Only currently supported WAV encodings are accepted. The optional libraries do
 not silently extend the evaluator's accepted file formats. Silence and mono
 channel cancellation are reported as unavailable, never as contradictions.
 
+Too little usable signal is a normal analytical outcome, not a failure to run.
+Rows that are unavailable because of `silent_signal`, `insufficient_signal`,
+`insufficient_landmarks`, `insufficient_peaks`, `insufficient_spectral_frames` or
+`channel_cancellation` (and agreement rows that lack inputs only for those
+reasons) append `AUDIO_INSUFFICIENT_SUPPORT` with `outcome:
+insufficient_support`. `AUDIO_DIAGNOSTIC_UNAVAILABLE` with `outcome: not_run` is
+kept for diagnostics that could not run, such as `provider_failed`,
+`caller_timeout`, `dependency_unavailable` or an invalid declared range.
+Completed observations carry `outcome: completed`; a completed non-match or an
+abstained musical comparison is already a normal inconclusive observation.
+
 Provider failures stay structured. A result that breaks the protocol inside
 the worker, for example a non-finite metric or a changed identity field,
 becomes `unavailable` with `invalid_provider_output`. If a worker process

@@ -13,12 +13,25 @@ RECORDER_METADATA = "recorder_metadata"
 SUBMITTER_DOCUMENT = "submitter_document"
 TIERS = (SIGNED_ATTESTATION, RECORDER_METADATA, SUBMITTER_DOCUMENT)
 
-# C2PA SDK validation states that mean the manifest signature verified.
-VERIFIED_C2PA_STATES = {"valid", "trusted"}
+# A signature that merely validates can come from a self-made certificate, so
+# only a credential the SDK reports as trusted identifies an accountable signer.
+VERIFIED_C2PA_STATES = {"trusted"}
+# The signature itself verified, whoever the signer is.
+SIGNATURE_VALID_C2PA_STATES = {"valid", "trusted"}
 
 
-def c2pa_tier(manifest):
-    state = str((manifest or {}).get("validation_state") or "").casefold()
+def c2pa_tier(manifest, reduces_human_share=False):
+    """Trust is asymmetric.
+
+    Evidence that lowers the human share of a work (an AI-generation label) is
+    accepted from any valid signature or from a known AI generation signer:
+    nobody gains by forging a claim that only hurts their own assessment.
+    Evidence that supports human authorship needs a trusted signer.
+    """
+    manifest = manifest or {}
+    state = str(manifest.get("validation_state") or "").casefold()
+    if reduces_human_share and (state in SIGNATURE_VALID_C2PA_STATES or manifest.get("known_ai_signer")):
+        return SIGNED_ATTESTATION
     return SIGNED_ATTESTATION if state in VERIFIED_C2PA_STATES else SUBMITTER_DOCUMENT
 
 

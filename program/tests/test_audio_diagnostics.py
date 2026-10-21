@@ -470,6 +470,38 @@ class NonFinalVersionTests(unittest.TestCase):
         self.assertGreater(semantics["harmonic_similarity_z"], 5)
 
 
+class InsufficientSupportFindingTests(unittest.TestCase):
+    """Too little signal is a normal outcome; only a failure to run is 'unavailable'."""
+
+    @staticmethod
+    def task(name):
+        return {"task_id": f"{name}:0", "relation_id": name, "source_hash": "1" * 64,
+                "target_hash": "2" * 64, "relationship_type": "excerpted_from"}
+
+    def test_insufficient_signal_and_failures_are_reported_differently(self):
+        from music_target.audio_diagnostics.agreement import AGREEMENT
+        from music_target.audio_diagnostics.contracts import unavailable
+        from music_target.audio_diagnostics.runner import _attach
+        silent, failed = self.task("silent"), self.task("failed")
+        rows = [unavailable(silent, "audfprint", "silent_signal", "Selected audio is silent."),
+                unavailable(silent, "spectromap", "silent_signal", "Selected audio is silent."),
+                unavailable(silent, AGREEMENT, "provider_inputs_unavailable", "Agreement needs both analyses."),
+                unavailable(silent, "music_semantics", "insufficient_signal", "Too little audio."),
+                unavailable(failed, "audfprint", "provider_failed", "IndexError: boom"),
+                unavailable(failed, "spectromap", "caller_timeout", "No caller time remains."),
+                unavailable(failed, AGREEMENT, "provider_inputs_unavailable", "Agreement needs both analyses.")]
+        response = _attach({"findings": [], "assessment_checks": {}}, rows,
+                           {"task_count": 2, "completed_provider_tasks": 0, "unavailable_provider_tasks": 7})
+        by_task = {}
+        for finding in response["findings"]:
+            by_task.setdefault(finding["diagnostic_id"].split(":")[0], set()).add(
+                (finding["code"], finding["outcome"], finding["severity"]))
+        self.assertEqual(by_task["silent"], {("AUDIO_INSUFFICIENT_SUPPORT", "insufficient_support", "info")})
+        self.assertEqual(by_task["failed"], {("AUDIO_DIAGNOSTIC_UNAVAILABLE", "not_run", "info")})
+        silent_messages = [f["message"] for f in response["findings"] if f["code"] == "AUDIO_INSUFFICIENT_SUPPORT"]
+        self.assertTrue(all("normal outcome, not an error" in message for message in silent_messages))
+
+
 class FingerprintAgreementTests(unittest.TestCase):
     task = {"task_id": "a:0", "relation_id": "a", "source_hash": "1" * 64, "target_hash": "2" * 64,
             "relationship_type": "derived_from"}

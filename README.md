@@ -219,9 +219,23 @@ Every cross-evidence check records an `evidence_tier`:
 
 | Tier | Source | Qualifies release with the required layer coverage? |
 |---|---|---|
-| `signed_attestation` | A C2PA manifest whose signature validated (`Valid`/`Trusted`) | Yes |
+| `signed_attestation` | A C2PA manifest from a trusted signer (`Trusted`); or an AI-generation label from any valid signature or from a known AI generation signer (see below) | Yes |
 | `recorder_metadata` | Submitted documents compared with BWF `bext`/iXML fields observed in a hash-bound WAV; their writer is not authenticated | Yes |
 | `submitter_document` | RIN, ERN, CompSheet, CueSheet, MIDI, DAW sessions, AAF, sound reports and unverified C2PA, compared with the graph, declarations or measured file properties | No |
+
+C2PA trust is asymmetric. A self-made certificate still produces a `Valid`
+signature, so a valid signature alone identifies no accountable signer.
+Evidence that lowers the human share of a work (an AI-generation source type,
+or any manifest signed by a certificate in
+`policies/c2pa_trust/known_ai_signers.json`) is accepted: nobody gains by
+forging a claim that only hurts their own assessment. Such manifests report
+`C2PA_KNOWN_AI_SIGNER` when the signer is listed, at medium severity if the
+artefact was not declared `ai-generated`. A manifest that supports human
+authorship needs a `Trusted` signer; a valid but untrusted one is a submitter
+document, cannot qualify Integrity for release, and reports
+`C2PA_SIGNER_UNTRUSTED`. A trusted signature identifies who signed, not that
+the claims are true. Known-signer fingerprints are base64 SHA-256 digests of the
+signing certificate; the C2PA SDK ignores other formats silently.
 
 Submitter documents are declarations in another format: the submitter could
 export an AAF and build the graph from it, so agreement between the two proves

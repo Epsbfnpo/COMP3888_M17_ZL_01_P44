@@ -1,0 +1,15 @@
+{
+  "description": "Signing certificates of known AI generation tools. A C2PA manifest signed by one of these certificates is reported as evidence that the content is AI-generated, even though the signer is not on a C2PA trust list. Evidence that lowers the human share of a work is accepted; this list never makes a signer trusted for claims that support human authorship. Fingerprints are base64-encoded SHA-256 digests of the DER signing certificate, the format the C2PA SDK expects in an allowed list.",
+  "signers": [
+    {
+      "name": "BytePlus Lumina (Seed Audio)",
+      "fingerprint_sha256_base64": "zmSDl9WSNf4bqBWfcq48MjUta9svR/aWaR4UKEUGgPk=",
+      "fingerprint_sha256_hex": "ce648397d59235fe1ba8159f72ae3c32352d6bdb2f47f696691e1428450680f9",
+      "certificate_subject": "CN=certificate@byteplus.com, O=Byteplus Pte. Ltd.",
+      "certificate_issuer": "CN=GlobalSign GCC R45 SMIME CA 2025, O=GlobalSign nv-sa",
+      "certificate_serial_number": "8582448330129485046574301241",
+      "valid_until": "2028-03-16",
+      "source": "Extracted from Lumina audio output on 2026-10-21. Confirm with BytePlus before relying on it for production."
+    }
+  ]
+}

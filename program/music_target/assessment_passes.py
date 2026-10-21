@@ -291,6 +291,18 @@ _C2PA_FAILURE_MESSAGES = {
 }
 
 
+def _c2pa_reduces_human_share(manifest):
+    """An AI-generation source type, or any manifest signed by a known AI generation signer."""
+    source_types = [str(item).casefold() for item in manifest.get("digital_source_types") or []]
+    return bool(manifest.get("known_ai_signer")) or any("trainedalgorithmic" in item for item in source_types)
+
+
+def _c2pa_signer_label(manifest):
+    signature = manifest.get("signature_info") or {}
+    parts = [signature.get("issuer"), signature.get("common_name")]
+    return ", ".join(str(part) for part in parts if part) or "unknown signer"
+
+
 def _c2pa_is_invalid(manifest):
     return bool(manifest.get("present")) and str(manifest.get("validation_state") or "").casefold() == "invalid"
 
@@ -614,17 +626,22 @@ class ExpandedCrossEvidencePass:
                                 **common,
                             })
             source_types = [str(item) for item in c2pa.get("digital_source_types", [])]
-            ai_claimed = any("trainedalgorithmic" in item.casefold() for item in source_types)
+            known_signer = c2pa.get("known_ai_signer")
+            ai_claimed = _c2pa_reduces_human_share(c2pa)
             if asset_hash in nodes:
                 creation = (nodes[asset_hash].get("attributes") or {}).get("creation_method")
                 methods = {creation} if isinstance(creation, str) else set(creation or [])
-                if source_types and methods:
+                if (source_types or known_signer) and methods:
                     checks.append({
                         "rule": "c2pa_ai_source_type_matches_creation_method",
                         "passed": ("ai-generated" in methods) if ai_claimed else True,
                         "digital_source_types": source_types,
                         "creation_method": sorted(methods),
                         **common,
+                        # An AI label is believed from any valid signature or a known AI
+                        # signer; a label supporting human authorship needs a trusted one.
+                        "evidence_tier": c2pa_tier(c2pa, reduces_human_share=ai_claimed),
+                        **({"known_ai_signer": known_signer.get("name")} if known_signer else {}),
                     })
 
         if "includes_ai_generated_audio" in set((workflow_input or {}).get("modifiers") or []):
@@ -695,6 +712,7 @@ class C2PAAttestationPass:
             "manifest_present": present,
             "signature_present": bool(manifest.get("signature_info")) if present else False,
             "validation_state": reported_state,
+            "known_ai_signer": (manifest.get("known_ai_signer") or {}).get("name"),
             "validation_codes": sorted(set(
                 C2PAAttestationPass._collect_codes(
                     manifest.get("validation_results")))),
@@ -720,12 +738,47 @@ class C2PAAttestationPass:
         return findings
 
     @staticmethod
+    def _signer_findings(native, records, final_hash):
+        """Report who signed; an AI label is accepted, a human-authorship signature needs trust."""
+        nodes = {node["artefact_hash"]: node for node in native.get("artefacts", [])}
+        findings = []
+        for record in records:
+            manifest = record["manifest"]
+            if not manifest.get("present"):
+                continue
+            final = record["asset_hash"] == final_hash
+            scope = "final" if final else "supporting"
+            signer = _c2pa_signer_label(manifest)
+            known = manifest.get("known_ai_signer")
+            state = str(manifest.get("validation_state") or "").casefold()
+            if known:
+                creation = ((nodes.get(record["asset_hash"]) or {}).get("attributes") or {}).get("creation_method")
+                methods = {creation} if isinstance(creation, str) else set(creation or [])
+                undeclared = bool(methods) and "ai-generated" not in methods
+                message = (f"The C2PA manifest is signed by a known AI generation signer ({known['name']}). "
+                           "Evidence that lowers the human share of a work is accepted even though this signer "
+                           "is not on a C2PA trust list.")
+                if undeclared:
+                    message += " The submitter did not declare this artefact as ai-generated."
+                findings.append(_finding("C2PA_KNOWN_AI_SIGNER", message, record["asset_hash"],
+                                         "medium" if undeclared else "info", scope=scope,
+                                         known_ai_signer=known["name"], signer=signer))
+            elif state == "valid" and not _c2pa_reduces_human_share(manifest):
+                message = (f"The C2PA signature is valid but its signer ({signer}) is not on a configured trust "
+                           "list. A signature identifies who signed, not that the claims are true; this manifest "
+                           "is treated as a submitter-supplied document and cannot qualify Integrity for release.")
+                findings.append(_finding("C2PA_SIGNER_UNTRUSTED", message, record["asset_hash"],
+                                         "medium" if final else "low", scope=scope, signer=signer))
+        return findings
+
+    @staticmethod
     def evaluate(native, parser_observations):
         records = _c2pa_records(native, parser_observations)
         final_hash = native["final_artefact_hash"]
         reports = [C2PAAttestationPass._report(record, final_hash)
                    for record in records]
-        findings = C2PAAttestationPass._failure_findings(records, final_hash)
+        findings = (C2PAAttestationPass._failure_findings(records, final_hash) +
+                    C2PAAttestationPass._signer_findings(native, records, final_hash))
         final_records = [record["manifest"] for record in records
                          if record["asset_hash"] == final_hash]
         if not final_records:

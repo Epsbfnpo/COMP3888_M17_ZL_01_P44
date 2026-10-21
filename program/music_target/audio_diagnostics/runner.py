@@ -19,6 +19,25 @@ from .policy import load_policy
 from .tasks import build_tasks
 
 STDERR_TAIL_CHARACTERS = 2000
+# Too little usable signal is a normal analytical outcome, not a failure to run.
+INSUFFICIENT_SUPPORT_REASONS = frozenset({
+    "silent_signal", "insufficient_signal", "insufficient_landmarks", "insufficient_peaks",
+    "insufficient_spectral_frames", "channel_cancellation"})
+
+
+def _insufficient_support(row, rows):
+    """True when a row could not conclude because the audio offered too little to compare."""
+    if row["status"] != "unavailable":
+        return False
+    if row["reason_code"] in INSUFFICIENT_SUPPORT_REASONS:
+        return True
+    if row["provider"] == AGREEMENT and row["reason_code"] == "provider_inputs_unavailable":
+        # Agreement inherits the outcome of the fingerprint rows it needs.
+        task = row["diagnostic_id"].rsplit(":", 1)[0]
+        inputs = [item for item in rows if item["provider"] in ("audfprint", "spectromap")
+                  and item["diagnostic_id"].rsplit(":", 1)[0] == task and item["status"] == "unavailable"]
+        return bool(inputs) and all(item["reason_code"] in INSUFFICIENT_SUPPORT_REASONS for item in inputs)
+    return False
 
 
 def _snapshot(root, relative, digest, directory, deadline):
@@ -165,13 +184,21 @@ def _attach(response, rows, summary):
                          AGREEMENT: "AUDIO_FINGERPRINT_AGREEMENT_OBSERVATION",
                          "music_semantics": "AUDIO_SEMANTIC_OBSERVATION"}
     for row in rows:
-        code = ("AUDIO_DIAGNOSTIC_UNAVAILABLE" if row["status"] == "unavailable" else
-                observation_codes.get(row["provider"], "AUDIO_FINGERPRINT_OBSERVATION"))
-        counted = {AGREEMENT: " offset(s) where both fingerprint algorithms voted, for ",
-                   "music_semantics": " aligned phrase(s) for "}.get(row["provider"], " content candidate(s) for ")
-        message = (row["provider"] + ": " + str(len(row["matches"])) + counted +
-                   row["relationship_type"] + ". " + row["message"])
-        combined["findings"].append({"code": code, "severity": "info", "message": message,
+        if _insufficient_support(row, rows):
+            code, outcome = "AUDIO_INSUFFICIENT_SUPPORT", "insufficient_support"
+            message = (row["provider"] + ": insufficient support for " + row["relationship_type"] + ". " +
+                       row["message"] + " This is a normal outcome, not an error.")
+        else:
+            if row["status"] == "unavailable":
+                code, outcome = "AUDIO_DIAGNOSTIC_UNAVAILABLE", "not_run"
+            else:
+                code = observation_codes.get(row["provider"], "AUDIO_FINGERPRINT_OBSERVATION")
+                outcome = "completed"
+            counted = {AGREEMENT: " offset(s) where both fingerprint algorithms voted, for ",
+                       "music_semantics": " aligned phrase(s) for "}.get(row["provider"], " content candidate(s) for ")
+            message = (row["provider"] + ": " + str(len(row["matches"])) + counted +
+                       row["relationship_type"] + ". " + row["message"])
+        combined["findings"].append({"code": code, "severity": "info", "message": message, "outcome": outcome,
                                      "diagnostic_id": row["diagnostic_id"], "provider": row["provider"],
                                      "source_hash": row["source_hash"], "target_hash": row["target_hash"],
                                      "status": row["status"], "reason_code": row["reason_code"],

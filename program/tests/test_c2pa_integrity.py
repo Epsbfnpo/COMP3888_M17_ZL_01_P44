@@ -4,6 +4,7 @@ Signed fixtures are generated at test time with a throwaway certificate chain,
 so no third-party audio or private keys are stored in the repository.
 """
 
+import base64
 import copy
 import datetime
 import hashlib
@@ -24,6 +25,7 @@ sys.path.insert(0, str(BASE))
 import run  # noqa: E402
 
 AI_SOURCE_TYPE = "http://cv.iptc.org/newscodes/digitalsourcetype/trainedAlgorithmicMedia"
+HUMAN_SOURCE_TYPE = "http://cv.iptc.org/newscodes/digitalsourcetype/digitalCapture"
 
 
 class C2paRequirementTests(unittest.TestCase):
@@ -61,8 +63,8 @@ def _tone(path, seconds=1.0, rate=8000, frequency=440.0):
         stream.writeframes(samples.tobytes())
 
 
-def _sign(source, target):
-    """Sign a WAV with an AI-generation claim using a throwaway CA and leaf."""
+def _sign(source, target, source_type=AI_SOURCE_TYPE):
+    """Sign a WAV with a digital source type claim using a throwaway CA and leaf."""
     import c2pa
     from cryptography import x509
     from cryptography.hazmat.primitives import hashes, serialization
@@ -101,11 +103,11 @@ def _sign(source, target):
     manifest = {"claim_generator_info": [{"name": "c2pa-test-fixture", "version": "1.0"}],
                 "title": "fixture.wav", "format": "audio/wav",
                 "assertions": [{"label": "c2pa.actions", "data": {"actions": [
-                    {"action": "c2pa.created", "digitalSourceType": AI_SOURCE_TYPE}]}}]}
+                    {"action": "c2pa.created", "digitalSourceType": source_type}]}}]}
     signer = c2pa.Signer.from_info(c2pa.C2paSignerInfo(alg=b"es256", sign_cert=chain, private_key=key, ta_url=None))
     with open(source, "rb") as src, open(target, "w+b") as dst:
         c2pa.Builder(json.dumps(manifest)).sign(signer, "audio/wav", src, dst)
-    return leaf.public_bytes(serialization.Encoding.DER)
+    return leaf.public_bytes(serialization.Encoding.DER), str(leaf.serial_number)
 
 
 def _edited_after_signing(signed):
@@ -138,7 +140,7 @@ class C2paValidationFailureTests(unittest.TestCase):
         folder = Path(cls.temp.name)
         _tone(folder / "plain.wav")
         _tone(folder / "plain-source.wav", frequency=330.0)
-        cls.leaf = _sign(folder / "plain.wav", folder / "signed.wav")
+        cls.leaf, _ = _sign(folder / "plain.wav", folder / "signed.wav")
         _sign(folder / "plain-source.wav", folder / "signed-source.wav")
         cls.files = {
             "signed": (folder / "signed.wav").read_bytes(),
@@ -230,3 +232,82 @@ class C2paValidationFailureTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+@unittest.skipIf(importlib.util.find_spec("c2pa") is None,
+                 "c2pa-python is a required dependency; see C2paRequirementTests")
+class AsymmetricC2paTrustTests(unittest.TestCase):
+    """An AI label is believed; a signature supporting human authorship needs a trusted signer."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.temp = tempfile.TemporaryDirectory()
+        folder = Path(cls.temp.name)
+        _tone(folder / "plain.wav")
+        _sign(folder / "plain.wav", folder / "human.wav", HUMAN_SOURCE_TYPE)
+        _sign(folder / "plain.wav", folder / "ai.wav", AI_SOURCE_TYPE)
+        # A known AI generation tool whose manifest happens to carry no AI source type.
+        leaf, serial = _sign(folder / "plain.wav", folder / "known.wav", HUMAN_SOURCE_TYPE)
+        cls.files = {name: (folder / f"{name}.wav").read_bytes() for name in ("human", "ai", "known")}
+        cls.files["known_edited"] = _edited_after_signing(folder / "known.wav")
+        cls.known_list = folder / "known_ai_signers.json"
+        cls.known_list.write_text(json.dumps({"signers": [{
+            "name": "Fixture AI Tool",
+            "fingerprint_sha256_base64": base64.b64encode(hashlib.sha256(leaf).digest()).decode(),
+            "certificate_serial_number": serial}]}))
+
+    @classmethod
+    def tearDownClass(cls):
+        cls.temp.cleanup()
+
+    def evaluate(self, label):
+        from unittest import mock
+        folder = Path(tempfile.mkdtemp(dir=self.temp.name))
+        (folder / "objects").mkdir()
+        digest = hashlib.sha256(self.files[label]).hexdigest()
+        (folder / "objects" / f"{digest}.wav").write_bytes(self.files[label])
+        request = json.loads((BASE / "examples/valid-generated/request.json").read_text())
+        request["workflow"]["workflow_id"] = "recorded_single_performance_to_final"
+        request["workflow"]["modifiers"] = []
+        request["chain"]["artefacts"] = [{"artefact_hash": digest, "artefact_type": "audio/master",
+                                          "attributes": {"creation_method": "recorded"}, "evidence": []}]
+        request["chain"]["final_artefact_hash"] = digest
+        request["objects"] = {digest: f"objects/{digest}.wav"}
+        with mock.patch("legacy_parsers.c2pa_parser.KNOWN_AI_SIGNERS_PATH", self.known_list):
+            response = run.evaluate(copy.deepcopy(request), folder, "native")
+        self.assertEqual(response["execution_status"], "succeeded", response.get("error"))
+        codes = {row["code"]: row for row in response["findings"]}
+        ai_checks = [row for row in response["assessment_checks"]["cross_evidence"]
+                     if row["rule"] == "c2pa_ai_source_type_matches_creation_method"]
+        return response, codes, ai_checks
+
+    def test_self_signed_human_authorship_claim_cannot_release_integrity(self):
+        response, codes, ai_checks = self.evaluate("human")
+        self.assertEqual(codes["C2PA_SIGNER_UNTRUSTED"]["severity"], "medium")
+        self.assertNotIn("C2PA_KNOWN_AI_SIGNER", codes)
+        self.assertEqual([(row["passed"], row["evidence_tier"]) for row in ai_checks],
+                         [(True, "submitter_document")])
+        self.assertIsNone(response["axes"]["integrity"]["value"])
+
+    def test_signed_ai_label_contradicts_a_recorded_declaration(self):
+        response, codes, ai_checks = self.evaluate("ai")
+        self.assertNotIn("C2PA_SIGNER_UNTRUSTED", codes)
+        self.assertEqual([(row["passed"], row["evidence_tier"]) for row in ai_checks],
+                         [(False, "signed_attestation")])
+        self.assertTrue(response["assessment_checks"]["integrity_decision"][0]["contradiction_present"])
+
+    def test_known_ai_signer_is_believed_without_an_ai_source_type(self):
+        response, codes, ai_checks = self.evaluate("known")
+        finding = codes["C2PA_KNOWN_AI_SIGNER"]
+        self.assertEqual((finding["severity"], finding["known_ai_signer"]), ("medium", "Fixture AI Tool"))
+        self.assertNotIn("C2PA_SIGNER_UNTRUSTED", codes)
+        self.assertEqual([(row["passed"], row["evidence_tier"], row["known_ai_signer"]) for row in ai_checks],
+                         [(False, "signed_attestation", "Fixture AI Tool")])
+        records = response["assessment_checks"]["c2pa_attestation_records"]
+        self.assertEqual(records[0]["known_ai_signer"], "Fixture AI Tool")
+
+    def test_known_ai_signer_is_still_recognised_after_editing(self):
+        response, codes, ai_checks = self.evaluate("known_edited")
+        self.assertIn("C2PA_KNOWN_AI_SIGNER", codes)
+        self.assertIn("C2PA_CONTENT_BINDING_FAILED", codes)
+        self.assertIs(ai_checks[0]["passed"], False)

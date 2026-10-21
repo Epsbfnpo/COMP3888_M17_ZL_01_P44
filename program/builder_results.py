@@ -97,6 +97,8 @@ ATTENTION_FINDINGS = {
     "C2PA_CONTENT_BINDING_FAILED": ("C2PA does not match the file", "Submit the file exactly as signed, or declare and document the edits made after signing."),
     "C2PA_SIGNATURE_INVALID": ("C2PA signature invalid", "Obtain a correctly signed file from the original tool; the manifest may have been altered."),
     "C2PA_VALIDATION_FAILED": ("C2PA validation failed", "Check the C2PA manifest with the issuing tool, then resubmit."),
+    "C2PA_KNOWN_AI_SIGNER": ("Signed AI-generation label", "Declare this artefact as ai-generated, or explain why the signed AI label does not apply."),
+    "C2PA_SIGNER_UNTRUSTED": ("Signer not trusted", "Provide a manifest from a trusted signer if this signature is meant to support the claims."),
     "C2PA_PARSER_UNAVAILABLE": ("Attestation not assessed", "Install the required C2PA dependency (pip install -r requirements.txt), then rerun the assessment."),
     "AI_DISCLOSURE_MISSING": ("Missing declaration", "Declare the creation method for each relevant audio artefact."),
     "MANUAL_REVIEW_RECOMMENDED": ("Manual review", "Review the related content-check details and provide any missing supported evidence."),
@@ -388,6 +390,12 @@ def attention_items(response, file_names=None, policy_rules=None):
     return issues
 
 
+# Mirrors music_target.audio_diagnostics.runner; kept here so the GUI needs no audio imports.
+INSUFFICIENT_SUPPORT_REASONS = frozenset({
+    "silent_signal", "insufficient_signal", "insufficient_landmarks", "insufficient_peaks",
+    "insufficient_spectral_frames", "channel_cancellation"})
+
+
 def audio_diagnostic_lines(response, file_names=None):
     """Plain-language lines for the optional, report-only audio diagnostics.
 
@@ -409,6 +417,8 @@ def audio_diagnostic_lines(response, file_names=None):
         pair = f"{_hash_label(row.get('source_hash'), names)} → {_hash_label(row.get('target_hash'), names)}"
         found = len(row.get("matches") or [])
         state = row.get("status", "?")
+        if state == "unavailable" and row.get("reason_code") in INSUFFICIENT_SUPPORT_REASONS:
+            state = "insufficient support (normal outcome)"
         detail = row.get("message", "")
         lines.append(f"  - {row.get('provider', '?')} | {row.get('relationship_type', '?')} | {pair}: "
                      f"{state}, {found} candidate(s). {detail}".rstrip())
