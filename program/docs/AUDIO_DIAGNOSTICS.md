@@ -152,6 +152,15 @@ not used as detected boundaries. `section_matches` locates detected target
 sections independently; local paths remain candidates even when their geometry
 passes, because local relationship thresholds have not been separately calibrated.
 
+A local location (a legacy phrase or a detected section) longer than the whole
+source cannot be searched inside it, for example a short loop or stem compared
+with a longer mix. Such a row reports `match_status:
+not_assessed_query_longer_than_source` with null `harmonic_similarity`,
+`source_range_seconds` and `alignment_quality`. If a single location fails
+unexpectedly, only that row reports `not_assessed_local_match_failed` with an
+`error` message; the provider and the other rows still complete. Unassessed rows
+are excluded from `matched_phrases` and phrase-order measures.
+
 Across versions:
 
 - All 12 transpositions are searched by sequence alignment. Every shuffled

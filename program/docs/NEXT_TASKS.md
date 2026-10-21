@@ -83,6 +83,10 @@ fingerprinting or other non-scoring diagnostics.
    expired/revoked credentials, missing manifests, malformed manifests, and
    ingredient relationship/hash mismatch. Confirm behaviour against the
    production C2PA SDK and the selected trust policy.
+   Partly done: `tests/test_c2pa_integrity.py` signs WAV fixtures at test time
+   with a throwaway certificate and covers valid, edited-after-signing,
+   corrupted-certificate and invalid supporting manifests. Real vendor-signed
+   fixtures, expired/revoked credentials and a configured trust policy remain.
 
 9. Confirm the DDEX Implementation Licence and schema redistribution rules
    before external deployment.
