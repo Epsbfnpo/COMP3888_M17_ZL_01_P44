@@ -16,6 +16,7 @@ from typing import Callable
 
 import manifest_logic as L
 import relationship_modes as RM
+import wav_probe
 
 Progress = Callable[[str], None]
 
@@ -54,7 +55,7 @@ def inspect_files(paths: list[str], progress: Progress, cancel: Event) -> list[d
             if size > RM.MAX_FILE_BYTES:
                 raise ValueError(f"File exceeds the {RM.MAX_FILE_BYTES // 2**20} MiB limit.")
             digest = verified_hash(path, cancel)
-            technical = L.wav_technical(path) if path.suffix.lower() in (".wav", ".wave") else {}
+            technical = wav_probe.wav_technical(path) if path.suffix.lower() in (".wav", ".wave") else {}
             results.append({"path": str(path), "hash": digest, "technical": technical})
         except (OSError, ValueError) as exc:
             results.append({"path": str(path), "error": str(exc)})

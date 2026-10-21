@@ -86,7 +86,7 @@ COMPARISON_NOTE = " A signal match supports or contradicts a claim; it is not pr
 ATTENTION_FINDINGS = {
     "MISSING_OBJECT": ("Missing file", "Locate the original file; confirm its SHA-256 matches the manifest."),
     "PARSER_FAILED": ("Invalid evidence", "Replace or repair the file so its declared format can be parsed."),
-    "WAV_PARSER_FAILED": ("Audio not assessed", "Replace or repair this audio with a supported integer-PCM WAV file."),
+    "WAV_PARSER_FAILED": ("Audio not assessed", "Replace or repair this audio with a supported WAV file (integer PCM or IEEE float)."),
     "CROSS_EVIDENCE_CHECK_UNAVAILABLE": ("Cross-evidence check not assessed", "Provide the supported source fields or bindings needed to compare this evidence."),
     "UNKNOWN_ARTEFACT_TYPE_SKIPPED": ("Evidence not assessed", "Choose a supported artefact type; the evaluator did not infer a type for this file."),
     "UNKNOWN_RELATIONSHIP_TYPE_SKIPPED": ("Relationship not assessed", "Choose a supported relationship type; the evaluator did not infer the submitted relationship."),
@@ -412,4 +412,80 @@ def audio_diagnostic_lines(response, file_names=None):
         detail = row.get("message", "")
         lines.append(f"  - {row.get('provider', '?')} | {row.get('relationship_type', '?')} | {pair}: "
                      f"{state}, {found} candidate(s). {detail}".rstrip())
+    return lines
+
+
+_SEMANTIC_PRIORITY = ("tempo", "transpos", "pitch", "support", "status", "reason")
+
+
+def _plain(value, depth=0):
+    if isinstance(value, bool) or value is None:
+        return {True: "yes", False: "no", None: "n/a"}[value]
+    if isinstance(value, float):
+        return f"{value:.4g}"
+    if isinstance(value, (int, str)):
+        return str(value)
+    if isinstance(value, list):
+        if not value:
+            return "none"
+        if all(isinstance(v, (int, float, str, bool)) for v in value) and len(value) <= 6:
+            return ", ".join(_plain(v) for v in value)
+        return f"{len(value)} item(s)"
+    if isinstance(value, dict) and depth < 1:
+        return "; ".join(f"{k.replace('_', ' ')}: {_plain(v, depth + 1)}"
+                         for k, v in value.items())
+    return f"{len(value)} field(s)"
+
+
+def _find_semantics(node, context, found):
+    if isinstance(node, dict):
+        here = {key: node[key] for key in ("source_hash", "target_hash", "relationship_type",
+                                           "provider") if key in node} or context
+        for key, value in node.items():
+            if key == "music_semantics":
+                found.append((here, value))
+            else:
+                _find_semantics(value, here, found)
+    elif isinstance(node, list):
+        for item in node:
+            _find_semantics(item, context, found)
+
+
+def music_semantics_lines(response, file_names=None):
+    """Summarise every ``music_semantics`` block (tempo scaling, transposition, support status).
+
+    The block is located wherever it occurs in the response and shown without
+    interpretation: tempo/transposition/support/status/reason fields first, then the
+    remaining scalar fields. Nothing here affects scores.
+    """
+    names = file_names or {}
+    found = []
+    _find_semantics(response, {}, found)
+    if not found:
+        return []
+    lines = ["Music semantics (tempo scaling, transposition and support status; "
+             "report-only, a musical match is not proof of provenance):"]
+    for context, block in found:
+        entries = block if isinstance(block, list) else [block]
+        for entry in entries:
+            if not isinstance(entry, dict):
+                lines.append(f"  - {_plain(entry)}")
+                continue
+            where = []
+            if context.get("source_hash") or context.get("target_hash"):
+                where.append(f"{_hash_label(context.get('source_hash'), names) or '?'} → "
+                             f"{_hash_label(context.get('target_hash'), names) or '?'}")
+            for key in ("relationship_type", "provider"):
+                if context.get(key):
+                    where.append(str(context[key]))
+            lines.append("  - " + (" | ".join(where) if where else "music_semantics"))
+            keys = list(entry)
+            ordered = [k for p in _SEMANTIC_PRIORITY for k in keys
+                       if p in k.lower() and k not in ()]
+            ordered = list(dict.fromkeys(ordered))
+            rest = [k for k in keys if k not in ordered]
+            for key in ordered + rest[:8]:
+                lines.append(f"      {key.replace('_', ' ')}: {_plain(entry[key])}")
+            if len(rest) > 8:
+                lines.append(f"      … {len(rest) - 8} more field(s) in the saved JSON")
     return lines

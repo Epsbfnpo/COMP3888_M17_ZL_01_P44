@@ -22,9 +22,11 @@ from tkinter import filedialog, messagebox, ttk
 
 import manifest_logic as L
 import relationship_modes as RM
+import wav_probe
 import builder_operations as operations
 from builder_results import (
-    attention_items, attention_workflow_results, audio_diagnostic_lines)
+    attention_items, attention_workflow_results, audio_diagnostic_lines,
+    music_semantics_lines)
 
 
 def parse_json_object(text: str, label: str) -> dict:
@@ -667,6 +669,9 @@ class App(tk.Tk):
                     f"\n{index}. {issue['status']} — {issue['affected']}\n"
                     f"   {issue['explanation']}\n"
                     f"   Suggested action: {issue['suggestion']}\n")
+        semantics = music_semantics_lines(response, file_names)
+        if semantics:
+            explanation.append("\n" + "\n".join(semantics) + "\n")
         diagnostics = audio_diagnostic_lines(response, file_names)
         if diagnostics:
             explanation.append("\n" + "\n".join(diagnostics) + "\n")
@@ -754,7 +759,7 @@ class App(tk.Tk):
                     f"{Path(selected).name} does not match the declared SHA-256 for "
                     f"{entry['id']}. The manifest identity was not changed.")
             entry["path"] = str(Path(selected).resolve())
-            entry["technical"] = L.wav_technical(selected)
+            entry["technical"] = wav_probe.wav_technical(selected)
             self.refresh()
         except (OSError, ValueError) as exc:
             messagebox.showerror("Cannot locate original", str(exc), parent=self)
@@ -783,9 +788,10 @@ class App(tk.Tk):
                 self._only_final(len(self.files) - 1)
             if dialog.result["type"].startswith("audio/") and not entry["technical"]:
                 messagebox.showwarning(
-                    "Not integer-PCM WAV",
-                    f"{path.name} is typed as audio but could not be read as integer-PCM "
-                    "WAV; the evaluator will reject it.")
+                    "Unsupported WAV",
+                    f"{path.name} is typed as audio but could not be read as a supported WAV "
+                    "(integer PCM 8/16/24/32-bit or IEEE float 32/64-bit, including "
+                    "WAVE_FORMAT_EXTENSIBLE); the evaluator will reject it.")
         self.refresh()
 
     def edit_file(self):
@@ -1013,7 +1019,7 @@ class App(tk.Tk):
                     "creation_method": attrs.pop("creation_method", ""),
                     "role": production.pop("role", ""), "production": production,
                     "technical": attrs.pop("technical", {}) or
-                                 (L.wav_technical(path) if path and path.is_file() else {}),
+                                 (wav_probe.wav_technical(path) if path and path.is_file() else {}),
                     "extra": attrs,
                     "final": digest == chain["final_artefact_hash"]})
             rels = [{"target": alias[a["artefact_hash"]], "source": alias[e["hash"]],
