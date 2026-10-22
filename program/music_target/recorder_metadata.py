@@ -52,18 +52,40 @@ def _ixml(path, descriptor):
 
 
 def recorder_fields(path, descriptor, embedded_metadata):
-    """Return recorder metadata for a parsed WAV, or None when it has none."""
+    """Return recorder metadata for a parsed WAV.
+
+    BWF is also written by DAWs, editors and sound libraries. Only a file that
+    names its recording (file name, tape, scene or take) counts as recorder
+    metadata; other BWF is reported as ``daw_or_library`` without a recorder
+    start timecode, because its time reference is a session timeline position.
+    """
     bext = (embedded_metadata or {}).get("broadcast_extension") or {}
     ixml, warning = _ixml(path, descriptor)
+    warnings = [warning] if warning else []
     if not bext and not ixml:
-        return {"present": False, "warnings": [warning] if warning else []}
+        return {"present": False, "bwf_kind": None, "warnings": warnings}
     described = _bext_fields(bext.get("description"))
     bext_tracks = {int(key[3:]): value for key, value in described.items()
                    if key.startswith("TRK") and key[3:].isdigit() and value}
     time_reference = bext.get("time_reference")
     rate = descriptor.sample_rate
+    reference_seconds = (time_reference / rate) if isinstance(time_reference, int) and rate else None
+    sources = sorted(name for name, present in (("bext", bool(bext)), ("iXML", bool(ixml))) if present)
+    identity = (described.get("FILENAME"), ixml.get("tape") or described.get("TAPE"),
+                ixml.get("scene") or described.get("SCENE"), ixml.get("take") or described.get("TAKE"))
+    if not any(identity):
+        return {
+            "present": False,
+            "bwf_kind": "daw_or_library",
+            "originator": bext.get("originator") or None,
+            "origination_date": bext.get("origination_date") or None,
+            "timeline_reference_seconds": reference_seconds,
+            "sources": sources,
+            "warnings": warnings,
+        }
     return {
         "present": True,
+        "bwf_kind": "recorder",
         # iXML is the cross-vendor standard; the bext description mirrors it
         # on some recorders and is the only place the recorder file name lives.
         "file_name": described.get("FILENAME"),
@@ -72,10 +94,10 @@ def recorder_fields(path, descriptor, embedded_metadata):
         "take": ixml.get("take") or described.get("TAKE"),
         "tracks": {str(key): value for key, value in sorted((ixml.get("tracks") or bext_tracks).items())},
         "origination_date": bext.get("origination_date") or None,
-        "start_timecode_seconds": (time_reference / rate) if isinstance(time_reference, int) and rate else None,
+        "start_timecode_seconds": reference_seconds,
         "duration_seconds": descriptor.duration_seconds,
         "timecode_rate": ixml.get("timecode_rate"),
         "timecode_flag": ixml.get("timecode_flag"),
-        "sources": sorted(name for name, present in (("bext", bool(bext)), ("iXML", bool(ixml))) if present),
-        "warnings": [warning] if warning else [],
+        "sources": sources,
+        "warnings": warnings,
     }

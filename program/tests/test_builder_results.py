@@ -6,10 +6,22 @@ BASE = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(BASE))
 
 from builder_results import (INSUFFICIENT_SUPPORT_LABEL, attention_items, attention_workflow_results,
-                             audio_diagnostic_lines, music_semantics_lines)
+                             audio_diagnostic_lines, axis_value_label, music_semantics_lines)
 
 
 class AttentionDisplayTests(unittest.TestCase):
+    def test_contradicted_integrity_shows_its_count_beside_the_value(self):
+        # The count comes from integrity_decision, which is kept when explanations are omitted.
+        response = {"assessment_checks": {"integrity_decision": [
+            {"status": "contradicted", "contradiction_count": 2, "assessed_fact_count": 122}]}}
+        contradicted = {"value": 0.990, "status": "contradicted"}
+        self.assertEqual(axis_value_label("integrity", contradicted, response), "0.990 (contradicted: 2)")
+        self.assertEqual(axis_value_label("integrity", {"value": None, "status": "contradicted"}, response),
+                         "Not assessed (contradicted: 2)")
+        self.assertEqual(axis_value_label("integrity", {"value": 1.0, "status": "consistent"}, response), "1.000")
+        self.assertEqual(axis_value_label("completeness", {"value": 0.5}, response), "0.500")
+        self.assertEqual(axis_value_label("integrity", contradicted, {}), "0.990 (contradicted)")
+
     def test_hides_explicit_successes_and_keeps_failures_and_unassessed_checks(self):
         response = {
             "workflow_assessment": {"rule_results": [

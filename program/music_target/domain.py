@@ -65,8 +65,9 @@ ENDPOINTS = {
     "comped_from": ({"audio/edited-take"}, {"audio/raw-take"}),
     "stemmed_from": ({"audio/stem"},
                      {"audio/raw-track", "audio/edited-take", "audio/sample"}),
+    # Dialogue post-production mixes recorder takes directly after the AAF edit.
     "mixed_from": ({"audio/mix"},
-                   {"audio/stem", "audio/raw-track", "audio/edited-take", "audio/sample"}),
+                   {"audio/stem", "audio/raw-take", "audio/raw-track", "audio/edited-take", "audio/sample"}),
     "mastered_from": ({"audio/master"}, {"audio/mix"}),
     "rendered_from": ({*AUDIO_TYPES}, {"project/midi", "project/daw-session", "project/automation"}),
     "input_to": (SUPPORTED_TYPES, SUPPORTED_TYPES),

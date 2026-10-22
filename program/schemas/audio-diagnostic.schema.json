@@ -116,7 +116,8 @@
       "enum": [
         "whole_file",
         "declared",
-        "derived_from_declared_source_duration"
+        "derived_from_declared_source_duration",
+        "aaf_source_range"
       ]
     }
   }

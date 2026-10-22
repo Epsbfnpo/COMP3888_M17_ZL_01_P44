@@ -5,8 +5,8 @@
   "asset_sha256": "8699068584ba01947d52e5f55a973a86adf3c465c32621d1fe4b7c1f8304b638",
   "system": {
     "name": "COMP3888-music-baseline",
-    "version": "0.7.0",
-    "source_revision": "sha256:d96ac7bb6f29d6c40feb702d26c8c621c5fdc0e7647bf49687e3c3a9dc077133"
+    "version": "0.8.1",
+    "source_revision": "sha256:17f814af455df89d912f1a8ce5d49680fa8dd2296675fda831c0281ecc6fd324"
   },
   "execution_status": "succeeded",
   "axes": {
@@ -20,29 +20,32 @@
       "availability": "partial",
       "value": null,
       "confidence": 0.267,
-      "reasoning": "Integrity has 1/3 score-eligible evidence layers; missing evidence reduces availability and confidence but is never treated as contradiction. A numeric value is withheld unless at least two layers are populated and an independent cross-evidence check (signed_attestation, recorder_metadata) was assessed, or a contradiction exists; submitter-provided documents corroborate but cannot release a value on their own. No independent cross-evidence was assessed for this submission. Structural validity and cryptographic attestation are reported separately and do not raise integrity. Legacy signal comparisons are disabled by policy and do not produce findings or affect integrity."
+      "reasoning": "Integrity has 1/3 score-eligible evidence layers; missing evidence reduces availability and confidence but is never treated as contradiction. Numeric release requires at least 2 populated contributing layer(s) and an assessed qualifying cross-evidence fact (signed_attestation, recorder_metadata); the value is withheld (insufficient_assessed_layers). An ordinary contradiction never releases a value. No qualifying cross-evidence was assessed for this submission. Structural validity and cryptographic attestation are reported separately and do not raise integrity. Legacy signal comparisons are disabled by policy and do not produce findings or affect integrity.",
+      "status": "insufficient_evidence"
     },
     "attestation_strength": {
-      "availability": "unavailable",
-      "value": null,
-      "confidence": null,
-      "reasoning": "C2PA SDK is unavailable for the final artefact, so no cryptographic attestation was assessed."
+      "availability": "available",
+      "value": 0.0,
+      "confidence": 0.9,
+      "reasoning": "C2PA SDK ran but found no active manifest associated with the final artefact."
     },
     "ai_disclosure": {
       "availability": "unavailable",
       "value": null,
       "confidence": null,
-      "reasoning": "Explicit creation_method declarations cover 0/2 audio artefacts; this is disclosure coverage, not AI detection."
+      "reasoning": "Creation-method disclosure coverage: explicit declarations cover 0/2 audio artefacts. This measures whether declarations were supplied, not whether they are true, the amount of AI audio, or the probability of AI generation; no content AI detector ran."
     }
   },
   "validation": {
-    "validation_state": null,
-    "signature_present": null,
+    "validation_state": "manifest_absent",
+    "signature_present": false,
     "signature_valid": null,
     "cryptographically_valid": null,
     "credential_trusted": null,
     "codes": [],
-    "reasons": []
+    "reasons": [
+      "C2PA SDK ran but found no active manifest associated with the final artefact."
+    ]
   },
   "findings": [
     {
@@ -89,6 +92,7 @@
       },
       "recorder_metadata": {
         "present": false,
+        "bwf_kind": null,
         "warnings": []
       },
       "checks": [],
@@ -138,6 +142,7 @@
       },
       "recorder_metadata": {
         "present": false,
+        "bwf_kind": null,
         "warnings": []
       },
       "checks": [],
@@ -155,6 +160,7 @@
       "content_relationship_verified": null,
       "value": null,
       "checks": [],
+      "range_validation_details": [],
       "duration_delta_seconds": -12.0
     },
     {
@@ -203,6 +209,7 @@
         },
         "recorder_metadata": {
           "present": false,
+          "bwf_kind": null,
           "warnings": []
         },
         "checks": [],
@@ -256,6 +263,7 @@
         },
         "recorder_metadata": {
           "present": false,
+          "bwf_kind": null,
           "warnings": []
         },
         "checks": [],
@@ -264,9 +272,21 @@
       "evidence_hash": "8699068584ba01947d52e5f55a973a86adf3c465c32621d1fe4b7c1f8304b638"
     },
     {
-      "code": "C2PA_PARSER_UNAVAILABLE",
-      "severity": "low",
-      "message": "c2pa-python is not installed; C2PA attestation was not assessed."
+      "code": "C2PA_FINAL_ATTESTATION",
+      "severity": "info",
+      "message": "The final artefact has no C2PA manifest. Many tools do not write C2PA yet, so this is not evidence against the submission. Attestation strength is 0.0 because there is nothing to verify; Integrity is not affected.",
+      "final_c2pa_state": "absent",
+      "attestation_value": 0.0,
+      "trust_status": null,
+      "known_ai_signer": null,
+      "evidence_hash": "8699068584ba01947d52e5f55a973a86adf3c465c32621d1fe4b7c1f8304b638"
+    },
+    {
+      "code": "AI_DISCLOSURE_IS_DECLARATION_COVERAGE",
+      "severity": "info",
+      "message": "The AI disclosure axis measures creation-method declaration coverage only. It does not detect AI audio or verify the truth of the declarations.",
+      "scoring_eligible": false,
+      "integrity_contribution": null
     },
     {
       "code": "AI_DISCLOSURE_MISSING",
@@ -304,13 +324,14 @@
     {
       "code": "AUDIO_FINGERPRINT_OBSERVATION",
       "severity": "info",
-      "message": "audfprint: 2 content candidate(s) for excerpted_from. Experimental content observations; thresholds are not calibrated.",
+      "message": "audfprint: 2 content candidate(s) for excerpted_from. Landmark offset candidates with bounded support checks; no provenance verdict.",
+      "outcome": "completed",
       "diagnostic_id": "60b9c6502621e1343c62ba77f6bec80845af681499511e451b1e928585631687:0:audfprint",
       "provider": "audfprint",
       "source_hash": "22bf064117b015ad6b47b7e649c83c5378ff26c1def988d09e1edb3ec6cfecfe",
       "target_hash": "8699068584ba01947d52e5f55a973a86adf3c465c32621d1fe4b7c1f8304b638",
       "status": "inconclusive",
-      "reason_code": "thresholds_not_calibrated",
+      "reason_code": "bounded_fingerprint_observation",
       "candidate_count": 2,
       "analysis_complete": true,
       "relationship_type": "excerpted_from",
@@ -323,6 +344,7 @@
       "code": "AUDIO_FINGERPRINT_OBSERVATION",
       "severity": "info",
       "message": "spectromap: 2 content candidate(s) for excerpted_from. Experimental content observations; thresholds are not calibrated.",
+      "outcome": "completed",
       "diagnostic_id": "60b9c6502621e1343c62ba77f6bec80845af681499511e451b1e928585631687:0:spectromap",
       "provider": "spectromap",
       "source_hash": "22bf064117b015ad6b47b7e649c83c5378ff26c1def988d09e1edb3ec6cfecfe",
@@ -341,6 +363,7 @@
       "code": "AUDIO_STRUCTURE_OBSERVATION",
       "severity": "info",
       "message": "librosa: 0 content candidate(s) for excerpted_from. Experimental content observations; thresholds are not calibrated.",
+      "outcome": "completed",
       "diagnostic_id": "60b9c6502621e1343c62ba77f6bec80845af681499511e451b1e928585631687:0:librosa",
       "provider": "librosa",
       "source_hash": "22bf064117b015ad6b47b7e649c83c5378ff26c1def988d09e1edb3ec6cfecfe",
@@ -356,9 +379,10 @@
       "content_match_is_provenance": false
     },
     {
-      "code": "AUDIO_DIAGNOSTIC_UNAVAILABLE",
+      "code": "AUDIO_INSUFFICIENT_SUPPORT",
       "severity": "info",
-      "message": "music_semantics: 0 aligned phrase(s) for excerpted_from. Too little audio for beat-level harmony and form.",
+      "message": "music_semantics: insufficient support for excerpted_from. Too little audio for beat-level harmony and form. This is a normal outcome, not an error.",
+      "outcome": "insufficient_support",
       "diagnostic_id": "60b9c6502621e1343c62ba77f6bec80845af681499511e451b1e928585631687:0:music_semantics",
       "provider": "music_semantics",
       "source_hash": "22bf064117b015ad6b47b7e649c83c5378ff26c1def988d09e1edb3ec6cfecfe",
@@ -377,6 +401,7 @@
       "code": "AUDIO_FINGERPRINT_AGREEMENT_OBSERVATION",
       "severity": "info",
       "message": "fingerprint_agreement: 2 offset(s) where both fingerprint algorithms voted, for excerpted_from. Experimental content observations; thresholds are not calibrated.",
+      "outcome": "completed",
       "diagnostic_id": "60b9c6502621e1343c62ba77f6bec80845af681499511e451b1e928585631687:0:fingerprint_agreement",
       "provider": "fingerprint_agreement",
       "source_hash": "22bf064117b015ad6b47b7e649c83c5378ff26c1def988d09e1edb3ec6cfecfe",
@@ -392,9 +417,9 @@
       "content_match_is_provenance": false
     }
   ],
-  "processing_ms": 2181.4615830080584,
+  "processing_ms": 1838.826416991651,
   "resource_usage": {
-    "cpu_ms": 1.575999999999994,
+    "cpu_ms": 3.5189999999999944,
     "peak_rss_kib": null
   },
   "error": null,
@@ -410,7 +435,7 @@
   "unknown_inputs": [],
   "workflow_assessment": {
     "policy_id": "comp3888-music-workflow-evidence",
-    "policy_version": "0.1.0-candidate",
+    "policy_version": "0.1.1-candidate",
     "workflow_id": "sample_and_loop_based_production",
     "workflow_title": "Sample- or loop-based production",
     "modifiers": [
@@ -604,8 +629,8 @@
   "assessment_checks": {
     "scoring_profile": [
       {
-        "profile_id": "default-v2",
-        "profile_version": 2
+        "profile_id": "default-v4",
+        "profile_version": 4
       }
     ],
     "bound_file_integrity": [
@@ -642,6 +667,7 @@
       }
     ],
     "relationship_integrity": [],
+    "relationship_range_validation": [],
     "integrity_layers": [
       {
         "layer": "file_integrity",
@@ -689,7 +715,7 @@
         "value": null,
         "contributes_to_integrity": true,
         "check_count": 0,
-        "reason": "Parser outputs compared with the graph, declarations, media and recorder metadata; each check records the evidence_tier that produced it.",
+        "reason": "One vote per cross-evidence rule and subject; any assessed failure keeps that fact failed. Recorder-metadata agreement is consistency evidence, not origin authentication.",
         "manual_review_reasons": [],
         "weight": 1.0,
         "evidence_tier_counts": {
@@ -705,29 +731,80 @@
             "assessed": 0,
             "passed": 0
           }
-        }
+        },
+        "raw_check_count": 0,
+        "aggregation_method": "one_vote_per_rule_subject_any_failure",
+        "fact_count": 0,
+        "scored_fact_count": 0
       },
       {
         "layer": "cryptographic_attestation",
         "status": "unavailable",
         "value": null,
         "contributes_to_integrity": false,
-        "check_count": 0,
+        "check_count": 1,
         "reason": "C2PA remains in the separate attestation-strength axis and never inflates integrity.",
         "manual_review_reasons": [],
         "weight": null
       }
     ],
+    "integrity_decision": [
+      {
+        "status": "insufficient_evidence",
+        "contradiction_present": false,
+        "severe_contradiction_present": false,
+        "numeric_release": "withheld",
+        "release_reason": "insufficient_assessed_layers",
+        "qualifying_cross_evidence_assessed": false,
+        "qualifying_facts": [],
+        "ordinary_contradiction_release_allowed": false,
+        "severe_contradiction_release": "capped_value",
+        "score_semantics": "assessed_check_consistency_not_provenance_authentication",
+        "contradiction_count": 0,
+        "assessed_fact_count": 2,
+        "fact_counts_by_layer": [
+          {
+            "layer": "file_integrity",
+            "assessed": 2,
+            "contradicted": 0
+          },
+          {
+            "layer": "declaration_consistency",
+            "assessed": 0,
+            "contradicted": 0
+          },
+          {
+            "layer": "cross_evidence_support",
+            "assessed": 0,
+            "contradicted": 0
+          }
+        ]
+      }
+    ],
+    "ai_disclosure_coverage": [
+      {
+        "axis_key": "ai_disclosure",
+        "display_name": "Creation-method disclosure coverage",
+        "metric_semantics": "declaration_coverage",
+        "applicable_audio_count": 2,
+        "assessed_audio_count": 2,
+        "declared_audio_count": 0,
+        "excluded_input_error_count": 0,
+        "content_ai_detection_performed": false,
+        "ai_generated_probability": null,
+        "declaration_truth_verified": false
+      }
+    ],
     "assessment_status_semantics": [
       {
         "status": "corroborated",
-        "meaning": "Independent evidence clearly supports content consistency, but does not prove provenance direction or authorship.",
+        "meaning": "The assessed check or fact is consistent with the compared fields; origin, direction and authorship are not authenticated.",
         "numeric_treatment": "1.0 in an eligible evidence layer."
       },
       {
         "status": "contradicted",
         "meaning": "An applicable assessed claim conflicts with observed evidence.",
-        "numeric_treatment": "0.0 in its eligible layer and emits a contradiction finding."
+        "numeric_treatment": "0.0 for that eligible check or fact; other facts may still contribute to the layer mean. Emits a contradiction finding."
       },
       {
         "status": "inconclusive",
@@ -741,6 +818,8 @@
       }
     ],
     "cross_evidence": [],
+    "cross_evidence_scored_facts": [],
+    "cross_evidence_audit": [],
     "c2pa_attestation_records": [
       {
         "scope": "supporting",
@@ -748,11 +827,15 @@
         "manifest_container_hash": "22bf064117b015ad6b47b7e649c83c5378ff26c1def988d09e1edb3ec6cfecfe",
         "asset_hash": "22bf064117b015ad6b47b7e649c83c5378ff26c1def988d09e1edb3ec6cfecfe",
         "binding_relationship": null,
-        "sdk_available": false,
-        "reader_succeeded": false,
+        "sdk_available": true,
+        "reader_succeeded": true,
         "manifest_present": false,
         "signature_present": false,
-        "validation_state": "sdk_unavailable",
+        "validation_state": "manifest_absent",
+        "trust_status": null,
+        "revocation_status": null,
+        "signer": null,
+        "known_ai_signer": null,
         "validation_codes": []
       },
       {
@@ -761,12 +844,45 @@
         "manifest_container_hash": "8699068584ba01947d52e5f55a973a86adf3c465c32621d1fe4b7c1f8304b638",
         "asset_hash": "8699068584ba01947d52e5f55a973a86adf3c465c32621d1fe4b7c1f8304b638",
         "binding_relationship": null,
-        "sdk_available": false,
-        "reader_succeeded": false,
+        "sdk_available": true,
+        "reader_succeeded": true,
         "manifest_present": false,
         "signature_present": false,
-        "validation_state": "sdk_unavailable",
+        "validation_state": "manifest_absent",
+        "trust_status": null,
+        "revocation_status": null,
+        "signer": null,
+        "known_ai_signer": null,
         "validation_codes": []
+      }
+    ],
+    "c2pa_trust_configuration": [
+      {
+        "trust_lists_manifest_sha256": "ecc89ace79e86086eed0df3d521bdb4f2c537a807600ed98b6a2e8551cc044ac",
+        "revocation_status": "not_checked",
+        "lists": {
+          "official": {
+            "label": "C2PA Trust List",
+            "source": "https://github.com/c2pa-org/conformance-public",
+            "commit": "47009eedfe6721edd0ce3e69b89c1101cd6f03e5",
+            "frozen_on": null,
+            "file_sha256": {
+              "official/C2PA-TRUST-LIST.pem": "b3949271a07b007e92ef1d18050b55388f5e0d2686a16fd864176c48421af8ae",
+              "official/C2PA-TSA-TRUST-LIST.pem": "7182cb227c02701be0eebd67ab635fca7f85431c32796fb53b267c657cd2c675"
+            }
+          },
+          "legacy_itl": {
+            "label": "Interim Trust List (legacy, frozen)",
+            "source": "https://github.com/contentauth/verify-site",
+            "commit": "83b2e30684086a62e132f5d4c148abd0151e9486",
+            "frozen_on": "2026-01-01",
+            "file_sha256": {
+              "itl/anchors.pem": "db57e50b9bd4e4c786cbb91f38fd85e2af6a9d5412438a8cddcc42688df07ae5",
+              "itl/allowed.pem": "dfe328032e56f98b83f27f48a3642314124568b9f71ff471dffabf9b307c65d5",
+              "itl/store.cfg": "1044c30a906b0c9cbe28b4a4c0002ca56a718f0ae22b9af83238543a07d0e718"
+            }
+          }
+        }
       }
     ],
     "physical_similarity": [
@@ -872,18 +988,68 @@
           }
         },
         "contradictions": [],
+        "contradiction_count": 0,
+        "assessed_fact_count": 2,
+        "fact_counts_by_layer": [
+          {
+            "layer": "file_integrity",
+            "assessed": 2,
+            "contradicted": 0
+          },
+          {
+            "layer": "declaration_consistency",
+            "assessed": 0,
+            "contradicted": 0
+          },
+          {
+            "layer": "cross_evidence_support",
+            "assessed": 0,
+            "contradicted": 0
+          }
+        ],
         "statements": [
           "Weighted mean of file_integrity 1.000 (weight 1).",
           "No numeric value: the withholding rule was not met (see reasoning)."
-        ]
+        ],
+        "decision": {
+          "status": "insufficient_evidence",
+          "contradiction_present": false,
+          "severe_contradiction_present": false,
+          "numeric_release": "withheld",
+          "release_reason": "insufficient_assessed_layers",
+          "qualifying_cross_evidence_assessed": false,
+          "qualifying_facts": [],
+          "ordinary_contradiction_release_allowed": false,
+          "severe_contradiction_release": "capped_value",
+          "score_semantics": "assessed_check_consistency_not_provenance_authentication",
+          "contradiction_count": 0,
+          "assessed_fact_count": 2,
+          "fact_counts_by_layer": [
+            {
+              "layer": "file_integrity",
+              "assessed": 2,
+              "contradicted": 0
+            },
+            {
+              "layer": "declaration_consistency",
+              "assessed": 0,
+              "contradicted": 0
+            },
+            {
+              "layer": "cross_evidence_support",
+              "assessed": 0,
+              "contradicted": 0
+            }
+          ]
+        }
       },
       {
         "axis": "attestation_strength",
-        "availability": "unavailable",
-        "value": null,
-        "confidence": null,
+        "availability": "available",
+        "value": 0.0,
+        "confidence": 0.9,
         "statements": [
-          "C2PA SDK is unavailable for the final artefact, so no cryptographic attestation was assessed."
+          "C2PA SDK ran but found no active manifest associated with the final artefact."
         ]
       },
       {
@@ -892,8 +1058,23 @@
         "value": null,
         "confidence": null,
         "statements": [
-          "Explicit creation_method declarations cover 0/2 audio artefacts; this is disclosure coverage, not AI detection."
-        ]
+          "Creation-method disclosure coverage: explicit declarations cover 0/2 audio artefacts. This measures whether declarations were supplied, not whether they are true, the amount of AI audio, or the probability of AI generation; no content AI detector ran."
+        ],
+        "display_name": "Creation-method disclosure coverage",
+        "metric_semantics": "declaration_coverage",
+        "content_ai_detection_performed": false,
+        "coverage": {
+          "axis_key": "ai_disclosure",
+          "display_name": "Creation-method disclosure coverage",
+          "metric_semantics": "declaration_coverage",
+          "applicable_audio_count": 2,
+          "assessed_audio_count": 2,
+          "declared_audio_count": 0,
+          "excluded_input_error_count": 0,
+          "content_ai_detection_performed": false,
+          "ai_generated_probability": null,
+          "declaration_truth_verified": false
+        }
       }
     ],
     "audio_fingerprint": [
@@ -907,10 +1088,10 @@
         "range_source": "whole_file",
         "provider": "audfprint",
         "provider_version": "cb03ba99feafd41b8874307f0f4e808a6ce34362",
-        "adapter_version": "1.0",
+        "adapter_version": "1.2",
         "status": "inconclusive",
-        "reason_code": "thresholds_not_calibrated",
-        "message": "Experimental content observations; thresholds are not calibrated.",
+        "reason_code": "bounded_fingerprint_observation",
+        "message": "Landmark offset candidates with bounded support checks; no provenance verdict.",
         "analysis_complete": true,
         "analysed_ranges": {
           "source": [
@@ -931,23 +1112,15 @@
         "matches": [
           {
             "source_minus_target_offset_seconds": 1.9969160997732427,
-            "matched_token_pairs": 33,
+            "matched_token_pairs": 49,
             "target_supported_windows_seconds": [
               [
                 0.0,
-                0.26431972789115643
+                0.5197392290249433
               ],
               [
-                0.2697392290249433,
-                0.751938775510204
-              ],
-              [
-                0.7573582766439909,
-                1.0073582766439908
-              ],
-              [
-                1.2681972789115648,
-                2.0290362811791383
+                0.9895578231292517,
+                2.214795918367347
               ],
               [
                 2.266655328798186,
@@ -955,25 +1128,17 @@
               ],
               [
                 2.7078344671201813,
-                3.2132539682539685
+                3.747312925170068
               ]
             ],
             "source_supported_windows_seconds": [
               [
                 1.9969160997732427,
-                2.2612358276643993
+                2.516655328798186
               ],
               [
-                2.266655328798186,
-                2.7488548752834467
-              ],
-              [
-                2.7542743764172335,
-                3.0042743764172335
-              ],
-              [
-                3.2651133786848074,
-                4.025952380952381
+                2.986473922902494,
+                4.21171201814059
               ],
               [
                 4.263571428571429,
@@ -981,22 +1146,35 @@
               ],
               [
                 4.7047505668934235,
-                5.210170068027211
+                5.74422902494331
               ]
             ],
-            "target_supported_window_duration_seconds": 2.5359977324263037
+            "target_supported_window_duration_seconds": 3.0576757369614516,
+            "source_supported_window_duration_seconds": 3.0576757369614516,
+            "source_supported_fraction": 0.19110473356009072,
+            "target_supported_fraction": 0.7644189342403629,
+            "support_semantics": "token_neighbourhood_windows_not_verified_continuous_audio",
+            "support_assessment": {
+              "status": "supported_within_profile",
+              "rejection_reasons": [],
+              "profile_id": "bounded-audio-2026-10-20-v2"
+            }
           },
           {
             "source_minus_target_offset_seconds": 10.00780045351474,
-            "matched_token_pairs": 7,
+            "matched_token_pairs": 13,
             "target_supported_windows_seconds": [
               [
                 0.0,
-                0.21787981859410432
+                0.4500793650793651
               ],
               [
-                1.7790362811791383,
-                2.0290362811791383
+                1.4539569160997732,
+                1.7039569160997732
+              ],
+              [
+                1.9647959183673471,
+                2.214795918367347
               ],
               [
                 2.289875283446712,
@@ -1005,16 +1183,24 @@
               [
                 2.7542743764172335,
                 3.2596938775510207
+              ],
+              [
+                3.450873015873016,
+                3.700873015873016
               ]
             ],
             "source_supported_windows_seconds": [
               [
                 10.00780045351474,
-                10.225680272108844
+                10.457879818594105
               ],
               [
-                11.786836734693878,
-                12.036836734693878
+                11.461757369614514,
+                11.711757369614514
+              ],
+              [
+                11.972596371882087,
+                12.222596371882087
               ],
               [
                 12.297675736961452,
@@ -1023,38 +1209,107 @@
               [
                 12.762074829931974,
                 13.26749433106576
+              ],
+              [
+                13.458673469387756,
+                13.708673469387756
               ]
             ],
-            "target_supported_window_duration_seconds": 1.385839002267574
+            "target_supported_window_duration_seconds": 2.1180385487528346,
+            "source_supported_window_duration_seconds": 2.1180385487528346,
+            "source_supported_fraction": 0.13237740929705216,
+            "target_supported_fraction": 0.5295096371882086,
+            "support_semantics": "token_neighbourhood_windows_not_verified_continuous_audio",
+            "support_assessment": {
+              "status": "supported_within_profile",
+              "rejection_reasons": [],
+              "profile_id": "bounded-audio-2026-10-20-v2"
+            }
           }
         ],
         "metrics": {
-          "source_tokens": 431,
-          "target_tokens": 89,
-          "raw_token_pair_matches": 40,
+          "source_tokens": 770,
+          "target_tokens": 153,
+          "raw_token_pair_matches": 64,
           "candidate_offsets": 2,
-          "mean_votes_per_offset_bin": 0.09975062344139651,
-          "support_window_seconds": 0.25
+          "mean_votes_per_offset_bin": 0.1596009975062344,
+          "support_window_seconds": 0.25,
+          "supported_offsets": 2,
+          "calibration_profile_id": "bounded-audio-2026-10-20-v2"
         },
         "limitations": [
           "Content correspondence does not establish authorship or historical direction.",
-          "Candidate thresholds are exploratory and do not validate a provenance claim.",
-          "Supported windows surround matched landmarks; they are not exact edit boundaries."
+          "Profile support is bounded to the documented mixture/excerpt experiment, not calibrated probability or provenance evidence.",
+          "Supported windows surround matched landmarks; they are not exact edit boundaries.",
+          "Support fractions are candidate window coverage, not calibrated match confidence; mixing can hide a real source and no candidate does not disprove a relationship."
         ],
         "scoring_eligible": false,
         "integrity_contribution": null,
         "content_match_is_provenance": false,
         "parameters": {
           "sample_rate_hz": 11025,
-          "density": 20.0,
+          "density": 40.0,
           "offset_bin_seconds": 0.05,
           "minimum_candidate_matches": 5,
           "support_window_seconds": 0.25
         },
-        "processing_ms": 456.90929202828556,
-        "policy_id": "audio-observations-experimental-v1",
-        "policy_version": 1,
-        "policy_sha256": "3ccfe9771db746a1d444f6ac9e3bf304d1de9c0538941ac27c41e7fe46953a54"
+        "processing_ms": 330.75904194265604,
+        "policy_id": "audio-observations-bounded-v2",
+        "policy_version": 2,
+        "policy_sha256": "f6069e2b45fad46ade14ba0fa569053e9b76bea87aa78c1f7d41d84e45e550f8",
+        "calibration": {
+          "profile_id": "bounded-audio-2026-10-20-v2",
+          "status": "bounded_calibration",
+          "summary": "Excerpt and mixture-component offsets (error <= 0.1 s): development 26/28 found at density 40; held-out 15/16 found; 0/6 controls supported. Lumina false-match benchmark (2026-10-21): 0/5 same-genre and 0/4 same-prompt pairs matched; a shared drum loop was detected in 1/4 pairs at loop gain 0.5 and 4/4 at gain 1.0, at the correct offset.",
+          "sample": {
+            "development_cases": 28,
+            "held_out_cases": 16,
+            "controls": 6
+          },
+          "transforms_tested": [
+            "excerpt",
+            "mixture_component",
+            "unrelated_same_genre_tempo_key",
+            "same_prompt_regeneration",
+            "shared_loop_gain_0.5_and_1.0"
+          ],
+          "not_tested": [
+            "covers",
+            "pitch_shift",
+            "time_stretch",
+            "alternate_takes"
+          ],
+          "false_match_rates": {
+            "benchmark": "false_match_lumina_2026-10-21",
+            "definition": "a candidate offset whose support_assessment is supported_within_profile",
+            "date": "2026-10-21",
+            "categories": {
+              "same_genre_tempo_key": {
+                "pairs": 5,
+                "false_matches": 0
+              },
+              "same_prompt_regeneration": {
+                "pairs": 4,
+                "false_matches": 0
+              },
+              "cover_prompts_melody_unverified": {
+                "pairs": 6,
+                "false_matches": 0
+              },
+              "shared_loop": {
+                "pairs": 4,
+                "detected": 1,
+                "note": "The loop is real shared audio; a fingerprint match does not mean one song derives from the other."
+              },
+              "shared_loop_full_gain": {
+                "pairs": 4,
+                "detected": 4,
+                "note": "The loop is real shared audio; a fingerprint match does not mean one song derives from the other."
+              }
+            },
+            "scope": "Case counts on a small Lumina sample; not a population false-positive rate."
+          }
+        }
       },
       {
         "diagnostic_id": "60b9c6502621e1343c62ba77f6bec80845af681499511e451b1e928585631687:0:spectromap",
@@ -1119,7 +1374,11 @@
                 13.818968253968254
               ]
             ],
-            "target_supported_window_duration_seconds": 3.530396825396825
+            "target_supported_window_duration_seconds": 3.530396825396825,
+            "source_supported_window_duration_seconds": 3.530396825396825,
+            "source_supported_fraction": 0.22064980158730158,
+            "target_supported_fraction": 0.8825992063492063,
+            "support_semantics": "token_neighbourhood_windows_not_verified_continuous_audio"
           },
           {
             "source_minus_target_offset_seconds": 1.991111111111111,
@@ -1176,7 +1435,11 @@
                 5.712301587301587
               ]
             ],
-            "target_supported_window_duration_seconds": 2.8175396825396826
+            "target_supported_window_duration_seconds": 2.8175396825396826,
+            "source_supported_window_duration_seconds": 2.8175396825396826,
+            "source_supported_fraction": 0.17609623015873016,
+            "target_supported_fraction": 0.7043849206349206,
+            "support_semantics": "token_neighbourhood_windows_not_verified_continuous_audio"
           }
         ],
         "metrics": {
@@ -1213,10 +1476,21 @@
           "minimum_candidate_matches": 5,
           "support_window_seconds": 0.25
         },
-        "processing_ms": 21.4721659431234,
-        "policy_id": "audio-observations-experimental-v1",
-        "policy_version": 1,
-        "policy_sha256": "3ccfe9771db746a1d444f6ac9e3bf304d1de9c0538941ac27c41e7fe46953a54"
+        "processing_ms": 20.546499988995492,
+        "policy_id": "audio-observations-bounded-v2",
+        "policy_version": 2,
+        "policy_sha256": "f6069e2b45fad46ade14ba0fa569053e9b76bea87aa78c1f7d41d84e45e550f8",
+        "calibration": {
+          "profile_id": "bounded-audio-2026-10-20-v2",
+          "status": "exploratory_uncalibrated",
+          "summary": "Upstream peak pairing on fixed windows; no thresholds have been calibrated. Candidate offsets are observations only.",
+          "sample": null,
+          "transforms_tested": [],
+          "not_tested": [
+            "all"
+          ],
+          "false_match_rates": null
+        }
       }
     ],
     "audio_structure": [
@@ -1230,7 +1504,7 @@
         "range_source": "whole_file",
         "provider": "librosa",
         "provider_version": "0.11.0",
-        "adapter_version": "1.0",
+        "adapter_version": "1.2",
         "status": "inconclusive",
         "reason_code": "thresholds_not_calibrated",
         "message": "Experimental content observations; thresholds are not calibrated.",
@@ -1253,6 +1527,10 @@
         },
         "matches": [],
         "metrics": {
+          "feature_normalization": {
+            "sections_and_repetitions": "per_file",
+            "cross_file_similarity": "joint_pair"
+          },
           "source_sections_seconds": [
             [
               0.0,
@@ -1264,10 +1542,6 @@
             ],
             [
               7.987664399092971,
-              10.983038548752834
-            ],
-            [
-              10.983038548752834,
               13.978412698412699
             ],
             [
@@ -1285,22 +1559,22 @@
             {
               "first_seconds": 0.0,
               "repeat_seconds": 7.987664399092971,
-              "feature_cosine": 0.9991148114204407
+              "feature_cosine": 0.9991083145141602
             },
             {
               "first_seconds": 0.9984580498866213,
               "repeat_seconds": 8.986122448979591,
-              "feature_cosine": 0.9998175501823425
+              "feature_cosine": 0.9997992515563965
             },
             {
               "first_seconds": 1.9969160997732427,
               "repeat_seconds": 9.984580498866213,
-              "feature_cosine": 0.9996432065963745
+              "feature_cosine": 0.9996324777603149
             },
             {
               "first_seconds": 2.995374149659864,
               "repeat_seconds": 10.983038548752834,
-              "feature_cosine": 0.9998018145561218
+              "feature_cosine": 0.9998059272766113
             }
           ],
           "target_repetition_candidates": [],
@@ -1329,10 +1603,21 @@
           "aggregation_seconds": 1.0,
           "candidate_cosine_similarity": 0.9
         },
-        "processing_ms": 787.4003329779953,
-        "policy_id": "audio-observations-experimental-v1",
-        "policy_version": 1,
-        "policy_sha256": "3ccfe9771db746a1d444f6ac9e3bf304d1de9c0538941ac27c41e7fe46953a54"
+        "processing_ms": 509.2617500340566,
+        "policy_id": "audio-observations-bounded-v2",
+        "policy_version": 2,
+        "policy_sha256": "f6069e2b45fad46ade14ba0fa569053e9b76bea87aa78c1f7d41d84e45e550f8",
+        "calibration": {
+          "profile_id": "bounded-audio-2026-10-20-v2",
+          "status": "exploratory_uncalibrated",
+          "summary": "Per-file feature sections and repetitions; cross-file similarity is a summary only because unrelated material scored as high as related material on real recordings.",
+          "sample": null,
+          "transforms_tested": [],
+          "not_tested": [
+            "all"
+          ],
+          "false_match_rates": null
+        }
       }
     ],
     "audio_fingerprint_agreement": [
@@ -1370,16 +1655,16 @@
         "matches": [
           {
             "source_minus_target_offset_seconds": 9.998095238095239,
-            "audfprint_votes": 7,
+            "audfprint_votes": 13,
             "spectromap_votes": 100,
-            "audfprint_votes_over_background": 70.175,
+            "audfprint_votes_over_background": 81.453125,
             "spectromap_votes_over_background": 226.2327981651376
           },
           {
             "source_minus_target_offset_seconds": 1.9955555555555555,
-            "audfprint_votes": 33,
+            "audfprint_votes": 49,
             "spectromap_votes": 20,
-            "audfprint_votes_over_background": 330.825,
+            "audfprint_votes_over_background": 307.015625,
             "spectromap_votes_over_background": 45.24655963302752
           }
         ],
@@ -1387,9 +1672,9 @@
           "agreed_offsets": 2,
           "tolerance_seconds": 0.05,
           "minimum_votes_per_provider": 2,
-          "audfprint_background": 0.09975062344139651,
+          "audfprint_background": 0.1596009975062344,
           "spectromap_background": 0.4420225573438094,
-          "expected_chance_agreements": 0.4727824894031322
+          "expected_chance_agreements": 1.1634876442639586
         },
         "limitations": [
           "Content correspondence does not establish authorship or historical direction.",
@@ -1400,10 +1685,58 @@
         "integrity_contribution": null,
         "content_match_is_provenance": false,
         "parameters": {},
-        "processing_ms": 0.031291041523218155,
-        "policy_id": "audio-observations-experimental-v1",
-        "policy_version": 1,
-        "policy_sha256": "3ccfe9771db746a1d444f6ac9e3bf304d1de9c0538941ac27c41e7fe46953a54"
+        "processing_ms": 0.0310409814119339,
+        "policy_id": "audio-observations-bounded-v2",
+        "policy_version": 2,
+        "policy_sha256": "f6069e2b45fad46ade14ba0fa569053e9b76bea87aa78c1f7d41d84e45e550f8",
+        "calibration": {
+          "profile_id": "bounded-audio-2026-10-20-v2",
+          "status": "exploratory_uncalibrated",
+          "summary": "Offsets where audfprint and SpectroMap both voted. On the Project Rock data it found 2 of 29 true takes inside final masters and 0 of 33 controls; both algorithms read the same audio, so agreement is not independent evidence.",
+          "sample": {
+            "true_takes": 29,
+            "controls": 33
+          },
+          "transforms_tested": [
+            "take_inside_final_master",
+            "unrelated_same_genre_tempo_key",
+            "same_prompt_regeneration",
+            "shared_loop_gain_0.5_and_1.0"
+          ],
+          "not_tested": [
+            "covers"
+          ],
+          "false_match_rates": {
+            "benchmark": "false_match_lumina_2026-10-21",
+            "definition": "an offset where audfprint and SpectroMap each cast at least 5 votes",
+            "date": "2026-10-21",
+            "categories": {
+              "same_genre_tempo_key": {
+                "pairs": 5,
+                "false_matches": 0
+              },
+              "same_prompt_regeneration": {
+                "pairs": 4,
+                "false_matches": 0
+              },
+              "cover_prompts_melody_unverified": {
+                "pairs": 6,
+                "false_matches": 0
+              },
+              "shared_loop": {
+                "pairs": 4,
+                "detected": 1,
+                "note": "The loop is real shared audio; a fingerprint match does not mean one song derives from the other."
+              },
+              "shared_loop_full_gain": {
+                "pairs": 4,
+                "detected": 4,
+                "note": "The loop is real shared audio; a fingerprint match does not mean one song derives from the other."
+              }
+            },
+            "scope": "Case counts on a small Lumina sample; not a population false-positive rate."
+          }
+        }
       }
     ],
     "audio_semantics": [
@@ -1438,12 +1771,75 @@
           "phrase_beats": 16,
           "label_similarity": 0.9,
           "baseline_shuffles": 20,
-          "minimum_seconds": 8.0
+          "minimum_seconds": 8.0,
+          "alignment_grid_seconds": 0.25,
+          "section_aggregation_seconds": 0.5,
+          "section_context_seconds": 12.0,
+          "section_minimum_seconds": 6.0,
+          "section_prominence": 0.03
         },
-        "processing_ms": 515.4574590269476,
-        "policy_id": "audio-observations-experimental-v1",
-        "policy_version": 1,
-        "policy_sha256": "3ccfe9771db746a1d444f6ac9e3bf304d1de9c0538941ac27c41e7fe46953a54"
+        "processing_ms": 531.701875035651,
+        "policy_id": "audio-observations-bounded-v2",
+        "policy_version": 2,
+        "policy_sha256": "f6069e2b45fad46ade14ba0fa569053e9b76bea87aa78c1f7d41d84e45e550f8",
+        "calibration": {
+          "profile_id": "bounded-audio-2026-10-20-v2",
+          "status": "bounded_calibration",
+          "summary": "Known DSP derivatives: development 7 Lumina families, 63 cases (59 supported, 4 abstained, transposition correct in 59/59, max tempo error 1.76%); validation 8 SALAMI families, 72 cases (57 supported, 15 abstained, 57/57 correct, max tempo error 1.27%). Controls: 0/22 and 0/29 supported. Sections: 16 SALAMI recordings, held-out boundary F@3s 0.538. Lumina false-match benchmark (2026-10-21): 0/5 same-genre, 0/4 same-prompt and 0/8 shared-loop pairs supported. Requested covers could not be verified as covers, so covers remain untested.",
+          "sample": {
+            "development_families": 7,
+            "development_cases": 63,
+            "validation_families": 8,
+            "validation_cases": 72,
+            "controls": 51,
+            "section_recordings": 16
+          },
+          "transforms_tested": [
+            "pitch_shift",
+            "time_stretch_0.8_to_1.35",
+            "excerpt",
+            "added_noise",
+            "mixture",
+            "unrelated_same_genre_tempo_key",
+            "same_prompt_regeneration",
+            "shared_loop_between_different_songs"
+          ],
+          "not_tested": [
+            "covers",
+            "reorchestrations",
+            "nonuniform_speed_changes",
+            "alternate_takes"
+          ],
+          "false_match_rates": {
+            "benchmark": "false_match_lumina_2026-10-21",
+            "definition": "correspondence_assessment.status is supported_within_profile",
+            "date": "2026-10-21",
+            "categories": {
+              "same_genre_tempo_key": {
+                "pairs": 5,
+                "false_matches": 0
+              },
+              "same_prompt_regeneration": {
+                "pairs": 4,
+                "false_matches": 0
+              },
+              "cover_prompts_melody_unverified": {
+                "pairs": 6,
+                "supported": 0,
+                "note": "Whether these clips share a composition is unverified, so musical correspondence is reported without classifying it as true or false."
+              },
+              "shared_loop": {
+                "pairs": 4,
+                "false_matches": 0
+              },
+              "shared_loop_full_gain": {
+                "pairs": 4,
+                "false_matches": 0
+              }
+            },
+            "scope": "Case counts on a small Lumina sample; not a population false-positive rate."
+          }
+        }
       }
     ],
     "audio_diagnostic_summary": [
@@ -1463,10 +1859,13 @@
         "task_count": 1,
         "completed_provider_tasks": 4,
         "unavailable_provider_tasks": 1,
-        "policy_id": "audio-observations-experimental-v1",
-        "policy_version": 1,
-        "policy_sha256": "3ccfe9771db746a1d444f6ac9e3bf304d1de9c0538941ac27c41e7fe46953a54",
-        "processing_ms": 1978.4162909490988
+        "policy_id": "audio-observations-bounded-v2",
+        "policy_version": 2,
+        "policy_sha256": "f6069e2b45fad46ade14ba0fa569053e9b76bea87aa78c1f7d41d84e45e550f8",
+        "processing_ms": 1613.1668750895187,
+        "calibration_status_sha256": "7ade764150c802ff947149ecfc813ff6f59300929aa0421e11d4a868aeba7668",
+        "aaf_range_tasks": 0,
+        "aaf_range_tasks_with_correspondence": 0
       }
     ]
   }

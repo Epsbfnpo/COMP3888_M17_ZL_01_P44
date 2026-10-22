@@ -78,7 +78,11 @@ RANGE_FIELDS = ("source_start_seconds", "source_end_seconds", "target_start_seco
 def read_pair(task, sample_rate, cache=None):
     attrs = task["attributes"]
     values = [attrs.get(key) for key in RANGE_FIELDS]
-    if any(value is not None for value in values) and not all(value is not None for value in values):
+    # An AAF range names only the source seconds used; the target is analysed whole.
+    aaf_source_only = (task.get("range_source") == "aaf_source_range" and values[2] is None
+                       and values[3] is None and values[0] is not None and values[1] is not None)
+    if (not aaf_source_only and any(value is not None for value in values)
+            and not all(value is not None for value in values)):
         missing = ", ".join(key for key, value in zip(RANGE_FIELDS, values) if value is None)
         raise AnalysisUnavailable("incomplete_declared_ranges",
                                   "Partial declared ranges are not silently completed; missing: " + missing + ".")

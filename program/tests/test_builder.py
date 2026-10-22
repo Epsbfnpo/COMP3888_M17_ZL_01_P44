@@ -14,6 +14,10 @@ BASE = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(BASE))
 
 import builder_operations as operations
+# assess_manifest imports run lazily, and importing it loads c2pa, which calls
+# platform.processor() and so subprocess.Popen. The worker tests patch Popen on
+# the shared subprocess module, so import run here, before any test patches it.
+import run  # noqa: F401
 
 
 class ExportTests(unittest.TestCase):

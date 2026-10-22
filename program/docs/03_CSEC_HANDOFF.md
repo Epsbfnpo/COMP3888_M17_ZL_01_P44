@@ -1,4 +1,4 @@
-# Music target: local integration handoff v0.7
+# Music target: local integration handoff v0.8
 
 Status: locally tested integration baseline, prepared for review. Not yet sent to CSEC or executed in CSEC's runner.
 
@@ -11,7 +11,7 @@ Status: locally tested integration baseline, prepared for review. Not yet sent t
 ## Pinned target
 
 - Target name: `COMP3888-music-baseline`.
-- Target version: `0.7.0`.
+- Target version: `0.8.1`. Version 0.8.1 adds optional `assessment_checks` entries (`aaf_reference_coverage`, `aaf_non_recorder_media`, `declared_chronology`) and counts in `integrity_decision`; the response `schema_version` stays `0.2-candidate`.
 - Runtime code revision: see `reports/release.json` and `system.source_revision` in each response.
   This is an explicit SHA-256 content identifier, not a claimed Git commit.
 - The supplied Ben library snapshot has no Git metadata; its original files are identified in `reports/source_inventory.json`.

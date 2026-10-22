@@ -4,8 +4,8 @@ This directory contains an implemented baseline for assessing evidence from musi
 
 The main approach is to reuse Ben's evidence graph and execution framework, connect the music parsers and checks, and expose a runnable interface for CSEC.
 
-The current version is **0.8.0** on `main` (base commit `2128cc4`, 21 October
-2026). It focuses on C2PA provenance: pinned trust lists, asymmetric trust and a
+The current version is **0.8.1** (22 October 2026). It builds on 0.8.0, which
+focused on C2PA provenance: pinned trust lists, asymmetric trust and a
 plain-language finding for every state of the final artefact's C2PA manifest
 (see [C2PA provenance and trust](#c2pa-provenance-and-trust)). Optional
 report-only audio diagnostics now carry their calibration status and the
@@ -13,8 +13,20 @@ results of a first false-match benchmark. Audio diagnostics do not change any
 score, weight, confidence, withholding rule or cap. LLM integration is outside
 this update.
 
+Version 0.8.1 applies the fixes from running the Project Rock post-production
+material through the evaluator. It narrows recorder metadata to files that name
+their recording, reports AAF-used takes that were not submitted and the AAF's
+other media, stores contradiction counts in `integrity_decision` and leads a
+contradicted Integrity with them, lets `mixed_from` take raw takes, limits
+audio diagnostics to the source seconds an AAF says it used, and warns when a
+declared source was originated after its target. Only the `mixed_from` change
+can alter a score: such edges are no longer skipped. See
+[Evidence tiers](#evidence-tiers) below and
+[`program/docs/PROJECT_ROCK_FINDINGS_2026-10-22.md`](program/docs/PROJECT_ROCK_FINDINGS_2026-10-22.md).
+
 The [technical manual](Manual_layout_check.docx) describes the whole program;
-its Section 8 covers the C2PA work in detail. The runnable evaluator is in
+its Section 8 covers the C2PA work in detail and Section 10 lists the known
+limitations. The runnable evaluator is in
 [`program/`](program/). Unless stated otherwise, file locations and commands
 below are relative to that directory.
 
@@ -28,7 +40,7 @@ below are relative to that directory.
 
 ## Recommended reading order
 
-1. [Technical manual](Manual_layout_check.docx): the complete program description; Section 8 covers C2PA provenance, trust and findings.
+1. [Technical manual](Manual_layout_check.docx): the complete program description; Section 8 covers C2PA provenance, trust and findings, and Section 10 lists the known limitations.
 2. [CSEC handoff](program/docs/03_CSEC_HANDOFF.md): integration instructions and supported boundaries.
 3. [C2PA trust lists](program/policies/c2pa_trust/README.md): pinned lists, known AI signers and the update procedure.
 4. [Physical diagnostic policy](program/docs/PHYSICAL_SIMILARITY.md): disabled legacy signal checks and the separate non-scoring boundary.
@@ -184,6 +196,19 @@ isolated diagnostic workers on retained, declared audio-to-audio edges. It does
 not search undeclared files or create graph relationships. CompSheet comparison
 requires a matching selection and complete declared ranges. Only the currently
 supported WAV encodings are accepted.
+
+When a submitted AAF uses a bound recorder take, the take is analysed only over
+the seconds the edit used (`range_source: aaf_source_range`, `selection_id`
+`aaf:<mob>:<n>`) against the whole target. The AAF range is tape timecode minus
+the take's recorder start; identical ranges from several channel slots are
+merged, and a range more than one frame outside the recording is left to the
+core `aaf_source_range_within_recorded_timecode` check and not analysed. This is
+the only case in which a target range may stay open. A fingerprint match in such
+a task is reported as `AUDIO_AAF_RANGE_CORRESPONDENCE` (content agreeing with the
+AAF, not provenance), and `audio_diagnostic_summary` counts `aaf_range_tasks` and
+`aaf_range_tasks_with_correspondence`. No match is not reported as disagreement.
+On Project Rock Ep01, 6 of 14 AAF ranges were found in the WIP mix and a
+whole-take false match disappeared.
 
 Detailed results are object arrays in `assessment_checks.audio_fingerprint`,
 `assessment_checks.audio_structure` and `assessment_checks.audio_diagnostic_summary`.
@@ -352,10 +377,15 @@ export an AAF and build the graph from it, so agreement between the two proves
 nothing. They still contribute to the `cross_evidence_support` value and still
 reveal contradictions. The policy permits metadata consistency to qualify
 release even though embedded fields can be rewritten. Every bound WAV with
-BWF/iXML metadata receives `RECORDER_METADATA_ORIGIN_NOT_AUTHENTICATED`, an
+recorder BWF/iXML metadata receives `RECORDER_METADATA_ORIGIN_NOT_AUTHENTICATED`, an
 informational finding with `scoring_eligible: false` and no Integrity
 contribution. It neither lowers nor raises the score; the metadata consistency
-checks still score and may release the value. For example:
+checks still score and may release the value. Only a file that names its
+recording (file name, tape, scene or take) counts as recorder metadata. BWF
+written by a DAW, editor or sound library (for example a Pro Tools bounce) is
+reported as `bwf_kind: daw_or_library`, and its time reference is a session
+timeline position (`timeline_reference_seconds`), not a recorder start
+timecode. For example:
 
 - **Sound report vs recorder:** the sound report says `2T01.WAV` (18 Dec)
   starts at `08:49:43:00`, and the take's `bext` time reference says the same.
@@ -388,6 +418,26 @@ reports and the episode AAF) produced 0 recorder contradictions and
 Integrity 1.0. A copy of the sound report with one start timecode shifted by
 2 s failed exactly that one check.
 
+An AAF also tells the evaluator what it does not hold. `assessment_checks.aaf_reference_coverage`
+lists the recorder takes the edit uses and which are bound; an unsubmitted take
+is reported as `AAF_REFERENCED_TAKES_NOT_SUBMITTED` (low, not scored).
+`assessment_checks.aaf_non_recorder_media` lists the edit's other media
+(library effects, music, renders) with `AAF_REFERENCES_NON_RECORDER_MEDIA`;
+no licensing determination is made, and creation-method coverage states that
+it counts submitted artefacts only. When Integrity is contradicted, its
+reasoning and score explanation start with the contradiction count (for
+example "1 of 122 assessed facts is contradicted (cross_evidence_support 1 of
+104)"), because one contradiction among many honest facts barely moves the
+number. `mixed_from` accepts
+`audio/raw-take` as a source, since dialogue post-production mixes takes
+directly after the AAF edit. `assessment_checks.declared_chronology` compares
+the BWF origination date (and time, when both files carry one) across each
+declared edge between bound WAVs; a source originated after its target is
+reported as `DECLARED_SOURCE_NEWER_THAN_TARGET` (low, not scored), because BWF
+dates can be reset or rewritten. Findings and experiments on the rest of the
+Project Rock material are in
+[`program/docs/PROJECT_ROCK_FINDINGS_2026-10-22.md`](program/docs/PROJECT_ROCK_FINDINGS_2026-10-22.md).
+
 An assessed failure of a rule listed in `severe_contradiction_rules` caps an
 otherwise available weighted result with `min(weighted_mean, 0.25)`. The cap
 cannot raise a lower value, and optional audio matches cannot cancel it. Final
@@ -409,11 +459,20 @@ extended. The Integrity entry lists:
 - the weighted mean, and whether a cap applied (`cap_applied`, `cap`) or the
   value was withheld (`withheld`);
 - the evidence-tier counts;
+- `contradiction_count`, `assessed_fact_count` and `fact_counts_by_layer`;
 - every failed check as a sentence with the compared values.
 
 For example: *"Sound report start timecode for 2T01.WAV is 08:49:45:00, but
 the recorder wrote 08:49:43:00 into the file (2.00 s apart)."* The same
 sentences are appended to the Integrity `reasoning` after "Contradictions:".
+When anything is contradicted, both the reasoning and the first statement
+start with the count and name the contradicted layers, for example *"2 of 122
+assessed facts are contradicted (cross_evidence_support 2 of 104)"*. The counts
+are computed once and stored in `assessment_checks.integrity_decision`
+(`contradiction_count`, `assessed_fact_count`, `fact_counts_by_layer`), so they
+remain available when `include_reasoning: false` omits the explanations. The
+desktop results read them from there and show the count beside the value
+("0.990 (contradicted: 2)").
 
 A timecode mismatch is an ordinary contradiction, not a severe one. Honest
 productions produce mismatches too: hand-typed reports, timecode drift, files
@@ -499,11 +558,18 @@ python3 -B check_public.py /path/to/public-bundles
 ```
 
 The second command writes results to `reports/`. Both commands operate locally and do not transmit data.
-On 21 October 2026 (version 0.8.0) discovery found 312 tests. The 308 non-GUI
-tests gave 303 passed and 5 skipped: the structure-benchmark cases need the
-benchmark-only `mir_eval` package, and 3 of them fail if they are forced to run
-without it. The four GUI tests each passed when run in a separate process; run
-them that way, because they can hang inside the full suite on macOS Tk. The
+On 22 October 2026 (version 0.8.0) discovery found 312 tests. With
+`REQUIRE_AUDIO_BACKENDS=1`, all 308 non-GUI tests passed with no skips; this
+needs the audio libraries and the benchmark-only `mir_eval` from
+`requirements-benchmark.txt` (without it, the 5 structure-benchmark cases are
+skipped). The four GUI tests each passed when run in a separate process; run
+them that way, because they can hang inside the full suite on macOS Tk.
+Version 0.8.1 (22 October 2026): the same procedure found 329 tests; all 325
+non-GUI tests passed in one process (29 s) and the four GUI tests passed
+separately (`reports/test-results.txt`, `reports/release.json`).
+`tests/test_builder.py` now also passes on its own: it imports `run` (and so
+c2pa) before its worker tests mock `subprocess.Popen`, because c2pa's import
+calls `platform.processor()`, which spawns a subprocess. The
 24 C2PA tests cover pinned-list hashes, trust status, asymmetric trust, known AI
 signers, the C2PA chunk precondition and every final state. The synthetic tests
 are engineering checks, not real-session accuracy calibration. Run the full dependency-required suite with
@@ -524,7 +590,7 @@ The locations below are relative to `program/`.
 | Location | Purpose |
 |---|---|
 | `vendor/libevchain/` | Local copy of Ben's source with three reviewable fixes |
-| `music_target/domain.py` | Music nodes, relationships, and permitted endpoint roles |
+| `music_target/domain.py` | Music nodes, relationships, and permitted endpoint roles (`mixed_from` accepts raw takes) |
 | `music_target/wav_io.py` | Streaming RIFF/WAVE inspection and vectorised integer/float sample decoding |
 | `music_target/wav_parser.py` | Local copy of the supplied WAV parser |
 | `music_target/engine.py` | File binding, `WavMetadataPass`, `RelationshipIntegrityPass`, library pipeline, and assessment-stage orchestration |
@@ -534,16 +600,16 @@ The locations below are relative to `program/`.
 | `music_target/physical_audio_passes.py` | Deprecated physical-similarity implementation retained for later cleanup; not imported by assessment |
 | `music_target/midi_parser.py` | Size- and structure-bounded Standard MIDI File parser |
 | `music_target/sheet_parsers.py` | CompSheet/CueSheet JSON, CSV, TXT, and PDF parsers plus field normalisation |
-| `music_target/recorder_metadata.py` | Recorder-written BWF `bext`/iXML fields (tape, file name, scene/take, tracks, start timecode) from a bound WAV |
-| `music_target/production_documents.py` | Sound report CSV and AAF (pyaaf2) parsers, and their checks against recorder metadata |
+| `music_target/recorder_metadata.py` | Recorder-written BWF `bext`/iXML fields (tape, file name, scene/take, tracks, start timecode) from a bound WAV; other BWF is reported as `daw_or_library` |
+| `music_target/production_documents.py` | Sound report CSV and AAF (pyaaf2) parsers, their checks against recorder metadata, AAF take coverage and the AAF's non-recorder media |
 | `music_target/evidence_tiers.py` | Evidence tiers for cross-evidence checks and their counts, including the asymmetric C2PA tier |
-| `music_target/score_explanations.py` | Per-axis score explanations and plain-language statements of failed checks |
+| `music_target/score_explanations.py` | Per-axis score explanations, contradiction and assessed-fact counts, and plain-language statements of failed checks |
 | `music_target/daw_session.py` | Ableton Live session parser and its checks against the graph and MIDI |
 | `music_target/audio_diagnostics/providers/music_semantics.py` | Report-only key, tempo, chord and phrase-form comparison across versions |
 | `benchmarks/` | Public music dataset benchmark (Slakh/BabySlakh, MUSDB18-HQ) with true and control relationships; `false_match.py` and its pinned Lumina manifest for the false-match benchmark |
 | `music_target/contract.py` | CSEC/native format adaptation, input validation, and version identification |
 | `policies/workflow_evidence_policy.json` | Candidate required, conditional, and optional evidence policy for 16 workflows |
-| `music_target/audio_diagnostics/` | Report-only task selection, verified snapshots, isolated workers, audfprint, SpectroMap, librosa and music_semantics adapters, fingerprint agreement, calibration status and result assembly |
+| `music_target/audio_diagnostics/` | Report-only task selection (including AAF-declared source ranges), verified snapshots, isolated workers, audfprint, SpectroMap, librosa and music_semantics adapters, fingerprint agreement, calibration status and result assembly |
 | `policies/audio_analysis_policy.json` | Local provider and candidate-parameter configuration; no scoring controls or proposed development caps |
 | `policies/audio_calibration_status.json` | Per-provider calibration status and false-match counts attached to every audio row; does not change scoring |
 | `policies/c2pa_trust/` | Pinned C2PA Trust List, TSA list and frozen legacy ITL (`trust_lists.json` with commits and SHA-256), `known_ai_signers.json` and the update procedure |

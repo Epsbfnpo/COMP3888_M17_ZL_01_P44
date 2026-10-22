@@ -26,7 +26,7 @@ import wav_probe
 import builder_operations as operations
 from builder_results import (
     INSUFFICIENT_SUPPORT_LABEL, attention_items, attention_workflow_results, audio_diagnostic_lines,
-    music_semantics_lines)
+    axis_value_label, music_semantics_lines)
 
 
 def parse_json_object(text: str, label: str) -> dict:
@@ -651,7 +651,7 @@ class App(tk.Tk):
         for name, axis in response["axes"].items():
             self.axis_tree.insert("", "end", values=(
                 name, axis["availability"],
-                "Not assessed" if axis["value"] is None else f"{axis['value']:.3f}",
+                axis_value_label(name, axis, response),
                 "Not assessed" if axis["confidence"] is None else f"{axis['confidence']:.3f}"))
             explanation.append(f"{name}: {axis.get('reasoning') or 'Reasoning not supplied.'}\n")
         file_names = {item["hash"]: Path(item["path"]).name
