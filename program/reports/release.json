@@ -1,11 +1,17 @@
 {
-  "target_version": "0.7.0",
-  "source_revision": "sha256:6d6cf145cceb10f559b4d113a365c4d86ed3e1ab39cb208865218ad5e77bc19c",
+  "target_version": "0.8.1",
+  "date": "2026-10-22",
+  "source_revision": "sha256:17f814af455df89d912f1a8ce5d49680fa8dd2296675fda831c0281ecc6fd324",
   "python": "3.13.7",
   "platform": "Darwin",
-  "tests_run": 102,
+  "tests_discovered": 329,
+  "tests_run": 329,
+  "non_gui_tests_one_process": 325,
+  "gui_tests_separate_processes": 4,
   "failures": 0,
   "errors": 0,
+  "skipped": 0,
+  "test_environment": "REQUIRE_AUDIO_BACKENDS=1; c2pa-python, audio libraries and mir_eval installed",
   "dependencies": {
     "jsonschema": "4.23.0",
     "attrs": "25.1.0",
@@ -14,7 +20,27 @@
     "rpds-py": "0.23.1",
     "pypdf": "6.19.0",
     "xmlschema": "4.3.2",
-    "c2pa-python": "0.37.10 (optional)"
+    "numpy": "2.2.6",
+    "pyaaf2": "1.7.1",
+    "c2pa-python": "0.37.10",
+    "cryptography": "50.0.2",
+    "cffi": "2.1.1",
+    "pycparser": "3.11",
+    "requests": "2.34.2",
+    "certifi": "2026.7.22",
+    "charset-normalizer": "3.5.2",
+    "idna": "3.20",
+    "urllib3": "2.8.0",
+    "toml": "0.10.2"
   },
+  "changes_since_0_8_0": [
+    "Recorder metadata only for files that name their recording; DAW and library BWF reported as daw_or_library",
+    "mixed_from accepts audio/raw-take sources",
+    "AAF take coverage and non-recorder media reported, not scored",
+    "Contradiction counts stored in integrity_decision with a per-layer breakdown and leading the Integrity reasoning",
+    "Audio diagnostics analyse AAF-declared source ranges; AUDIO_AAF_RANGE_CORRESPONDENCE observations",
+    "DECLARED_SOURCE_NEWER_THAN_TARGET chronology warning from BWF origination fields, not scored",
+    "test_builder.py imports run before mocking subprocess.Popen"
+  ],
   "revision_scope": "SHA-256 of runtime Python, requirements, policy JSON, JSON schemas, and bundled XSD files. Documentation, tests and reports excluded."
 }

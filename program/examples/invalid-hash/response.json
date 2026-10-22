@@ -5,8 +5,8 @@
   "asset_sha256": "746c90b6d8f6306ce93c347477103c16027d71a4072cf12d10a9f7246ce93d18",
   "system": {
     "name": "COMP3888-music-baseline",
-    "version": "0.7.0",
-    "source_revision": "sha256:d96ac7bb6f29d6c40feb702d26c8c621c5fdc0e7647bf49687e3c3a9dc077133"
+    "version": "0.8.1",
+    "source_revision": "sha256:17f814af455df89d912f1a8ce5d49680fa8dd2296675fda831c0281ecc6fd324"
   },
   "execution_status": "error",
   "axes": {
@@ -52,9 +52,9 @@
       "evidence_hash": "746c90b6d8f6306ce93c347477103c16027d71a4072cf12d10a9f7246ce93d18"
     }
   ],
-  "processing_ms": 199.0223330212757,
+  "processing_ms": 219.26791698206216,
   "resource_usage": {
-    "cpu_ms": 1.0119999999999851,
+    "cpu_ms": 1.1200000000000099,
     "peak_rss_kib": null
   },
   "error": "SHA-256 mismatch for declared object 746c90b6d8f6306ce93c347477103c16027d71a4072cf12d10a9f7246ce93d18."

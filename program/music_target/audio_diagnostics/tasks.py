@@ -12,6 +12,50 @@ def is_audio(node):
     return node["artefact_type"] == "audio" or node["artefact_type"].startswith("audio/")
 
 
+AAF_RANGE = "aaf_source_range"
+
+
+def _norm(value):
+    return str(value or "").strip().casefold()
+
+
+def _aaf_ranges(response):
+    """Source seconds each AAF-used recorder take contributes, keyed by the take's hash.
+
+    AAF ranges are tape timecode; subtracting the take's recorder start gives
+    seconds into the file. Duplicate ranges (one per channel slot) are merged.
+    A range more than one frame outside the recording is left to the core
+    aaf_source_range_within_recorded_timecode check and not analysed.
+    """
+    recorders = {}
+    for row in response.get("findings", []):
+        recorder = row.get("recorder_metadata") or {}
+        if row.get("code") == "WAV_OBSERVATION" and recorder.get("present") and recorder.get("file_name"):
+            recorders.setdefault((_norm(recorder.get("tape")), _norm(recorder["file_name"])), []).append(
+                (row["evidence_hash"], recorder))
+    ranges = {}
+    for row in response.get("findings", []):
+        if not (row.get("code") == "PARSER_OBSERVATION" and row.get("parser") == "aaf"
+                and row.get("parser_status") in {"parsed", "partial"} and row.get("parser_result")):
+            continue
+        for reference in row["parser_result"].get("references", []):
+            matches = recorders.get((_norm(reference.get("tape")), _norm(reference.get("file_name"))), [])
+            if len(matches) != 1:
+                continue  # unsubmitted or ambiguous take: the core reports it
+            digest, recorder = matches[0]
+            start, duration = recorder.get("start_timecode_seconds"), recorder.get("duration_seconds")
+            if start is None or not duration:
+                continue
+            for item in reference.get("source_ranges", []):
+                frame = 1 / item["edit_rate"]
+                begin, end = item["start_seconds"] - start, item["end_seconds"] - start
+                if begin < -frame or end > duration + frame or end - begin <= 0:
+                    continue
+                key = (round(max(begin, 0.0), 6), round(min(end, duration), 6))
+                ranges.setdefault(digest, {}).setdefault(key, reference.get("master_mob"))
+    return {digest: sorted(items.items()) for digest, items in ranges.items()}
+
+
 def build_tasks(native, response):
     nodes = {node["artefact_hash"]: node for node in native["artefacts"]}
     bound = {row["evidence_hash"] for row in response.get("assessment_checks", {}).get("bound_file_integrity", [])
@@ -22,6 +66,7 @@ def build_tasks(native, response):
               if row["code"] == "PARSER_OBSERVATION" and row.get("parser") == "comp-sheet"
               and row.get("parser_status") in {"parsed", "partial"} and row.get("parser_result")]
     issues = native.get("_input_issues", {})
+    aaf_ranges = _aaf_ranges(response)
     tasks = []
     for target in native["artefacts"]:
         for index, edge in enumerate(target.get("evidence", [])):
@@ -51,9 +96,23 @@ def build_tasks(native, response):
                             selections.append(selection)
                 if not selections:
                     task["unavailable_reason"] = "comp_selection_unavailable"
-            variants = selections or [None]
+            aaf = []
+            if (not task["unavailable_reason"] and task["relationship_type"] != "comped_from"
+                    and all(value is None for value in task["attributes"].values())):
+                # The edit names which seconds of this take it used: analyse those
+                # seconds against the whole target instead of the whole take.
+                aaf = aaf_ranges.get(task["source_hash"], [])
+            variants = selections or aaf or [None]
             for number, selection in enumerate(variants):
                 variant = {**task, "task_id": relation_id + ":" + str(number)}
+                if selection and aaf:
+                    (begin, end), mob = selection
+                    variant["selection_id"] = f"aaf:{mob}:{number}"
+                    variant["attributes"] = {"source_start_seconds": begin, "source_end_seconds": end,
+                                             "target_start_seconds": None, "target_end_seconds": None}
+                    variant["range_source"] = AAF_RANGE
+                    tasks.append(variant)
+                    continue
                 if selection:
                     variant["selection_id"] = selection["selection_id"]
                     variant["attributes"] = {key: selection.get(key) for key in RANGE_FIELDS}

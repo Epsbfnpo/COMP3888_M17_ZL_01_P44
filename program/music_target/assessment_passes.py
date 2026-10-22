@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import dataclasses
 import math
+import re
 from pathlib import Path
 
 from music_target.evidence_audit import audit_cross_evidence, aggregate_cross_evidence
@@ -13,10 +14,10 @@ from legacy_parsers.ern_parser import parse_ern_file
 from legacy_parsers.rin_parser import parse_rin_file
 from music_target.daw_session import DawSessionError, daw_session_checks, parse_ableton_session
 from music_target.midi_parser import parse_midi_file
-from music_target.production_documents import (aaf_checks, parse_aaf_file, parse_sound_report_file,
-                                               sound_report_checks)
+from music_target.production_documents import (aaf_checks, aaf_non_recorder_media, aaf_reference_coverage,
+                                               parse_aaf_file, parse_sound_report_file, sound_report_checks)
 from music_target.evidence_tiers import TIERS, assign_default_tiers, c2pa_signer_trusted, c2pa_tier, tier_counts
-from music_target.score_explanations import describe_check
+from music_target.score_explanations import contradiction_summary, describe_check, fact_counts
 from music_target.scoring_profile import load_default_scoring_profile
 from music_target.sheet_parsers import parse_comp_sheet_file, parse_cue_sheet_file
 
@@ -1185,6 +1186,54 @@ def _disabled_physical_similarity(native):
     return results, summary
 
 
+_BWF_DATE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
+_BWF_TIME = re.compile(r"^\d{2}:\d{2}:\d{2}$")
+
+
+def _bwf_stamp(observation):
+    """(date, time or None) from a WAV's bext origination fields, or None."""
+    bext = ((observation or {}).get("embedded_metadata") or {}).get("broadcast_extension") or {}
+    date, time = str(bext.get("origination_date") or ""), str(bext.get("origination_time") or "")
+    if not _BWF_DATE.match(date):
+        return None
+    return date, time if _BWF_TIME.match(time) else None
+
+
+def declared_chronology(native, wav_observations, bound_hashes):
+    """Declared audio edges whose source's BWF origination is later than its target's.
+
+    BWF dates can be reset or rewritten, so a reversed order is reported for
+    review and never scored. Same-day files are compared by time only when
+    both carry one.
+    """
+    rows, findings = [], []
+    for target in native["artefacts"]:
+        for edge in target.get("evidence", []):
+            source_hash, target_hash = edge["hash"], target["artefact_hash"]
+            if source_hash not in bound_hashes or target_hash not in bound_hashes:
+                continue
+            source, later = _bwf_stamp(wav_observations.get(source_hash)), _bwf_stamp(wav_observations.get(target_hash))
+            if source is None or later is None:
+                continue
+            newer = source[0] > later[0] or (source[0] == later[0] and source[1] is not None
+                                              and later[1] is not None and source[1] > later[1])
+            row = {"source_hash": source_hash, "target_hash": target_hash,
+                   "relationship_type": edge["relationship_type"],
+                   "source_origination": " ".join(part for part in source if part),
+                   "target_origination": " ".join(part for part in later if part),
+                   "source_newer_than_target": newer, "scoring_eligible": False, "integrity_contribution": None}
+            rows.append(row)
+            if newer:
+                findings.append(_finding(
+                    "DECLARED_SOURCE_NEWER_THAN_TARGET",
+                    f"The declared {edge['relationship_type']} source was originated {row['source_origination']}, "
+                    f"after its target ({row['target_origination']}), according to their BWF fields. BWF dates can "
+                    "be reset or rewritten, so this is reported for review and not scored.",
+                    target_hash, "low", scoring_eligible=False, integrity_contribution=None,
+                    source_hash=source_hash, relationship_type=edge["relationship_type"]))
+    return rows, findings
+
+
 def assess_axes(native, chain, bound_hashes, missing_hashes, wav_observations,
                 relationship_observations, parser_observations, workflow_input,
                 scoring_profile=None):
@@ -1358,7 +1407,10 @@ def assess_axes(native, chain, bound_hashes, missing_hashes, wav_observations,
                 "qualifying_facts": qualifying_facts,
                 "ordinary_contradiction_release_allowed": False,
                 "severe_contradiction_release": "capped_value" if severe_release else "disabled",
-                "score_semantics": "assessed_check_consistency_not_provenance_authentication"}
+                "score_semantics": "assessed_check_consistency_not_provenance_authentication",
+                # Counted once here; reasoning, explanations and the desktop view read these.
+                **fact_counts({"file_integrity": file_checks, "declaration_consistency": rel_checks,
+                               "cross_evidence_support": [fact["representative_check"] for fact in cross_facts]})}
     withholding_clause = (f"Numeric release requires {rule_description}; "
                           + ("the rule permitted this value. " if threshold_met and integrity_value is not None else
                              "a severe contradiction released a value no higher than the cap. "
@@ -1388,9 +1440,14 @@ def assess_axes(native, chain, bound_hashes, missing_hashes, wav_observations,
               [fact["representative_check"] for fact in cross_facts] if item.get("passed") is False]
     contradiction_clause = ("Contradictions: " + " ".join(describe_check(item) for item in failed) + " "
                             if failed else "")
+    # Many honest facts dilute one contradiction in the mean, so the count
+    # leads the reasoning: a reader of the number alone would miss it.
+    summary = contradiction_summary(decision)
+    count_clause = f"{summary}; the numeric value alone understates this. " if summary else ""
     integrity = _axis(
         integrity_availability, integrity_value, integrity_confidence,
-        (f"Integrity has {len(components)}/{denominator_layers} score-eligible evidence layers; missing evidence reduces availability and confidence but is never treated as contradiction. "
+        (f"{count_clause}"
+         f"Integrity has {len(components)}/{denominator_layers} score-eligible evidence layers; missing evidence reduces availability and confidence but is never treated as contradiction. "
          f"{withholding_clause}"
          f"{cap_clause}"
          f"{contradiction_clause}"
@@ -1410,6 +1467,37 @@ def assess_axes(native, chain, bound_hashes, missing_hashes, wav_observations,
                  metadata_sources=(observation.get("recorder_metadata") or {}).get("sources", []))
         for digest, observation in wav_observations.items()
         if digest in bound_hashes and (observation.get("recorder_metadata") or {}).get("present") is True]
+    aaf_coverage, aaf_media, aaf_findings = [], [], []
+    for owner_digest, parsed in sorted(parser_observations.items()):
+        if parsed.get("parser") != "aaf" or not parsed.get("data") or owner_digest not in bound_hashes:
+            continue
+        coverage = aaf_reference_coverage(parsed["data"], owner_digest, wav_observations)
+        media = aaf_non_recorder_media(parsed["data"], owner_digest)
+        aaf_coverage.append(coverage)
+        aaf_media.append(media)
+        if coverage["missing_recordings"]:
+            names = ", ".join(f"{item['tape']}/{item['file_name']}" for item in coverage["missing_recordings"])
+            aaf_findings.append(_finding(
+                "AAF_REFERENCED_TAKES_NOT_SUBMITTED",
+                f"The AAF edit uses {coverage['referenced_recordings']} recorder takes; "
+                f"{coverage['bound_recordings']} are bound in this submission. Not submitted: {names}. "
+                "This is reported, not scored.",
+                owner_digest, "low", scoring_eligible=False, integrity_contribution=None,
+                missing_recordings=coverage["missing_recordings"]))
+        if media["media_count"]:
+            aaf_findings.append(_finding(
+                "AAF_REFERENCES_NON_RECORDER_MEDIA",
+                f"The AAF edit references {media['media_count']} media items that are not recorder takes "
+                "(for example library effects, music or renders). The evaluator cannot link them to submitted "
+                "files and makes no licensing determination; they are listed in "
+                "assessment_checks.aaf_non_recorder_media.",
+                owner_digest, "info", scoring_eligible=False, integrity_contribution=None,
+                media_count=media["media_count"]))
+    chronology, chronology_findings = declared_chronology(native, wav_observations, bound_hashes)
+    unlinked_media = sum(item["media_count"] for item in aaf_media)
+    if unlinked_media and ai.get("reasoning"):
+        ai["reasoning"] += (f" Coverage counts submitted artefacts only; the submitted AAF also references "
+                            f"{unlinked_media} media items that are not part of this submission.")
     sample_data_findings = []
     for node in native["artefacts"]:
         digest = node["artefact_hash"]
@@ -1449,7 +1537,12 @@ def assess_axes(native, chain, bound_hashes, missing_hashes, wav_observations,
     }
     if cap_record:
         checks["severe_contradiction_cap"] = [cap_record]
+    if chronology:
+        checks["declared_chronology"] = chronology
+    if aaf_coverage:
+        checks["aaf_reference_coverage"] = aaf_coverage
+        checks["aaf_non_recorder_media"] = aaf_media
     findings = (file_findings + rel_findings + cross_findings +
-                sample_data_findings + metadata_findings +
+                sample_data_findings + metadata_findings + aaf_findings + chronology_findings +
                 attestation_findings + ai_findings)
     return integrity, attestation, ai, validation, checks, findings

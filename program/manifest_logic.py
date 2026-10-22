@@ -9,13 +9,11 @@ this module only lets the GUI catch problems before you save.
 from __future__ import annotations
 
 import ast
-import contextlib
 import hashlib
 import json
 import math
 import os
 import re
-import wave
 from pathlib import Path
 
 SCHEMA_VERSION = "0.0.3"
@@ -84,21 +82,6 @@ def sha256_file(path) -> str:
         for chunk in iter(lambda: handle.read(1024 * 1024), b""):
             digest.update(chunk)
     return digest.hexdigest()
-
-
-def wav_technical(path) -> dict:
-    """Objective fields from an integer-PCM WAV; {} if unreadable."""
-    try:
-        with contextlib.closing(wave.open(str(path), "rb")) as handle:
-            rate = handle.getframerate()
-            return {
-                "duration_seconds": round(handle.getnframes() / rate, 6),
-                "sample_rate_hz": rate,
-                "channels": handle.getnchannels(),
-                "bit_depth": handle.getsampwidth() * 8,
-            }
-    except (wave.Error, EOFError, OSError, ZeroDivisionError):
-        return {}
 
 
 def object_rel_path(entry: dict) -> str:

@@ -58,18 +58,47 @@ def describe_check(check):
     return f"{rule} failed for {name}."
 
 
-def contradictions(assessment_checks):
-    rows = []
+def fact_counts(layer_checks):
+    """Assessed and contradicted facts per Integrity layer, computed once per response.
+
+    ``layer_checks`` maps each contributing layer to the checks it scores (for
+    cross-evidence, one representative check per scored fact).
+    """
+    layers = [{"layer": layer,
+               "assessed": sum(1 for item in checks if item.get("passed") in (True, False)),
+               "contradicted": sum(1 for item in checks if item.get("passed") is False)}
+              for layer, checks in layer_checks.items()]
+    return {"contradiction_count": sum(item["contradicted"] for item in layers),
+            "assessed_fact_count": sum(item["assessed"] for item in layers),
+            "fact_counts_by_layer": layers}
+
+
+def contradiction_summary(counts):
+    """'2 of 122 assessed facts are contradicted (cross_evidence_support 2 of 104)', or None."""
+    total = counts.get("contradiction_count") or 0
+    if not total:
+        return None
+    verb = "is" if total == 1 else "are"
+    layers = ", ".join(f"{item['layer']} {item['contradicted']} of {item['assessed']}"
+                       for item in counts.get("fact_counts_by_layer", []) if item["contradicted"])
+    return f"{total} of {counts['assessed_fact_count']} assessed facts {verb} contradicted ({layers})"
+
+
+def _layer_checks(assessment_checks):
     for layer, key in LAYER_CHECKS.items():
         if layer == "cross_evidence_support" and "cross_evidence_scored_facts" in assessment_checks:
             checks = [fact["representative_check"] for fact in assessment_checks["cross_evidence_scored_facts"]]
         else:
             checks = assessment_checks.get(key) or []
         for check in checks:
-            if check.get("passed") is False:
-                rows.append({"layer": layer, "rule": check.get("rule"),
-                             "evidence_tier": check.get("evidence_tier"), "statement": describe_check(check)})
-    return rows
+            yield layer, check
+
+
+def contradictions(assessment_checks):
+    return [{"layer": layer, "rule": check.get("rule"),
+             "evidence_tier": check.get("evidence_tier"), "statement": describe_check(check)}
+            for layer, check in _layer_checks(assessment_checks) if check.get("passed") is False]
+
 
 
 def _integrity(axis, checks):
@@ -78,7 +107,12 @@ def _integrity(axis, checks):
     cap = (checks.get("severe_contradiction_cap") or [None])[0]
     cross = next((item for item in layers if item["layer"] == "cross_evidence_support"), {})
     found = contradictions(checks)
+    decision = (checks.get("integrity_decision") or [None])[0] or {}
+    summary = contradiction_summary(decision)
     statements = []
+    if summary:
+        # First, so the count is not lost behind a value that barely moved.
+        statements.append(summary + ".")
     if populated:
         statements.append("Weighted mean of " + ", ".join(
             f"{item['layer']} {item['value']:.3f} (weight {item['weight']:g})" for item in populated) + ".")
@@ -97,7 +131,10 @@ def _integrity(axis, checks):
             "cap_applied": bool(cap and cap["value_lowered"]), "cap": cap,
             "withheld": axis["value"] is None and bool(populated),
             "evidence_tier_counts": cross.get("evidence_tier_counts"),
-            "contradictions": found, "statements": statements,
+            "contradictions": found, "contradiction_count": decision.get("contradiction_count"),
+            "assessed_fact_count": decision.get("assessed_fact_count"),
+            "fact_counts_by_layer": decision.get("fact_counts_by_layer"),
+            "statements": statements,
             "decision": (checks.get("integrity_decision") or [None])[0]}
 
 

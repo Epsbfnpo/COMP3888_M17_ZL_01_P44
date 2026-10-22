@@ -232,6 +232,30 @@ def _attach(response, rows, summary):
                                      "relationship_type": row["relationship_type"],
                                      "detail_key": detail_keys.get(row["provider"], "audio_fingerprint"),
                                      **NON_SCORING})
+    # An AAF-range task compares only the seconds the edit says it used, so a
+    # fingerprint match there is content agreeing with the AAF declaration.
+    # Absence is not reported as disagreement: weak dialogue can be missed.
+    aaf_rows = [row for row in rows if row.get("range_source") == "aaf_source_range"
+                and row["provider"] in ("audfprint", "spectromap") and row["analysis_complete"]]
+    corresponded = {}
+    for row in aaf_rows:
+        if row["matches"]:
+            corresponded.setdefault((row["source_hash"], row["target_hash"], row.get("selection_id")), []).append(row)
+    summary["aaf_range_tasks"] = len({(row["source_hash"], row["target_hash"], row.get("selection_id"))
+                                      for row in aaf_rows})
+    summary["aaf_range_tasks_with_correspondence"] = len(corresponded)
+    checks["audio_diagnostic_summary"] = [summary]
+    for (source, target, selection), matched in corresponded.items():
+        span = matched[0]["analysed_ranges"].get("source")
+        combined["findings"].append({
+            "code": "AUDIO_AAF_RANGE_CORRESPONDENCE", "severity": "info",
+            "message": (f"Content from the AAF-declared source range {span[0]:.2f}-{span[1]:.2f} s was found in the "
+                        f"target by {', '.join(sorted(row['provider'] for row in matched))}. This agrees with the AAF "
+                        "edit but is a content observation, not provenance; it does not change any score."),
+            "selection_id": selection, "source_hash": source, "target_hash": target,
+            "source_range_seconds": span, "providers": sorted(row["provider"] for row in matched),
+            "diagnostic_ids": sorted(row["diagnostic_id"] for row in matched),
+            "detail_key": "audio_fingerprint", **NON_SCORING})
     if summary.get("reason_code"):
         combined["findings"].append({"code": "AUDIO_DIAGNOSTIC_UNAVAILABLE", "severity": "info",
                                      "message": summary["message"], **NON_SCORING})

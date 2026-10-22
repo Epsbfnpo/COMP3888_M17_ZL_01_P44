@@ -1,5 +1,14 @@
 # Verification Record
 
+## Version 0.8.1 (2026-10-22)
+
+- `REQUIRE_AUDIO_BACKENDS=1`, CPython 3.13.7 on macOS: **329 tests, all passed**. 325 non-GUI tests ran in one process (29 s, no skips); the four `test_builder.GuiTests` cases ran in separate processes. Details: `reports/test-results.txt` and `reports/release.json`.
+- New regression coverage: DAW and library BWF are not recorder metadata; raw takes may be mixed directly; AAF-used takes missing from a submission and the AAF's non-recorder media are reported without changing a score; contradiction counts live in `integrity_decision` with a per-layer breakdown and singular/plural wording; AAF-declared source ranges drive audio diagnostic tasks, and only those tasks may leave the target range open; a source originated after its target is reported, not scored.
+- Real material (Project Rock Ep01, outside the repository): core axes unchanged by every reporting change; audio on/off parity holds including the new records; 6 of 14 AAF-declared take ranges were found in the WIP mix. See `docs/PROJECT_ROCK_FINDINGS_2026-10-22.md`.
+- Example responses under `examples/` were regenerated with 0.8.1. Since the 0.7.0 snapshots, `attestation_strength` reads 0.0 rather than null for files without a C2PA manifest, as defined in 0.8.0. `reports/public-results/` was not regenerated, because the public CSEC bundles are not stored in the repository.
+
+## Historical record (v0.7.0 phase 0)
+
 Updated: 2026-10-14. Scope: `V3/program` v0.7.0 phase 0.
 
 - `.venv/bin/python -B -m unittest discover -s tests -v`: **102 passed, 0 failures, 0 errors** on CPython 3.13.7 with the pinned dependencies in `requirements.txt`, including `numpy==2.2.6`. The phase-0 change has not yet been rerun across every supported Python/platform combination.

@@ -5,8 +5,8 @@
   "asset_sha256": "746c90b6d8f6306ce93c347477103c16027d71a4072cf12d10a9f7246ce93d18",
   "system": {
     "name": "COMP3888-music-baseline",
-    "version": "0.7.0",
-    "source_revision": "sha256:d96ac7bb6f29d6c40feb702d26c8c621c5fdc0e7647bf49687e3c3a9dc077133"
+    "version": "0.8.1",
+    "source_revision": "sha256:17f814af455df89d912f1a8ce5d49680fa8dd2296675fda831c0281ecc6fd324"
   },
   "execution_status": "succeeded",
   "axes": {
@@ -20,29 +20,32 @@
       "availability": "partial",
       "value": null,
       "confidence": 0.267,
-      "reasoning": "Integrity has 1/3 score-eligible evidence layers; missing evidence reduces availability and confidence but is never treated as contradiction. A numeric value is withheld unless at least two layers are populated and an independent cross-evidence check (signed_attestation, recorder_metadata) was assessed, or a contradiction exists; submitter-provided documents corroborate but cannot release a value on their own. No independent cross-evidence was assessed for this submission. Structural validity and cryptographic attestation are reported separately and do not raise integrity. Legacy signal comparisons are disabled by policy and do not produce findings or affect integrity."
+      "reasoning": "Integrity has 1/3 score-eligible evidence layers; missing evidence reduces availability and confidence but is never treated as contradiction. Numeric release requires at least 2 populated contributing layer(s) and an assessed qualifying cross-evidence fact (signed_attestation, recorder_metadata); the value is withheld (insufficient_assessed_layers). An ordinary contradiction never releases a value. No qualifying cross-evidence was assessed for this submission. Structural validity and cryptographic attestation are reported separately and do not raise integrity. Legacy signal comparisons are disabled by policy and do not produce findings or affect integrity.",
+      "status": "insufficient_evidence"
     },
     "attestation_strength": {
-      "availability": "unavailable",
-      "value": null,
-      "confidence": null,
-      "reasoning": "C2PA SDK is unavailable for the final artefact, so no cryptographic attestation was assessed."
+      "availability": "available",
+      "value": 0.0,
+      "confidence": 0.9,
+      "reasoning": "C2PA SDK ran but found no active manifest associated with the final artefact."
     },
     "ai_disclosure": {
       "availability": "unavailable",
       "value": null,
       "confidence": null,
-      "reasoning": "Explicit creation_method declarations cover 0/1 audio artefacts; this is disclosure coverage, not AI detection."
+      "reasoning": "Creation-method disclosure coverage: explicit declarations cover 0/1 audio artefacts. This measures whether declarations were supplied, not whether they are true, the amount of AI audio, or the probability of AI generation; no content AI detector ran."
     }
   },
   "validation": {
-    "validation_state": null,
-    "signature_present": null,
+    "validation_state": "manifest_absent",
+    "signature_present": false,
     "signature_valid": null,
     "cryptographically_valid": null,
     "credential_trusted": null,
     "codes": [],
-    "reasons": []
+    "reasons": [
+      "C2PA SDK ran but found no active manifest associated with the final artefact."
+    ]
   },
   "findings": [
     {
@@ -89,6 +92,7 @@
       },
       "recorder_metadata": {
         "present": false,
+        "bwf_kind": null,
         "warnings": []
       },
       "checks": [],
@@ -140,6 +144,7 @@
         },
         "recorder_metadata": {
           "present": false,
+          "bwf_kind": null,
           "warnings": []
         },
         "checks": [],
@@ -148,9 +153,21 @@
       "evidence_hash": "746c90b6d8f6306ce93c347477103c16027d71a4072cf12d10a9f7246ce93d18"
     },
     {
-      "code": "C2PA_PARSER_UNAVAILABLE",
-      "severity": "low",
-      "message": "c2pa-python is not installed; C2PA attestation was not assessed."
+      "code": "C2PA_FINAL_ATTESTATION",
+      "severity": "info",
+      "message": "The final artefact has no C2PA manifest. Many tools do not write C2PA yet, so this is not evidence against the submission. Attestation strength is 0.0 because there is nothing to verify; Integrity is not affected.",
+      "final_c2pa_state": "absent",
+      "attestation_value": 0.0,
+      "trust_status": null,
+      "known_ai_signer": null,
+      "evidence_hash": "746c90b6d8f6306ce93c347477103c16027d71a4072cf12d10a9f7246ce93d18"
+    },
+    {
+      "code": "AI_DISCLOSURE_IS_DECLARATION_COVERAGE",
+      "severity": "info",
+      "message": "The AI disclosure axis measures creation-method declaration coverage only. It does not detect AI audio or verify the truth of the declarations.",
+      "scoring_eligible": false,
+      "integrity_contribution": null
     },
     {
       "code": "AI_DISCLOSURE_MISSING",
@@ -163,9 +180,9 @@
       "message": "No workflow was supplied; completeness is legacy declared-object availability only."
     }
   ],
-  "processing_ms": 193.83329199627042,
+  "processing_ms": 221.5660410001874,
   "resource_usage": {
-    "cpu_ms": 1.2109999999999899,
+    "cpu_ms": 2.596999999999988,
     "peak_rss_kib": null
   },
   "error": null,
@@ -182,8 +199,8 @@
   "assessment_checks": {
     "scoring_profile": [
       {
-        "profile_id": "default-v2",
-        "profile_version": 2
+        "profile_id": "default-v4",
+        "profile_version": 4
       }
     ],
     "bound_file_integrity": [
@@ -208,6 +225,7 @@
       }
     ],
     "relationship_integrity": [],
+    "relationship_range_validation": [],
     "integrity_layers": [
       {
         "layer": "file_integrity",
@@ -255,7 +273,7 @@
         "value": null,
         "contributes_to_integrity": true,
         "check_count": 0,
-        "reason": "Parser outputs compared with the graph, declarations, media and recorder metadata; each check records the evidence_tier that produced it.",
+        "reason": "One vote per cross-evidence rule and subject; any assessed failure keeps that fact failed. Recorder-metadata agreement is consistency evidence, not origin authentication.",
         "manual_review_reasons": [],
         "weight": 1.0,
         "evidence_tier_counts": {
@@ -271,29 +289,80 @@
             "assessed": 0,
             "passed": 0
           }
-        }
+        },
+        "raw_check_count": 0,
+        "aggregation_method": "one_vote_per_rule_subject_any_failure",
+        "fact_count": 0,
+        "scored_fact_count": 0
       },
       {
         "layer": "cryptographic_attestation",
         "status": "unavailable",
         "value": null,
         "contributes_to_integrity": false,
-        "check_count": 0,
+        "check_count": 1,
         "reason": "C2PA remains in the separate attestation-strength axis and never inflates integrity.",
         "manual_review_reasons": [],
         "weight": null
       }
     ],
+    "integrity_decision": [
+      {
+        "status": "insufficient_evidence",
+        "contradiction_present": false,
+        "severe_contradiction_present": false,
+        "numeric_release": "withheld",
+        "release_reason": "insufficient_assessed_layers",
+        "qualifying_cross_evidence_assessed": false,
+        "qualifying_facts": [],
+        "ordinary_contradiction_release_allowed": false,
+        "severe_contradiction_release": "capped_value",
+        "score_semantics": "assessed_check_consistency_not_provenance_authentication",
+        "contradiction_count": 0,
+        "assessed_fact_count": 1,
+        "fact_counts_by_layer": [
+          {
+            "layer": "file_integrity",
+            "assessed": 1,
+            "contradicted": 0
+          },
+          {
+            "layer": "declaration_consistency",
+            "assessed": 0,
+            "contradicted": 0
+          },
+          {
+            "layer": "cross_evidence_support",
+            "assessed": 0,
+            "contradicted": 0
+          }
+        ]
+      }
+    ],
+    "ai_disclosure_coverage": [
+      {
+        "axis_key": "ai_disclosure",
+        "display_name": "Creation-method disclosure coverage",
+        "metric_semantics": "declaration_coverage",
+        "applicable_audio_count": 1,
+        "assessed_audio_count": 1,
+        "declared_audio_count": 0,
+        "excluded_input_error_count": 0,
+        "content_ai_detection_performed": false,
+        "ai_generated_probability": null,
+        "declaration_truth_verified": false
+      }
+    ],
     "assessment_status_semantics": [
       {
         "status": "corroborated",
-        "meaning": "Independent evidence clearly supports content consistency, but does not prove provenance direction or authorship.",
+        "meaning": "The assessed check or fact is consistent with the compared fields; origin, direction and authorship are not authenticated.",
         "numeric_treatment": "1.0 in an eligible evidence layer."
       },
       {
         "status": "contradicted",
         "meaning": "An applicable assessed claim conflicts with observed evidence.",
-        "numeric_treatment": "0.0 in its eligible layer and emits a contradiction finding."
+        "numeric_treatment": "0.0 for that eligible check or fact; other facts may still contribute to the layer mean. Emits a contradiction finding."
       },
       {
         "status": "inconclusive",
@@ -307,6 +376,8 @@
       }
     ],
     "cross_evidence": [],
+    "cross_evidence_scored_facts": [],
+    "cross_evidence_audit": [],
     "c2pa_attestation_records": [
       {
         "scope": "final",
@@ -314,12 +385,45 @@
         "manifest_container_hash": "746c90b6d8f6306ce93c347477103c16027d71a4072cf12d10a9f7246ce93d18",
         "asset_hash": "746c90b6d8f6306ce93c347477103c16027d71a4072cf12d10a9f7246ce93d18",
         "binding_relationship": null,
-        "sdk_available": false,
-        "reader_succeeded": false,
+        "sdk_available": true,
+        "reader_succeeded": true,
         "manifest_present": false,
         "signature_present": false,
-        "validation_state": "sdk_unavailable",
+        "validation_state": "manifest_absent",
+        "trust_status": null,
+        "revocation_status": null,
+        "signer": null,
+        "known_ai_signer": null,
         "validation_codes": []
+      }
+    ],
+    "c2pa_trust_configuration": [
+      {
+        "trust_lists_manifest_sha256": "ecc89ace79e86086eed0df3d521bdb4f2c537a807600ed98b6a2e8551cc044ac",
+        "revocation_status": "not_checked",
+        "lists": {
+          "official": {
+            "label": "C2PA Trust List",
+            "source": "https://github.com/c2pa-org/conformance-public",
+            "commit": "47009eedfe6721edd0ce3e69b89c1101cd6f03e5",
+            "frozen_on": null,
+            "file_sha256": {
+              "official/C2PA-TRUST-LIST.pem": "b3949271a07b007e92ef1d18050b55388f5e0d2686a16fd864176c48421af8ae",
+              "official/C2PA-TSA-TRUST-LIST.pem": "7182cb227c02701be0eebd67ab635fca7f85431c32796fb53b267c657cd2c675"
+            }
+          },
+          "legacy_itl": {
+            "label": "Interim Trust List (legacy, frozen)",
+            "source": "https://github.com/contentauth/verify-site",
+            "commit": "83b2e30684086a62e132f5d4c148abd0151e9486",
+            "frozen_on": "2026-01-01",
+            "file_sha256": {
+              "itl/anchors.pem": "db57e50b9bd4e4c786cbb91f38fd85e2af6a9d5412438a8cddcc42688df07ae5",
+              "itl/allowed.pem": "dfe328032e56f98b83f27f48a3642314124568b9f71ff471dffabf9b307c65d5",
+              "itl/store.cfg": "1044c30a906b0c9cbe28b4a4c0002ca56a718f0ae22b9af83238543a07d0e718"
+            }
+          }
+        }
       }
     ],
     "physical_similarity": [],
@@ -402,18 +506,68 @@
           }
         },
         "contradictions": [],
+        "contradiction_count": 0,
+        "assessed_fact_count": 1,
+        "fact_counts_by_layer": [
+          {
+            "layer": "file_integrity",
+            "assessed": 1,
+            "contradicted": 0
+          },
+          {
+            "layer": "declaration_consistency",
+            "assessed": 0,
+            "contradicted": 0
+          },
+          {
+            "layer": "cross_evidence_support",
+            "assessed": 0,
+            "contradicted": 0
+          }
+        ],
         "statements": [
           "Weighted mean of file_integrity 1.000 (weight 1).",
           "No numeric value: the withholding rule was not met (see reasoning)."
-        ]
+        ],
+        "decision": {
+          "status": "insufficient_evidence",
+          "contradiction_present": false,
+          "severe_contradiction_present": false,
+          "numeric_release": "withheld",
+          "release_reason": "insufficient_assessed_layers",
+          "qualifying_cross_evidence_assessed": false,
+          "qualifying_facts": [],
+          "ordinary_contradiction_release_allowed": false,
+          "severe_contradiction_release": "capped_value",
+          "score_semantics": "assessed_check_consistency_not_provenance_authentication",
+          "contradiction_count": 0,
+          "assessed_fact_count": 1,
+          "fact_counts_by_layer": [
+            {
+              "layer": "file_integrity",
+              "assessed": 1,
+              "contradicted": 0
+            },
+            {
+              "layer": "declaration_consistency",
+              "assessed": 0,
+              "contradicted": 0
+            },
+            {
+              "layer": "cross_evidence_support",
+              "assessed": 0,
+              "contradicted": 0
+            }
+          ]
+        }
       },
       {
         "axis": "attestation_strength",
-        "availability": "unavailable",
-        "value": null,
-        "confidence": null,
+        "availability": "available",
+        "value": 0.0,
+        "confidence": 0.9,
         "statements": [
-          "C2PA SDK is unavailable for the final artefact, so no cryptographic attestation was assessed."
+          "C2PA SDK ran but found no active manifest associated with the final artefact."
         ]
       },
       {
@@ -422,8 +576,23 @@
         "value": null,
         "confidence": null,
         "statements": [
-          "Explicit creation_method declarations cover 0/1 audio artefacts; this is disclosure coverage, not AI detection."
-        ]
+          "Creation-method disclosure coverage: explicit declarations cover 0/1 audio artefacts. This measures whether declarations were supplied, not whether they are true, the amount of AI audio, or the probability of AI generation; no content AI detector ran."
+        ],
+        "display_name": "Creation-method disclosure coverage",
+        "metric_semantics": "declaration_coverage",
+        "content_ai_detection_performed": false,
+        "coverage": {
+          "axis_key": "ai_disclosure",
+          "display_name": "Creation-method disclosure coverage",
+          "metric_semantics": "declaration_coverage",
+          "applicable_audio_count": 1,
+          "assessed_audio_count": 1,
+          "declared_audio_count": 0,
+          "excluded_input_error_count": 0,
+          "content_ai_detection_performed": false,
+          "ai_generated_probability": null,
+          "declaration_truth_verified": false
+        }
       }
     ]
   }

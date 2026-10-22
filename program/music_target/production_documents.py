@@ -267,7 +267,7 @@ def parse_aaf_file(path):
         import aaf2
     except ImportError as exc:
         raise ProductionDocumentError("pyaaf2 is not installed; AAF evidence was not assessed.") from exc
-    references, warnings = [], []
+    references, other_media, warnings = [], [], []
     try:
         with aaf2.open(str(path), "r") as handle:
             compositions = sorted(mob.name for mob in handle.content.compositionmobs() if mob.name)
@@ -275,7 +275,14 @@ def parse_aaf_file(path):
                 comments = _comments(master)
                 ranges = _tape_ranges(master)
                 if not ranges:
-                    continue  # not a recorder take (library SFX, renders, tone)
+                    # Not a recorder take: library effects, music, renders or tone.
+                    # Kept as named media so the edit's other sources stay visible.
+                    other_media.append({
+                        "master_mob": master.name,
+                        "locator_file_names": sorted({PurePosixPath(item).name for item in _locator_paths(master)
+                                                      if item}),
+                    })
+                    continue
                 paths = [item for item in _locator_paths(master) if item.casefold().endswith(".wav")]
                 file_name = comments.get("TapeID") or (PurePosixPath(paths[0]).name if paths else None)
                 tape = ranges[0]["tape"] or (PurePosixPath(paths[0]).parent.name if paths else None)
@@ -294,7 +301,34 @@ def parse_aaf_file(path):
         raise ProductionDocumentError(f"AAF could not be read: {type(exc).__name__}: {exc}") from exc
     if not references:
         warnings.append("No recorder-take references with tape timecode were found.")
-    return {"metadata": {"compositions": compositions}, "references": references, "warnings": warnings}
+    return {"metadata": {"compositions": compositions}, "references": references,
+            "other_media": sorted(other_media, key=lambda item: str(item["master_mob"])), "warnings": warnings}
+
+
+def aaf_reference_coverage(data, owner_digest, wav_observations):
+    """Which recorder takes the AAF edit uses are bound in the submission.
+
+    An unsubmitted take is reported, not scored: a submitter may leave a take
+    out for a legitimate reason, and missing evidence is never a contradiction.
+    """
+    by_key, _ = recorder_index(wav_observations)
+    used = {}
+    for reference in data.get("references", []):
+        key = (reference.get("tape"), reference.get("file_name"))
+        used.setdefault(key, set()).add(reference.get("master_mob"))
+    missing = [{"tape": tape, "file_name": name, "master_mobs": sorted(mob for mob in mobs if mob)}
+               for (tape, name), mobs in sorted(used.items(), key=lambda item: (str(item[0][0]), str(item[0][1])))
+               if not by_key.get((_normalise(tape), _normalise(name)))]
+    return {"evidence_hash": owner_digest, "referenced_recordings": len(used),
+            "bound_recordings": len(used) - len(missing), "missing_recordings": missing,
+            "scoring_eligible": False, "integrity_contribution": None}
+
+
+def aaf_non_recorder_media(data, owner_digest):
+    """Media the AAF edit references that is not a recorder take (effects, music, renders)."""
+    media = data.get("other_media", [])
+    return {"evidence_hash": owner_digest, "media_count": len(media), "media": media,
+            "linked_to_submission": None, "scoring_eligible": False, "integrity_contribution": None}
 
 
 def aaf_checks(data, owner_digest, wav_observations):

@@ -120,6 +120,17 @@ ATTENTION_FINDINGS = {
 }
 
 
+def axis_value_label(name, axis, response):
+    """Value text for the axis table; a contradicted Integrity shows its count beside the number."""
+    text = "Not assessed" if axis["value"] is None else f"{axis['value']:.3f}"
+    if name != "integrity" or axis.get("status") != "contradicted":
+        return text
+    # integrity_decision is present even when include_reasoning=false omits the explanations.
+    decision = ((response.get("assessment_checks") or {}).get("integrity_decision") or [{}])[0] or {}
+    count = decision.get("contradiction_count")
+    return f"{text} (contradicted: {count})" if count else f"{text} (contradicted)"
+
+
 def _hash_label(digest, names):
     return names.get(digest, f"file {digest[:12]}") if digest else ""
 
