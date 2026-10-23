@@ -1,6 +1,16 @@
 {
-  "description": "Calibration evidence attached to every audio diagnostic row. Figures are case counts from docs/AUDIO_CALIBRATION_2026-10-20.md and docs/AUDIO_DIAGNOSTICS.md, not probabilities. The frozen gate profile (audio_calibration_profile.json) is unchanged. false_match_rates are filled by benchmarks/false_match.py.",
+  "description": "Calibration evidence attached to every audio diagnostic row. Figures are case counts from docs/AUDIO_CALIBRATION_2026-10-20.md, docs/FALSE_MATCH_BENCHMARK_2026-10-21.md and docs/PROJECT_ROCK_FINDINGS_2026-10-22.md, each with a 95% Wilson interval, not probabilities. The frozen gate profile (audio_calibration_profile.json) is unchanged. false_match_rates are filled by benchmarks/false_match.py.",
   "profile_id": "bounded-audio-2026-10-20-v2",
+  "intervals": {
+    "method": "wilson_score",
+    "confidence": 0.95,
+    "splits": {
+      "development": "Cases used to choose or revise the frozen gates.",
+      "held_out": "Cases evaluated only after the gates were frozen; never used for tuning.",
+      "real_material": "Production material never used for tuning, with ground truth from production documents."
+    },
+    "note": "An interval describes the uncertainty of one small count, not a population rate. Cases derived from one source family or one session are not independent, so the real uncertainty is wider."
+  },
   "providers": {
     "audfprint": {
       "status": "bounded_calibration",
@@ -9,6 +19,69 @@
         "development_cases": 28,
         "held_out_cases": 16,
         "controls": 6
+      },
+      "case_counts": {
+        "development": [
+          {
+            "measure": "Mixture components and excerpts found at the correct offset (error <= 0.1 s, density 40)",
+            "count": 26,
+            "cases": 28,
+            "wilson_95": {
+              "lower": 0.774,
+              "upper": 0.98
+            }
+          },
+          {
+            "measure": "Distinct-recording controls with a supported offset",
+            "count": 0,
+            "cases": 21,
+            "wilson_95": {
+              "lower": 0.0,
+              "upper": 0.155
+            }
+          }
+        ],
+        "held_out": [
+          {
+            "measure": "Mixture components and excerpts found at the correct offset (error <= 0.1 s, density 40), original four held-out Lumina families",
+            "count": 15,
+            "cases": 16,
+            "wilson_95": {
+              "lower": 0.717,
+              "upper": 0.989
+            }
+          },
+          {
+            "measure": "Distinct-recording controls with a supported offset",
+            "count": 0,
+            "cases": 6,
+            "wilson_95": {
+              "lower": 0.0,
+              "upper": 0.39
+            }
+          }
+        ],
+        "real_material": [
+          {
+            "measure": "Project Rock Ep01 AAF-used takes with a supported match, whole-take comparison",
+            "count": 2,
+            "cases": 13,
+            "wilson_95": {
+              "lower": 0.043,
+              "upper": 0.422
+            }
+          },
+          {
+            "measure": "Project Rock Ep01 AAF-range tasks with a supported match inside the used range",
+            "count": 0,
+            "cases": 14,
+            "wilson_95": {
+              "lower": 0.0,
+              "upper": 0.215
+            },
+            "note": "One task (6T03) had a candidate below the support gates; 14 tasks cover 13 takes."
+          }
+        ]
       },
       "transforms_tested": [
         "excerpt",
@@ -30,28 +103,49 @@
         "categories": {
           "same_genre_tempo_key": {
             "pairs": 5,
-            "false_matches": 0
+            "false_matches": 0,
+            "wilson_95": {
+              "lower": 0.0,
+              "upper": 0.434
+            }
           },
           "same_prompt_regeneration": {
             "pairs": 4,
-            "false_matches": 0
+            "false_matches": 0,
+            "wilson_95": {
+              "lower": 0.0,
+              "upper": 0.49
+            }
           },
           "cover_prompts_melody_unverified": {
             "pairs": 6,
-            "false_matches": 0
+            "false_matches": 0,
+            "wilson_95": {
+              "lower": 0.0,
+              "upper": 0.39
+            }
           },
           "shared_loop": {
             "pairs": 4,
             "detected": 1,
-            "note": "The loop is real shared audio; a fingerprint match does not mean one song derives from the other."
+            "note": "The loop is real shared audio; a fingerprint match does not mean one song derives from the other.",
+            "wilson_95": {
+              "lower": 0.046,
+              "upper": 0.699
+            }
           },
           "shared_loop_full_gain": {
             "pairs": 4,
             "detected": 4,
-            "note": "The loop is real shared audio; a fingerprint match does not mean one song derives from the other."
+            "note": "The loop is real shared audio; a fingerprint match does not mean one song derives from the other.",
+            "wilson_95": {
+              "lower": 0.51,
+              "upper": 1.0
+            }
           }
         },
-        "scope": "Case counts on a small Lumina sample; not a population false-positive rate."
+        "scope": "Case counts on a small Lumina sample; not a population false-positive rate.",
+        "split": "held_out"
       }
     },
     "music_semantics": {
@@ -64,6 +158,86 @@
         "validation_cases": 72,
         "controls": 51,
         "section_recordings": 16
+      },
+      "case_counts": {
+        "development": [
+          {
+            "measure": "Known DSP derivatives supported (7 Lumina families)",
+            "count": 59,
+            "cases": 63,
+            "wilson_95": {
+              "lower": 0.848,
+              "upper": 0.975
+            }
+          },
+          {
+            "measure": "Supported derivatives with the correct transposition",
+            "count": 59,
+            "cases": 59,
+            "wilson_95": {
+              "lower": 0.939,
+              "upper": 1.0
+            }
+          },
+          {
+            "measure": "Independent-generation controls and a sustained tone supported",
+            "count": 0,
+            "cases": 22,
+            "wilson_95": {
+              "lower": 0.0,
+              "upper": 0.149
+            }
+          },
+          {
+            "measure": "Version-one held-out derivatives supported (reused as regression cases)",
+            "count": 31,
+            "cases": 36,
+            "wilson_95": {
+              "lower": 0.713,
+              "upper": 0.939
+            },
+            "note": "These families exposed the N04_fast error that shaped version two, so they are not held out for it."
+          },
+          {
+            "measure": "Version-one held-out controls supported (reused as regression cases)",
+            "count": 0,
+            "cases": 7,
+            "wilson_95": {
+              "lower": 0.0,
+              "upper": 0.354
+            }
+          }
+        ],
+        "held_out": [
+          {
+            "measure": "Known DSP derivatives supported (8 SALAMI families)",
+            "count": 57,
+            "cases": 72,
+            "wilson_95": {
+              "lower": 0.684,
+              "upper": 0.869
+            }
+          },
+          {
+            "measure": "Supported derivatives with the correct transposition",
+            "count": 57,
+            "cases": 57,
+            "wilson_95": {
+              "lower": 0.937,
+              "upper": 1.0
+            }
+          },
+          {
+            "measure": "Distinct-recording controls and a sustained tone supported",
+            "count": 0,
+            "cases": 29,
+            "wilson_95": {
+              "lower": 0.0,
+              "upper": 0.117
+            }
+          }
+        ],
+        "real_material": []
       },
       "transforms_tested": [
         "pitch_shift",
@@ -88,33 +262,70 @@
         "categories": {
           "same_genre_tempo_key": {
             "pairs": 5,
-            "false_matches": 0
+            "false_matches": 0,
+            "wilson_95": {
+              "lower": 0.0,
+              "upper": 0.434
+            }
           },
           "same_prompt_regeneration": {
             "pairs": 4,
-            "false_matches": 0
+            "false_matches": 0,
+            "wilson_95": {
+              "lower": 0.0,
+              "upper": 0.49
+            }
           },
           "cover_prompts_melody_unverified": {
             "pairs": 6,
             "supported": 0,
-            "note": "Whether these clips share a composition is unverified, so musical correspondence is reported without classifying it as true or false."
+            "note": "Whether these clips share a composition is unverified, so musical correspondence is reported without classifying it as true or false.",
+            "wilson_95": {
+              "lower": 0.0,
+              "upper": 0.39
+            }
           },
           "shared_loop": {
             "pairs": 4,
-            "false_matches": 0
+            "false_matches": 0,
+            "wilson_95": {
+              "lower": 0.0,
+              "upper": 0.49
+            }
           },
           "shared_loop_full_gain": {
             "pairs": 4,
-            "false_matches": 0
+            "false_matches": 0,
+            "wilson_95": {
+              "lower": 0.0,
+              "upper": 0.49
+            }
           }
         },
-        "scope": "Case counts on a small Lumina sample; not a population false-positive rate."
+        "scope": "Case counts on a small Lumina sample; not a population false-positive rate.",
+        "split": "held_out"
       }
     },
     "spectromap": {
       "status": "exploratory_uncalibrated",
       "summary": "Upstream peak pairing on fixed windows; no thresholds have been calibrated. Candidate offsets are observations only.",
       "sample": null,
+      "case_counts": {
+        "development": [],
+        "held_out": [],
+        "real_material": [
+          {
+            "measure": "Project Rock Ep01 AAF-range tasks with a correspondence inside the used range",
+            "count": 6,
+            "cases": 14,
+            "wilson_95": {
+              "lower": 0.214,
+              "upper": 0.674
+            },
+            "note": "Exploratory provider without calibrated gates; 14 tasks cover 13 takes."
+          }
+        ]
+      },
       "transforms_tested": [],
       "not_tested": [
         "all"
@@ -125,6 +336,7 @@
       "status": "exploratory_uncalibrated",
       "summary": "Per-file feature sections and repetitions; cross-file similarity is a summary only because unrelated material scored as high as related material on real recordings.",
       "sample": null,
+      "case_counts": null,
       "transforms_tested": [],
       "not_tested": [
         "all"
@@ -137,6 +349,30 @@
       "sample": {
         "true_takes": 29,
         "controls": 33
+      },
+      "case_counts": {
+        "development": [],
+        "held_out": [],
+        "real_material": [
+          {
+            "measure": "Project Rock true takes with an agreed offset inside the final master",
+            "count": 2,
+            "cases": 29,
+            "wilson_95": {
+              "lower": 0.019,
+              "upper": 0.22
+            }
+          },
+          {
+            "measure": "Project Rock unrelated controls with an agreed offset",
+            "count": 0,
+            "cases": 33,
+            "wilson_95": {
+              "lower": 0.0,
+              "upper": 0.104
+            }
+          }
+        ]
       },
       "transforms_tested": [
         "take_inside_final_master",
@@ -154,28 +390,49 @@
         "categories": {
           "same_genre_tempo_key": {
             "pairs": 5,
-            "false_matches": 0
+            "false_matches": 0,
+            "wilson_95": {
+              "lower": 0.0,
+              "upper": 0.434
+            }
           },
           "same_prompt_regeneration": {
             "pairs": 4,
-            "false_matches": 0
+            "false_matches": 0,
+            "wilson_95": {
+              "lower": 0.0,
+              "upper": 0.49
+            }
           },
           "cover_prompts_melody_unverified": {
             "pairs": 6,
-            "false_matches": 0
+            "false_matches": 0,
+            "wilson_95": {
+              "lower": 0.0,
+              "upper": 0.39
+            }
           },
           "shared_loop": {
             "pairs": 4,
             "detected": 1,
-            "note": "The loop is real shared audio; a fingerprint match does not mean one song derives from the other."
+            "note": "The loop is real shared audio; a fingerprint match does not mean one song derives from the other.",
+            "wilson_95": {
+              "lower": 0.046,
+              "upper": 0.699
+            }
           },
           "shared_loop_full_gain": {
             "pairs": 4,
             "detected": 4,
-            "note": "The loop is real shared audio; a fingerprint match does not mean one song derives from the other."
+            "note": "The loop is real shared audio; a fingerprint match does not mean one song derives from the other.",
+            "wilson_95": {
+              "lower": 0.51,
+              "upper": 1.0
+            }
           }
         },
-        "scope": "Case counts on a small Lumina sample; not a population false-positive rate."
+        "scope": "Case counts on a small Lumina sample; not a population false-positive rate.",
+        "split": "held_out"
       }
     }
   },

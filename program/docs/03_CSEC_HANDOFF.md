@@ -1,11 +1,14 @@
-# Music target: local integration handoff v0.8
+# Music target: local integration handoff v0.8.1
 
-Status: locally tested integration baseline, prepared for review. Not yet sent to CSEC or executed in CSEC's runner.
+Status (updated 23 October 2026): locally tested integration baseline for version 0.8.1, prepared for CSEC's
+adversarial testing. Not yet executed in CSEC's runner. The scoring sections will be revised, and the target
+version pinned, when the scoring update in progress is merged.
 
 ## Contact and collaboration mode
 
-- Technical contact: **pending team input**.
+- Technical contact (COMP3888_M17_01_ZL): **Hongjie Deng**. CSEC contact: pending.
 - Collaboration mode: **pending team selection** (full red-team integration, or schema/sample exchange only).
+  The adversarial testing package in [`csec_redteam/`](csec_redteam/README.md) assumes CSEC runs the target locally.
 - This package prepares a runnable target; preparing it does not commit the team to an integration mode.
 
 ## Pinned target
@@ -52,7 +55,10 @@ python3 -B run.py --request /path/to/request.json --root /path/to/case-root
 - The original supplied candidate request and response schemas are retained under `schemas/`.
 - Public media type: `audio/wav` only. Maps to Ben's base `audio`, without invented production roles.
 - Container/codec: RIFF/WAVE with uncompressed integer PCM (8/16/24/32 bit) or IEEE float (32/64 bit), including matching `WAVE_FORMAT_EXTENSIBLE` SubFormats, 1–32 channels, sample rate 1–384000 Hz. RF64/BW64 and compressed WAV codecs remain unsupported.
-- Public CSEC remains WAV-only. Native input additionally supports MIDI, RIN 2.1, ERN 4.3, C2PA, CompSheet and CueSheet evidence; DAW parsing remains out of scope.
+- Public CSEC remains WAV-only. Native input additionally supports MIDI, RIN 2.1, ERN 4.3, standalone C2PA manifests,
+  CompSheet and CueSheet, field-recorder sound reports (`text/sound-report`), AAF edits (`project/aaf`) and Ableton Live
+  sets (`project/daw-session`). Other DAW session formats are accepted but not parsed. BWF `bext` and iXML recorder
+  metadata are read from WAV files. See [`csec_redteam/NATIVE_INPUT_GUIDE.md`](csec_redteam/NATIVE_INPUT_GUIDE.md).
 - PNG/MP4 return `unsupported` for this audio target.
 - At most 128 nodes, 512 MiB per object, 1 GiB across objects, 2 MiB input JSON.
 - WAV headers and metadata chunks are inspected incrementally without whole-file `read_bytes()` or the version-dependent standard-library `wave` decoder. The active assessment path does not decode sample content for signal comparison. Deprecated sample readers and low-rate proxy helpers remain isolated for later cleanup.
@@ -116,21 +122,33 @@ the future optional-diagnostic boundary are documented in
 
 ## Local public-corpus verification
 
-Eleven supplied public bundles were exercised. Two WAV cases returned succeeded; seven PNG and two MP4 cases returned unsupported.
+Eleven supplied public bundles were exercised with version 0.1.0; this is a historical snapshot and has not been
+rerun with 0.8.1 (see `reports/public-results/README.md`). Two WAV cases returned succeeded; seven PNG and two MP4
+cases returned unsupported.
 All eleven responses were validated against the supplied CSEC response schema.
 No private oracle, expected decision or attack label was used. See `reports/public-summary.json` and individual response files.
 
+## Adversarial testing package
+
+The draft package for CSEC's adversarial testing (attack goals and success
+criteria, native-input guide, packing script, cost-record and issue-report
+templates) is in [`csec_redteam/`](csec_redteam/README.md). Native requests
+are used because the public profile accepts WAV only. CSEC already holds the
+client's Project Rock dataset, which is not redistributed.
+
 ## Outstanding coordination
 
-1. Fill the technical contact and select collaboration mode.
+1. Name the CSEC contact and select the collaboration mode.
 2. Confirm the Ben upstream commit to use when replacing the local snapshot.
 3. Confirm whether the candidate profile and the limited completeness metric are acceptable for initial execution reporting.
-4. Supply a genuine honest sample with an explained creation history; the invalid/unsupported fixtures are already included.
+4. Genuine honest material: CSEC already holds the client's Project Rock dataset, which serves as the honest
+   baseline and is not redistributed; the invalid/unsupported fixtures are already included.
+6. After the scoring update: pin the version and Git tag, rerun the public bundles, and check a fresh-environment install.
 5. If binary classification is later desired, provide a named/versioned target decision policy and appropriate evaluation ground truth.
 
-The user-provided CSEC message requests revision, install/run command, supported types, one output, timeout and any existing policy preferably by Friday 11 September 2026; then a runnable revision plus honest and invalid/unsupported samples by Sunday 13 September 2026.
-
 ## Scoring remediation (2026-10-20)
+
+This section describes 0.8.1 and will be revised after the scoring update in progress.
 
 The default profile is now default-v4. Cross-evidence scores one rule/subject
 fact once, with any failure retaining a contradiction; raw checks and source

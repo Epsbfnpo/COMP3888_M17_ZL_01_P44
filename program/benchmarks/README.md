@@ -5,6 +5,17 @@ observation semantics, see [the remediation record](../docs/REMEDIATION_2026-10-
 Structure benchmark evaluation additionally needs `requirements-benchmark.txt`
 (`mir_eval`); install it alongside the runtime and audio dependencies.
 
+## Case counts and intervals
+
+`audio_calibration.py` stores a `summary` beside its rows and prints it: each
+case count (derivatives supported, correct transpositions, controls supported,
+or per fingerprint density the mixtures found at the correct offset and the
+controls with a supported offset) with a 95% Wilson interval. `false_match.py`
+adds a `wilson_95` interval to every category and marks its record
+`split: held_out`. Both use `music_target/case_intervals.py`. The intervals
+describe single small counts, not population rates; cases from one family are
+not independent.
+
 ## Calibration manifest checks
 
 `python -B benchmarks/audio_dataset.py /path/to/manifest.json` validates the

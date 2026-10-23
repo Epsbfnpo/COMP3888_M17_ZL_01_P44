@@ -281,12 +281,13 @@ class CalibrationLineTests(unittest.TestCase):
     def test_calibration_is_listed_once_per_provider(self):
         calibration = {"status": "bounded_calibration", "transforms_tested": ["excerpt"],
                        "not_tested": ["covers"], "false_match_rates": {"categories": {
-                           "same_prompt_regeneration": {"pairs": 4, "false_matches": 0}}}}
+                           "same_prompt_regeneration": {"pairs": 4, "false_matches": 0,
+                                                        "wilson_95": {"lower": 0.0, "upper": 0.49}}}}}
         rows = [_row("audfprint", calibration=calibration), _row("spectromap", calibration={
             "status": "exploratory_uncalibrated", "transforms_tested": [], "not_tested": ["all"]})]
         lines = audio_diagnostic_lines({"assessment_checks": {
             "audio_diagnostic_summary": [{"completed_provider_tasks": 2}], "audio_fingerprint": rows}}, {})
         text = "\n".join(lines)
         self.assertIn("- audfprint: bounded calibration; tested: excerpt; not tested: covers; "
-                      "benchmark: same prompt regeneration 0/4 false", text)
+                      "benchmark: same prompt regeneration 0/4 false (95% CI 0-49%)", text)
         self.assertIn("- spectromap: exploratory uncalibrated", text)

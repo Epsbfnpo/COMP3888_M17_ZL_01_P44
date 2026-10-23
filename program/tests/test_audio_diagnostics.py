@@ -523,6 +523,9 @@ class CalibrationStatusTests(unittest.TestCase):
         semantics = checks["audio_semantics"][0]["calibration"]
         self.assertIn("covers", semantics["not_tested"])
         self.assertEqual(semantics["sample"]["validation_cases"], 72)
+        held_out = semantics["case_counts"]["held_out"]
+        self.assertIn({"lower": 0.0, "upper": 0.117}, [entry["wilson_95"] for entry in held_out])
+        self.assertIsNone(checks["audio_structure"][0]["calibration"]["case_counts"])
         self.assertTrue(checks["audio_diagnostic_summary"][0]["calibration_status_sha256"])
 
 

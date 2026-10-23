@@ -7,6 +7,7 @@ Manifest: {"families": [{"id": "N02", "partition": "test", "path": "/data/N02.wa
 All derivatives and mixture parents remain inside the requested partition.
 Known DSP relationships are ground truth; distinct recordings are controls,
 not a claim about authorship or absence of shared musical material.
+The output's summary gives each case count with its 95% Wilson interval.
 """
 import argparse
 import hashlib
@@ -22,6 +23,10 @@ from music_target.audio_diagnostics.policy import DEFAULTS
 from music_target.audio_diagnostics.providers.music_semantics import _describe, _comparison
 from music_target.audio_diagnostics.providers.calibration import qualify_comparison, fingerprint_support, profile
 from music_target.audio_diagnostics.providers.alignment import align_tokens
+from music_target.case_intervals import case_count
+
+SUPPORTED = "supported_within_profile"
+OFFSET_TOLERANCE_SECONDS = 0.1
 
 
 def load_families(manifest, partition):
@@ -124,6 +129,34 @@ def fingerprint_rows(families):
     return rows
 
 
+def semantic_summary(rows):
+    derived = [row for row in rows if row["label"] == "known_dsp_derivative"]
+    supported = [row for row in derived if row["assessment"]["status"] == SUPPORTED]
+    correct = [row for row in supported if row["best_pitch"] == row["truth"]["transposition"]]
+    controls = [row for row in rows if row["label"] != "known_dsp_derivative"]
+    return [case_count("Known DSP derivatives supported", len(supported), len(derived)),
+            case_count("Supported derivatives with the correct transposition", len(correct), len(supported)),
+            case_count("Controls supported", sum(row["assessment"]["status"] == SUPPORTED for row in controls),
+                       len(controls))]
+
+
+def fingerprint_summary(rows):
+    def supported_offsets(row):
+        return [match["source_minus_target_offset_seconds"] for match in row["matches"]
+                if match["support_assessment"]["status"] == SUPPORTED]
+    summary = []
+    for density in sorted({row["density"] for row in rows}):
+        known = [row for row in rows if row["density"] == density and row["expected_offset"] is not None]
+        controls = [row for row in rows if row["density"] == density and row["expected_offset"] is None]
+        found = sum(any(abs(offset - row["expected_offset"]) <= OFFSET_TOLERANCE_SECONDS
+                        for offset in supported_offsets(row)) for row in known)
+        summary += [case_count(f"Mixture components and excerpts found at the correct offset "
+                               f"(error <= {OFFSET_TOLERANCE_SECONDS} s, density {density})", found, len(known)),
+                    case_count(f"Controls with a supported offset (density {density})",
+                               sum(bool(supported_offsets(row)) for row in controls), len(controls))]
+    return summary
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("manifest", type=Path)
@@ -133,11 +166,16 @@ def main():
     args = parser.parse_args()
     families = load_families(args.manifest, args.partition)
     rows = semantic_rows(families) if args.mode == "semantics" else fingerprint_rows(families)
+    summary = semantic_summary(rows) if args.mode == "semantics" else fingerprint_summary(rows)
     output = {"profile_sha256": profile()["freeze_sha256"], "partition": args.partition,
-              "mode": args.mode, "families": [row["id"] for row in families], "rows": rows}
+              "mode": args.mode, "families": [row["id"] for row in families], "summary": summary, "rows": rows}
     args.out.parent.mkdir(parents=True, exist_ok=True)
     args.out.write_text(json.dumps(output, indent=2, allow_nan=False) + "\n")
     print(f"{len(rows)} observations written to {args.out}")
+    for entry in summary:
+        bounds = entry["wilson_95"]
+        interval = f"95% CI {bounds['lower']:.3f}-{bounds['upper']:.3f}" if bounds else "no cases"
+        print(f"  {entry['measure']}: {entry['count']}/{entry['cases']} ({interval})")
 
 
 if __name__ == "__main__":

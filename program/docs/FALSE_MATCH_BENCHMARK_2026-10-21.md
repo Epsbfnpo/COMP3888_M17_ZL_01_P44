@@ -39,12 +39,13 @@ gave identical results.
 
 | Category | Pairs | audfprint | Agreement | music_semantics |
 |---|---|---|---|---|
-| Same genre, tempo and key (different songs) | 5 | 0 false | 0 false | 0 false |
-| Same prompt generated twice | 4 | 0 false | 0 false | 0 false |
-| Cover prompts, melody unverified | 6 | 0 false | 0 false | 0 supported (unclassified) |
-| Shared drum loop, loop gain 0.5 | 4 | 1 detected | 1 detected | 0 false |
-| Shared drum loop, loop gain 1.0 | 4 | 4 detected | 4 detected | 0 false |
+| Same genre, tempo and key (different songs) | 5 | 0 false (0–43%) | 0 false (0–43%) | 0 false (0–43%) |
+| Same prompt generated twice | 4 | 0 false (0–49%) | 0 false (0–49%) | 0 false (0–49%) |
+| Cover prompts, melody unverified | 6 | 0 false (0–39%) | 0 false (0–39%) | 0 supported, unclassified (0–39%) |
+| Shared drum loop, loop gain 0.5 | 4 | 1 detected (5–70%) | 1 detected (5–70%) | 0 false (0–49%) |
+| Shared drum loop, loop gain 1.0 | 4 | 4 detected (51–100%) | 4 detected (51–100%) | 0 false (0–49%) |
 
+Bracketed figures are 95% Wilson intervals for the count (added 2026-10-23).
 Every detected shared loop was reported at the correct offset (0.0 s, both
 songs contain the loop at 5 s).
 
@@ -64,10 +65,17 @@ songs contain the loop at 5 s).
   and these pairs cannot measure cover recall. Real cover recordings are needed.
 - 19 unrelated pairs and 8 shared-loop pairs are far too few to estimate a
   false-positive rate; zero false matches here does not imply zero in general.
+  The intervals make this concrete: 0 false matches in 4 same-prompt pairs is
+  consistent with a true rate anywhere from 0 to 49%. The categories cannot be
+  pooled into one rate, because they test different kinds of similarity.
+- The benchmark ran on 21 October, after the gate profile was frozen on
+  20 October, and no gate was changed afterwards, so its split is `held_out`.
 
 The counts are recorded under `false_match_rates` in
-`policies/audio_calibration_status.json` and appear beside each diagnostic row
-and in the builder's calibration summary.
+`policies/audio_calibration_status.json`, each category with its `wilson_95`
+interval and the record with `split: held_out`, and appear beside each
+diagnostic row and in the builder's calibration summary (for example
+"same prompt regeneration 0/4 false (95% CI 0-49%)").
 
 To reproduce: `python -B benchmarks/false_match.py
 benchmarks/false_match_lumina_2026-10-21.json --audio <clip folder> --out

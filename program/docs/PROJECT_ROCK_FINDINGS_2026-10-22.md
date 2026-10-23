@@ -33,9 +33,13 @@ Findings 7 and 10 were implemented in version 0.8.1. Neither changes a score.
 | Ep01 chain, chronology | No check | `declared_chronology` compares 13 take-to-mix edges; none is reversed, so no `DECLARED_SOURCE_NEWER_THAN_TARGET` |
 | Audio on/off parity | Held | Still holds with both new records |
 
-Restricting the take to its used seconds helped SpectroMap (6 takes) but left
-audfprint with one supported match (6T03) instead of two (5T15, 6T11) in the
-whole-take run, because a few seconds of dialogue give it fewer landmarks.
+Restricting the take to its used seconds helped SpectroMap (6 of 14 tasks) but
+left audfprint with one candidate (6T03, below the support gates) instead of two
+supported matches (5T15, 6T11) in the whole-take run, because a few seconds of
+dialogue give it fewer landmarks. With 95% Wilson intervals: SpectroMap 6/14
+(21–67%), audfprint supported 0/14 (0–22%) in the used ranges and 2/13 (4–42%)
+over whole takes. These counts are recorded as `real_material` in
+`policies/audio_calibration_status.json`.
 Absence of a match is still not reported as disagreement with the AAF.
 
 Findings 6 and 4b need a client decision; 8 needs no code change; 9 waits for

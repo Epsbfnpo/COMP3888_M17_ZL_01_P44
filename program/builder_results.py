@@ -539,6 +539,12 @@ def _plain_list(values):
     return ", ".join(str(value).replace("_", " ") for value in values or []) or "none"
 
 
+def _interval_text(bounds):
+    if not isinstance(bounds, dict):
+        return ""
+    return f" (95% CI {bounds['lower'] * 100:.0f}-{bounds['upper'] * 100:.0f}%)"
+
+
 def calibration_lines(rows):
     """One line per provider: how far its results have been calibrated, and on what."""
     seen, lines = {}, []
@@ -547,7 +553,7 @@ def calibration_lines(rows):
             seen[row["provider"]] = row["calibration"]
     if not seen:
         return lines
-    lines.append("  Calibration (case counts on limited samples, not probabilities):")
+    lines.append("  Calibration (case counts on limited samples with 95% Wilson intervals, not probabilities):")
     for provider, record in seen.items():
         status = str(record.get("status") or "unknown").replace("_", " ")
         text = f"    - {provider}: {status}"
@@ -561,11 +567,12 @@ def calibration_lines(rows):
             for name, item in rates["categories"].items():
                 label = name.replace("_", " ")
                 if "false_matches" in item:
-                    parts.append(f"{label} {item['false_matches']}/{item['pairs']} false")
+                    part = f"{label} {item['false_matches']}/{item['pairs']} false"
                 elif "detected" in item:
-                    parts.append(f"{label} {item['detected']}/{item['pairs']} detected")
+                    part = f"{label} {item['detected']}/{item['pairs']} detected"
                 else:
-                    parts.append(f"{label} {item.get('supported')}/{item['pairs']} supported (unverified)")
+                    part = f"{label} {item.get('supported')}/{item['pairs']} supported (unverified)"
+                parts.append(part + _interval_text(item.get("wilson_95")))
             text += "; benchmark: " + ", ".join(parts)
         lines.append(text)
     return lines

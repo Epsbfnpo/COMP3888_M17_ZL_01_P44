@@ -136,9 +136,15 @@ Every row also carries a `calibration` object from
 `policies/audio_calibration_status.json`: `status` (`bounded_calibration` for
 audfprint and music_semantics; `exploratory_uncalibrated` for SpectroMap,
 librosa and fingerprint agreement), a summary with case counts, `sample`,
-`transforms_tested`, `not_tested` and `false_match_rates` from
-`benchmarks/false_match.py` (see `FALSE_MATCH_BENCHMARK_2026-10-21.md`). The
-frozen gate profile is unchanged. The summary records the status file's
+`case_counts`, `transforms_tested`, `not_tested` and `false_match_rates` from
+`benchmarks/false_match.py` (see `FALSE_MATCH_BENCHMARK_2026-10-21.md`).
+`case_counts` lists each count under `development`, `held_out` or
+`real_material` with `measure`, `count`, `cases` and a 95% Wilson interval
+`wilson_95` (`lower`, `upper`); every false-match category carries the same
+interval, and the record is marked `split: held_out`. The status file's
+`intervals` object defines the splits. An interval is not a population rate,
+and cases from one family are not independent (see the interval table in
+`AUDIO_CALIBRATION_2026-10-20.md`). The frozen gate profile is unchanged. The summary records the status file's
 SHA-256 as `calibration_status_sha256`.
 
 Provider failures stay structured. A result that breaks the protocol inside

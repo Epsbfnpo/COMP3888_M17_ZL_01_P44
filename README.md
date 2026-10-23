@@ -238,7 +238,15 @@ policy is enabled with `--audio-analysis-policy policies/audio_analysis_policy.j
 and music_semantics, `exploratory_uncalibrated` for SpectroMap, librosa and
 fingerprint agreement, with case counts, transforms tested and not tested, and
 false-match counts. The frozen `audio_calibration_profile.json` is unchanged,
-so this explains results without changing them. A provider that ran but had too
+so this explains results without changing them. `case_counts` separates
+`development` (cases used to choose or revise the gates), `held_out` (cases
+evaluated only after the gates were frozen) and `real_material` (Project Rock,
+never used for tuning), and every count, including each false-match category,
+carries a 95% Wilson interval (`music_target/case_intervals.py`). For example,
+0 of 29 held-out controls supported gives an upper bound of 11.7%, and 15 of 16
+held-out mixtures found gives 71.7–98.9%. Cases derived from one family are not
+independent, so the real uncertainty is wider; an interval is not a population
+rate. A provider that ran but had too
 little audio to compare (silence, too few landmarks, peaks or frames, channel
 cancellation) reports `AUDIO_INSUFFICIENT_SUPPORT` (outcome
 `insufficient_support`) instead of an apparent non-match;
@@ -250,16 +258,19 @@ similar pairs through the real evaluator. The 21 October 2026 run
 ([results](program/docs/FALSE_MATCH_BENCHMARK_2026-10-21.md)) used 23 pairs
 from 25 SHA-256-pinned Lumina clips:
 
-| Category | Pairs | Result |
-|---|---|---|
-| Same genre, tempo and key | 5 | No fingerprint, agreement or semantics match |
-| Same-prompt regeneration | 4 | No match |
-| Cover prompts (melody unverified) | 6 | No fingerprint match; semantics 0/6, left unclassified |
-| Shared drum loop, gain 0.5 / 1.0 | 4 / 4 | Loop detected 1/4 / 4/4 at the inserted offset; semantics 0/8 |
+| Category | Pairs | Result | 95% Wilson interval |
+|---|---|---|---|
+| Same genre, tempo and key | 5 | No fingerprint, agreement or semantics match | 0–43% false |
+| Same-prompt regeneration | 4 | No match | 0–49% false |
+| Cover prompts (melody unverified) | 6 | No fingerprint match; semantics 0/6, left unclassified | 0–39% |
+| Shared drum loop, gain 0.5 / 1.0 | 4 / 4 | Loop detected 1/4 / 4/4 at the inserted offset; semantics 0/8 | 5–70% / 51–100% detected |
 
 A shared loop is real shared audio, so detecting it is correct but does not
 show derivation. These are case counts on a small sample, not population
-false-positive rates; real covers remain untested.
+false-positive rates; real covers remain untested. The intervals show how
+little so few pairs establish: zero false matches in 4 pairs is still
+consistent with a false-match rate of up to 49%. The benchmark ran after the
+gates were frozen, so it counts as held-out.
 
 ## C2PA provenance and trust
 
@@ -568,7 +579,9 @@ skipped). The four GUI tests each passed when run in a separate process; run
 them that way, because they can hang inside the full suite on macOS Tk.
 Version 0.8.1 (22 October 2026): the same procedure found 332 tests; all 328
 non-GUI tests passed in one process (31 s) and the four GUI tests passed
-separately (`reports/test-results.txt`, `reports/release.json`).
+separately. After the Wilson intervals were added (23 October 2026) it found
+342 tests; all 338 non-GUI tests passed in one process (30 s) and the four
+GUI tests passed separately (`reports/test-results.txt`, `reports/release.json`).
 `tests/test_builder.py` now also passes on its own: it imports `run` (and so
 c2pa) before its worker tests mock `subprocess.Popen`, because c2pa's import
 calls `platform.processor()`, which spawns a subprocess. The
@@ -613,12 +626,14 @@ The locations below are relative to `program/`.
 | `policies/workflow_evidence_policy.json` | Candidate required, conditional, and optional evidence policy for 16 workflows |
 | `music_target/audio_diagnostics/` | Report-only task selection (including AAF-declared source ranges), verified snapshots, isolated workers, audfprint, SpectroMap, librosa and music_semantics adapters, fingerprint agreement, calibration status and result assembly |
 | `policies/audio_analysis_policy.json` | Local provider and candidate-parameter configuration; no scoring controls or proposed development caps |
-| `policies/audio_calibration_status.json` | Per-provider calibration status and false-match counts attached to every audio row; does not change scoring |
+| `policies/audio_calibration_status.json` | Per-provider calibration status, case counts split into development, held-out and real material, and false-match counts, each with a 95% Wilson interval; attached to every audio row and does not change scoring |
+| `music_target/case_intervals.py` | 95% Wilson score intervals for case counts, used by the calibration status and both benchmark scripts |
 | `policies/c2pa_trust/` | Pinned C2PA Trust List, TSA list and frozen legacy ITL (`trust_lists.json` with commits and SHA-256), `known_ai_signers.json` and the update procedure |
 | `schemas/audio-diagnostic.schema.json` | Diagnostic result validation and fixed non-scoring fields |
 | `requirements-audio.txt`, `requirements-audio-lock.txt` | Optional audio dependencies and the tested environment |
 | `make_audio_diagnostic_example.py`, `examples/audio-diagnostics/` | Reproducible repeated-excerpt example, request and core/audio reports |
 | `tests/test_audio_diagnostics.py` | 41 provider, protocol, score-isolation, insufficient-support and calibration-status tests |
+| `tests/test_case_intervals.py` | 10 tests: interval values and bounds, stored intervals matching their counts, and the benchmark summaries |
 | `tests/test_c2pa_integrity.py` | 24 C2PA tests: runtime-signed fixtures, pinned lists, trust status, asymmetric trust, known AI signers, the C2PA chunk precondition and every final state |
 | `reports/audio-diagnostics-verification.json` | Historical 19 October 2026 verification and real-provider example results |
 | `docs/AUDIO_DIAGNOSTICS.md` | Detailed audio setup, usage, output and interpretation |

@@ -1,5 +1,11 @@
 # Verification Record
 
+## Version 0.8.1, calibration intervals (2026-10-23)
+
+- `REQUIRE_AUDIO_BACKENDS=1`, CPython 3.13.7 on macOS: **342 tests, all passed**. 338 non-GUI tests ran in one process (30 s, no skips); the four `test_builder.GuiTests` cases ran in separate processes.
+- New: `music_target/case_intervals.py` (95% Wilson score intervals) and `tests/test_case_intervals.py` (10 tests). Every count in `policies/audio_calibration_status.json` now carries `wilson_95` and sits under `development`, `held_out` or `real_material`; a test recomputes every stored interval from its count. `benchmarks/audio_calibration.py` and `benchmarks/false_match.py` output the intervals; the builder shows them beside the benchmark counts.
+- No score, gate or finding changed. The status file is hashed into `source_revision`, so all example responses were regenerated; in `examples/audio-diagnostics/response.json` only the attached `calibration` objects, the status hash, `source_revision` and timings differ.
+
 ## Version 0.8.1 (2026-10-22)
 
 - `REQUIRE_AUDIO_BACKENDS=1`, CPython 3.13.7 on macOS: **332 tests, all passed**. 328 non-GUI tests ran in one process (31 s, no skips); the four `test_builder.GuiTests` cases ran in separate processes. Details: `reports/test-results.txt` and `reports/release.json`.

@@ -5,7 +5,8 @@ audio diagnostics) as a derived_from relationship. Per category it counts how
 often each provider reports a match. Whether a match is false depends on the
 category: covers share a composition but no audio, and shared-loop pairs share
 real audio but are otherwise different songs. Counts are case observations on a
-small sample, never population rates.
+small sample, never population rates; each carries a 95% Wilson interval. The
+benchmark runs after the gate profile was frozen, so its split is held_out.
 
     python -B benchmarks/false_match.py benchmarks/false_match_lumina_2026-10-21.json \
         --audio /path/to/clips --out /tmp/false_match.json [--write-status]
@@ -30,6 +31,7 @@ sys.path[:0] = [str(PROGRAM), str(PROGRAM / "vendor")]
 import run  # noqa: E402
 from music_target.audio_diagnostics.policy import DEFAULT_PATH  # noqa: E402
 from music_target.audio_diagnostics.runner import augment_response  # noqa: E402
+from music_target.case_intervals import interval_record  # noqa: E402
 
 STATUS_PATH = PROGRAM / "policies" / "audio_calibration_status.json"
 # A match per provider; the five-vote floor is audfprint's own candidate floor.
@@ -136,9 +138,10 @@ def summarize(manifest, results):
                 entry = {"pairs": len(rows), "detected": matches, "note": category["expected_reason"]}
             else:
                 entry = {"pairs": len(rows), "false_matches": matches}
+            entry["wilson_95"] = interval_record(matches, len(rows))
             categories[name] = entry
         summary[provider] = {"benchmark": manifest["benchmark_id"], "definition": DEFINITIONS[provider],
-                             "date": manifest["date"], "categories": categories,
+                             "date": manifest["date"], "split": "held_out", "categories": categories,
                              "scope": "Case counts on a small Lumina sample; not a population false-positive rate."}
     return summary
 

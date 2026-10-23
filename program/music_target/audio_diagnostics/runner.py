@@ -186,7 +186,8 @@ def _calibration(provider, status):
     record = (status.get("providers") or {}).get(provider)
     if record is None:
         return {"status": "exploratory_uncalibrated", "summary": "No calibration record for this provider.",
-                "sample": None, "transforms_tested": [], "not_tested": ["all"], "false_match_rates": None}
+                "sample": None, "case_counts": None, "transforms_tested": [], "not_tested": ["all"],
+                "false_match_rates": None}
     return {"profile_id": status.get("profile_id"), **copy.deepcopy(record)}
 
 
