@@ -543,7 +543,8 @@ class App(tk.Tk):
             tab, columns=("dimension", "availability", "value", "confidence"),
             show="headings", height=4)
         for name in ("dimension", "availability", "value", "confidence"):
-            self.axis_tree.heading(name, text=name)
+            self.axis_tree.heading(
+                name, text="confidence (layers checked)" if name == "confidence" else name)
         self.axis_tree.pack(fill="x")
         details = ttk.Frame(tab)
         details.pack(fill="both", expand=True, pady=6)

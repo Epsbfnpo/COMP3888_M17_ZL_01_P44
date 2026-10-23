@@ -55,6 +55,7 @@ PARSER_STATUSES = {
 CHECK_COLLECTIONS = {
     "bound_file_integrity": BOOLEAN_CHECK_STATUSES,
     "structural_validity": BOOLEAN_CHECK_STATUSES,
+    "declared_file_properties": BOOLEAN_CHECK_STATUSES,
     "relationship_integrity": BOOLEAN_CHECK_STATUSES,
     "cross_evidence": BOOLEAN_CHECK_STATUSES,
     "edit_derivation": DERIVATION_STATUSES,
@@ -165,6 +166,8 @@ def _suggestion_for_check(collection, item, status):
                 else "Repair or replace the file with a readable file of its declared type.")
     if collection == "structural_validity":
         return "Correct the graph references and relationship endpoints, then rerun evaluation."
+    if collection == "declared_file_properties":
+        return "Check the declared technical value against the file."
     if collection == "relationship_integrity":
         return "Check the declared technical value or relationship range against the files."
     if collection == "cross_evidence":
@@ -328,7 +331,7 @@ def attention_items(response, file_names=None, policy_rules=None):
                     disposition = "hide"
                 if item.get("status") == "unavailable" and not item.get("check_count", 0):
                     disposition = "hide"
-            elif collection in ("bound_file_integrity", "structural_validity",
+            elif collection in ("bound_file_integrity", "structural_validity", "declared_file_properties",
                                 "relationship_integrity", "cross_evidence"):
                 disposition = ("unassessed" if item.get("status") == "unavailable"
                                else mapping.get(item.get("passed"), "unknown"))

@@ -6,7 +6,7 @@
   "system": {
     "name": "COMP3888-music-baseline",
     "version": "0.8.1",
-    "source_revision": "sha256:be7bfe70c048d0be210d44f91e568470677dae4991eb4cfc54446d37092f54bc"
+    "source_revision": "sha256:4defb9da102238512c01cfff9fb020b23014d1abea5317dea984724a6a05e327"
   },
   "execution_status": "succeeded",
   "axes": {
@@ -20,7 +20,7 @@
       "availability": "partial",
       "value": null,
       "confidence": 0.533,
-      "reasoning": "Integrity has 2/3 score-eligible evidence layers; missing evidence reduces availability and confidence but is never treated as contradiction. Numeric release requires at least 2 populated contributing layer(s) and an assessed qualifying cross-evidence fact (signed_attestation, recorder_metadata); the value is withheld (insufficient_qualifying_cross_evidence). An ordinary contradiction never releases a value. No qualifying cross-evidence was assessed for this submission. Structural validity and cryptographic attestation are reported separately and do not raise integrity. Legacy signal comparisons are disabled by policy and do not produce findings or affect integrity.",
+      "reasoning": "Integrity has 2/3 score-eligible evidence layers; missing evidence reduces availability and confidence but is never treated as contradiction. Integrity confidence reflects how many of the three evidence layers were checked. To see how many checks passed, refer to the integrity value and the layer results. Numeric release requires at least 2 populated contributing layer(s) and an assessed qualifying cross-evidence fact (signed_attestation, recorder_metadata); the value is withheld (insufficient_qualifying_cross_evidence). An ordinary contradiction never releases a value. No qualifying cross-evidence was assessed for this submission. The files and claims have been checked against each other, but this does not guarantee who created the material, when it was recorded or that the recording session took place. Signed origin evidence, where available, is shown in attestation_strength. Structural validity and cryptographic attestation are reported separately and do not raise integrity. Legacy signal comparisons are disabled by policy and do not produce findings or affect integrity.",
       "status": "insufficient_evidence"
     },
     "attestation_strength": {
@@ -1492,8 +1492,8 @@
   "assessment_checks": {
     "scoring_profile": [
       {
-        "profile_id": "default-v4",
-        "profile_version": 4
+        "profile_id": "default-v6",
+        "profile_version": 6
       }
     ],
     "bound_file_integrity": [
@@ -1503,73 +1503,9 @@
         "evidence_hash": "133c934683b5f977ce77d1ead96ce4451162ad75e3bea2432bd6fbbe3f6e0c7b"
       },
       {
-        "rule": "technical.duration_seconds_matches_observed",
-        "passed": true,
-        "evidence_hash": "133c934683b5f977ce77d1ead96ce4451162ad75e3bea2432bd6fbbe3f6e0c7b",
-        "declared": 179.583129,
-        "observed": 179.58312925170068,
-        "source_pass": "WavMetadataPass"
-      },
-      {
-        "rule": "technical.sample_rate_hz_matches_observed",
-        "passed": true,
-        "evidence_hash": "133c934683b5f977ce77d1ead96ce4451162ad75e3bea2432bd6fbbe3f6e0c7b",
-        "declared": 44100,
-        "observed": 44100,
-        "source_pass": "WavMetadataPass"
-      },
-      {
-        "rule": "technical.channels_matches_observed",
-        "passed": true,
-        "evidence_hash": "133c934683b5f977ce77d1ead96ce4451162ad75e3bea2432bd6fbbe3f6e0c7b",
-        "declared": 2,
-        "observed": 2,
-        "source_pass": "WavMetadataPass"
-      },
-      {
-        "rule": "technical.bit_depth_matches_observed",
-        "passed": true,
-        "evidence_hash": "133c934683b5f977ce77d1ead96ce4451162ad75e3bea2432bd6fbbe3f6e0c7b",
-        "declared": 16,
-        "observed": 16,
-        "source_pass": "WavMetadataPass"
-      },
-      {
         "rule": "object_hash_bound",
         "passed": true,
         "evidence_hash": "945f4de7b584607c94a44a16f297ec3b6bf5f5f1e2624edb28eebcdcff60f744"
-      },
-      {
-        "rule": "technical.duration_seconds_matches_observed",
-        "passed": true,
-        "evidence_hash": "945f4de7b584607c94a44a16f297ec3b6bf5f5f1e2624edb28eebcdcff60f744",
-        "declared": 179.266803,
-        "observed": 179.26680272108842,
-        "source_pass": "WavMetadataPass"
-      },
-      {
-        "rule": "technical.sample_rate_hz_matches_observed",
-        "passed": true,
-        "evidence_hash": "945f4de7b584607c94a44a16f297ec3b6bf5f5f1e2624edb28eebcdcff60f744",
-        "declared": 44100,
-        "observed": 44100,
-        "source_pass": "WavMetadataPass"
-      },
-      {
-        "rule": "technical.channels_matches_observed",
-        "passed": true,
-        "evidence_hash": "945f4de7b584607c94a44a16f297ec3b6bf5f5f1e2624edb28eebcdcff60f744",
-        "declared": 2,
-        "observed": 2,
-        "source_pass": "WavMetadataPass"
-      },
-      {
-        "rule": "technical.bit_depth_matches_observed",
-        "passed": true,
-        "evidence_hash": "945f4de7b584607c94a44a16f297ec3b6bf5f5f1e2624edb28eebcdcff60f744",
-        "declared": 16,
-        "observed": 16,
-        "source_pass": "WavMetadataPass"
       },
       {
         "rule": "object_hash_bound",
@@ -1577,73 +1513,9 @@
         "evidence_hash": "50e40ffe2e928e74d937ca4eaeba9a35160800972eaf25adb71ce31e147ea129"
       },
       {
-        "rule": "technical.duration_seconds_matches_observed",
-        "passed": true,
-        "evidence_hash": "50e40ffe2e928e74d937ca4eaeba9a35160800972eaf25adb71ce31e147ea129",
-        "declared": 179.266803,
-        "observed": 179.26680272108842,
-        "source_pass": "WavMetadataPass"
-      },
-      {
-        "rule": "technical.sample_rate_hz_matches_observed",
-        "passed": true,
-        "evidence_hash": "50e40ffe2e928e74d937ca4eaeba9a35160800972eaf25adb71ce31e147ea129",
-        "declared": 44100,
-        "observed": 44100,
-        "source_pass": "WavMetadataPass"
-      },
-      {
-        "rule": "technical.channels_matches_observed",
-        "passed": true,
-        "evidence_hash": "50e40ffe2e928e74d937ca4eaeba9a35160800972eaf25adb71ce31e147ea129",
-        "declared": 2,
-        "observed": 2,
-        "source_pass": "WavMetadataPass"
-      },
-      {
-        "rule": "technical.bit_depth_matches_observed",
-        "passed": true,
-        "evidence_hash": "50e40ffe2e928e74d937ca4eaeba9a35160800972eaf25adb71ce31e147ea129",
-        "declared": 16,
-        "observed": 16,
-        "source_pass": "WavMetadataPass"
-      },
-      {
         "rule": "object_hash_bound",
         "passed": true,
         "evidence_hash": "0a2c29f42e0570d270f27d268062dab5ab30d86a0ed720b31f8b6735cd268190"
-      },
-      {
-        "rule": "technical.duration_seconds_matches_observed",
-        "passed": true,
-        "evidence_hash": "0a2c29f42e0570d270f27d268062dab5ab30d86a0ed720b31f8b6735cd268190",
-        "declared": 178.050612,
-        "observed": 178.05061224489796,
-        "source_pass": "WavMetadataPass"
-      },
-      {
-        "rule": "technical.sample_rate_hz_matches_observed",
-        "passed": true,
-        "evidence_hash": "0a2c29f42e0570d270f27d268062dab5ab30d86a0ed720b31f8b6735cd268190",
-        "declared": 44100,
-        "observed": 44100,
-        "source_pass": "WavMetadataPass"
-      },
-      {
-        "rule": "technical.channels_matches_observed",
-        "passed": true,
-        "evidence_hash": "0a2c29f42e0570d270f27d268062dab5ab30d86a0ed720b31f8b6735cd268190",
-        "declared": 2,
-        "observed": 2,
-        "source_pass": "WavMetadataPass"
-      },
-      {
-        "rule": "technical.bit_depth_matches_observed",
-        "passed": true,
-        "evidence_hash": "0a2c29f42e0570d270f27d268062dab5ab30d86a0ed720b31f8b6735cd268190",
-        "declared": 16,
-        "observed": 16,
-        "source_pass": "WavMetadataPass"
       }
     ],
     "structural_validity": [
@@ -1679,6 +1551,136 @@
         "source_hash": "50e40ffe2e928e74d937ca4eaeba9a35160800972eaf25adb71ce31e147ea129",
         "target_hash": "0a2c29f42e0570d270f27d268062dab5ab30d86a0ed720b31f8b6735cd268190",
         "relationship_type": "mixed_from"
+      }
+    ],
+    "declared_file_properties": [
+      {
+        "rule": "technical.duration_seconds_matches_observed",
+        "passed": true,
+        "evidence_hash": "133c934683b5f977ce77d1ead96ce4451162ad75e3bea2432bd6fbbe3f6e0c7b",
+        "declared": 179.583129,
+        "observed": 179.58312925170068,
+        "source_pass": "WavMetadataPass"
+      },
+      {
+        "rule": "technical.sample_rate_hz_matches_observed",
+        "passed": true,
+        "evidence_hash": "133c934683b5f977ce77d1ead96ce4451162ad75e3bea2432bd6fbbe3f6e0c7b",
+        "declared": 44100,
+        "observed": 44100,
+        "source_pass": "WavMetadataPass"
+      },
+      {
+        "rule": "technical.channels_matches_observed",
+        "passed": true,
+        "evidence_hash": "133c934683b5f977ce77d1ead96ce4451162ad75e3bea2432bd6fbbe3f6e0c7b",
+        "declared": 2,
+        "observed": 2,
+        "source_pass": "WavMetadataPass"
+      },
+      {
+        "rule": "technical.bit_depth_matches_observed",
+        "passed": true,
+        "evidence_hash": "133c934683b5f977ce77d1ead96ce4451162ad75e3bea2432bd6fbbe3f6e0c7b",
+        "declared": 16,
+        "observed": 16,
+        "source_pass": "WavMetadataPass"
+      },
+      {
+        "rule": "technical.duration_seconds_matches_observed",
+        "passed": true,
+        "evidence_hash": "945f4de7b584607c94a44a16f297ec3b6bf5f5f1e2624edb28eebcdcff60f744",
+        "declared": 179.266803,
+        "observed": 179.26680272108842,
+        "source_pass": "WavMetadataPass"
+      },
+      {
+        "rule": "technical.sample_rate_hz_matches_observed",
+        "passed": true,
+        "evidence_hash": "945f4de7b584607c94a44a16f297ec3b6bf5f5f1e2624edb28eebcdcff60f744",
+        "declared": 44100,
+        "observed": 44100,
+        "source_pass": "WavMetadataPass"
+      },
+      {
+        "rule": "technical.channels_matches_observed",
+        "passed": true,
+        "evidence_hash": "945f4de7b584607c94a44a16f297ec3b6bf5f5f1e2624edb28eebcdcff60f744",
+        "declared": 2,
+        "observed": 2,
+        "source_pass": "WavMetadataPass"
+      },
+      {
+        "rule": "technical.bit_depth_matches_observed",
+        "passed": true,
+        "evidence_hash": "945f4de7b584607c94a44a16f297ec3b6bf5f5f1e2624edb28eebcdcff60f744",
+        "declared": 16,
+        "observed": 16,
+        "source_pass": "WavMetadataPass"
+      },
+      {
+        "rule": "technical.duration_seconds_matches_observed",
+        "passed": true,
+        "evidence_hash": "50e40ffe2e928e74d937ca4eaeba9a35160800972eaf25adb71ce31e147ea129",
+        "declared": 179.266803,
+        "observed": 179.26680272108842,
+        "source_pass": "WavMetadataPass"
+      },
+      {
+        "rule": "technical.sample_rate_hz_matches_observed",
+        "passed": true,
+        "evidence_hash": "50e40ffe2e928e74d937ca4eaeba9a35160800972eaf25adb71ce31e147ea129",
+        "declared": 44100,
+        "observed": 44100,
+        "source_pass": "WavMetadataPass"
+      },
+      {
+        "rule": "technical.channels_matches_observed",
+        "passed": true,
+        "evidence_hash": "50e40ffe2e928e74d937ca4eaeba9a35160800972eaf25adb71ce31e147ea129",
+        "declared": 2,
+        "observed": 2,
+        "source_pass": "WavMetadataPass"
+      },
+      {
+        "rule": "technical.bit_depth_matches_observed",
+        "passed": true,
+        "evidence_hash": "50e40ffe2e928e74d937ca4eaeba9a35160800972eaf25adb71ce31e147ea129",
+        "declared": 16,
+        "observed": 16,
+        "source_pass": "WavMetadataPass"
+      },
+      {
+        "rule": "technical.duration_seconds_matches_observed",
+        "passed": true,
+        "evidence_hash": "0a2c29f42e0570d270f27d268062dab5ab30d86a0ed720b31f8b6735cd268190",
+        "declared": 178.050612,
+        "observed": 178.05061224489796,
+        "source_pass": "WavMetadataPass"
+      },
+      {
+        "rule": "technical.sample_rate_hz_matches_observed",
+        "passed": true,
+        "evidence_hash": "0a2c29f42e0570d270f27d268062dab5ab30d86a0ed720b31f8b6735cd268190",
+        "declared": 44100,
+        "observed": 44100,
+        "source_pass": "WavMetadataPass"
+      },
+      {
+        "rule": "technical.channels_matches_observed",
+        "passed": true,
+        "evidence_hash": "0a2c29f42e0570d270f27d268062dab5ab30d86a0ed720b31f8b6735cd268190",
+        "declared": 2,
+        "observed": 2,
+        "source_pass": "WavMetadataPass"
+      },
+      {
+        "rule": "technical.bit_depth_matches_observed",
+        "passed": true,
+        "evidence_hash": "0a2c29f42e0570d270f27d268062dab5ab30d86a0ed720b31f8b6735cd268190",
+        "declared": 16,
+        "observed": 16,
+        "source_pass": "WavMetadataPass"
       }
     ],
     "relationship_integrity": [
@@ -1774,6 +1776,604 @@
         "target_hash": "0a2c29f42e0570d270f27d268062dab5ab30d86a0ed720b31f8b6735cd268190",
         "relationship_type": "mixed_from",
         "source_pass": "RelationshipIntegrityPass"
+      }
+    ],
+    "declaration_scored_facts": [
+      {
+        "fact_id": "68414c2c41c6922b4aaf3ef6468e536853cf044aa11fdb882f22da7c3f52c52a",
+        "identity": {
+          "file_hash": "133c934683b5f977ce77d1ead96ce4451162ad75e3bea2432bd6fbbe3f6e0c7b",
+          "property": "duration_seconds"
+        },
+        "rule": "technical.duration_seconds_matches_observed",
+        "passed": true,
+        "status": "corroborated",
+        "observation_count": 1,
+        "observation_indices": [
+          0
+        ],
+        "conflicting_outcomes": false,
+        "representative_check": {
+          "rule": "technical.duration_seconds_matches_observed",
+          "passed": true,
+          "evidence_hash": "133c934683b5f977ce77d1ead96ce4451162ad75e3bea2432bd6fbbe3f6e0c7b",
+          "declared": 179.583129,
+          "observed": 179.58312925170068,
+          "source_pass": "WavMetadataPass"
+        }
+      },
+      {
+        "fact_id": "919940e07b34ae4529766b02f3f0af01ebe1f6db148c7ceb789f1db9c9f75260",
+        "identity": {
+          "file_hash": "133c934683b5f977ce77d1ead96ce4451162ad75e3bea2432bd6fbbe3f6e0c7b",
+          "property": "sample_rate_hz"
+        },
+        "rule": "technical.sample_rate_hz_matches_observed",
+        "passed": true,
+        "status": "corroborated",
+        "observation_count": 1,
+        "observation_indices": [
+          1
+        ],
+        "conflicting_outcomes": false,
+        "representative_check": {
+          "rule": "technical.sample_rate_hz_matches_observed",
+          "passed": true,
+          "evidence_hash": "133c934683b5f977ce77d1ead96ce4451162ad75e3bea2432bd6fbbe3f6e0c7b",
+          "declared": 44100,
+          "observed": 44100,
+          "source_pass": "WavMetadataPass"
+        }
+      },
+      {
+        "fact_id": "2291a15772258bf4c75ac1c51f289b28d6d4a1a599994ebb90c8ae6098ca60a3",
+        "identity": {
+          "file_hash": "133c934683b5f977ce77d1ead96ce4451162ad75e3bea2432bd6fbbe3f6e0c7b",
+          "property": "channels"
+        },
+        "rule": "technical.channels_matches_observed",
+        "passed": true,
+        "status": "corroborated",
+        "observation_count": 1,
+        "observation_indices": [
+          2
+        ],
+        "conflicting_outcomes": false,
+        "representative_check": {
+          "rule": "technical.channels_matches_observed",
+          "passed": true,
+          "evidence_hash": "133c934683b5f977ce77d1ead96ce4451162ad75e3bea2432bd6fbbe3f6e0c7b",
+          "declared": 2,
+          "observed": 2,
+          "source_pass": "WavMetadataPass"
+        }
+      },
+      {
+        "fact_id": "e33baa4ba3d4b5887e2d8fb5dea95d7052399d2d0d09c85fda0cb5eecca24226",
+        "identity": {
+          "file_hash": "133c934683b5f977ce77d1ead96ce4451162ad75e3bea2432bd6fbbe3f6e0c7b",
+          "property": "bit_depth"
+        },
+        "rule": "technical.bit_depth_matches_observed",
+        "passed": true,
+        "status": "corroborated",
+        "observation_count": 1,
+        "observation_indices": [
+          3
+        ],
+        "conflicting_outcomes": false,
+        "representative_check": {
+          "rule": "technical.bit_depth_matches_observed",
+          "passed": true,
+          "evidence_hash": "133c934683b5f977ce77d1ead96ce4451162ad75e3bea2432bd6fbbe3f6e0c7b",
+          "declared": 16,
+          "observed": 16,
+          "source_pass": "WavMetadataPass"
+        }
+      },
+      {
+        "fact_id": "71cd95d44c800c9c4df1ba411cc0fb86b8f2ccebf786b6e463333a54c61e7e59",
+        "identity": {
+          "file_hash": "945f4de7b584607c94a44a16f297ec3b6bf5f5f1e2624edb28eebcdcff60f744",
+          "property": "duration_seconds"
+        },
+        "rule": "technical.duration_seconds_matches_observed",
+        "passed": true,
+        "status": "corroborated",
+        "observation_count": 1,
+        "observation_indices": [
+          4
+        ],
+        "conflicting_outcomes": false,
+        "representative_check": {
+          "rule": "technical.duration_seconds_matches_observed",
+          "passed": true,
+          "evidence_hash": "945f4de7b584607c94a44a16f297ec3b6bf5f5f1e2624edb28eebcdcff60f744",
+          "declared": 179.266803,
+          "observed": 179.26680272108842,
+          "source_pass": "WavMetadataPass"
+        }
+      },
+      {
+        "fact_id": "c010bdc199f4a8450217331b807425403af5ed0cc1388f6ffa317e23772fb114",
+        "identity": {
+          "file_hash": "945f4de7b584607c94a44a16f297ec3b6bf5f5f1e2624edb28eebcdcff60f744",
+          "property": "sample_rate_hz"
+        },
+        "rule": "technical.sample_rate_hz_matches_observed",
+        "passed": true,
+        "status": "corroborated",
+        "observation_count": 1,
+        "observation_indices": [
+          5
+        ],
+        "conflicting_outcomes": false,
+        "representative_check": {
+          "rule": "technical.sample_rate_hz_matches_observed",
+          "passed": true,
+          "evidence_hash": "945f4de7b584607c94a44a16f297ec3b6bf5f5f1e2624edb28eebcdcff60f744",
+          "declared": 44100,
+          "observed": 44100,
+          "source_pass": "WavMetadataPass"
+        }
+      },
+      {
+        "fact_id": "8f0a51b14b6bf64aba9924dfcc3db75689d091a417513316ccd7aae60f2e3d20",
+        "identity": {
+          "file_hash": "945f4de7b584607c94a44a16f297ec3b6bf5f5f1e2624edb28eebcdcff60f744",
+          "property": "channels"
+        },
+        "rule": "technical.channels_matches_observed",
+        "passed": true,
+        "status": "corroborated",
+        "observation_count": 1,
+        "observation_indices": [
+          6
+        ],
+        "conflicting_outcomes": false,
+        "representative_check": {
+          "rule": "technical.channels_matches_observed",
+          "passed": true,
+          "evidence_hash": "945f4de7b584607c94a44a16f297ec3b6bf5f5f1e2624edb28eebcdcff60f744",
+          "declared": 2,
+          "observed": 2,
+          "source_pass": "WavMetadataPass"
+        }
+      },
+      {
+        "fact_id": "0a6e2d13b530e70cd169f182200de8fc54dbb6e654148ca0a81f669d9bf1f6e4",
+        "identity": {
+          "file_hash": "945f4de7b584607c94a44a16f297ec3b6bf5f5f1e2624edb28eebcdcff60f744",
+          "property": "bit_depth"
+        },
+        "rule": "technical.bit_depth_matches_observed",
+        "passed": true,
+        "status": "corroborated",
+        "observation_count": 1,
+        "observation_indices": [
+          7
+        ],
+        "conflicting_outcomes": false,
+        "representative_check": {
+          "rule": "technical.bit_depth_matches_observed",
+          "passed": true,
+          "evidence_hash": "945f4de7b584607c94a44a16f297ec3b6bf5f5f1e2624edb28eebcdcff60f744",
+          "declared": 16,
+          "observed": 16,
+          "source_pass": "WavMetadataPass"
+        }
+      },
+      {
+        "fact_id": "241296d695b39c0d4bc457a79f6a6e1fca13f3249e90d549f17664dc31734299",
+        "identity": {
+          "file_hash": "50e40ffe2e928e74d937ca4eaeba9a35160800972eaf25adb71ce31e147ea129",
+          "property": "duration_seconds"
+        },
+        "rule": "technical.duration_seconds_matches_observed",
+        "passed": true,
+        "status": "corroborated",
+        "observation_count": 1,
+        "observation_indices": [
+          8
+        ],
+        "conflicting_outcomes": false,
+        "representative_check": {
+          "rule": "technical.duration_seconds_matches_observed",
+          "passed": true,
+          "evidence_hash": "50e40ffe2e928e74d937ca4eaeba9a35160800972eaf25adb71ce31e147ea129",
+          "declared": 179.266803,
+          "observed": 179.26680272108842,
+          "source_pass": "WavMetadataPass"
+        }
+      },
+      {
+        "fact_id": "8e8de78ce7bf7337488da17f38d9d99a9e492ffc29069610bf7dadecaeeaf9e3",
+        "identity": {
+          "file_hash": "50e40ffe2e928e74d937ca4eaeba9a35160800972eaf25adb71ce31e147ea129",
+          "property": "sample_rate_hz"
+        },
+        "rule": "technical.sample_rate_hz_matches_observed",
+        "passed": true,
+        "status": "corroborated",
+        "observation_count": 1,
+        "observation_indices": [
+          9
+        ],
+        "conflicting_outcomes": false,
+        "representative_check": {
+          "rule": "technical.sample_rate_hz_matches_observed",
+          "passed": true,
+          "evidence_hash": "50e40ffe2e928e74d937ca4eaeba9a35160800972eaf25adb71ce31e147ea129",
+          "declared": 44100,
+          "observed": 44100,
+          "source_pass": "WavMetadataPass"
+        }
+      },
+      {
+        "fact_id": "9036e77db1f51446af239dab88050c025730d699e74895aa5cf81c74d7b56c96",
+        "identity": {
+          "file_hash": "50e40ffe2e928e74d937ca4eaeba9a35160800972eaf25adb71ce31e147ea129",
+          "property": "channels"
+        },
+        "rule": "technical.channels_matches_observed",
+        "passed": true,
+        "status": "corroborated",
+        "observation_count": 1,
+        "observation_indices": [
+          10
+        ],
+        "conflicting_outcomes": false,
+        "representative_check": {
+          "rule": "technical.channels_matches_observed",
+          "passed": true,
+          "evidence_hash": "50e40ffe2e928e74d937ca4eaeba9a35160800972eaf25adb71ce31e147ea129",
+          "declared": 2,
+          "observed": 2,
+          "source_pass": "WavMetadataPass"
+        }
+      },
+      {
+        "fact_id": "6f6b8f89d80e38e2664cd658f8f00a9e8ffdda4e32f7d61451bd3561808b6f87",
+        "identity": {
+          "file_hash": "50e40ffe2e928e74d937ca4eaeba9a35160800972eaf25adb71ce31e147ea129",
+          "property": "bit_depth"
+        },
+        "rule": "technical.bit_depth_matches_observed",
+        "passed": true,
+        "status": "corroborated",
+        "observation_count": 1,
+        "observation_indices": [
+          11
+        ],
+        "conflicting_outcomes": false,
+        "representative_check": {
+          "rule": "technical.bit_depth_matches_observed",
+          "passed": true,
+          "evidence_hash": "50e40ffe2e928e74d937ca4eaeba9a35160800972eaf25adb71ce31e147ea129",
+          "declared": 16,
+          "observed": 16,
+          "source_pass": "WavMetadataPass"
+        }
+      },
+      {
+        "fact_id": "51a9cba9005c7528a7fd3e0914ba0b4ae4545e3c9520673c9574ac70afc7f9c7",
+        "identity": {
+          "file_hash": "0a2c29f42e0570d270f27d268062dab5ab30d86a0ed720b31f8b6735cd268190",
+          "property": "duration_seconds"
+        },
+        "rule": "technical.duration_seconds_matches_observed",
+        "passed": true,
+        "status": "corroborated",
+        "observation_count": 1,
+        "observation_indices": [
+          12
+        ],
+        "conflicting_outcomes": false,
+        "representative_check": {
+          "rule": "technical.duration_seconds_matches_observed",
+          "passed": true,
+          "evidence_hash": "0a2c29f42e0570d270f27d268062dab5ab30d86a0ed720b31f8b6735cd268190",
+          "declared": 178.050612,
+          "observed": 178.05061224489796,
+          "source_pass": "WavMetadataPass"
+        }
+      },
+      {
+        "fact_id": "ffb82861442d8da42c3ce72e964d2b638ba423d0ceb2183c9f43b4fdc216f811",
+        "identity": {
+          "file_hash": "0a2c29f42e0570d270f27d268062dab5ab30d86a0ed720b31f8b6735cd268190",
+          "property": "sample_rate_hz"
+        },
+        "rule": "technical.sample_rate_hz_matches_observed",
+        "passed": true,
+        "status": "corroborated",
+        "observation_count": 1,
+        "observation_indices": [
+          13
+        ],
+        "conflicting_outcomes": false,
+        "representative_check": {
+          "rule": "technical.sample_rate_hz_matches_observed",
+          "passed": true,
+          "evidence_hash": "0a2c29f42e0570d270f27d268062dab5ab30d86a0ed720b31f8b6735cd268190",
+          "declared": 44100,
+          "observed": 44100,
+          "source_pass": "WavMetadataPass"
+        }
+      },
+      {
+        "fact_id": "6c635999523756495a2e84598595600aa715a8d955ee351bee12d86a15845708",
+        "identity": {
+          "file_hash": "0a2c29f42e0570d270f27d268062dab5ab30d86a0ed720b31f8b6735cd268190",
+          "property": "channels"
+        },
+        "rule": "technical.channels_matches_observed",
+        "passed": true,
+        "status": "corroborated",
+        "observation_count": 1,
+        "observation_indices": [
+          14
+        ],
+        "conflicting_outcomes": false,
+        "representative_check": {
+          "rule": "technical.channels_matches_observed",
+          "passed": true,
+          "evidence_hash": "0a2c29f42e0570d270f27d268062dab5ab30d86a0ed720b31f8b6735cd268190",
+          "declared": 2,
+          "observed": 2,
+          "source_pass": "WavMetadataPass"
+        }
+      },
+      {
+        "fact_id": "e7a1b4881d11a0a7bda008eba874278913ffd12d30073645d6b2920855873794",
+        "identity": {
+          "file_hash": "0a2c29f42e0570d270f27d268062dab5ab30d86a0ed720b31f8b6735cd268190",
+          "property": "bit_depth"
+        },
+        "rule": "technical.bit_depth_matches_observed",
+        "passed": true,
+        "status": "corroborated",
+        "observation_count": 1,
+        "observation_indices": [
+          15
+        ],
+        "conflicting_outcomes": false,
+        "representative_check": {
+          "rule": "technical.bit_depth_matches_observed",
+          "passed": true,
+          "evidence_hash": "0a2c29f42e0570d270f27d268062dab5ab30d86a0ed720b31f8b6735cd268190",
+          "declared": 16,
+          "observed": 16,
+          "source_pass": "WavMetadataPass"
+        }
+      },
+      {
+        "fact_id": "c6a1f8656cbca909192a527463afa6dbfebd8692177e67e88ec887f161c729cf",
+        "identity": {
+          "observation_index": 16,
+          "rule": "source_time_within_duration"
+        },
+        "rule": "source_time_within_duration",
+        "passed": true,
+        "status": "corroborated",
+        "observation_count": 1,
+        "observation_indices": [
+          16
+        ],
+        "conflicting_outcomes": false,
+        "representative_check": {
+          "rule": "source_time_within_duration",
+          "passed": true,
+          "declared": 60.0,
+          "observed_duration_seconds": 179.58312925170068,
+          "tolerance_seconds": 2.2675736961451248e-05,
+          "source_hash": "133c934683b5f977ce77d1ead96ce4451162ad75e3bea2432bd6fbbe3f6e0c7b",
+          "target_hash": "0a2c29f42e0570d270f27d268062dab5ab30d86a0ed720b31f8b6735cd268190",
+          "relationship_type": "mixed_from",
+          "source_pass": "RelationshipIntegrityPass"
+        }
+      },
+      {
+        "fact_id": "5662bbd247e8ad5b34a9754c1ec75db5d3b39d58910401942b088bc040345a68",
+        "identity": {
+          "observation_index": 17,
+          "rule": "source_time_order_valid"
+        },
+        "rule": "source_time_order_valid",
+        "passed": true,
+        "status": "corroborated",
+        "observation_count": 1,
+        "observation_indices": [
+          17
+        ],
+        "conflicting_outcomes": false,
+        "representative_check": {
+          "rule": "source_time_order_valid",
+          "passed": true,
+          "reason_code": "positive_content_span",
+          "source_hash": "133c934683b5f977ce77d1ead96ce4451162ad75e3bea2432bd6fbbe3f6e0c7b",
+          "target_hash": "0a2c29f42e0570d270f27d268062dab5ab30d86a0ed720b31f8b6735cd268190",
+          "relationship_type": "mixed_from",
+          "source_pass": "RelationshipIntegrityPass"
+        }
+      },
+      {
+        "fact_id": "70fbf01d0ea22be2d31ec9b75062c8abffcf08b64d3db1c4be580351ef7458ce",
+        "identity": {
+          "observation_index": 18,
+          "rule": "target_time_within_duration"
+        },
+        "rule": "target_time_within_duration",
+        "passed": true,
+        "status": "corroborated",
+        "observation_count": 1,
+        "observation_indices": [
+          18
+        ],
+        "conflicting_outcomes": false,
+        "representative_check": {
+          "rule": "target_time_within_duration",
+          "passed": true,
+          "declared": 60.0,
+          "observed_duration_seconds": 178.05061224489796,
+          "tolerance_seconds": 2.2675736961451248e-05,
+          "source_hash": "133c934683b5f977ce77d1ead96ce4451162ad75e3bea2432bd6fbbe3f6e0c7b",
+          "target_hash": "0a2c29f42e0570d270f27d268062dab5ab30d86a0ed720b31f8b6735cd268190",
+          "relationship_type": "mixed_from",
+          "source_pass": "RelationshipIntegrityPass"
+        }
+      },
+      {
+        "fact_id": "13c675b123b051caa82a4be35bc5b3210a0fb689cac8589301375961f8057e8d",
+        "identity": {
+          "observation_index": 19,
+          "rule": "source_time_within_duration"
+        },
+        "rule": "source_time_within_duration",
+        "passed": true,
+        "status": "corroborated",
+        "observation_count": 1,
+        "observation_indices": [
+          19
+        ],
+        "conflicting_outcomes": false,
+        "representative_check": {
+          "rule": "source_time_within_duration",
+          "passed": true,
+          "declared": 60.0,
+          "observed_duration_seconds": 179.26680272108842,
+          "tolerance_seconds": 2.2675736961451248e-05,
+          "source_hash": "945f4de7b584607c94a44a16f297ec3b6bf5f5f1e2624edb28eebcdcff60f744",
+          "target_hash": "0a2c29f42e0570d270f27d268062dab5ab30d86a0ed720b31f8b6735cd268190",
+          "relationship_type": "mixed_from",
+          "source_pass": "RelationshipIntegrityPass"
+        }
+      },
+      {
+        "fact_id": "dbbf5660f45c75f70bbf2a84128d8bd82f572e83a0c86b13e5a37905b68a7473",
+        "identity": {
+          "observation_index": 20,
+          "rule": "source_time_order_valid"
+        },
+        "rule": "source_time_order_valid",
+        "passed": true,
+        "status": "corroborated",
+        "observation_count": 1,
+        "observation_indices": [
+          20
+        ],
+        "conflicting_outcomes": false,
+        "representative_check": {
+          "rule": "source_time_order_valid",
+          "passed": true,
+          "reason_code": "positive_content_span",
+          "source_hash": "945f4de7b584607c94a44a16f297ec3b6bf5f5f1e2624edb28eebcdcff60f744",
+          "target_hash": "0a2c29f42e0570d270f27d268062dab5ab30d86a0ed720b31f8b6735cd268190",
+          "relationship_type": "mixed_from",
+          "source_pass": "RelationshipIntegrityPass"
+        }
+      },
+      {
+        "fact_id": "b6e082b003809bbbdcf31984def2662138abf61611609a03808e8bd5000f93ac",
+        "identity": {
+          "observation_index": 21,
+          "rule": "target_time_within_duration"
+        },
+        "rule": "target_time_within_duration",
+        "passed": true,
+        "status": "corroborated",
+        "observation_count": 1,
+        "observation_indices": [
+          21
+        ],
+        "conflicting_outcomes": false,
+        "representative_check": {
+          "rule": "target_time_within_duration",
+          "passed": true,
+          "declared": 60.0,
+          "observed_duration_seconds": 178.05061224489796,
+          "tolerance_seconds": 2.2675736961451248e-05,
+          "source_hash": "945f4de7b584607c94a44a16f297ec3b6bf5f5f1e2624edb28eebcdcff60f744",
+          "target_hash": "0a2c29f42e0570d270f27d268062dab5ab30d86a0ed720b31f8b6735cd268190",
+          "relationship_type": "mixed_from",
+          "source_pass": "RelationshipIntegrityPass"
+        }
+      },
+      {
+        "fact_id": "1d199ebcc6da0398a421e6904de6b8b4e61d97bd0210baa6316fa59a26b26490",
+        "identity": {
+          "observation_index": 22,
+          "rule": "source_time_within_duration"
+        },
+        "rule": "source_time_within_duration",
+        "passed": true,
+        "status": "corroborated",
+        "observation_count": 1,
+        "observation_indices": [
+          22
+        ],
+        "conflicting_outcomes": false,
+        "representative_check": {
+          "rule": "source_time_within_duration",
+          "passed": true,
+          "declared": 60.0,
+          "observed_duration_seconds": 179.26680272108842,
+          "tolerance_seconds": 2.2675736961451248e-05,
+          "source_hash": "50e40ffe2e928e74d937ca4eaeba9a35160800972eaf25adb71ce31e147ea129",
+          "target_hash": "0a2c29f42e0570d270f27d268062dab5ab30d86a0ed720b31f8b6735cd268190",
+          "relationship_type": "mixed_from",
+          "source_pass": "RelationshipIntegrityPass"
+        }
+      },
+      {
+        "fact_id": "17032f54076a15432cfdc69536cc6e3a43516de5ecadc73aff15e94ecae9f59b",
+        "identity": {
+          "observation_index": 23,
+          "rule": "source_time_order_valid"
+        },
+        "rule": "source_time_order_valid",
+        "passed": true,
+        "status": "corroborated",
+        "observation_count": 1,
+        "observation_indices": [
+          23
+        ],
+        "conflicting_outcomes": false,
+        "representative_check": {
+          "rule": "source_time_order_valid",
+          "passed": true,
+          "reason_code": "positive_content_span",
+          "source_hash": "50e40ffe2e928e74d937ca4eaeba9a35160800972eaf25adb71ce31e147ea129",
+          "target_hash": "0a2c29f42e0570d270f27d268062dab5ab30d86a0ed720b31f8b6735cd268190",
+          "relationship_type": "mixed_from",
+          "source_pass": "RelationshipIntegrityPass"
+        }
+      },
+      {
+        "fact_id": "7c46d682ecbf334640fc1511b87139d0a3e4300948600c64dc80bc4c6adc7c73",
+        "identity": {
+          "observation_index": 24,
+          "rule": "target_time_within_duration"
+        },
+        "rule": "target_time_within_duration",
+        "passed": true,
+        "status": "corroborated",
+        "observation_count": 1,
+        "observation_indices": [
+          24
+        ],
+        "conflicting_outcomes": false,
+        "representative_check": {
+          "rule": "target_time_within_duration",
+          "passed": true,
+          "declared": 60.0,
+          "observed_duration_seconds": 178.05061224489796,
+          "tolerance_seconds": 2.2675736961451248e-05,
+          "source_hash": "50e40ffe2e928e74d937ca4eaeba9a35160800972eaf25adb71ce31e147ea129",
+          "target_hash": "0a2c29f42e0570d270f27d268062dab5ab30d86a0ed720b31f8b6735cd268190",
+          "relationship_type": "mixed_from",
+          "source_pass": "RelationshipIntegrityPass"
+        }
       }
     ],
     "relationship_range_validation": [
@@ -2090,8 +2690,8 @@
         "status": "corroborated",
         "value": 1.0,
         "contributes_to_integrity": true,
-        "check_count": 20,
-        "reason": "SHA-256 binding, cached WAV technical checks, and parser readability of submitted files.",
+        "check_count": 4,
+        "reason": "SHA-256 binding and parser readability of submitted files; no submitter claims are compared here.",
         "manual_review_reasons": [],
         "weight": 1.0
       },
@@ -2110,8 +2710,8 @@
         "status": "corroborated",
         "value": 1.0,
         "contributes_to_integrity": true,
-        "check_count": 9,
-        "reason": "Submitted relationship parameters compared with cached source and target media observations.",
+        "check_count": 25,
+        "reason": "Submitted file technical claims and relationship parameters compared with measured media; one vote per declared file property, and any failed claim keeps that fact failed.",
         "manual_review_reasons": [],
         "weight": 1.0
       },
@@ -2181,12 +2781,12 @@
         "fact_counts_by_layer": [
           {
             "layer": "file_integrity",
-            "assessed": 20,
+            "assessed": 4,
             "contradicted": 0
           },
           {
             "layer": "declaration_consistency",
-            "assessed": 9,
+            "assessed": 25,
             "contradicted": 0
           },
           {
@@ -2236,6 +2836,37 @@
     "cross_evidence": [],
     "cross_evidence_scored_facts": [],
     "cross_evidence_audit": [],
+    "evidence_sources": [
+      {
+        "document_count": 0,
+        "fact_count": 0,
+        "known_common_sources": [],
+        "identified_signers": [],
+        "independent_source_count": null,
+        "independence": "unknown",
+        "subjects_with_multiple_documents": [],
+        "origin_fields": [],
+        "scoring_effect": "none_report_only"
+      }
+    ],
+    "support_breadth": [
+      {
+        "applicable": false,
+        "relevant_asset_types": [
+          "audio/raw-take",
+          "audio/raw-track"
+        ],
+        "relevant_asset_count": 0,
+        "supported": 0,
+        "contradicted": 0,
+        "no_qualifying_evidence": 0,
+        "checked_share": null,
+        "assets": [],
+        "min_supported_asset_share": null,
+        "requirement": "not_set",
+        "scoring_effect": "none_report_only"
+      }
+    ],
     "c2pa_attestation_records": [
       {
         "scope": "supporting",
@@ -2440,14 +3071,14 @@
             "status": "corroborated",
             "value": 1.0,
             "weight": 1.0,
-            "check_count": 20
+            "check_count": 4
           },
           {
             "layer": "declaration_consistency",
             "status": "corroborated",
             "value": 1.0,
             "weight": 1.0,
-            "check_count": 9
+            "check_count": 25
           },
           {
             "layer": "cross_evidence_support",
@@ -2481,12 +3112,12 @@
         "fact_counts_by_layer": [
           {
             "layer": "file_integrity",
-            "assessed": 20,
+            "assessed": 4,
             "contradicted": 0
           },
           {
             "layer": "declaration_consistency",
-            "assessed": 9,
+            "assessed": 25,
             "contradicted": 0
           },
           {
@@ -2515,12 +3146,12 @@
           "fact_counts_by_layer": [
             {
               "layer": "file_integrity",
-              "assessed": 20,
+              "assessed": 4,
               "contradicted": 0
             },
             {
               "layer": "declaration_consistency",
-              "assessed": 9,
+              "assessed": 25,
               "contradicted": 0
             },
             {

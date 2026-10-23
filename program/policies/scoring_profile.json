@@ -1,7 +1,7 @@
 {
-  "profile_id": "default-v4",
-  "profile_version": 4,
-  "description": "Version 4 aggregates cross-evidence by rule and subject (one failed observation keeps the fact failed). Numeric release requires the configured layer count and qualifying assessed cross-evidence; an ordinary contradiction never releases a value. A severe contradiction is computed by the evaluator and needs no independent support, so it releases min(weighted mean, cap) even when the value would otherwise be withheld (version 3 withheld it). Recorder metadata remains eligible for consistency scoring and release, with a non-scoring origin-not-authenticated finding. Integrity is check consistency, not authenticated provenance. Layer weights, confidence formula and severe-contradiction ceiling are unchanged.",
+  "profile_id": "default-v6",
+  "profile_version": 6,
+  "description": "Version 6 counts the same claim about one recording, repeated in several documents (sound report and AAF scene/take or track names), as one cross-evidence fact (one_vote_per_claim), because their independence is unknown. Version 5 moved submitted file technical claims (sample rate, channels, bit depth, duration) from file integrity to declaration consistency, so file integrity holds only checks with no submitter claim (hash binding, parser readability); declaration consistency scores one fact per declared file property, so the same claim made on a file and on its relationships counts once. As in version 4, it aggregates cross-evidence by rule and subject (one failed observation keeps the fact failed). Numeric release requires the configured layer count and qualifying assessed cross-evidence; an ordinary contradiction never releases a value. A severe contradiction is computed by the evaluator and needs no independent support, so it releases min(weighted mean, cap) even when the value would otherwise be withheld (version 3 withheld it). Recorder metadata remains eligible for consistency scoring and release, with a non-scoring origin-not-authenticated finding. Integrity is check consistency, not authenticated provenance. Layer weights, confidence formula and severe-contradiction ceiling are unchanged. Confidence reflects how many evidence layers were checked; check results are shown in the integrity value and layer results.",
   "integrity": {
     "layer_weights": {
       "file_integrity": 1.0,
@@ -9,8 +9,8 @@
       "cross_evidence_support": 1.0
     },
     "layer_weight_rationale": {
-      "file_integrity": "Hash binding and parser success are the hardest evidence to fabricate convincingly; baseline weight.",
-      "declaration_consistency": "Declared relationship parameters compared against hash-bound submitted files; this measures consistency, not independent origin authentication.",
+      "file_integrity": "The files have been checked against their declared hashes and can be read, but this does not guarantee who created them or when.",
+      "declaration_consistency": "Declared file technical claims and relationship parameters compared against hash-bound submitted files, one vote per declared file property; this measures consistency, not independent origin authentication.",
       "cross_evidence_support": "One vote per rule and subject; any assessed failure keeps the fact failed. Assessed signed-attestation and recorder-metadata checks qualify for numeric release. Embedded metadata origin is not authenticated by field agreement; its informational finding has no score effect."
     },
     "withholding_rule": {
@@ -34,6 +34,7 @@
       "c2pa_standalone_manifest_bound_to_graph_asset",
       "comp_sheet_selection_matches_comped_from_edge"
     ],
-    "severe_contradiction_cap": 0.25
+    "severe_contradiction_cap": 0.25,
+    "one_vote_per_claim": true
   }
 }
