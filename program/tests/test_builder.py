@@ -20,6 +20,41 @@ import builder_operations as operations
 import run  # noqa: F401
 
 
+class ManifestLimitTests(unittest.TestCase):
+    """The builder's preflight must accept exactly what the evaluator accepts."""
+
+    def test_builder_limits_match_the_evaluator(self):
+        import manifest_logic
+        import relationship_modes
+        from music_target import engine
+        for module in (manifest_logic, relationship_modes):
+            self.assertEqual((module.MAX_FILE_BYTES, module.MAX_TOTAL_BYTES),
+                             (engine.MAX_FILE_BYTES, engine.MAX_TOTAL_BYTES))
+
+    def entry(self, path, technical=None):
+        return {"id": "take", "type": "audio/master", "hash": "a" * 64, "path": str(path), "final": True,
+                "technical": technical if technical is not None else {"sample_rate_hz": 48000},
+                "creation_method": "recorded", "production": {}, "extra": {}}
+
+    def test_preflight_accepts_large_files_and_rejects_oversized_ones(self):
+        import manifest_logic
+        with tempfile.TemporaryDirectory() as folder:
+            # Sparse files: the size check reads st_size only, so no disk space is used.
+            large, oversized = Path(folder) / "large.wav", Path(folder) / "oversized.wav"
+            with open(large, "wb") as handle:
+                handle.truncate(133 * 2**20)  # the 132.5 MiB Project Rock effect was rejected before
+            with open(oversized, "wb") as handle:
+                handle.truncate(manifest_logic.MAX_FILE_BYTES + 1)
+            manifest_logic.build_chain([self.entry(large)], [])
+            with self.assertRaisesRegex(ValueError, "limit is 512 MiB per file"):
+                manifest_logic.build_chain([self.entry(oversized)], [])
+
+    def test_unreadable_audio_message_names_the_supported_encodings(self):
+        import manifest_logic
+        with self.assertRaisesRegex(ValueError, "IEEE float 32/64-bit, including WAVE_FORMAT_EXTENSIBLE"):
+            manifest_logic.build_chain([self.entry(Path("missing.wav"), technical={})], [])
+
+
 class ExportTests(unittest.TestCase):
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory()

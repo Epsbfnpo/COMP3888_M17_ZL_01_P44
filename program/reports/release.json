@@ -1,12 +1,12 @@
 {
   "target_version": "0.8.1",
   "date": "2026-10-22",
-  "source_revision": "sha256:17f814af455df89d912f1a8ce5d49680fa8dd2296675fda831c0281ecc6fd324",
+  "source_revision": "sha256:be7bfe70c048d0be210d44f91e568470677dae4991eb4cfc54446d37092f54bc",
   "python": "3.13.7",
   "platform": "Darwin",
-  "tests_discovered": 329,
-  "tests_run": 329,
-  "non_gui_tests_one_process": 325,
+  "tests_discovered": 332,
+  "tests_run": 332,
+  "non_gui_tests_one_process": 328,
   "gui_tests_separate_processes": 4,
   "failures": 0,
   "errors": 0,
@@ -40,7 +40,8 @@
     "Contradiction counts stored in integrity_decision with a per-layer breakdown and leading the Integrity reasoning",
     "Audio diagnostics analyse AAF-declared source ranges; AUDIO_AAF_RANGE_CORRESPONDENCE observations",
     "DECLARED_SOURCE_NEWER_THAN_TARGET chronology warning from BWF origination fields, not scored",
-    "test_builder.py imports run before mocking subprocess.Popen"
+    "test_builder.py imports run before mocking subprocess.Popen",
+    "Desktop builder preflight limits match the evaluator (512 MiB per object, 1 GiB per request); duplicate and editor-backup files removed"
   ],
   "revision_scope": "SHA-256 of runtime Python, requirements, policy JSON, JSON schemas, and bundled XSD files. Documentation, tests and reports excluded."
 }

@@ -1,6 +1,6 @@
-"""Relationship declaration guidance for the evaluator (v0.7.0 phase 0).
+"""Relationship declaration guidance for the evaluator.
 
-Pure logic (no Tkinter). Signal/physical similarity is policy-disabled in v0.7.0
+Pure logic (no Tkinter). Signal/physical similarity has been policy-disabled since v0.7.0
 (every relationship gets an 'unavailable / disabled_by_policy' placeholder), and
 exact reconstruction is no longer run. Declared ranges, sample rate and bit depth
 are still checked against the files; unknown field names are flagged. The
@@ -48,7 +48,7 @@ KNOWN_ATTRIBUTES = frozenset({
     "fade_in_seconds", "fade_out_seconds", "input_sample_rate_hz", "output_sample_rate_hz",
     "input_bit_depth", "output_bit_depth", "source_format", "target_format"})
 
-# Evaluator limits (v0.7.0 engine.py)
+# Evaluator limits (music_target/engine.py)
 MAX_FILE_BYTES = 512 * 1024 * 1024
 MAX_TOTAL_BYTES = 1024 * 1024 * 1024
 

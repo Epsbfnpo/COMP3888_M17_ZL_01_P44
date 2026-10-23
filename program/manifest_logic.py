@@ -21,8 +21,8 @@ HASH_METHOD = "sha256"
 PROFILE = "music-native-v0.1"
 
 MAX_NODES = 128
-MAX_FILE_BYTES = 32 * 1024 * 1024      # music_target/engine.py
-MAX_TOTAL_BYTES = 128 * 1024 * 1024    # music_target/engine.py
+MAX_FILE_BYTES = 512 * 1024 * 1024     # music_target/engine.py
+MAX_TOTAL_BYTES = 1024 * 1024 * 1024   # music_target/engine.py
 MAX_SUGGESTED_RANGE_SECONDS = 60       # UI convenience only; evaluator can stream full ranges.
 
 AUDIO_TYPES = (
@@ -282,8 +282,9 @@ def build_chain(files, rels) -> dict:
             raise ValueError(f"'{f['id']}' and '{seen[f['hash']]}' have identical content")
         seen[f["hash"]] = f["id"]
         if f["type"].startswith("audio/") and not f["technical"]:
-            raise ValueError(f"'{f['id']}' is typed as audio but is not readable as "
-                             "integer-PCM WAV (the evaluator would reject it)")
+            raise ValueError(f"'{f['id']}' is typed as audio but could not be read as a supported WAV "
+                             "(integer PCM 8/16/24/32-bit or IEEE float 32/64-bit, including "
+                             "WAVE_FORMAT_EXTENSIBLE); the evaluator would reject it")
         if f.get("path") and Path(f["path"]).is_file():
             size = Path(f["path"]).stat().st_size
             total += size

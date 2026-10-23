@@ -5,7 +5,7 @@ Updated: 2026-10-14
 This file is the current consolidated roadmap for `v3/program`. It replaces the
 shorter v0.4 task list and incorporates unresolved work from the legacy v3
 prototype. The implemented baseline already includes workflow completeness,
-MIDI/RIN/ERN/C2PA/CompSheet/CueSheet parsing and CrossEvidence. In v0.7.0 the
+MIDI/RIN/ERN/C2PA/CompSheet/CueSheet parsing and CrossEvidence. Since v0.7.0 (and still in v0.8.1) the
 legacy `PhysicalSimilarityPass` is policy-disabled and is not imported or
 invoked by assessment. Relationships receive non-scoring compatibility
 placeholders only. The current priority is the claim ledger, deterministic
@@ -141,7 +141,8 @@ fingerprinting or other non-scoring diagnostics.
 
 18. Synchronise examples, README, handoff documentation, schemas, release
     version, source revision, verification report, and test counts after each
-    release. Phase 0 records and examples were regenerated for v0.7.0.
+    release. Records and examples were last regenerated for v0.8.1 (22 October
+    2026); `reports/public-results/` still needs the public CSEC bundles to be regenerated.
 
 ## P2: Engineering quality and broader media support
 
