@@ -1,12 +1,12 @@
 {
   "target_version": "0.8.1",
-  "date": "2026-10-23",
-  "source_revision": "sha256:c96f628bd893f764cb6eb2bf74b61d83044afd13bbbdf97089afb7059a7aa78a",
+  "date": "2026-10-24",
+  "source_revision": "sha256:435359857cb3b52b8599caf35ea487946105b17a0cb6f5230e17b7be1d153848",
   "python": "3.13.7",
   "platform": "Darwin",
-  "tests_discovered": 372,
-  "tests_run": 372,
-  "non_gui_tests_one_process": 368,
+  "tests_discovered": 386,
+  "tests_run": 386,
+  "non_gui_tests_one_process": 382,
   "gui_tests_separate_processes": 4,
   "failures": 0,
   "errors": 0,
@@ -44,7 +44,10 @@
     "test_builder.py imports run before mocking subprocess.Popen",
     "Desktop builder preflight limits match the evaluator (512 MiB per object, 1 GiB per request); duplicate and editor-backup files removed",
     "95% Wilson intervals on every audio calibration and false-match case count, split into development, held-out and real material; benchmark scripts report them; not scored",
-    "FLAC and MP3 (MPEG Layer III) evaluated by content in native and public requests: FLAC metadata blocks, kept WAV chunks as recorder metadata and a decoded-audio MD5 check; MP3 frame walking with exact or estimated length and unavailable checks for what MP3 cannot carry; diagnostics decode both; soundfile is a core requirement"
+    "FLAC and MP3 (MPEG Layer III) evaluated by content in native and public requests: FLAC metadata blocks, kept WAV chunks as recorder metadata and a decoded-audio MD5 check; MP3 frame walking with exact or estimated length and unavailable checks for what MP3 cannot carry; diagnostics decode both; soundfile is a core requirement",
+    "False-match benchmark can re-encode pairs as FLAC or MP3 (--encode); FLAC identical to WAV, MP3 no false match but lower shared-loop recall",
+    "Checked real Lumina MP3 (C2PA in ID3 GEOB, known AI signer); diagnostics decode only MPEG frames and refuse truncated MP3 decoding (libsndfile length estimate without a Xing header)",
+    "Report-only per-file content bandwidth provider (audio_bandwidth): flags MP3 content below its bitrate, lossless files band-limited like a lossy encode, and upsampled files; never scored. MP3 without gapless information decodes with a two-frame length tolerance"
   ],
   "revision_scope": "SHA-256 of runtime Python, requirements, policy JSON, JSON schemas, and bundled XSD files. Documentation, tests and reports excluded."
 }

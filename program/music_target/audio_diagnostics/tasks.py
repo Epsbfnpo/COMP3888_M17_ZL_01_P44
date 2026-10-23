@@ -131,6 +131,23 @@ def build_tasks(native, response):
     return tasks
 
 
+def file_tasks(native, response):
+    """One whole-file task per bound, parseable audio artefact, for per-file providers."""
+    bound = {row["evidence_hash"] for row in response.get("assessment_checks", {}).get("bound_file_integrity", [])
+             if row.get("rule") == "object_hash_bound" and row.get("passed") is True}
+    failed = {row.get("evidence_hash") for row in response["findings"]
+              if row["code"] in {"WAV_PARSER_FAILED", "AUDIO_PARSER_FAILED", "OBJECT_CHANGED_DURING_EVALUATION"}}
+    tasks = []
+    for node in native["artefacts"]:
+        digest = node["artefact_hash"]
+        if is_audio(node) and digest in bound and digest not in failed:
+            tasks.append({"task_id": "file:" + digest + ":0", "relation_id": "file:" + digest,
+                          "source_hash": digest, "target_hash": digest, "relationship_type": "single_file",
+                          "attributes": {key: None for key in RANGE_FIELDS}, "selection_id": None,
+                          "range_source": "whole_file", "unavailable_reason": None})
+    return tasks
+
+
 DERIVED = "derived_from_declared_source_duration"
 
 

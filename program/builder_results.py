@@ -533,6 +533,13 @@ def audio_diagnostic_lines(response, file_names=None):
                     f"{len(metrics.get('source_sections_seconds') or [])} source / "
                     f"{len(metrics.get('target_sections_seconds') or [])} target acoustic sections "
                     "(structure observation; uncalibrated)")))
+    bandwidth = checks.get("audio_bandwidth") or []
+    if bandwidth:
+        lines.append("  Content bandwidth per file (heuristic; uncalibrated):")
+    for row in bandwidth:
+        name = names.get(row.get("source_hash")) or (row.get("source_hash") or "")[:12]
+        assessment = (row.get("metrics") or {}).get("assessment") or {}
+        lines.append(f"    - {name}: " + (_not_completed(row) or assessment.get("reason", "")))
     return lines
 
 

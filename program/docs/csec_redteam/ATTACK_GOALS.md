@@ -155,7 +155,8 @@ defect.
 | Only one known AI signer is listed (BytePlus Lumina, not yet confirmed by BytePlus). | AI audio from other generators that is not recognised as AI-labelled. |
 | Submitting a recording as MP3, or as FLAC encoded without `--keep-foreign-metadata`, removes the recorder metadata, so sound-report and AAF recorder checks cannot run. This is reported (`AUDIO_FORMAT_LIMITED_CHECKS`, `FLAC_RECORDER_METADATA_ABSENT`), not counted as a contradiction. | Whether converting a fabricated package to MP3 or plain FLAC avoids contradictions a WAV version would have shown. |
 | Creation-method declarations are taken as declared; `ai_disclosure` measures coverage only. | Not an attack on its own; combine with G1 or G2. |
-| Audio diagnostics can match shared material (a licensed loop or effect) between unrelated works. | Expected behaviour; record cases. |
+| Audio diagnostics can match shared material (a licensed loop or effect) between unrelated works. Five free-site MP3s that share short sounds at fixed times match at offset 0 in 6 of 10 pairs. | Expected behaviour; record cases. |
+| The `bandwidth` diagnostic (report-only, uncalibrated) reads only where the audio stops. Restoring high frequencies (synthesised "air", noise above the old low-pass), or low-passing a genuine file, changes its reading; AI output is band-limited too. It never scores. | Effort to make a fake FLAC or upsampled file read `no_band_limit_found`; genuine files flagged. |
 
 ## 4. Out of scope for this round
 
