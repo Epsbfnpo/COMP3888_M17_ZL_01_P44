@@ -94,7 +94,8 @@
         "covers",
         "pitch_shift",
         "time_stretch",
-        "alternate_takes"
+        "alternate_takes",
+        "mp3_encoded_queries"
       ],
       "false_match_rates": {
         "benchmark": "false_match_lumina_2026-10-21",
@@ -253,7 +254,8 @@
         "covers",
         "reorchestrations",
         "nonuniform_speed_changes",
-        "alternate_takes"
+        "alternate_takes",
+        "mp3_encoded_queries"
       ],
       "false_match_rates": {
         "benchmark": "false_match_lumina_2026-10-21",

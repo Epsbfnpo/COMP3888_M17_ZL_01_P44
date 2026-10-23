@@ -110,6 +110,9 @@ Success, any of:
   absolute paths, AAF or C2PA references);
 - XML entity expansion or external entity resolution in RIN, ERN, iXML or any
   other XML input;
+- parser abuse in FLAC or MP3: oversized or compressed ID3v2 frames, metadata
+  blocks that overrun the file, lost MPEG sync, or a FLAC/MP3 disguised by its
+  extension or an ID3 prefix;
 - any network access while evaluating.
 
 ### G5. An input error is hidden or silently corrected
@@ -150,6 +153,7 @@ defect.
 | Stripping a C2PA manifest gives `absent`, not a negative result. | Effort to strip or re-encode without leaving traces. |
 | C2PA certificate revocation is not checked (`revocation_status: not_checked`, offline by design), and there is no time-stamp authority check. | Whether a revoked or expired signer is accepted. |
 | Only one known AI signer is listed (BytePlus Lumina, not yet confirmed by BytePlus). | AI audio from other generators that is not recognised as AI-labelled. |
+| Submitting a recording as MP3, or as FLAC encoded without `--keep-foreign-metadata`, removes the recorder metadata, so sound-report and AAF recorder checks cannot run. This is reported (`AUDIO_FORMAT_LIMITED_CHECKS`, `FLAC_RECORDER_METADATA_ABSENT`), not counted as a contradiction. | Whether converting a fabricated package to MP3 or plain FLAC avoids contradictions a WAV version would have shown. |
 | Creation-method declarations are taken as declared; `ai_disclosure` measures coverage only. | Not an attack on its own; combine with G1 or G2. |
 | Audio diagnostics can match shared material (a licensed loop or effect) between unrelated works. | Expected behaviour; record cases. |
 
@@ -160,7 +164,8 @@ defect.
 - The desktop manifest builder (`builder_gui.py`); the target is `run.py`.
 - Statistical false-accept or false-reject rates: there is no decision policy
   to compute them against.
-- The public CSEC bundle profile beyond WAV: it accepts `audio/wav` only, so
+- The public CSEC bundle profile beyond single audio files: it accepts
+  `audio/wav`, `audio/flac` and `audio/mpeg` with `draft-of.audio` only, so
   most music evidence can be tested only through native requests
   ([NATIVE_INPUT_GUIDE.md](NATIVE_INPUT_GUIDE.md)).
 

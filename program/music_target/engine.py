@@ -11,6 +11,11 @@ from libevchain.types import AudioType, ALL_RELATIONSHIPS
 
 from music_target import domain
 from music_target.assessment_passes import assess_axes, parse_bound_artefacts
+from music_target.audio_formats import detect
+from music_target.audio_observations import (MP3_RECORDER, flac_embedded, flac_observed, flac_recorder,
+                                             mp3_embedded, mp3_limited_checks, mp3_observed)
+from music_target.flac_io import FlacError, UnsupportedFlac, inspect_flac, verify_md5
+from music_target.mp3_io import Mp3Error, UnsupportedMp3, inspect_mp3
 from music_target.wav_io import UnsupportedWav, WavError, inspect_wav
 from music_target.recorder_metadata import recorder_fields
 from music_target.wav_parser import parse_wav_file
@@ -94,13 +99,129 @@ def strict_pcm_check(path):
     return _observed_wav(_inspect_supported_wav(path))
 
 
+def _inspect_other(path, detected, deadline):
+    """FLAC or MP3 descriptor; format errors become request-level errors as for WAV."""
+    try:
+        if detected.container == "FLAC":
+            return inspect_flac(path, detected)
+        return inspect_mp3(path, detected, deadline)
+    except (UnsupportedFlac, UnsupportedMp3) as exc:
+        raise Unsupported(str(exc)) from exc
+    except (FlacError, Mp3Error) as exc:
+        raise InputError(str(exc)) from exc
+
+
+# Declared technical fields a format cannot carry, and why they are not compared.
+_UNMEASURABLE = {
+    "MP3": {"bit_depth": "MP3 is lossy and has no bit depth.",
+            "duration_seconds": "The exact MP3 duration is unknown: there is no Xing/Info header "
+                                "with encoder delay and padding."},
+    "FLAC": {"duration_seconds": "STREAMINFO does not record the total number of samples."},
+}
+
+
+def _technical_checks(artefact, observed, unmeasurable=None):
+    """Compare declared technical fields with measured ones (shared by every format)."""
+    claim = artefact._attributes.get("technical", {})
+    chain = getattr(artefact, "_evaluation_chain", None)
+    declaration_errors = (getattr(chain, "_declaration_error_nodes", {})
+                          if chain is not None else {})
+    skipped_claims = artefact.artefact_hash in declaration_errors
+    if skipped_claims:
+        # The declaration contains fields this evaluator does not know;
+        # it is not corrected, so its technical claims are not compared.
+        claim = {}
+    checks, mismatches = [], []
+    for key, value in claim.items():
+        if value is None:
+            continue
+        measured = observed[key]
+        if measured is None:
+            checks.append({"rule": f"technical.{key}_matches_observed",
+                           "passed": None,
+                           "status": "unavailable",
+                           "evidence_hash": artefact.artefact_hash,
+                           "declared": value,
+                           "observed": None,
+                           "reason": (unmeasurable or {}).get(key, "This property was not measurable."),
+                           "source_pass": "WavMetadataPass"})
+            continue
+        same = (math.isclose(value, measured, rel_tol=0, abs_tol=0.002)
+                if key == "duration_seconds" else value == measured)
+        checks.append({"rule": f"technical.{key}_matches_observed",
+                       "passed": same,
+                       "evidence_hash": artefact.artefact_hash,
+                       "declared": value,
+                       "observed": measured,
+                       "source_pass": "WavMetadataPass"})
+        if not same:
+            mismatches.append({"field": key, "declared": value, "observed": measured})
+    return checks, mismatches, skipped_claims
+
+
+def _md5_check(digest, md5):
+    passed = {"matched": True, "mismatched": False, "failed": False}.get(md5["status"])
+    check = {"rule": "flac_md5_matches_decoded_audio", "passed": passed, "evidence_hash": digest,
+             "source_pass": "WavMetadataPass",
+             **{key: md5.get(key) for key in ("stored_md5", "decoded_md5", "decoded_frames",
+                                              "declared_total_samples", "reason_code", "reason")
+                if md5.get(key) is not None}}
+    if passed is None:
+        check["status"] = "unavailable"
+    return check
+
+
+def _evaluate_other(artefact, path, detected):
+    """FLAC and MP3 observations, in the WAV result shape plus ``audio_format``."""
+    chain = getattr(artefact, "_evaluation_chain", None)
+    deadline = getattr(chain, "_deadline", None)
+    descriptor = _inspect_other(path, detected, deadline)
+    container = descriptor.format
+    artefact._wav_parser_failure = None
+    artefact._wav_parser_failure_reason_code = None
+    artefact._wav_descriptor = None
+    artefact._audio_descriptor = descriptor
+    if container == "FLAC":
+        observed, embedded = flac_observed(descriptor), flac_embedded(descriptor)
+        try:
+            recorder = flac_recorder(descriptor, embedded)
+        except Exception as exc:  # metadata never decides whether audio is usable
+            recorder = {"present": False, "warnings": ["Recorder metadata could not be read: " + str(exc)]}
+    else:
+        observed, embedded, recorder = mp3_observed(descriptor), mp3_embedded(descriptor), dict(MP3_RECORDER)
+    checks, mismatches, skipped_claims = _technical_checks(artefact, observed, _UNMEASURABLE[container])
+    result = {"status": "parsed", "audio_format": container, "observed": observed,
+              "embedded_metadata": embedded, "recorder_metadata": recorder,
+              "checks": checks, "claim_mismatches": mismatches}
+    notes = [f"{container} structure was checked; submission claims were compared with measured file properties.",
+             "Embedded dates, credits and software tags are unauthenticated metadata."]
+    if container == "FLAC":
+        md5 = verify_md5(path, descriptor, deadline)
+        result["checks"] = checks + [_md5_check(artefact.artefact_hash, md5)]
+        result["flac_md5"] = md5
+    else:
+        result["limited_checks"] = mp3_limited_checks(descriptor)
+        notes.append("MP3 is lossy; checks that need a bit depth, recorder metadata or an exact "
+                     "length are reported as unavailable.")
+    if skipped_claims:
+        result["technical_claims_skipped"] = "input_error"
+    return None, result, notes
+
+
 class WavMetadataPass(ArtefactPass):
+    """Per-file audio observations: WAV, FLAC and MP3, decided by file content."""
+
     @staticmethod
     def evaluate(artefact):
         if not artefact.has_file():
             return None, None, ["No verified file is bound to this artefact."]
         path = Path(artefact.get_file())
+        container = None
         try:
+            detected = detect(path)
+            container = detected.container
+            if container in ("FLAC", "MP3", "MPEG Layer I/II"):
+                return _evaluate_other(artefact, path, detected)
             descriptor = _inspect_supported_wav(path)
             observed = _observed_wav(descriptor)
             parsed = dataclasses.asdict(parse_wav_file(str(path), descriptor))
@@ -116,14 +237,16 @@ class WavMetadataPass(ArtefactPass):
                 cause, "reason_code", "unsupported_wav_format"
                 if failure_type == "unsupported" else "invalid_wav")
             artefact._wav_descriptor = None
-            return None, {
+            other = container in ("FLAC", "MP3", "MPEG Layer I/II")
+            label = ("MP3" if container == "MPEG Layer I/II" else container) if other else "WAV"
+            failure = {
                 "status": "parser_failed",
                 "failure_type": failure_type,
                 "error": str(exc),
                 "observed": {},
                 "embedded_metadata": None,
                 "checks": [{
-                    "rule": "wav_parser_available",
+                    "rule": "audio_parser_available" if other else "wav_parser_available",
                     "passed": None,
                     "status": "unavailable",
                     "evidence_hash": artefact.artefact_hash,
@@ -131,36 +254,16 @@ class WavMetadataPass(ArtefactPass):
                     "reason": str(exc),
                 }],
                 "claim_mismatches": [],
-            }, [
-                "This non-final WAV could not be decoded by the supported WAV parser; only checks that require this node are unavailable.",
+            }
+            if other:
+                failure["audio_format"] = label
+            return None, failure, [
+                f"This non-final {label} could not be decoded by the supported {label} parser; only checks that require this node are unavailable.",
             ]
         artefact._wav_parser_failure = None
         artefact._wav_parser_failure_reason_code = None
         artefact._wav_descriptor = descriptor
-        claim = artefact._attributes.get("technical", {})
-        chain = getattr(artefact, "_evaluation_chain", None)
-        declaration_errors = (getattr(chain, "_declaration_error_nodes", {})
-                              if chain is not None else {})
-        skipped_claims = artefact.artefact_hash in declaration_errors
-        if skipped_claims:
-            # The declaration contains fields this evaluator does not know;
-            # it is not corrected, so its technical claims are not compared.
-            claim = {}
-        checks, mismatches = [], []
-        for key, value in claim.items():
-            if value is None:
-                continue
-            measured = observed[key]
-            same = (math.isclose(value, measured, rel_tol=0, abs_tol=0.002)
-                    if key == "duration_seconds" else value == measured)
-            checks.append({"rule": f"technical.{key}_matches_observed",
-                           "passed": same,
-                           "evidence_hash": artefact.artefact_hash,
-                           "declared": value,
-                           "observed": measured,
-                           "source_pass": "WavMetadataPass"})
-            if not same:
-                mismatches.append({"field": key, "declared": value, "observed": measured})
+        checks, mismatches, skipped_claims = _technical_checks(artefact, observed)
         try:
             recorder = recorder_fields(path, descriptor, parsed)
         except Exception as exc:  # metadata never decides whether audio is usable
@@ -260,6 +363,30 @@ class RelationshipIntegrityPass(EvidencePass):
             "Duration difference is diagnostic only.",
             "Scoped edit, comp, stem and mix claims receive separate content checks; mastering receives continuity corroboration only.",
         ]
+
+
+_RECORDING_TYPES = {"audio/raw-take", "audio/raw-track"}
+
+
+def _format_findings(digest, observation, artefact_type):
+    """Report-only notes on what a FLAC or MP3 file allows the evaluator to check."""
+    container = observation.get("audio_format")
+    if container == "MP3":
+        return [{**finding("AUDIO_FORMAT_LIMITED_CHECKS",
+                           "MP3 is lossy, so some checks cannot be made on this file; they are listed "
+                           "in limited_checks and reported as unavailable, not as contradictions.", digest),
+                 "audio_format": "MP3", "limited_checks": observation.get("limited_checks", []),
+                 "scoring_eligible": False, "integrity_contribution": None}]
+    recorder = observation.get("recorder_metadata") or {}
+    if (container == "FLAC" and artefact_type in _RECORDING_TYPES
+            and recorder.get("foreign_metadata_kept") is False):
+        return [{**finding("FLAC_RECORDER_METADATA_ABSENT",
+                           "This FLAC recording carries no WAV chunks (bext/iXML). A recorder writes them "
+                           "into the WAV; plain FLAC encoding drops them unless the encoder keeps foreign "
+                           "metadata (flac --keep-foreign-metadata). Recorder comparisons are not possible; "
+                           "this is not a contradiction.", digest),
+                 "audio_format": "FLAC", "scoring_eligible": False, "integrity_contribution": None}]
+    return []
 
 
 def collect_results(final_artefact):
@@ -427,22 +554,30 @@ def evaluate_chain(native, objects, root, workflow=None, allow_disconnected=Fals
                         {ALL_RELATIONSHIPS: [RelationshipIntegrityPass]}, collect_results)
     observations, relationships = pipeline.eval_chain(chain)
     claim_mismatch = False
+    node_types = {node["artefact_hash"]: node["artefact_type"] for node in native["artefacts"]}
     for digest, observation in observations.items():
         if observation is not None:
             claim_mismatch |= bool(observation.get("claim_mismatches", []))
+            other = observation.get("audio_format")
             if observation.get("status") == "parser_failed":
                 findings.append({
-                    **finding("WAV_PARSER_FAILED",
-                              "A non-final WAV could not be parsed; dependent checks are unavailable.",
-                              digest, "medium"),
+                    **(finding("AUDIO_PARSER_FAILED",
+                               f"A non-final {other} file could not be parsed; dependent checks are unavailable.",
+                               digest, "medium") if other else
+                       finding("WAV_PARSER_FAILED",
+                               "A non-final WAV could not be parsed; dependent checks are unavailable.",
+                               digest, "medium")),
                     **observation,
                 })
             else:
                 findings.append({
-                    **finding("WAV_OBSERVATION",
-                              "Measured WAV properties and extracted metadata.", digest),
+                    **(finding("AUDIO_OBSERVATION",
+                               f"Measured {other} properties and extracted metadata.", digest) if other else
+                       finding("WAV_OBSERVATION",
+                               "Measured WAV properties and extracted metadata.", digest)),
                     **observation,
                 })
+                findings.extend(_format_findings(digest, observation, node_types.get(digest)))
     for result in relationships:
         findings.append({**finding("RELATIONSHIP_INTEGRITY_OBSERVATION", "Declared relationship parameters were checked by the cached EvidencePass; separate content analysis may corroborate or contradict the submitted transformation."),
                          **result})

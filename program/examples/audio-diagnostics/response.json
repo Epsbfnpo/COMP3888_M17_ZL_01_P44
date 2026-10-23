@@ -6,7 +6,7 @@
   "system": {
     "name": "COMP3888-music-baseline",
     "version": "0.8.1",
-    "source_revision": "sha256:9e9e186f663ca67c232a8f70b8595507d92a3290e8e83f48cedf2d763c0b1149"
+    "source_revision": "sha256:c96f628bd893f764cb6eb2bf74b61d83044afd13bbbdf97089afb7059a7aa78a"
   },
   "execution_status": "succeeded",
   "axes": {
@@ -417,9 +417,9 @@
       "content_match_is_provenance": false
     }
   ],
-  "processing_ms": 2311.3595420727506,
+  "processing_ms": 2336.1911249812692,
   "resource_usage": {
-    "cpu_ms": 3.9750000000000063,
+    "cpu_ms": 3.457000000000016,
     "peak_rss_kib": null
   },
   "error": null,
@@ -1253,7 +1253,7 @@
           "minimum_candidate_matches": 5,
           "support_window_seconds": 0.25
         },
-        "processing_ms": 497.46108311228454,
+        "processing_ms": 477.5525830918923,
         "policy_id": "audio-observations-bounded-v2",
         "policy_version": 2,
         "policy_sha256": "f6069e2b45fad46ade14ba0fa569053e9b76bea87aa78c1f7d41d84e45e550f8",
@@ -1340,7 +1340,8 @@
             "covers",
             "pitch_shift",
             "time_stretch",
-            "alternate_takes"
+            "alternate_takes",
+            "mp3_encoded_queries"
           ],
           "false_match_rates": {
             "benchmark": "false_match_lumina_2026-10-21",
@@ -1560,7 +1561,7 @@
           "minimum_candidate_matches": 5,
           "support_window_seconds": 0.25
         },
-        "processing_ms": 19.812375074252486,
+        "processing_ms": 21.649584057740867,
         "policy_id": "audio-observations-bounded-v2",
         "policy_version": 2,
         "policy_sha256": "f6069e2b45fad46ade14ba0fa569053e9b76bea87aa78c1f7d41d84e45e550f8",
@@ -1703,7 +1704,7 @@
           "aggregation_seconds": 1.0,
           "candidate_cosine_similarity": 0.9
         },
-        "processing_ms": 814.5290000829846,
+        "processing_ms": 868.1349580874667,
         "policy_id": "audio-observations-bounded-v2",
         "policy_version": 2,
         "policy_sha256": "f6069e2b45fad46ade14ba0fa569053e9b76bea87aa78c1f7d41d84e45e550f8",
@@ -1786,7 +1787,7 @@
         "integrity_contribution": null,
         "content_match_is_provenance": false,
         "parameters": {},
-        "processing_ms": 0.03366696182638407,
+        "processing_ms": 0.028832932002842426,
         "policy_id": "audio-observations-bounded-v2",
         "policy_version": 2,
         "policy_sha256": "f6069e2b45fad46ade14ba0fa569053e9b76bea87aa78c1f7d41d84e45e550f8",
@@ -1924,7 +1925,7 @@
           "section_minimum_seconds": 6.0,
           "section_prominence": 0.03
         },
-        "processing_ms": 531.4845410175622,
+        "processing_ms": 532.1470000781119,
         "policy_id": "audio-observations-bounded-v2",
         "policy_version": 2,
         "policy_sha256": "f6069e2b45fad46ade14ba0fa569053e9b76bea87aa78c1f7d41d84e45e550f8",
@@ -2034,7 +2035,8 @@
             "covers",
             "reorchestrations",
             "nonuniform_speed_changes",
-            "alternate_takes"
+            "alternate_takes",
+            "mp3_encoded_queries"
           ],
           "false_match_rates": {
             "benchmark": "false_match_lumina_2026-10-21",
@@ -2109,8 +2111,8 @@
         "policy_id": "audio-observations-bounded-v2",
         "policy_version": 2,
         "policy_sha256": "f6069e2b45fad46ade14ba0fa569053e9b76bea87aa78c1f7d41d84e45e550f8",
-        "processing_ms": 2070.6286660861224,
-        "calibration_status_sha256": "10ba54272a9b3b31ed7cf94fa06077587409836cdee114e4eb98e1812be79cb3",
+        "processing_ms": 2107.5290829176083,
+        "calibration_status_sha256": "1d9f021c41ac75da6a8f88391df5936f6a6a0c27e5c412c27870f95b51f78180",
         "aaf_range_tasks": 0,
         "aaf_range_tasks_with_correspondence": 0
       }

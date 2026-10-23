@@ -44,7 +44,8 @@ def _snapshot(root, relative, digest, directory, deadline):
     path = (root / relative).resolve(strict=True)
     if not path.is_relative_to(root) or not path.is_file():
         raise ValueError("Audio file no longer resolves to a regular file inside the bundle root.")
-    target = directory / (digest + ".wav")
+    # Keep the submitted extension; readers decide the format from content.
+    target = directory / (digest + (Path(relative).suffix.lower() or ".audio"))
     hasher = hashlib.sha256()
     with path.open("rb") as source, target.open("wb") as destination:
         while True:

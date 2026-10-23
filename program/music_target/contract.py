@@ -95,6 +95,10 @@ def source_revision():
     return "sha256:" + digest.hexdigest()
 
 
+# Public media types evaluated as audio. The file content decides the
+# container; the declared type only selects the evaluator's audio role.
+PUBLIC_AUDIO_TYPES = frozenset({"audio/wav", "audio/flac", "audio/mpeg"})
+
 # Used only when a request carries no timeout of its own (for example
 # --bundle mode). Callers that send options.timeout_seconds are not capped.
 DEFAULT_TIMEOUT_SECONDS = 60
@@ -102,7 +106,8 @@ DEFAULT_TIMEOUT_SECONDS = 60
 
 def public_bundle_request(bundle):
     validate(bundle, "public-bundle.schema.json")
-    suffixes = {"audio/wav": "wav", "image/png": "png", "video/mp4": "mp4"}
+    suffixes = {"audio/wav": "wav", "audio/flac": "flac", "audio/mpeg": "mp3",
+                "image/png": "png", "video/mp4": "mp4"}
     objects = {}
     for artefact in bundle["artefacts"]:
         suffix = suffixes.get(artefact["type"])
@@ -536,7 +541,7 @@ def to_native(request, mode, include_report=False, allow_local_files=False):
         for item in bundle["artefacts"]:
             chain["artefacts"].append({
                 "artefact_hash": item["hash"],
-                "artefact_type": "audio" if item["type"] == "audio/wav" else item["type"],
+                "artefact_type": "audio" if item["type"] in PUBLIC_AUDIO_TYPES else item["type"],
                 "attributes": {},
                 "evidence": [{"hash": edge["hash"],
                               "relationship_type": ("draft-of.audio"

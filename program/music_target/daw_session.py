@@ -108,7 +108,8 @@ def daw_session_checks(data, owner_digest, native, wav_observations, parser_obse
 
     def shape(digest):
         observed = (wav_observations.get(digest) or {}).get("observed") or {}
-        if not observed.get("file_size_bytes") or not observed.get("sample_rate_hz"):
+        if (not observed.get("file_size_bytes") or not observed.get("sample_rate_hz")
+                or observed.get("duration_seconds") is None):
             return None
         return (observed["file_size_bytes"], round(observed["duration_seconds"] * observed["sample_rate_hz"]),
                 observed["sample_rate_hz"])

@@ -6,7 +6,7 @@
   "system": {
     "name": "COMP3888-music-baseline",
     "version": "0.8.1",
-    "source_revision": "sha256:9e9e186f663ca67c232a8f70b8595507d92a3290e8e83f48cedf2d763c0b1149"
+    "source_revision": "sha256:c96f628bd893f764cb6eb2bf74b61d83044afd13bbbdf97089afb7059a7aa78a"
   },
   "execution_status": "succeeded",
   "axes": {
@@ -1233,9 +1233,9 @@
       "message": "multitrack.sources: Found 0 usable bound matching artefact(s); minimum is 2."
     }
   ],
-  "processing_ms": 311.94287491962314,
+  "processing_ms": 276.3567919610068,
   "resource_usage": {
-    "cpu_ms": 55.25899999999997,
+    "cpu_ms": 52.05500000000002,
     "peak_rss_kib": null
   },
   "error": null,

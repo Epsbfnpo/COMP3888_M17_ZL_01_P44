@@ -6,8 +6,8 @@ the response fields under "Reading the response" may gain fields.
 
 ## Why native input
 
-The public CSEC bundle profile accepts `audio/wav` only and the single
-relationship `draft-of.audio`. Recorder metadata, sound reports, AAF edits,
+The public CSEC bundle profile accepts single audio files (`audio/wav`,
+`audio/flac`, `audio/mpeg`) and the single relationship `draft-of.audio`. Recorder metadata, sound reports, AAF edits,
 DDEX, MIDI, comp and cue sheets and C2PA ingredients can only be submitted as
 a **native request**. For this round, please attack the evaluator through
 native requests; changing the shared CSEC contract needs a separate agreement.
@@ -79,7 +79,7 @@ in its own `evidence`. Every node must connect to the final artefact.
 
 | Type | File | What the evaluator does |
 |---|---|---|
-| `audio/raw-take`, `audio/raw-track`, `audio/edited-take`, `audio/stem`, `audio/mix`, `audio/master`, `audio/sample`, `audio/reference`, `audio/ai-source`, `audio/unclassified` | WAV (integer PCM 8/16/24/32-bit, IEEE float 32/64-bit, `WAVE_FORMAT_EXTENSIBLE`) | Format and declared technical properties, BWF `bext` and iXML recorder metadata, embedded C2PA manifest |
+| `audio/raw-take`, `audio/raw-track`, `audio/edited-take`, `audio/stem`, `audio/mix`, `audio/master`, `audio/sample`, `audio/reference`, `audio/ai-source`, `audio/unclassified` | WAV (integer PCM 8/16/24/32-bit, IEEE float 32/64-bit, `WAVE_FORMAT_EXTENSIBLE`), FLAC, or MP3 (MPEG Layer III); the content decides | Format and declared technical properties, BWF `bext` and iXML recorder metadata (WAV, and FLAC that kept them), FLAC decoded-audio MD5, embedded C2PA manifest. MP3 has no bit depth or recorder metadata, and its exact length is known only from a Xing/Info header with encoder delay and padding; those checks are reported as unavailable |
 | `text/sound-report` | CSV: metadata lines (`Date:`, `Frame Rate:`), then a take table starting with `File Name` | Take names, scene/take, start timecode and length against recorder metadata |
 | `project/aaf` | AAF | Recorder-take references and used source ranges against recorder metadata; takes used but not submitted; non-recorder media |
 | `provenance/c2pa` | Standalone C2PA manifest | Validation, trust and ingredients against the graph |

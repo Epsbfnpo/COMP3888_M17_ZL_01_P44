@@ -97,6 +97,7 @@ ATTENTION_FINDINGS = {
     "MISSING_OBJECT": ("Missing file", "Locate the original file; confirm its SHA-256 matches the manifest."),
     "PARSER_FAILED": ("Invalid evidence", "Replace or repair the file so its declared format can be parsed."),
     "WAV_PARSER_FAILED": ("Audio not assessed", "Replace or repair this audio with a supported WAV file (integer PCM or IEEE float)."),
+    "AUDIO_PARSER_FAILED": ("Audio not assessed", "Replace or repair this audio with a supported WAV, FLAC or MP3 (MPEG Layer III) file."),
     "CROSS_EVIDENCE_CHECK_UNAVAILABLE": ("Cross-evidence check not assessed", "Provide the supported source fields or bindings needed to compare this evidence."),
     "UNKNOWN_ARTEFACT_TYPE_SKIPPED": ("Evidence not assessed", "Choose a supported artefact type; the evaluator did not infer a type for this file."),
     "UNKNOWN_RELATIONSHIP_TYPE_SKIPPED": ("Relationship not assessed", "Choose a supported relationship type; the evaluator did not infer the submitted relationship."),

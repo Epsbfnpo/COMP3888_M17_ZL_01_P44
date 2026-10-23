@@ -6,7 +6,8 @@ policies/workflow_evidence_policy.json (next to this file, or in the current
 directory) and asks for it if it cannot be found.
 
 Nothing is inferred: types, roles, the final artefact and every relationship
-are exactly what you declare. Hashes and WAV technical data come from the files.
+are exactly what you declare. Hashes and audio technical data (WAV, FLAC, MP3)
+come from the files.
 """
 
 from __future__ import annotations
@@ -24,6 +25,18 @@ import manifest_logic as L
 import relationship_modes as RM
 import wav_probe
 import builder_operations as operations
+
+
+def technical_summary(tech):
+    """One line of measured audio properties; fields a format lacks are left out."""
+    if not tech:
+        return "no supported audio data"
+    parts = [f"{tech['duration_seconds']} s" if tech.get("duration_seconds") is not None
+             else "length not stated in the file",
+             f"{tech['sample_rate_hz']} Hz", f"{tech['channels']} ch"]
+    if tech.get("bit_depth") is not None:
+        parts.append(f"{tech['bit_depth']}-bit")
+    return ", ".join(parts)
 from builder_results import (
     INSUFFICIENT_SUPPORT_LABEL, attention_items, attention_workflow_results, audio_diagnostic_lines,
     axis_value_label, music_semantics_lines)
@@ -87,10 +100,7 @@ class FileDialog(Dialog):
         ttk.Label(self.body, text=name, font=("TkDefaultFont", 10, "bold")).grid(
             row=self._row, column=0, columnspan=2, sticky="w")
         self._row += 1
-        tech = entry["technical"]
-        info = (f"sha256 {entry['hash'][:16]}…   "
-                + (f"{tech['duration_seconds']} s, {tech['sample_rate_hz']} Hz, "
-                   f"{tech['channels']} ch, {tech['bit_depth']}-bit" if tech else "no WAV data"))
+        info = f"sha256 {entry['hash'][:16]}…   " + technical_summary(entry["technical"])
         ttk.Label(self.body, text=info).grid(row=self._row, column=0, columnspan=2,
                                              sticky="w", pady=(0, 6))
         self._row += 1
@@ -258,7 +268,8 @@ class RelDialog(Dialog):
         s = self.files.get(self.vars["source"].get())
         span = RM.suggest_range(t, s)
         if span is None:
-            messagebox.showinfo("Ranges", "Choose target and source WAV files first.", parent=self)
+            messagebox.showinfo("Ranges", "Choose target and source audio files with known "
+                                "durations first.", parent=self)
             return
         for name in ("ss", "ts"):
             self.vars[name].set(str(span[0]))
@@ -768,7 +779,7 @@ class App(tk.Tk):
                     f"{Path(selected).name} does not match the declared SHA-256 for "
                     f"{entry['id']}. The manifest identity was not changed.")
             entry["path"] = str(Path(selected).resolve())
-            entry["technical"] = wav_probe.wav_technical(selected)
+            entry["technical"] = wav_probe.audio_technical(selected)
             self.refresh()
         except (OSError, ValueError) as exc:
             messagebox.showerror("Cannot locate original", str(exc), parent=self)
@@ -797,10 +808,9 @@ class App(tk.Tk):
                 self._only_final(len(self.files) - 1)
             if dialog.result["type"].startswith("audio/") and not entry["technical"]:
                 messagebox.showwarning(
-                    "Unsupported WAV",
-                    f"{path.name} is typed as audio but could not be read as a supported WAV "
-                    "(integer PCM 8/16/24/32-bit or IEEE float 32/64-bit, including "
-                    "WAVE_FORMAT_EXTENSIBLE); the evaluator will reject it.")
+                    "Unsupported audio",
+                    f"{path.name} is typed as audio but could not be read as supported audio: "
+                    f"{L.SUPPORTED_AUDIO_TEXT}. The evaluator will reject it.")
         self.refresh()
 
     def edit_file(self):
@@ -1028,7 +1038,7 @@ class App(tk.Tk):
                     "creation_method": attrs.pop("creation_method", ""),
                     "role": production.pop("role", ""), "production": production,
                     "technical": attrs.pop("technical", {}) or
-                                 (wav_probe.wav_technical(path) if path and path.is_file() else {}),
+                                 (wav_probe.audio_technical(path) if path and path.is_file() else {}),
                     "extra": attrs,
                     "final": digest == chain["final_artefact_hash"]})
             rels = [{"target": alias[a["artefact_hash"]], "source": alias[e["hash"]],

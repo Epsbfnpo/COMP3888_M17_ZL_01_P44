@@ -1,12 +1,12 @@
 {
   "target_version": "0.8.1",
   "date": "2026-10-23",
-  "source_revision": "sha256:9e9e186f663ca67c232a8f70b8595507d92a3290e8e83f48cedf2d763c0b1149",
+  "source_revision": "sha256:c96f628bd893f764cb6eb2bf74b61d83044afd13bbbdf97089afb7059a7aa78a",
   "python": "3.13.7",
   "platform": "Darwin",
-  "tests_discovered": 342,
-  "tests_run": 342,
-  "non_gui_tests_one_process": 338,
+  "tests_discovered": 372,
+  "tests_run": 372,
+  "non_gui_tests_one_process": 368,
   "gui_tests_separate_processes": 4,
   "failures": 0,
   "errors": 0,
@@ -31,7 +31,8 @@
     "charset-normalizer": "3.5.2",
     "idna": "3.20",
     "urllib3": "2.8.0",
-    "toml": "0.10.2"
+    "toml": "0.10.2",
+    "soundfile": "0.14.0"
   },
   "changes_since_0_8_0": [
     "Recorder metadata only for files that name their recording; DAW and library BWF reported as daw_or_library",
@@ -42,7 +43,8 @@
     "DECLARED_SOURCE_NEWER_THAN_TARGET chronology warning from BWF origination fields, not scored",
     "test_builder.py imports run before mocking subprocess.Popen",
     "Desktop builder preflight limits match the evaluator (512 MiB per object, 1 GiB per request); duplicate and editor-backup files removed",
-    "95% Wilson intervals on every audio calibration and false-match case count, split into development, held-out and real material; benchmark scripts report them; not scored"
+    "95% Wilson intervals on every audio calibration and false-match case count, split into development, held-out and real material; benchmark scripts report them; not scored",
+    "FLAC and MP3 (MPEG Layer III) evaluated by content in native and public requests: FLAC metadata blocks, kept WAV chunks as recorder metadata and a decoded-audio MD5 check; MP3 frame walking with exact or estimated length and unavailable checks for what MP3 cannot carry; diagnostics decode both; soundfile is a core requirement"
   ],
   "revision_scope": "SHA-256 of runtime Python, requirements, policy JSON, JSON schemas, and bundled XSD files. Documentation, tests and reports excluded."
 }

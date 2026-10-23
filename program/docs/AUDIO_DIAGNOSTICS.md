@@ -44,7 +44,7 @@ providers append an informational diagnostic-unavailable finding while the
 successful core response is retained.
 
 The enabled pipeline runs the existing scoring worker first, then prepares
-verified temporary WAV snapshots and starts **one isolated worker per task**.
+verified temporary audio snapshots and starts **one isolated worker per task**.
 That worker runs every policy provider in turn and writes one JSON line per
 provider as soon as it finishes. Each file range is decoded once and each
 analysis rate resampled once, and the shared arrays are read-only. If the
@@ -117,8 +117,14 @@ partial ranges are not completed: `incomplete_declared_ranges` names the
 missing fields. Time measurements are converted back to the original file's
 timeline.
 
-Only currently supported WAV encodings are accepted. The optional libraries do
-not silently extend the evaluator's accepted file formats. Silence and mono
+The formats the core accepts are analysed: supported WAV encodings are read
+directly, and FLAC and MP3 are decoded with soundfile (libsndfile). FLAC decodes
+to the same samples as the WAV it came from. For MP3 the decoder's gapless
+length is used when the file carries encoder delay and padding, otherwise its
+padded frame length; decoded MP3 samples approximate the original, and
+`mp3_encoded_queries` is listed as not tested in the calibration status. The
+optional libraries do not silently extend the evaluator's accepted file
+formats. Silence and mono
 channel cancellation are reported as unavailable, never as contradictions.
 
 Too little usable signal is a normal analytical outcome, not a failure to run.

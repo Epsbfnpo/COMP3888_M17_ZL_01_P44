@@ -6,7 +6,7 @@
   "system": {
     "name": "COMP3888-music-baseline",
     "version": "0.8.1",
-    "source_revision": "sha256:9e9e186f663ca67c232a8f70b8595507d92a3290e8e83f48cedf2d763c0b1149"
+    "source_revision": "sha256:c96f628bd893f764cb6eb2bf74b61d83044afd13bbbdf97089afb7059a7aa78a"
   },
   "execution_status": "succeeded",
   "axes": {
@@ -180,9 +180,9 @@
       "message": "No workflow was supplied; completeness is legacy declared-object availability only."
     }
   ],
-  "processing_ms": 238.11033298261464,
+  "processing_ms": 221.8451249646023,
   "resource_usage": {
-    "cpu_ms": 2.876000000000017,
+    "cpu_ms": 2.613000000000004,
     "peak_rss_kib": null
   },
   "error": null,

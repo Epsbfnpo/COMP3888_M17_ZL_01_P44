@@ -7,6 +7,9 @@ pypdf==6.19.0
 xmlschema==4.3.2
 numpy==2.2.6
 pyaaf2==1.7.1
+# FLAC and MP3 decoding (bundled libsndfile with libFLAC and mpg123): the FLAC
+# MD5 check and audio diagnostics. Metadata parsing needs only the standard library.
+soundfile==0.14.0
 # C2PA verification is required: without it, signed AI-generation labels in
 # submitted audio cannot be checked against the submitter's declarations.
 c2pa-python==0.37.10

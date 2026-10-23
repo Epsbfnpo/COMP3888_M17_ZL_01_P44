@@ -53,18 +53,28 @@ python3 -B run.py --request /path/to/request.json --root /path/to/case-root
 
 - CSEC request profile: `csec-public-bundle-v0.2-candidate`, schema version `0.2-candidate`.
 - The original supplied candidate request and response schemas are retained under `schemas/`.
-- Public media type: `audio/wav` only. Maps to Ben's base `audio`, without invented production roles.
-- Container/codec: RIFF/WAVE with uncompressed integer PCM (8/16/24/32 bit) or IEEE float (32/64 bit), including matching `WAVE_FORMAT_EXTENSIBLE` SubFormats, 1–32 channels, sample rate 1–384000 Hz. RF64/BW64 and compressed WAV codecs remain unsupported.
-- Public CSEC remains WAV-only. Native input additionally supports MIDI, RIN 2.1, ERN 4.3, standalone C2PA manifests,
+- Public media types: `audio/wav`, `audio/flac` and `audio/mpeg`. Each maps to Ben's base `audio`, without invented
+  production roles. The file content decides the container, not the declared type or the extension. The request
+  schema's object-path pattern now also accepts `.flac` and `.mp3`; this local extension of the supplied candidate
+  schema needs CSEC's agreement before it is relied on.
+- WAV: RIFF/WAVE with uncompressed integer PCM (8/16/24/32 bit) or IEEE float (32/64 bit), including matching
+  `WAVE_FORMAT_EXTENSIBLE` SubFormats, 1–32 channels, sample rate 1–384000 Hz. RF64/BW64 and compressed WAV codecs
+  remain unsupported.
+- FLAC: 1–8 channels, sample rate 1–384000 Hz; metadata blocks parsed with bounds; WAV chunks kept by
+  `flac --keep-foreign-metadata` are read as recorder metadata; the decoded-audio MD5 is checked against STREAMINFO.
+- MP3 (MPEG-1/2/2.5 Layer III): exact length only from a Xing/Info header with encoder delay and padding; no bit
+  depth or recorder metadata, so those checks are reported as unavailable (`AUDIO_FORMAT_LIMITED_CHECKS`). MPEG
+  Layer I/II and free-format bitrates are unsupported.
+- Native input additionally supports MIDI, RIN 2.1, ERN 4.3, standalone C2PA manifests,
   CompSheet and CueSheet, field-recorder sound reports (`text/sound-report`), AAF edits (`project/aaf`) and Ableton Live
   sets (`project/daw-session`). Other DAW session formats are accepted but not parsed. BWF `bext` and iXML recorder
-  metadata are read from WAV files. See [`csec_redteam/NATIVE_INPUT_GUIDE.md`](csec_redteam/NATIVE_INPUT_GUIDE.md).
+  metadata are read from WAV and FLAC files. See [`csec_redteam/NATIVE_INPUT_GUIDE.md`](csec_redteam/NATIVE_INPUT_GUIDE.md).
 - PNG/MP4 return `unsupported` for this audio target.
 - At most 128 nodes, 512 MiB per object, 1 GiB across objects, 2 MiB input JSON.
-- WAV headers and metadata chunks are inspected incrementally without whole-file `read_bytes()` or the version-dependent standard-library `wave` decoder. The active assessment path does not decode sample content for signal comparison. Deprecated sample readers and low-rate proxy helpers remain isolated for later cleanup.
+- WAV headers and metadata chunks, FLAC metadata blocks and MP3 frame headers are inspected incrementally without whole-file `read_bytes()` or the version-dependent standard-library `wave` decoder. The active assessment path does not decode sample content for signal comparison. Deprecated sample readers and low-rate proxy helpers remain isolated for later cleanup.
 - Safe RIFF anomalies are retained as warnings. The direct sample reader still rejects IEEE-float NaN/Infinity, but the active assessment does not scan sample content merely to run a disabled signal diagnostic.
 - The deprecated proxy implementation is not reached by assessment.
-- The final object is checked before any other object and must exist, stay inside the root, fit the size limits, match its lower-case SHA-256 and objects mapping, and be a supported WAV. Any problem with it stops the request (`error`; `unsupported` for the size limit or an unsupported container) and only the final object's problem is reported.
+- The final object is checked before any other object and must exist, stay inside the root, fit the size limits, match its lower-case SHA-256 and objects mapping, and be a supported WAV, FLAC or MP3. Any problem with it stops the request (`error`; `unsupported` for the size limit or an unsupported container) and only the final object's problem is reported.
 - Input errors are never corrected. A non-final problem isolates only what depends on it: `OBJECT_HASH_MISMATCH`, `OBJECT_SKIPPED_SIZE_LIMIT`, `OBJECT_PATH_INVALID`, `INVALID_HASH_FORMAT` (upper-case hash) and `INVALID_OBJECT_PATH` (upper-case extension or file name not matching the hash) leave the file unbound; `UNKNOWN_FIELD` (with a suggested spelling) disables only the checks that use that declaration. Dependent checks are `unavailable`, workflow rules that rely on the node are `not_assessed`, and `SCORE_AFFECTED_BY_INPUT_ERRORS` marks every otherwise available axis `partial`. Missing non-final evidence files are reported as partial availability. Objects entries that name no declared artefact are reported as `UNUSED_OBJECT_MAPPING` and ignored.
 - The native request schema accepts upper-case hashes, any file extension and extra attribute fields so that these problems can be isolated and reported; the CSEC request and response schemas are unchanged. Hash values that are not lower-case SHA-256 appear in findings as `submitted_hash`, never as `evidence_hash`.
 - Dangling graph references (including a hash that differs from its node only in letter case), cycles, duplicate hashes, duplicate source edges per target, disconnected nodes and invalid role endpoints are errors.
@@ -88,7 +98,7 @@ python3 -B run.py --request /path/to/request.json --root /path/to/case-root
 
 | Axis | Current meaning |
 |---|---|
-| completeness | Native submissions evaluate applicable workflow expectations; public WAV-only requests retain limited declared-object availability. |
+| completeness | Native submissions evaluate applicable workflow expectations; public audio-only requests retain limited declared-object availability. |
 | integrity | Separately reports file binding, structural validity, declaration consistency, CrossEvidence, cryptographic attestation, and a policy-disabled physical diagnostic layer. Signal results never contribute to integrity; structural validity and C2PA attestation also do not raise it. The claim-ledger scoring redesign is future work. |
 | attestation_strength | C2PA manifest/validation/trust levels assessed by the C2PA SDK (a required dependency); unavailable only if the installation is incomplete. |
 | ai_disclosure | Wire key retained; display Creation-method disclosure coverage. Structured counts in `assessment_checks.ai_disclosure_coverage`; no content AI detection or declaration-truth verification. |
@@ -133,7 +143,7 @@ No private oracle, expected decision or attack label was used. See `reports/publ
 The draft package for CSEC's adversarial testing (attack goals and success
 criteria, native-input guide, packing script, cost-record and issue-report
 templates) is in [`csec_redteam/`](csec_redteam/README.md). Native requests
-are used because the public profile accepts WAV only. CSEC already holds the
+are used because the public profile carries single audio files and the `draft-of.audio` relationship only. CSEC already holds the
 client's Project Rock dataset, which is not redistributed.
 
 ## Outstanding coordination

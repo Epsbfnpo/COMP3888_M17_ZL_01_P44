@@ -1,7 +1,47 @@
 # Plan: adding FLAC and MP3 support
 
-Status: proposal, 23 October 2026. Nothing implemented yet.
-Authors: Hongjie Deng, for William Alexander.
+Status: **implemented on branch `feature/flac-mp3-support` (23 October 2026)**,
+Steps 0–4 below. Authors: Hongjie Deng, for William Alexander.
+
+## Implementation status
+
+| Step | Done | Where |
+|---|---|---|
+| 0. Format detection | Content decides; ID3v2 tags are skipped before deciding, so a signed FLAC is FLAC | `music_target/audio_formats.py`, `wav_io.py` |
+| 1. FLAC | Bounded block parser, kept `bext`/`iXML`/`LIST` chunks feed the recorder, sound-report, AAF and chronology checks; `flac_md5_matches_decoded_audio`; C2PA presence from the leading ID3v2 `GEOB` frame | `flac_io.py`, `audio_observations.py`, `recorder_metadata.py`, `engine.py`, `assessment_passes.py` |
+| 2. MP3 | Every frame header walked; exact length from Xing/Info + LAME delay/padding, otherwise estimated and `duration_seconds: null`; unmeasurable fields give `unavailable` checks; `AUDIO_FORMAT_LIMITED_CHECKS` | `mp3_io.py`, `audio_observations.py`, `engine.py` |
+| 3. Diagnostics | FLAC/MP3 decoded with soundfile; snapshots keep their extension; `mp3_encoded_queries` added to `not_tested` | `audio_diagnostics/io.py`, `runner.py`, `policies/audio_calibration_status.json` |
+| 4. Contract, builder, docs | Public types `audio/flac` and `audio/mpeg`; request-schema object paths accept `.flac`/`.mp3`; builder probe uses the same parsers; README, CSEC handoff, red-team guide, diagnostics doc | `contract.py`, `schemas/scoring-request.schema.json`, `check_public.py`, `wav_probe.py`, `builder_*.py`, `manifest_logic.py` |
+
+Decisions taken (23 October 2026): soundfile 0.14.0 is a core requirement;
+scoring follows the existing WAV rules for now (the MD5 check sits in the
+file-integrity layer like the WAV technical checks) and will be revisited with
+the scoring update; the public CSEC profile accepts FLAC and MP3.
+
+Differences from the plan below:
+
+- **Finding codes.** FLAC and MP3 use format-neutral `AUDIO_OBSERVATION` and
+  `AUDIO_PARSER_FAILED` (rule `audio_parser_available`) with an
+  `audio_format` field. WAV keeps its existing codes, so WAV responses are
+  unchanged.
+- **`FLAC_RECORDER_METADATA_ABSENT`** is reported only for recordings
+  (`audio/raw-take`, `audio/raw-track`), where recorder metadata is expected;
+  a FLAC master without WAV chunks is normal.
+- **LAME tag CRC.** Recorded as `lame_tag_crc_valid` but not required: FFmpeg
+  writes a wrong CRC for some sample rates while its delay and padding are
+  correct, and decoders use them anyway.
+- **Edge `source_format`/`target_format` are still not compared.** These
+  free-text fields have no defined vocabulary ("wav", "WAV", "audio/wav"), so
+  comparing them would create false contradictions. The artefact-level
+  `technical.format` claim is compared, with the values `WAV`, `FLAC`, `MP3`.
+- **Not done:** rerunning the false-match benchmark on MP3 versions of the
+  Lumina clips (the clips are not in the repository).
+- **Also fixed:** the builder's `mixed_from` endpoint list now allows
+  `audio/raw-take`, as the evaluator has since 0.8.1.
+
+Verification: 29 new tests in `tests/test_audio_formats.py`; the existing WAV
+examples regenerate identically apart from `source_revision` and the new
+`mp3_encoded_queries` calibration note.
 
 ## Why
 

@@ -2754,9 +2754,8 @@ class InputValidationTests(unittest.TestCase):
                 self.assertIn(name, str(caught.exception))
                 self.assertIn(".wav", str(caught.exception))
 
-    def test_final_flac_named_wav_returns_unsupported(self):
+    def _final_named_wav(self, data):
         final = self.template["chain"]["final_artefact_hash"]
-        data = b"fLaC" + bytes(200)
         digest = hashlib.sha256(data).hexdigest()
         request = copy.deepcopy(self.template)
         request["chain"]["final_artefact_hash"] = digest
@@ -2767,9 +2766,19 @@ class InputValidationTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             root = self._copy_example_objects(directory)
             (root / f"objects/{digest}.wav").write_bytes(data)
-            result = self.score(request, root)
+            return self.score(request, root)
+
+    def test_final_malformed_flac_named_wav_is_read_as_flac(self):
+        # The content decides the format: a FLAC named .wav is parsed as FLAC,
+        # and a malformed one is an input error, as for a malformed WAV.
+        result = self._final_named_wav(b"fLaC" + bytes(200))
+        self.assertEqual(result["execution_status"], "error")
+        self.assertIn("STREAMINFO", result["error"])
+
+    def test_final_ogg_named_wav_returns_unsupported(self):
+        result = self._final_named_wav(b"OggS" + bytes(200))
         self.assertEqual(result["execution_status"], "unsupported")
-        self.assertIn("FLAC", result["error"])
+        self.assertIn("Ogg", result["error"])
 
     def test_empty_data_chunk_does_not_swallow_following_chunks(self):
         fmt = struct.pack("<HHIIHH", 1, 1, 8000, 16000, 2, 16)

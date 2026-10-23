@@ -1,5 +1,12 @@
 # Verification Record
 
+## FLAC and MP3 support (2026-10-23, branch feature/flac-mp3-support)
+
+- `REQUIRE_AUDIO_BACKENDS=1`, CPython 3.13.7 on macOS: **372 tests, all passed**. 368 non-GUI tests ran in one process (31 s, no skips); the four `test_builder.GuiTests` cases ran in separate processes.
+- New: `tests/test_audio_formats.py` (29 tests) for detection by content (including an ID3v2 tag before `fLaC`), bounded ID3v2, FLAC blocks, kept WAV chunks and MD5, MP3 exact and estimated length, lost sync and tags, evaluator results, C2PA in FLAC and MP3, diagnostics decoding, the public profile and the builder probe. A malformed FLAC named `.wav` is now an input error (read as FLAC) instead of `unsupported`; an Ogg file named `.wav` is still `unsupported`.
+- Checked by hand against reference tools: the FLAC MD5 recomputed from soundfile equals `metaflac --show-md5sum` for 8-, 16- and 24-bit files with 1–3 channels; the MP3 exact sample count equals soundfile's gapless length for 16 LAME and FFmpeg encodes (CBR, VBR, 11.025–48 kHz, MPEG-1, 2 and 2.5); a 20-minute MP3 is walked in 0.07 s and a 299 MiB FLAC MD5 is verified in 1.6 s.
+- WAV unchanged: every example regenerates identically apart from `source_revision` and the `mp3_encoded_queries` calibration note. On the repeated-excerpt example, WAV, FLAC and MP3 versions give the same audfprint offsets (2.0 s and 10.01 s).
+
 ## Version 0.8.1, calibration intervals (2026-10-23)
 
 - `REQUIRE_AUDIO_BACKENDS=1`, CPython 3.13.7 on macOS: **342 tests, all passed**. 338 non-GUI tests ran in one process (30 s, no skips); the four `test_builder.GuiTests` cases ran in separate processes.

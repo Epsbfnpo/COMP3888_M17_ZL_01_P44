@@ -15,6 +15,8 @@ from typing import Iterator
 
 import numpy as np
 
+from music_target.audio_formats import detect
+
 
 WAVE_FORMAT_PCM = 0x0001
 WAVE_FORMAT_IEEE_FLOAT = 0x0003
@@ -30,7 +32,9 @@ MAX_FMT_CHUNK_BYTES = 4096
 MAX_DECODE_BLOCK_BYTES = 16 * 1024 * 1024
 
 # Leading bytes of common audio containers that are not RIFF/WAVE.  The file
-# content, not its extension, decides the format.
+# content, not its extension, decides the format.  ``audio_formats.detect``
+# is consulted first because ID3v2 tags can precede FLAC as well as MP3; this
+# prefix list is the fallback for content it cannot identify.
 _OTHER_CONTAINERS = (
     (b"fLaC", "FLAC"),
     (b"OggS", "Ogg"),
@@ -113,14 +117,14 @@ def _detected_container(header: bytes) -> str | None:
 
 
 def _container_bounds(handle, file_size: int,
-                      suffix: str = "") -> tuple[int, list[str], int]:
+                      suffix: str = "", detected: str | None = None) -> tuple[int, list[str], int]:
     header = handle.read(12)
-    detected = _detected_container(header)
+    detected = detected or _detected_container(header)
     if detected:
         extension = f"extension '{suffix}'" if suffix else "no extension"
         raise UnsupportedWav(
-            f"File content is {detected} audio ({extension}); {detected} is "
-            "not supported by this target.", "unsupported_container")
+            f"File content is {detected} audio ({extension}), not WAV; {detected} is "
+            "not read by the WAV reader.", "unsupported_container")
     if len(header) != 12:
         raise WavError("Truncated RIFF/WAVE header.", "truncated_riff_header")
     container_id = header[:4]
@@ -231,9 +235,11 @@ def inspect_wav(path: str | os.PathLike[str]) -> WavDescriptor:
     path = Path(path)
     stat = path.stat()
     file_size = stat.st_size
+    container = detect(path).container
+    other = container if container not in (None, "WAV", "RF64") else None
     with path.open("rb") as handle:
         container_end, warnings, trailing = _container_bounds(
-            handle, file_size, path.suffix)
+            handle, file_size, path.suffix, other)
         riff_unfinalised = "riff_size_unfinalised" in warnings
         position = 12
         fmt = None

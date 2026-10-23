@@ -50,7 +50,7 @@ def parse_bound_artefacts(native, chain, wav_observations):
             if kind.startswith("audio/") or kind == "audio":
                 wav_result = wav_observations.get(digest)
                 wav_failed = ((wav_result or {}).get("status") == "parser_failed")
-                parsed = {"parser": "wav",
+                parsed = {"parser": ((wav_result or {}).get("audio_format") or "wav").lower(),
                           "status": "failed" if wav_failed else "parsed",
                           "data": wav_result}
                 # C2PA may be embedded in the media itself. Attempt once per
@@ -128,6 +128,13 @@ def parse_bound_artefacts(native, chain, wav_observations):
                                      "and C2PA cross-evidence checks were not assessed. Install it with "
                                      "pip install -r requirements.txt.", severity="medium"))
     return observations, findings
+
+
+def _observed_duration(wav_observations, digest):
+    """Measured duration of a bound audio file, or None (not bound, unparsed, or unknown for the format)."""
+    if not digest:
+        return None
+    return ((wav_observations.get(digest) or {}).get("observed") or {}).get("duration_seconds")
 
 
 class BoundFileIntegrityPass:
@@ -244,9 +251,8 @@ class CrossEvidencePass:
                                        "passed": (source, target) in comp_edges,
                                        "selection_id": selection["selection_id"],
                                        "source_hash": source, "target_hash": target})
-                    if (target and target in wav_observations and
-                            selection.get("target_end_seconds") is not None):
-                        duration = wav_observations[target]["observed"]["duration_seconds"]
+                    duration = _observed_duration(wav_observations, target)
+                    if duration is not None and selection.get("target_end_seconds") is not None:
                         checks.append({"rule": "comp_sheet_target_range_within_audio",
                                        "passed": selection["target_end_seconds"] <= duration,
                                        "selection_id": selection["selection_id"],
@@ -258,8 +264,8 @@ class CrossEvidencePass:
                         checks.append({"rule": "cue_sheet_asset_exists_in_graph",
                                        "passed": asset in graph_hashes,
                                        "cue_id": cue["cue_id"], "asset_hash": asset})
-                    if asset and asset in wav_observations:
-                        duration = wav_observations[asset]["observed"]["duration_seconds"]
+                    duration = _observed_duration(wav_observations, asset)
+                    if duration is not None:
                         checks.append({"rule": "cue_sheet_range_within_audio",
                                        "passed": cue["end_seconds"] <= duration,
                                        "cue_id": cue["cue_id"], "asset_hash": asset})
@@ -278,25 +284,34 @@ def _unavailable_check(rule, reason, **extra):
 
 
 def _reconcile_with_c2pa_chunk(c2pa, wav_result):
-    """Use the WAV parser's chunk list as ground truth for whether a manifest exists.
+    """Use the container parser as ground truth for whether a manifest exists.
 
-    A reader failure means a damaged manifest only when the file really carries a
-    C2PA chunk; otherwise the SDK failed for another reason and there is simply no
-    manifest. A C2PA chunk the SDK finds no manifest in is unreadable, not absent.
+    WAV keeps a manifest in a ``C2PA`` chunk; FLAC and MP3 in an ID3v2 ``GEOB``
+    frame of type application/c2pa. A reader failure means a damaged manifest
+    only when the file really carries one; otherwise the SDK failed for another
+    reason and there is simply no manifest. A manifest location the SDK finds no
+    manifest in is unreadable, not absent.
     """
     metadata = (wav_result or {}).get("embedded_metadata")
     if not c2pa.get("sdk_available") or not isinstance(metadata, dict):
-        return c2pa  # chunk list unknown (WAV parser failed): keep the SDK result
-    has_chunk = any(item.get("chunk_id") == "C2PA" for item in metadata.get("other_chunks") or [])
+        return c2pa  # container unknown (parser failed): keep the SDK result
+    if "c2pa_container_present" in metadata:
+        has_chunk = bool(metadata["c2pa_container_present"])
+    else:
+        has_chunk = any(item.get("chunk_id") == "C2PA" for item in metadata.get("other_chunks") or [])
     c2pa["c2pa_chunk_present"] = has_chunk
     warnings = list(c2pa.get("warnings") or [])
     if not c2pa.get("reader_succeeded") and not has_chunk:
         c2pa.update(reader_succeeded=True, present=False)
-        warnings.append("The C2PA SDK could not read this file, but it has no C2PA chunk; "
+        warnings.append("The C2PA SDK could not read this file, but it has no C2PA manifest location; "
+                        "treated as having no manifest." if "c2pa_container_present" in metadata else
+                        "The C2PA SDK could not read this file, but it has no C2PA chunk; "
                         "treated as having no manifest.")
     elif c2pa.get("reader_succeeded") and not c2pa.get("present") and has_chunk:
         c2pa["reader_succeeded"] = False
-        warnings.append("The file has a C2PA chunk, but the SDK found no readable manifest in it.")
+        warnings.append("The file has a C2PA manifest location, but the SDK found no readable manifest in it."
+                        if "c2pa_container_present" in metadata else
+                        "The file has a C2PA chunk, but the SDK found no readable manifest in it.")
     c2pa["warnings"] = warnings
     return c2pa
 
@@ -577,9 +592,8 @@ class ExpandedCrossEvidencePass:
                                        "passed": (source, target) in comp_edges,
                                        "selection_id": selection["selection_id"],
                                        "source_hash": source, "target_hash": target})
-                    if (target and target in wav_observations and
-                            selection.get("target_end_seconds") is not None):
-                        duration = wav_observations[target]["observed"]["duration_seconds"]
+                    duration = _observed_duration(wav_observations, target)
+                    if duration is not None and selection.get("target_end_seconds") is not None:
                         checks.append({"rule": "comp_sheet_target_range_within_audio",
                                        "passed": selection["target_end_seconds"] <= duration,
                                        "selection_id": selection["selection_id"],
@@ -591,8 +605,8 @@ class ExpandedCrossEvidencePass:
                         checks.append({"rule": "cue_sheet_asset_exists_in_graph",
                                        "passed": asset in graph_hashes,
                                        "cue_id": cue["cue_id"], "asset_hash": asset})
-                    if asset and asset in wav_observations:
-                        duration = wav_observations[asset]["observed"]["duration_seconds"]
+                    duration = _observed_duration(wav_observations, asset)
+                    if duration is not None:
                         checks.append({"rule": "cue_sheet_range_within_audio",
                                        "passed": cue["end_seconds"] <= duration,
                                        "cue_id": cue["cue_id"], "asset_hash": asset})

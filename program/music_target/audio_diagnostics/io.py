@@ -1,11 +1,18 @@
-"""Exact-range WAV reading and anti-aliased analysis preprocessing."""
+"""Exact-range audio reading (WAV, FLAC, MP3) and anti-aliased analysis preprocessing."""
 
 import math
+from collections import namedtuple
 from pathlib import Path
 
 import numpy as np
+from music_target.audio_formats import detect
 from music_target.wav_io import inspect_wav, read_frames
 from music_target.time_ranges import content_range_checks
+
+# What the decoder delivers: for MP3 this is the gapless length when the file
+# carries encoder delay and padding, otherwise the padded frame length.
+DecodedAudio = namedtuple("DecodedAudio", "sample_rate channels frame_count duration_seconds")
+DECODE_BLOCK_SECONDS = 10
 
 
 class AnalysisUnavailable(ValueError):
@@ -14,8 +21,36 @@ class AnalysisUnavailable(ValueError):
         self.code = code
 
 
+def _open(path):
+    """(descriptor, frame reader) for a WAV, or a FLAC/MP3 decoded by soundfile."""
+    container = detect(path).container
+    if container not in ("FLAC", "MP3"):
+        descriptor = inspect_wav(Path(path))
+        return descriptor, lambda first, last: (block for _, block in read_frames(path, descriptor, first, last))
+    import soundfile
+    try:
+        with soundfile.SoundFile(str(path)) as audio:
+            descriptor = DecodedAudio(audio.samplerate, audio.channels, audio.frames,
+                                      audio.frames / audio.samplerate)
+    except (RuntimeError, soundfile.LibsndfileError) as exc:
+        raise AnalysisUnavailable("decoder_unavailable", f"The {container} file could not be decoded: {exc}") from None
+
+    def blocks(first, last):
+        size = max(1, descriptor.sample_rate * DECODE_BLOCK_SECONDS)
+        with soundfile.SoundFile(str(path)) as audio:
+            audio.seek(first)
+            remaining = last - first
+            while remaining > 0:
+                block = audio.read(min(size, remaining), dtype="float32", always_2d=True)
+                if not len(block):
+                    break
+                remaining -= len(block)
+                yield np.ascontiguousarray(block)
+    return descriptor, blocks
+
+
 def _decode_mono(path, start, end):
-    descriptor = inspect_wav(Path(path))
+    descriptor, blocks = _open(path)
     start = 0.0 if start is None else start
     end = descriptor.duration_seconds if end is None else end
     checks = content_range_checks(start, end, descriptor.duration_seconds, descriptor.sample_rate)
@@ -24,7 +59,7 @@ def _decode_mono(path, start, end):
     end = min(end, descriptor.duration_seconds)
     first = round(start * descriptor.sample_rate)
     last = min(descriptor.frame_count, round(end * descriptor.sample_rate))
-    chunks = [block for _, block in read_frames(path, descriptor, first, last)]
+    chunks = list(blocks(first, last))
     if not chunks:
         raise AnalysisUnavailable("insufficient_signal", "The selected audio range is empty.")
     frames = np.concatenate(chunks, axis=0)

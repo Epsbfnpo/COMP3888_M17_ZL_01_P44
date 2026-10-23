@@ -24,6 +24,16 @@ can alter a score: such edges are no longer skipped. See
 [Evidence tiers](#evidence-tiers) below and
 [`program/docs/PROJECT_ROCK_FINDINGS_2026-10-22.md`](program/docs/PROJECT_ROCK_FINDINGS_2026-10-22.md).
 
+**FLAC and MP3 (after 0.8.1, branch `feature/flac-mp3-support`).** Besides
+WAV/BWF, the evaluator now reads FLAC and MP3 (MPEG Layer III), in native
+requests and in the public CSEC profile (`audio/flac`, `audio/mpeg`). FLAC keeps
+nearly every WAV check, including recorder metadata kept by
+`flac --keep-foreign-metadata`, and adds an MD5 check of the decoded audio. MP3
+is lossy, so checks that need a bit depth, recorder metadata or an exact length
+are reported as unavailable rather than as contradictions. See
+[FLAC and MP3](#flac-and-mp3) below. Scoring follows the existing WAV rules
+and may change with the scoring update in progress.
+
 The [technical manual](Manual_layout_check.docx) describes the whole program;
 its Section 8 covers the C2PA work in detail and Section 10 lists the known
 limitations. The runnable evaluator is in
@@ -129,8 +139,9 @@ and a closing `SCORE_AFFECTED_BY_INPUT_ERRORS` finding marks every otherwise
 available axis `partial`. A misspelled relationship field disables that
 relationship's deterministic checks instead of being ignored, so a typo cannot turn
 an honest declaration into a contradiction. File content, not the extension,
-decides the audio format: AIFF, FLAC, Ogg or MP3 data in a `.wav` file is
-reported as that format. If a non-final file changes while it is being
+decides the audio format: FLAC or MP3 data in a `.wav` file is read as FLAC or
+MP3, and AIFF, Ogg, RF64/BW64 or MPEG Layer I/II data is reported as that
+format and unsupported. If a non-final file changes while it is being
 evaluated, the request is evaluated once more with that file isolated
 (`OBJECT_CHANGED_DURING_EVALUATION`); a second change, or a change to the final
 artefact, returns `error`.
@@ -194,8 +205,11 @@ licences are recorded in `music_target/audio_diagnostics/vendor/UPSTREAM.json`.
 The parent process first retains the existing core scoring response, then runs
 isolated diagnostic workers on retained, declared audio-to-audio edges. It does
 not search undeclared files or create graph relationships. CompSheet comparison
-requires a matching selection and complete declared ranges. Only the currently
-supported WAV encodings are accepted.
+requires a matching selection and complete declared ranges. Supported WAV
+encodings are read directly; FLAC and MP3 are decoded with soundfile
+(libsndfile). For MP3 the decoder's gapless length is used, so diagnostics
+compare an approximation of the original recording; the calibration status
+lists `mp3_encoded_queries` as not tested.
 
 When a submitted AAF uses a bound recorder take, the take is analysed only over
 the seconds the edit used (`range_source: aaf_source_range`, `selection_id`
@@ -340,7 +354,9 @@ supporting artefacts.
 **The C2PA chunk precondition.** A reader failure counts as an unreadable
 manifest only when the WAV parser found a `C2PA` chunk; without one the file
 simply has no manifest. A `C2PA` chunk with no readable manifest is unreadable
-rather than absent.
+rather than absent. FLAC and MP3 keep a manifest in an ID3v2 `GEOB` frame of
+type `application/c2pa` (for FLAC the C2PA SDK places the tag before the
+`fLaC` marker), and the same rule uses that frame.
 
 **Effects on Integrity.** An invalid final manifest fails the ordinary rule
 `final_c2pa_manifest_validates`: Integrity is marked contradicted, but the
@@ -496,6 +512,48 @@ describe. Such artefacts get one info finding,
 artefact, and they neither raise nor lower completeness.
 `include_reasoning: false` omits the explanations.
 
+## FLAC and MP3
+
+The file content, not the extension, decides the format
+(`music_target/audio_formats.py`). An ID3v2 tag before the audio does not
+decide it: the bytes after the tags do, because the C2PA SDK writes an ID3v2
+tag before the `fLaC` marker of a signed FLAC.
+
+**FLAC** (`music_target/flac_io.py`). Metadata blocks are parsed directly and
+bounded: `STREAMINFO` (rate, channels, bit depth, total samples, MD5),
+`VORBIS_COMMENT`, and `APPLICATION` blocks with ID `riff`, where
+`flac --keep-foreign-metadata` keeps the source WAV's `bext`, `iXML` and `LIST`
+chunks. Those chunks feed the same recorder-metadata, sound-report, AAF and
+chronology checks as a WAV take. The new check `flac_md5_matches_decoded_audio`
+decodes the audio with soundfile and compares the MD5 of the samples with
+`STREAMINFO`; it sits in the file-integrity layer like the WAV technical
+checks, so a mismatch is a `FILE_INTEGRITY_CONTRADICTION`. An MD5 the encoder
+did not store, a bit depth libsndfile cannot decode (for example 32-bit FLAC)
+or the caller's deadline makes the check `unavailable`. A FLAC recording
+(`audio/raw-take`, `audio/raw-track`) without kept WAV chunks gets the
+informational `FLAC_RECORDER_METADATA_ABSENT`: plain FLAC encoding drops them.
+
+**MP3** (`music_target/mp3_io.py`). Every frame header is walked, so frame
+count, stream parameters and lost sync are measured. The exact length is known
+only from a Xing/Info header with a LAME-style encoder delay and padding
+(`frames x samples_per_frame - delay - padding`, the length gapless decoders
+produce); otherwise `duration_seconds` is `null` and only
+`estimated_duration_seconds` is given. MP3 has no bit depth and no standard
+place for recorder metadata. Declared fields that cannot be measured give
+checks with `passed: null` and `status: unavailable`, never contradictions,
+and each MP3 gets the informational `AUDIO_FORMAT_LIMITED_CHECKS` listing the
+check families not run. ID3v1, APEv2 and appended ID3v2 tags are excluded from
+the audio; compressed or encrypted ID3 frames are not decoded.
+
+FLAC and MP3 observations use the format-neutral codes `AUDIO_OBSERVATION` and
+`AUDIO_PARSER_FAILED` (rule `audio_parser_available`) with an `audio_format`
+field; WAV keeps `WAV_OBSERVATION` and `WAV_PARSER_FAILED`. soundfile
+0.14.0 is now a core requirement. Metadata parsing uses only the standard
+library, so the desktop builder reads FLAC and MP3 with the same parsers and
+fills in only the fields each format carries (no MP3 bit depth; an MP3
+duration only when exact). The plan and test results are in
+[`program/docs/FLAC_MP3_SUPPORT_PLAN.md`](program/docs/FLAC_MP3_SUPPORT_PLAN.md).
+
 ## Run the native example
 
 From the repository root, enter the evaluator directory and use Python 3.11 or later:
@@ -580,7 +638,8 @@ them that way, because they can hang inside the full suite on macOS Tk.
 Version 0.8.1 (22 October 2026): the same procedure found 332 tests; all 328
 non-GUI tests passed in one process (31 s) and the four GUI tests passed
 separately. After the Wilson intervals were added (23 October 2026) it found
-342 tests; all 338 non-GUI tests passed in one process (30 s) and the four
+342 tests; all 338 non-GUI tests passed in one process (30 s). With FLAC and MP3
+support it found 372 tests; all 368 non-GUI tests passed in one process (31 s) and the four
 GUI tests passed separately (`reports/test-results.txt`, `reports/release.json`).
 `tests/test_builder.py` now also passes on its own: it imports `run` (and so
 c2pa) before its worker tests mock `subprocess.Popen`, because c2pa's import
@@ -607,6 +666,10 @@ The locations below are relative to `program/`.
 | `vendor/libevchain/` | Local copy of Ben's source with three reviewable fixes |
 | `music_target/domain.py` | Music nodes, relationships, and permitted endpoint roles (`mixed_from` accepts raw takes) |
 | `music_target/wav_io.py` | Streaming RIFF/WAVE inspection and vectorised integer/float sample decoding |
+| `music_target/audio_formats.py` | Content-based container detection (WAV, FLAC, MP3, and unsupported AIFF, Ogg, RF64, MPEG Layer I/II) and bounded ID3v2 reading |
+| `music_target/flac_io.py` | Bounded FLAC metadata parsing, kept WAV chunks and the decoded-audio MD5 check |
+| `music_target/mp3_io.py` | MP3 frame walking, Xing/Info/LAME/VBRI headers, exact or estimated length and tag boundaries |
+| `music_target/audio_observations.py` | FLAC and MP3 observations in the WAV result shape, and the MP3 limited-check list |
 | `music_target/wav_parser.py` | Local copy of the supplied WAV parser |
 | `music_target/engine.py` | File binding, `WavMetadataPass`, `RelationshipIntegrityPass`, library pipeline, and assessment-stage orchestration |
 | `music_target/workflow_policy.py` | Safe policy loading, condition evaluation, and per-expectation workflow completeness |
@@ -634,6 +697,7 @@ The locations below are relative to `program/`.
 | `make_audio_diagnostic_example.py`, `examples/audio-diagnostics/` | Reproducible repeated-excerpt example, request and core/audio reports |
 | `tests/test_audio_diagnostics.py` | 41 provider, protocol, score-isolation, insufficient-support and calibration-status tests |
 | `tests/test_case_intervals.py` | 10 tests: interval values and bounds, stored intervals matching their counts, and the benchmark summaries |
+| `tests/test_audio_formats.py` | 29 FLAC and MP3 tests: detection by content, ID3v2, FLAC blocks, kept WAV chunks and MD5, MP3 exact and estimated length, sync loss and tags, evaluator results, C2PA in FLAC and MP3, diagnostics decoding, the public profile and the builder probe |
 | `tests/test_c2pa_integrity.py` | 24 C2PA tests: runtime-signed fixtures, pinned lists, trust status, asymmetric trust, known AI signers, the C2PA chunk precondition and every final state |
 | `reports/audio-diagnostics-verification.json` | Historical 19 October 2026 verification and real-provider example results |
 | `docs/AUDIO_DIAGNOSTICS.md` | Detailed audio setup, usage, output and interpretation |
