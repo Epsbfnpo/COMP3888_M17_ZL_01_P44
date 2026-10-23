@@ -34,12 +34,63 @@ Differences from the plan below:
   free-text fields have no defined vocabulary ("wav", "WAV", "audio/wav"), so
   comparing them would create false contradictions. The artefact-level
   `technical.format` claim is compared, with the values `WAV`, `FLAC`, `MP3`.
-- **Not done:** rerunning the false-match benchmark on MP3 versions of the
-  Lumina clips (the clips are not in the repository).
+- **False-match benchmark on FLAC and MP3** (`benchmarks/false_match.py --encode`,
+  23 October 2026): FLAC identical to WAV; MP3 no false match, but shared-loop
+  recall fell (half gain 0/4 instead of 1/4, full gain 3/4 instead of 4/4).
+  See `docs/FALSE_MATCH_BENCHMARK_2026-10-21.md`.
+- **Real material** (Project Rock Ep01 transcoded, 23 October 2026): FLAC
+  takes with kept metadata give identical results to WAV; plain FLAC takes
+  lose the recorder evidence and Integrity is withheld; an MP3 mix at 320 or
+  128 kbps keeps every result except chronology. See
+  `docs/PROJECT_ROCK_FINDINGS_2026-10-22.md`.
+- **Real AI-platform MP3** (BytePlus Lumina, Seed Speech 2.0 with Format
+  mp3, 24 October 2026, 1.5 credits for three 4-second clips; two were
+  downloaded, 24 kHz and 48 kHz). Each file is CBR 64 kbps mono with an
+  ID3v2.4 tag of about 21.7 KB holding `TSSE` (FFmpeg `Lavf58.76.100`) and a
+  `GEOB application/c2pa` frame, and no Xing/LAME header, so the exact length
+  is unknown (estimated 3.864 s and 3.432 s, equal to ffprobe). The C2PA
+  manifest validates; the signer is the same BytePlus certificate as Lumina's
+  WAV output, so it matches the known AI signer (listed as "BytePlus Lumina
+  (Seed Audio)", which therefore covers Seed Speech too) and stays `untrusted`
+  (not on the C2PA Trust List). Declared `ai-generated`: Integrity 1.0
+  consistent; declared `recorded`: `c2pa_ai_source_type_matches_creation_method`
+  fails and Integrity is 0.5 contradicted. Declared bit depth and duration
+  give `unavailable` checks, sample rate and channels match.
+- **libsndfile MP3 length bug found and handled.** Without a Xing header,
+  libsndfile estimates an MP3's length from the bytes it is given and decodes
+  only that far: for the Lumina files it counted the 21.7 KB tag as audio
+  (6.58 s instead of 3.86 s), and for a variable-bitrate file it stopped early
+  and dropped real audio. The diagnostics reader now decodes only the MPEG
+  frames (which fixes constant-bitrate files such as Lumina's), takes the
+  expected length from the frame walk, and reports `decoder_length_mismatch`
+  instead of analysing a truncated signal when the decoder delivers fewer
+  samples (variable-bitrate files without a Xing header). Without gapless
+  information a shortfall of up to two frames is accepted, because libsndfile
+  also drops part of the last frames of a constant-bitrate file (439 samples
+  on the 2-minute Jingle Bells MP3 from the Testing_music set, which the
+  first version of the guard refused).
+- **Testing_music run and fake formats** (24 October 2026). The program was
+  run on 11 downloaded files (6 free-site MP3s, Bach as WAV and FLAC at
+  16/44.1 and 24/96, one Lumina 16 kHz MP3) and 7 locally made files
+  following SoniqTools' test-audio page: genuine 128 and 320 kbps MP3s, a
+  320 kbps MP3 re-encoded from 128, a FLAC made from the 128 kbps MP3, and a
+  24/96 FLAC and WAV upsampled from CD audio. Every case ran. The pair
+  diagnostics found offset 0.0 between FLAC and WAV, 96 and 44.1 kHz, MP3 and
+  WAV, and between each fake and its source. The structural checks could not
+  see the fakes: a fake FLAC has a valid MD5 and a fake 320 kbps MP3 has
+  valid 320 kbps frames. The new report-only `bandwidth` diagnostics
+  provider (`audio_diagnostics/providers/bandwidth.py`, see
+  `AUDIO_DIAGNOSTICS.md`) measures where each file's audio really stops. It
+  flags all four trick files and none of the four genuine lossless files;
+  both genuine encodes read `consistent_with_bitrate`. All six free-site
+  "320 kbps" MP3s stop at 16.5–18.2 kHz, so they were probably made from
+  lower-bitrate files. It never scores, because AI generators also produce
+  band-limited audio (all 25 Lumina benchmark WAVs stop at 17.4–19.9 kHz).
 - **Also fixed:** the builder's `mixed_from` endpoint list now allows
   `audio/raw-take`, as the evaluator has since 0.8.1.
 
-Verification: 29 new tests in `tests/test_audio_formats.py`; the existing WAV
+Verification: 29 new tests in `tests/test_audio_formats.py`, then 9 in
+`tests/test_bandwidth.py` and one builder test (386 tests in total); the existing WAV
 examples regenerate identically apart from `source_revision` and the new
 `mp3_encoded_queries` calibration note.
 

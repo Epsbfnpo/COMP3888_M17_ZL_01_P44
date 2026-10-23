@@ -45,7 +45,8 @@
         "spectromap",
         "librosa",
         "music_semantics",
-        "fingerprint_agreement"
+        "fingerprint_agreement",
+        "bandwidth"
       ]
     },
     "provider_version": {

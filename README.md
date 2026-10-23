@@ -201,6 +201,7 @@ licences are recorded in `music_target/audio_diagnostics/vendor/UPSTREAM.json`.
 | audfprint | Landmark fingerprints, candidate time offsets and supported windows, including repeated-source candidates |
 | SpectroMap | Spectral peaks detected in fixed 4-second windows, so density does not depend on file length; exact peak-pair comparison and offset voting |
 | librosa | Chroma, MFCC and energy features; candidate boundaries, repetitions and cross-file correspondences |
+| bandwidth | Per file: where the decoded audio stops compared with its container, sample rate and MP3 bitrate (heuristic, uncalibrated) |
 
 The parent process first retains the existing core scoring response, then runs
 isolated diagnostic workers on retained, declared audio-to-audio edges. It does
@@ -209,7 +210,10 @@ requires a matching selection and complete declared ranges. Supported WAV
 encodings are read directly; FLAC and MP3 are decoded with soundfile
 (libsndfile). For MP3 the decoder's gapless length is used, so diagnostics
 compare an approximation of the original recording; the calibration status
-lists `mp3_encoded_queries` as not tested.
+lists `mp3_encoded_queries` as not tested. Rerunning the false-match benchmark
+on FLAC and MP3 versions (23 October 2026) gave identical results for FLAC; for
+MP3 there was still no false match, but audfprint found the shared loop in 0 of
+4 half-gain pairs (WAV: 1) and 3 of 4 full-gain pairs (WAV: 4).
 
 When a submitted AAF uses a bound recorder take, the take is analysed only over
 the seconds the edit used (`range_source: aaf_source_range`, `selection_id`
@@ -545,6 +549,33 @@ and each MP3 gets the informational `AUDIO_FORMAT_LIMITED_CHECKS` listing the
 check families not run. ID3v1, APEv2 and appended ID3v2 tags are excluded from
 the audio; compressed or encrypted ID3 frames are not decoded.
 
+Real Lumina MP3 output (Seed Speech 2.0, Format mp3) was checked on 24
+October 2026: its C2PA manifest sits in an ID3v2.4 `GEOB` frame, validates,
+and is signed by the same BytePlus certificate as Lumina's WAV, so it is
+recognised as the known AI signer; declaring such a file `recorded` is a
+contradiction. These files have no Xing header, so their exact length is
+unknown. libsndfile estimates such lengths from the file size and decodes
+only that far, so audio diagnostics decode only the MPEG frames and report
+`decoder_length_mismatch` rather than analyse a truncated signal. Without
+gapless information a shortfall of up to two frames is accepted, because
+libsndfile also drops part of the last frames of a constant-bitrate file.
+
+**Fake formats and content bandwidth.** A FLAC made from an MP3, a 320 kbps
+MP3 re-encoded from 128 kbps, or a 96 kHz file upsampled from CD audio passes
+every structural check: the FLAC MD5 is valid and the MP3 frames really are
+320 kbps. With `--audio-analysis`, the report-only `bandwidth` provider now
+measures where each file's decoded audio stops and compares it with the
+container and bitrate (`assessment_checks.audio_bandwidth`, with an
+`AUDIO_CONTENT_BAND_LIMITED` finding for flagged files). On the Testing_music
+set (24 October 2026) it flagged all four locally made fake files and none of
+the four genuine lossless files, and all six free-site "320 kbps" MP3s stop at
+16.5–18.2 kHz. It never scores and is uncalibrated: AI generators produce
+band-limited audio too (all 25 Lumina benchmark WAVs stop at 17.4–19.9 kHz),
+so a flag says where the audio stops, not who made the file. Five of those
+free-site MP3s also share short sounds at fixed times, which audfprint
+correctly matches at offset 0 (6 of 10 pairs); see
+[the false-match benchmark](program/docs/FALSE_MATCH_BENCHMARK_2026-10-21.md).
+
 FLAC and MP3 observations use the format-neutral codes `AUDIO_OBSERVATION` and
 `AUDIO_PARSER_FAILED` (rule `audio_parser_available`) with an `audio_format`
 field; WAV keeps `WAV_OBSERVATION` and `WAV_PARSER_FAILED`. soundfile
@@ -553,6 +584,11 @@ library, so the desktop builder reads FLAC and MP3 with the same parsers and
 fills in only the fields each format carries (no MP3 bit depth; an MP3
 duration only when exact). The plan and test results are in
 [`program/docs/FLAC_MP3_SUPPORT_PLAN.md`](program/docs/FLAC_MP3_SUPPORT_PLAN.md).
+On the Project Rock Ep01 chain transcoded locally, FLAC takes encoded with
+`--keep-foreign-metadata` gave the same result as WAV; plain FLAC takes lost
+the recorder evidence, so Integrity was withheld; an MP3 final mix (320 or
+128 kbps) changed nothing except the chronology comparison
+([findings](program/docs/PROJECT_ROCK_FINDINGS_2026-10-22.md)).
 
 ## Run the native example
 
@@ -639,8 +675,10 @@ Version 0.8.1 (22 October 2026): the same procedure found 332 tests; all 328
 non-GUI tests passed in one process (31 s) and the four GUI tests passed
 separately. After the Wilson intervals were added (23 October 2026) it found
 342 tests; all 338 non-GUI tests passed in one process (30 s). With FLAC and MP3
-support it found 372 tests; all 368 non-GUI tests passed in one process (31 s) and the four
-GUI tests passed separately (`reports/test-results.txt`, `reports/release.json`).
+support it found 376 tests; all 372 non-GUI tests passed in one process (31 s) and the four
+GUI tests passed separately. With the bandwidth provider (24 October 2026) it
+found 386 tests; all 382 non-GUI tests passed in one process (32 s) and the
+four GUI tests passed separately (`reports/test-results.txt`, `reports/release.json`).
 `tests/test_builder.py` now also passes on its own: it imports `run` (and so
 c2pa) before its worker tests mock `subprocess.Popen`, because c2pa's import
 calls `platform.processor()`, which spawns a subprocess. The

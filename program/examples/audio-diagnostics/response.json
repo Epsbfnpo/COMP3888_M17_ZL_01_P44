@@ -6,7 +6,7 @@
   "system": {
     "name": "COMP3888-music-baseline",
     "version": "0.8.1",
-    "source_revision": "sha256:c96f628bd893f764cb6eb2bf74b61d83044afd13bbbdf97089afb7059a7aa78a"
+    "source_revision": "sha256:435359857cb3b52b8599caf35ea487946105b17a0cb6f5230e17b7be1d153848"
   },
   "execution_status": "succeeded",
   "axes": {
@@ -415,11 +415,49 @@
       "scoring_eligible": false,
       "integrity_contribution": null,
       "content_match_is_provenance": false
+    },
+    {
+      "code": "AUDIO_BANDWIDTH_OBSERVATION",
+      "severity": "info",
+      "message": "bandwidth: no sharp band limit found. No sharp band limit below the Nyquist frequency was found.",
+      "outcome": "completed",
+      "diagnostic_id": "file:22bf064117b015ad6b47b7e649c83c5378ff26c1def988d09e1edb3ec6cfecfe:0:bandwidth",
+      "provider": "bandwidth",
+      "source_hash": "22bf064117b015ad6b47b7e649c83c5378ff26c1def988d09e1edb3ec6cfecfe",
+      "target_hash": "22bf064117b015ad6b47b7e649c83c5378ff26c1def988d09e1edb3ec6cfecfe",
+      "status": "inconclusive",
+      "reason_code": "bandwidth_observation",
+      "candidate_count": 0,
+      "analysis_complete": true,
+      "relationship_type": "single_file",
+      "detail_key": "audio_bandwidth",
+      "scoring_eligible": false,
+      "integrity_contribution": null,
+      "content_match_is_provenance": false
+    },
+    {
+      "code": "AUDIO_BANDWIDTH_OBSERVATION",
+      "severity": "info",
+      "message": "bandwidth: no sharp band limit found. No sharp band limit below the Nyquist frequency was found.",
+      "outcome": "completed",
+      "diagnostic_id": "file:8699068584ba01947d52e5f55a973a86adf3c465c32621d1fe4b7c1f8304b638:0:bandwidth",
+      "provider": "bandwidth",
+      "source_hash": "8699068584ba01947d52e5f55a973a86adf3c465c32621d1fe4b7c1f8304b638",
+      "target_hash": "8699068584ba01947d52e5f55a973a86adf3c465c32621d1fe4b7c1f8304b638",
+      "status": "inconclusive",
+      "reason_code": "bandwidth_observation",
+      "candidate_count": 0,
+      "analysis_complete": true,
+      "relationship_type": "single_file",
+      "detail_key": "audio_bandwidth",
+      "scoring_eligible": false,
+      "integrity_contribution": null,
+      "content_match_is_provenance": false
     }
   ],
-  "processing_ms": 2336.1911249812692,
+  "processing_ms": 2135.8814170816913,
   "resource_usage": {
-    "cpu_ms": 3.457000000000016,
+    "cpu_ms": 3.613000000000005,
     "peak_rss_kib": null
   },
   "error": null,
@@ -1253,10 +1291,10 @@
           "minimum_candidate_matches": 5,
           "support_window_seconds": 0.25
         },
-        "processing_ms": 477.5525830918923,
+        "processing_ms": 325.8504589321092,
         "policy_id": "audio-observations-bounded-v2",
-        "policy_version": 2,
-        "policy_sha256": "f6069e2b45fad46ade14ba0fa569053e9b76bea87aa78c1f7d41d84e45e550f8",
+        "policy_version": 3,
+        "policy_sha256": "802922f116cc4e5a96222efc6db0aa64b628351edf10f3b8126f5ee52d80bf54",
         "calibration": {
           "profile_id": "bounded-audio-2026-10-20-v2",
           "status": "bounded_calibration",
@@ -1334,7 +1372,8 @@
             "mixture_component",
             "unrelated_same_genre_tempo_key",
             "same_prompt_regeneration",
-            "shared_loop_gain_0.5_and_1.0"
+            "shared_loop_gain_0.5_and_1.0",
+            "flac_and_mp3_encoded_false_match_pairs"
           ],
           "not_tested": [
             "covers",
@@ -1393,6 +1432,110 @@
             },
             "scope": "Case counts on a small Lumina sample; not a population false-positive rate.",
             "split": "held_out"
+          },
+          "encoded_false_match_rates": {
+            "flac": {
+              "benchmark": "false_match_lumina_2026-10-21",
+              "date": "2026-10-23",
+              "split": "held_out",
+              "encoding": "FLAC, samples identical to the WAV clips",
+              "categories": {
+                "same_genre_tempo_key": {
+                  "pairs": 5,
+                  "false_matches": 0,
+                  "wilson_95": {
+                    "lower": 0.0,
+                    "upper": 0.434
+                  }
+                },
+                "same_prompt_regeneration": {
+                  "pairs": 4,
+                  "false_matches": 0,
+                  "wilson_95": {
+                    "lower": 0.0,
+                    "upper": 0.49
+                  }
+                },
+                "cover_prompts_melody_unverified": {
+                  "pairs": 6,
+                  "false_matches": 0,
+                  "wilson_95": {
+                    "lower": 0.0,
+                    "upper": 0.39
+                  }
+                },
+                "shared_loop": {
+                  "pairs": 4,
+                  "detected": 1,
+                  "note": "The loop is real shared audio; a fingerprint match does not mean one song derives from the other.",
+                  "wilson_95": {
+                    "lower": 0.046,
+                    "upper": 0.699
+                  }
+                },
+                "shared_loop_full_gain": {
+                  "pairs": 4,
+                  "detected": 4,
+                  "note": "The loop is real shared audio; a fingerprint match does not mean one song derives from the other.",
+                  "wilson_95": {
+                    "lower": 0.51,
+                    "upper": 1.0
+                  }
+                }
+              },
+              "same_as_wav": true
+            },
+            "mp3": {
+              "benchmark": "false_match_lumina_2026-10-21",
+              "date": "2026-10-23",
+              "split": "held_out",
+              "encoding": "MP3 by libsndfile 1.2.2 (LAME 3.100, VBR, about 140-163 kbps average)",
+              "categories": {
+                "same_genre_tempo_key": {
+                  "pairs": 5,
+                  "false_matches": 0,
+                  "wilson_95": {
+                    "lower": 0.0,
+                    "upper": 0.434
+                  }
+                },
+                "same_prompt_regeneration": {
+                  "pairs": 4,
+                  "false_matches": 0,
+                  "wilson_95": {
+                    "lower": 0.0,
+                    "upper": 0.49
+                  }
+                },
+                "cover_prompts_melody_unverified": {
+                  "pairs": 6,
+                  "false_matches": 0,
+                  "wilson_95": {
+                    "lower": 0.0,
+                    "upper": 0.39
+                  }
+                },
+                "shared_loop": {
+                  "pairs": 4,
+                  "detected": 0,
+                  "note": "The loop is real shared audio; a fingerprint match does not mean one song derives from the other.",
+                  "wilson_95": {
+                    "lower": 0.0,
+                    "upper": 0.49
+                  }
+                },
+                "shared_loop_full_gain": {
+                  "pairs": 4,
+                  "detected": 3,
+                  "note": "The loop is real shared audio; a fingerprint match does not mean one song derives from the other.",
+                  "wilson_95": {
+                    "lower": 0.301,
+                    "upper": 0.954
+                  }
+                }
+              },
+              "same_as_wav": false
+            }
           }
         }
       },
@@ -1561,10 +1704,10 @@
           "minimum_candidate_matches": 5,
           "support_window_seconds": 0.25
         },
-        "processing_ms": 21.649584057740867,
+        "processing_ms": 18.68308405391872,
         "policy_id": "audio-observations-bounded-v2",
-        "policy_version": 2,
-        "policy_sha256": "f6069e2b45fad46ade14ba0fa569053e9b76bea87aa78c1f7d41d84e45e550f8",
+        "policy_version": 3,
+        "policy_sha256": "802922f116cc4e5a96222efc6db0aa64b628351edf10f3b8126f5ee52d80bf54",
         "calibration": {
           "profile_id": "bounded-audio-2026-10-20-v2",
           "status": "exploratory_uncalibrated",
@@ -1704,10 +1847,10 @@
           "aggregation_seconds": 1.0,
           "candidate_cosine_similarity": 0.9
         },
-        "processing_ms": 868.1349580874667,
+        "processing_ms": 546.2643329519778,
         "policy_id": "audio-observations-bounded-v2",
-        "policy_version": 2,
-        "policy_sha256": "f6069e2b45fad46ade14ba0fa569053e9b76bea87aa78c1f7d41d84e45e550f8",
+        "policy_version": 3,
+        "policy_sha256": "802922f116cc4e5a96222efc6db0aa64b628351edf10f3b8126f5ee52d80bf54",
         "calibration": {
           "profile_id": "bounded-audio-2026-10-20-v2",
           "status": "exploratory_uncalibrated",
@@ -1787,10 +1930,10 @@
         "integrity_contribution": null,
         "content_match_is_provenance": false,
         "parameters": {},
-        "processing_ms": 0.028832932002842426,
+        "processing_ms": 0.03524997737258673,
         "policy_id": "audio-observations-bounded-v2",
-        "policy_version": 2,
-        "policy_sha256": "f6069e2b45fad46ade14ba0fa569053e9b76bea87aa78c1f7d41d84e45e550f8",
+        "policy_version": 3,
+        "policy_sha256": "802922f116cc4e5a96222efc6db0aa64b628351edf10f3b8126f5ee52d80bf54",
         "calibration": {
           "profile_id": "bounded-audio-2026-10-20-v2",
           "status": "exploratory_uncalibrated",
@@ -1827,7 +1970,8 @@
             "take_inside_final_master",
             "unrelated_same_genre_tempo_key",
             "same_prompt_regeneration",
-            "shared_loop_gain_0.5_and_1.0"
+            "shared_loop_gain_0.5_and_1.0",
+            "flac_and_mp3_encoded_false_match_pairs"
           ],
           "not_tested": [
             "covers"
@@ -1882,6 +2026,110 @@
             },
             "scope": "Case counts on a small Lumina sample; not a population false-positive rate.",
             "split": "held_out"
+          },
+          "encoded_false_match_rates": {
+            "flac": {
+              "benchmark": "false_match_lumina_2026-10-21",
+              "date": "2026-10-23",
+              "split": "held_out",
+              "encoding": "FLAC, samples identical to the WAV clips",
+              "categories": {
+                "same_genre_tempo_key": {
+                  "pairs": 5,
+                  "false_matches": 0,
+                  "wilson_95": {
+                    "lower": 0.0,
+                    "upper": 0.434
+                  }
+                },
+                "same_prompt_regeneration": {
+                  "pairs": 4,
+                  "false_matches": 0,
+                  "wilson_95": {
+                    "lower": 0.0,
+                    "upper": 0.49
+                  }
+                },
+                "cover_prompts_melody_unverified": {
+                  "pairs": 6,
+                  "false_matches": 0,
+                  "wilson_95": {
+                    "lower": 0.0,
+                    "upper": 0.39
+                  }
+                },
+                "shared_loop": {
+                  "pairs": 4,
+                  "detected": 1,
+                  "note": "The loop is real shared audio; a fingerprint match does not mean one song derives from the other.",
+                  "wilson_95": {
+                    "lower": 0.046,
+                    "upper": 0.699
+                  }
+                },
+                "shared_loop_full_gain": {
+                  "pairs": 4,
+                  "detected": 4,
+                  "note": "The loop is real shared audio; a fingerprint match does not mean one song derives from the other.",
+                  "wilson_95": {
+                    "lower": 0.51,
+                    "upper": 1.0
+                  }
+                }
+              },
+              "same_as_wav": true
+            },
+            "mp3": {
+              "benchmark": "false_match_lumina_2026-10-21",
+              "date": "2026-10-23",
+              "split": "held_out",
+              "encoding": "MP3 by libsndfile 1.2.2 (LAME 3.100, VBR, about 140-163 kbps average)",
+              "categories": {
+                "same_genre_tempo_key": {
+                  "pairs": 5,
+                  "false_matches": 0,
+                  "wilson_95": {
+                    "lower": 0.0,
+                    "upper": 0.434
+                  }
+                },
+                "same_prompt_regeneration": {
+                  "pairs": 4,
+                  "false_matches": 0,
+                  "wilson_95": {
+                    "lower": 0.0,
+                    "upper": 0.49
+                  }
+                },
+                "cover_prompts_melody_unverified": {
+                  "pairs": 6,
+                  "false_matches": 0,
+                  "wilson_95": {
+                    "lower": 0.0,
+                    "upper": 0.39
+                  }
+                },
+                "shared_loop": {
+                  "pairs": 4,
+                  "detected": 0,
+                  "note": "The loop is real shared audio; a fingerprint match does not mean one song derives from the other.",
+                  "wilson_95": {
+                    "lower": 0.0,
+                    "upper": 0.49
+                  }
+                },
+                "shared_loop_full_gain": {
+                  "pairs": 4,
+                  "detected": 3,
+                  "note": "The loop is real shared audio; a fingerprint match does not mean one song derives from the other.",
+                  "wilson_95": {
+                    "lower": 0.301,
+                    "upper": 0.954
+                  }
+                }
+              },
+              "same_as_wav": false
+            }
           }
         }
       }
@@ -1925,10 +2173,10 @@
           "section_minimum_seconds": 6.0,
           "section_prominence": 0.03
         },
-        "processing_ms": 532.1470000781119,
+        "processing_ms": 568.5762499924749,
         "policy_id": "audio-observations-bounded-v2",
-        "policy_version": 2,
-        "policy_sha256": "f6069e2b45fad46ade14ba0fa569053e9b76bea87aa78c1f7d41d84e45e550f8",
+        "policy_version": 3,
+        "policy_sha256": "802922f116cc4e5a96222efc6db0aa64b628351edf10f3b8126f5ee52d80bf54",
         "calibration": {
           "profile_id": "bounded-audio-2026-10-20-v2",
           "status": "bounded_calibration",
@@ -2029,7 +2277,8 @@
             "mixture",
             "unrelated_same_genre_tempo_key",
             "same_prompt_regeneration",
-            "shared_loop_between_different_songs"
+            "shared_loop_between_different_songs",
+            "flac_and_mp3_encoded_false_match_pairs"
           ],
           "not_tested": [
             "covers",
@@ -2087,7 +2336,409 @@
             },
             "scope": "Case counts on a small Lumina sample; not a population false-positive rate.",
             "split": "held_out"
+          },
+          "encoded_false_match_rates": {
+            "flac": {
+              "benchmark": "false_match_lumina_2026-10-21",
+              "date": "2026-10-23",
+              "split": "held_out",
+              "encoding": "FLAC, samples identical to the WAV clips",
+              "categories": {
+                "same_genre_tempo_key": {
+                  "pairs": 5,
+                  "false_matches": 0,
+                  "wilson_95": {
+                    "lower": 0.0,
+                    "upper": 0.434
+                  }
+                },
+                "same_prompt_regeneration": {
+                  "pairs": 4,
+                  "false_matches": 0,
+                  "wilson_95": {
+                    "lower": 0.0,
+                    "upper": 0.49
+                  }
+                },
+                "cover_prompts_melody_unverified": {
+                  "pairs": 6,
+                  "supported": 0,
+                  "note": "Whether these clips share a composition is unverified, so musical correspondence is reported without classifying it as true or false.",
+                  "wilson_95": {
+                    "lower": 0.0,
+                    "upper": 0.39
+                  }
+                },
+                "shared_loop": {
+                  "pairs": 4,
+                  "false_matches": 0,
+                  "wilson_95": {
+                    "lower": 0.0,
+                    "upper": 0.49
+                  }
+                },
+                "shared_loop_full_gain": {
+                  "pairs": 4,
+                  "false_matches": 0,
+                  "wilson_95": {
+                    "lower": 0.0,
+                    "upper": 0.49
+                  }
+                }
+              },
+              "same_as_wav": true
+            },
+            "mp3": {
+              "benchmark": "false_match_lumina_2026-10-21",
+              "date": "2026-10-23",
+              "split": "held_out",
+              "encoding": "MP3 by libsndfile 1.2.2 (LAME 3.100, VBR, about 140-163 kbps average)",
+              "categories": {
+                "same_genre_tempo_key": {
+                  "pairs": 5,
+                  "false_matches": 0,
+                  "wilson_95": {
+                    "lower": 0.0,
+                    "upper": 0.434
+                  }
+                },
+                "same_prompt_regeneration": {
+                  "pairs": 4,
+                  "false_matches": 0,
+                  "wilson_95": {
+                    "lower": 0.0,
+                    "upper": 0.49
+                  }
+                },
+                "cover_prompts_melody_unverified": {
+                  "pairs": 6,
+                  "supported": 0,
+                  "note": "Whether these clips share a composition is unverified, so musical correspondence is reported without classifying it as true or false.",
+                  "wilson_95": {
+                    "lower": 0.0,
+                    "upper": 0.39
+                  }
+                },
+                "shared_loop": {
+                  "pairs": 4,
+                  "false_matches": 0,
+                  "wilson_95": {
+                    "lower": 0.0,
+                    "upper": 0.49
+                  }
+                },
+                "shared_loop_full_gain": {
+                  "pairs": 4,
+                  "false_matches": 0,
+                  "wilson_95": {
+                    "lower": 0.0,
+                    "upper": 0.49
+                  }
+                }
+              },
+              "same_as_wav": true
+            }
           }
+        }
+      }
+    ],
+    "audio_bandwidth": [
+      {
+        "diagnostic_id": "file:22bf064117b015ad6b47b7e649c83c5378ff26c1def988d09e1edb3ec6cfecfe:0:bandwidth",
+        "relation_id": "file:22bf064117b015ad6b47b7e649c83c5378ff26c1def988d09e1edb3ec6cfecfe",
+        "relationship_type": "single_file",
+        "source_hash": "22bf064117b015ad6b47b7e649c83c5378ff26c1def988d09e1edb3ec6cfecfe",
+        "target_hash": "22bf064117b015ad6b47b7e649c83c5378ff26c1def988d09e1edb3ec6cfecfe",
+        "selection_id": null,
+        "range_source": "whole_file",
+        "provider": "bandwidth",
+        "provider_version": null,
+        "adapter_version": "1.0",
+        "status": "inconclusive",
+        "reason_code": "bandwidth_observation",
+        "message": "No sharp band limit below the Nyquist frequency was found.",
+        "analysis_complete": true,
+        "analysed_ranges": {
+          "whole_file": [
+            0.0,
+            16.0
+          ],
+          "original_sample_rates_hz": [
+            22050
+          ],
+          "channel_policy": "arithmetic_mean"
+        },
+        "matches": [],
+        "metrics": {
+          "container": "WAV",
+          "sample_rate_hz": 22050,
+          "nyquist_hz": 11025.0,
+          "nominal_bitrate_kbps": null,
+          "content_edge_hz": null,
+          "cutoffs": [],
+          "frames_analysed": 43,
+          "assessment": {
+            "status": "no_band_limit_found",
+            "reason": "No sharp band limit below the Nyquist frequency was found."
+          }
+        },
+        "limitations": [
+          "A band limit shows where the decoded audio stops, not who made the file or why.",
+          "Mastering with a low-pass filter, band-limited source material (speech, old recordings) or very quiet audio can look the same as a lossy or resampled history.",
+          "Thresholds are exploratory and uncalibrated; absence of a band limit does not show a file is original."
+        ],
+        "scoring_eligible": false,
+        "integrity_contribution": null,
+        "content_match_is_provenance": false,
+        "parameters": {
+          "frame_size": 8192,
+          "spectrum_frames": 600,
+          "level_percentile": 90,
+          "cliff_drop_db": 20.0,
+          "step_drop_db": 6.0,
+          "flat_floor_spread_db": 3.0,
+          "step_search_top_fraction": 0.9
+        },
+        "processing_ms": 13.67095799650997,
+        "policy_id": "audio-observations-bounded-v2",
+        "policy_version": 3,
+        "policy_sha256": "802922f116cc4e5a96222efc6db0aa64b628351edf10f3b8126f5ee52d80bf54",
+        "calibration": {
+          "profile_id": "bounded-audio-2026-10-20-v2",
+          "status": "exploratory_uncalibrated",
+          "summary": "Per-file content band limit from a 90th-percentile spectrum: a sharp cliff (>= 20 dB) or a step into a flat noise floor (>= 6 dB). Thresholds were set on the SoniqTools Bach clip, locally made trick files and six 320 kbps MP3s from a free-music site. Every Lumina music WAV tested is band-limited at 17.4-19.9 kHz by the generator, so a band limit is not evidence of a lossy history.",
+          "sample": {
+            "development_files": 17,
+            "real_material_files": 40
+          },
+          "case_counts": {
+            "development": [
+              {
+                "measure": "Genuine lossless files (SoniqTools Bach WAV/FLAC, 16/44.1 and 24/96) with no band limit flagged",
+                "count": 4,
+                "cases": 4,
+                "wilson_95": {
+                  "lower": 0.51,
+                  "upper": 1.0
+                }
+              },
+              {
+                "measure": "Trick files flagged (MP3 saved as FLAC, 128 kbps re-encoded at 320, CD upsampled to 96 kHz FLAC and WAV)",
+                "count": 4,
+                "cases": 4,
+                "wilson_95": {
+                  "lower": 0.51,
+                  "upper": 1.0
+                }
+              },
+              {
+                "measure": "Genuine LAME 128 and 320 kbps encodes reported consistent with their bitrate",
+                "count": 2,
+                "cases": 2,
+                "wilson_95": {
+                  "lower": 0.342,
+                  "upper": 1.0
+                }
+              },
+              {
+                "measure": "320 kbps MP3s from a free-music site flagged as below their bitrate",
+                "count": 6,
+                "cases": 6,
+                "wilson_95": {
+                  "lower": 0.61,
+                  "upper": 1.0
+                },
+                "note": "Five stop at 16.5-16.8 kHz (a 128 kbps low-pass); one stops at 18.2 kHz. Their history is inferred, not known."
+              }
+            ],
+            "held_out": [],
+            "real_material": [
+              {
+                "measure": "Project Rock recorder takes, mixes and reference flagged",
+                "count": 1,
+                "cases": 15,
+                "wilson_95": {
+                  "lower": 0.012,
+                  "upper": 0.298
+                },
+                "note": "The edit-reference WAV (48 kHz) stops at 22.05 kHz and is reported as resampled up from 44.1 kHz; the reference videos in the dataset carry 44.1 kHz audio."
+              },
+              {
+                "measure": "Lumina music WAVs (AI generator output) reported as band-limited like a lossy encoding",
+                "count": 25,
+                "cases": 25,
+                "wilson_95": {
+                  "lower": 0.867,
+                  "upper": 1.0
+                },
+                "note": "The generator's output is band-limited at 17.4-19.9 kHz; this is the documented false-positive risk."
+              }
+            ]
+          },
+          "transforms_tested": [
+            "mp3_saved_as_flac",
+            "mp3_reencoded_at_higher_bitrate",
+            "cd_upsampled_to_96_khz",
+            "genuine_lossless",
+            "genuine_mp3_128_and_320"
+          ],
+          "not_tested": [
+            "aac_or_opus_sources",
+            "low_pass_mastering",
+            "vinyl_or_tape_transfers",
+            "speech",
+            "sample_rates_below_32_khz_for_mp3"
+          ],
+          "false_match_rates": null
+        }
+      },
+      {
+        "diagnostic_id": "file:8699068584ba01947d52e5f55a973a86adf3c465c32621d1fe4b7c1f8304b638:0:bandwidth",
+        "relation_id": "file:8699068584ba01947d52e5f55a973a86adf3c465c32621d1fe4b7c1f8304b638",
+        "relationship_type": "single_file",
+        "source_hash": "8699068584ba01947d52e5f55a973a86adf3c465c32621d1fe4b7c1f8304b638",
+        "target_hash": "8699068584ba01947d52e5f55a973a86adf3c465c32621d1fe4b7c1f8304b638",
+        "selection_id": null,
+        "range_source": "whole_file",
+        "provider": "bandwidth",
+        "provider_version": null,
+        "adapter_version": "1.0",
+        "status": "inconclusive",
+        "reason_code": "bandwidth_observation",
+        "message": "No sharp band limit below the Nyquist frequency was found.",
+        "analysis_complete": true,
+        "analysed_ranges": {
+          "whole_file": [
+            0.0,
+            4.0
+          ],
+          "original_sample_rates_hz": [
+            22050
+          ],
+          "channel_policy": "arithmetic_mean"
+        },
+        "matches": [],
+        "metrics": {
+          "container": "WAV",
+          "sample_rate_hz": 22050,
+          "nyquist_hz": 11025.0,
+          "nominal_bitrate_kbps": null,
+          "content_edge_hz": null,
+          "cutoffs": [],
+          "frames_analysed": 10,
+          "assessment": {
+            "status": "no_band_limit_found",
+            "reason": "No sharp band limit below the Nyquist frequency was found."
+          }
+        },
+        "limitations": [
+          "A band limit shows where the decoded audio stops, not who made the file or why.",
+          "Mastering with a low-pass filter, band-limited source material (speech, old recordings) or very quiet audio can look the same as a lossy or resampled history.",
+          "Thresholds are exploratory and uncalibrated; absence of a band limit does not show a file is original."
+        ],
+        "scoring_eligible": false,
+        "integrity_contribution": null,
+        "content_match_is_provenance": false,
+        "parameters": {
+          "frame_size": 8192,
+          "spectrum_frames": 600,
+          "level_percentile": 90,
+          "cliff_drop_db": 20.0,
+          "step_drop_db": 6.0,
+          "flat_floor_spread_db": 3.0,
+          "step_search_top_fraction": 0.9
+        },
+        "processing_ms": 10.604417067952454,
+        "policy_id": "audio-observations-bounded-v2",
+        "policy_version": 3,
+        "policy_sha256": "802922f116cc4e5a96222efc6db0aa64b628351edf10f3b8126f5ee52d80bf54",
+        "calibration": {
+          "profile_id": "bounded-audio-2026-10-20-v2",
+          "status": "exploratory_uncalibrated",
+          "summary": "Per-file content band limit from a 90th-percentile spectrum: a sharp cliff (>= 20 dB) or a step into a flat noise floor (>= 6 dB). Thresholds were set on the SoniqTools Bach clip, locally made trick files and six 320 kbps MP3s from a free-music site. Every Lumina music WAV tested is band-limited at 17.4-19.9 kHz by the generator, so a band limit is not evidence of a lossy history.",
+          "sample": {
+            "development_files": 17,
+            "real_material_files": 40
+          },
+          "case_counts": {
+            "development": [
+              {
+                "measure": "Genuine lossless files (SoniqTools Bach WAV/FLAC, 16/44.1 and 24/96) with no band limit flagged",
+                "count": 4,
+                "cases": 4,
+                "wilson_95": {
+                  "lower": 0.51,
+                  "upper": 1.0
+                }
+              },
+              {
+                "measure": "Trick files flagged (MP3 saved as FLAC, 128 kbps re-encoded at 320, CD upsampled to 96 kHz FLAC and WAV)",
+                "count": 4,
+                "cases": 4,
+                "wilson_95": {
+                  "lower": 0.51,
+                  "upper": 1.0
+                }
+              },
+              {
+                "measure": "Genuine LAME 128 and 320 kbps encodes reported consistent with their bitrate",
+                "count": 2,
+                "cases": 2,
+                "wilson_95": {
+                  "lower": 0.342,
+                  "upper": 1.0
+                }
+              },
+              {
+                "measure": "320 kbps MP3s from a free-music site flagged as below their bitrate",
+                "count": 6,
+                "cases": 6,
+                "wilson_95": {
+                  "lower": 0.61,
+                  "upper": 1.0
+                },
+                "note": "Five stop at 16.5-16.8 kHz (a 128 kbps low-pass); one stops at 18.2 kHz. Their history is inferred, not known."
+              }
+            ],
+            "held_out": [],
+            "real_material": [
+              {
+                "measure": "Project Rock recorder takes, mixes and reference flagged",
+                "count": 1,
+                "cases": 15,
+                "wilson_95": {
+                  "lower": 0.012,
+                  "upper": 0.298
+                },
+                "note": "The edit-reference WAV (48 kHz) stops at 22.05 kHz and is reported as resampled up from 44.1 kHz; the reference videos in the dataset carry 44.1 kHz audio."
+              },
+              {
+                "measure": "Lumina music WAVs (AI generator output) reported as band-limited like a lossy encoding",
+                "count": 25,
+                "cases": 25,
+                "wilson_95": {
+                  "lower": 0.867,
+                  "upper": 1.0
+                },
+                "note": "The generator's output is band-limited at 17.4-19.9 kHz; this is the documented false-positive risk."
+              }
+            ]
+          },
+          "transforms_tested": [
+            "mp3_saved_as_flac",
+            "mp3_reencoded_at_higher_bitrate",
+            "cd_upsampled_to_96_khz",
+            "genuine_lossless",
+            "genuine_mp3_128_and_320"
+          ],
+          "not_tested": [
+            "aac_or_opus_sources",
+            "low_pass_mastering",
+            "vinyl_or_tape_transfers",
+            "speech",
+            "sample_rates_below_32_khz_for_mp3"
+          ],
+          "false_match_rates": null
         }
       }
     ],
@@ -2102,17 +2753,19 @@
           "audfprint",
           "spectromap",
           "librosa",
-          "music_semantics"
+          "music_semantics",
+          "bandwidth"
         ],
         "relationship_count": 1,
         "task_count": 1,
-        "completed_provider_tasks": 4,
+        "completed_provider_tasks": 6,
         "unavailable_provider_tasks": 1,
         "policy_id": "audio-observations-bounded-v2",
-        "policy_version": 2,
-        "policy_sha256": "f6069e2b45fad46ade14ba0fa569053e9b76bea87aa78c1f7d41d84e45e550f8",
-        "processing_ms": 2107.5290829176083,
-        "calibration_status_sha256": "1d9f021c41ac75da6a8f88391df5936f6a6a0c27e5c412c27870f95b51f78180",
+        "policy_version": 3,
+        "policy_sha256": "802922f116cc4e5a96222efc6db0aa64b628351edf10f3b8126f5ee52d80bf54",
+        "file_task_count": 2,
+        "processing_ms": 1902.4942500982434,
+        "calibration_status_sha256": "bd9543448487a604c7869132eabe399e30bda0f556d17d215a291566de5f54a4",
         "aaf_range_tasks": 0,
         "aaf_range_tasks_with_correspondence": 0
       }

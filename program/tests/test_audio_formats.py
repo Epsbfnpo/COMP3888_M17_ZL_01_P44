@@ -525,6 +525,41 @@ class DiagnosticReadTests(unittest.TestCase):
         self.assertGreater(correlation, 0.99)
 
 
+class Mp3DecodedLengthTests(unittest.TestCase):
+    """libsndfile estimates the length of an MP3 without a Xing header and stops decoding there."""
+
+    @staticmethod
+    def without_info_frame(path, prefix=b""):
+        from music_target.audio_formats import mpeg_header
+        data = Path(path).read_bytes()
+        start = inspect_mp3(path).audio_offset
+        stripped = Path(str(path) + ".stripped.mp3")
+        stripped.write_bytes(prefix + data[start + mpeg_header(data, start).frame_bytes:])
+        return stripped
+
+    def test_large_id3_tag_on_constant_bitrate_mp3_decodes_in_full(self):
+        # Lumina's MP3s: constant bitrate, a ~21 KB ID3 tag (the C2PA manifest), no Xing header.
+        from music_target.audio_diagnostics.io import _open
+        folder = Path(tempfile.mkdtemp())
+        cbr = folder / "cbr.mp3"
+        soundfile.write(str(cbr), tone(), RATE, format="MP3", bitrate_mode="CONSTANT", compression_level=0.5)
+        path = self.without_info_frame(cbr, id3v24([geob(payload=bytes(range(256)) * 80)]))
+        descriptor, blocks = _open(path)
+        decoded = sum(len(block) for block in blocks(0, descriptor.frame_count))
+        self.assertEqual(descriptor.frame_count, inspect_mp3(path).audio_frames * 1152)
+        self.assertEqual(decoded, descriptor.frame_count)
+        self.assertNotEqual(soundfile.info(str(path)).frames, descriptor.frame_count)
+
+    def test_variable_bitrate_mp3_without_xing_header_is_not_analysed_truncated(self):
+        from music_target.audio_diagnostics.io import AnalysisUnavailable, read_audio
+        folder = Path(tempfile.mkdtemp())
+        path = self.without_info_frame(write_mp3(folder / "vbr.mp3"))
+        self.assertEqual(inspect_mp3(path).bitrate_mode, "VBR")
+        with self.assertRaises(AnalysisUnavailable) as caught:
+            read_audio(path, None, None, 22050)
+        self.assertEqual(caught.exception.code, "decoder_length_mismatch")
+
+
 class PublicContractTests(unittest.TestCase):
     def test_public_bundles_accept_flac_and_mpeg_audio(self):
         from music_target.contract import public_bundle_request
@@ -543,6 +578,21 @@ class PublicContractTests(unittest.TestCase):
                 self.assertEqual(response["execution_status"], "succeeded", response.get("error"))
                 from music_target.contract import validate
                 validate(response, "scoring-response.schema.json")
+
+
+class BenchmarkEncodingTests(unittest.TestCase):
+    def test_false_match_encoding_keeps_flac_samples_and_mp3_length(self):
+        sys.path.insert(0, str(BASE / "benchmarks"))
+        import false_match
+        folder = Path(tempfile.mkdtemp())
+        samples = tone()
+        source = folder / "clip.wav"
+        soundfile.write(str(source), samples, RATE, subtype="PCM_16")
+        flac = false_match.encode(source, folder, "flac")
+        mp3 = false_match.encode(source, folder, "mp3")
+        np.testing.assert_array_equal(soundfile.read(str(flac))[0], soundfile.read(str(source))[0])
+        self.assertEqual(detect(mp3).container, "MP3")
+        self.assertEqual(inspect_mp3(mp3).total_samples, len(samples))
 
 
 class BuilderProbeTests(unittest.TestCase):

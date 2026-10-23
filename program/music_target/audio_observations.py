@@ -17,7 +17,8 @@ from music_target.wav_parser import _parse_bext, _parse_list_info
 MP3_LIMITED_CHECKS = (
     ("bit_depth", "MP3 has no bit depth; declared bit depths are not compared."),
     ("recorder_metadata", "MP3 has no standard field for recorder metadata (bext/iXML), so sound-report "
-                          "and AAF comparisons with recorder fields are not possible."),
+                          "and AAF comparisons with recorder fields, and chronology checks on BWF origination "
+                          "dates, are not possible."),
     ("lossless_content", "MP3 is lossy: decoded samples differ from the original recording, so audio "
                          "diagnostics compare an approximation of the source."),
 )

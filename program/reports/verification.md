@@ -1,10 +1,21 @@
 # Verification Record
 
+## Testing_music run and content bandwidth (2026-10-24, branch feature/flac-mp3-support)
+
+- `REQUIRE_AUDIO_BACKENDS=1`, CPython 3.13.7 on macOS: **386 tests, all passed**. 382 non-GUI tests ran in one process (32 s, no skips); the four `test_builder.GuiTests` cases ran in separate processes.
+- New: `tests/test_bandwidth.py` (9 tests: assessment rules, detector on synthetic low-passed, floor-masked and upsampled noise, block-size invariance, insufficient signal, evaluator axes unchanged) and one builder test for the per-file bandwidth lines.
+- Material: 11 downloaded files (6 free-site MP3s, Bach as 16/44.1 and 24/96 WAV and FLAC, one Lumina 16 kHz MP3) and 7 locally made files (genuine 128 and 320 kbps MP3s, a fake 320 kbps MP3 from 128, a fake FLAC from 128, a fake 24/96 FLAC and WAV from CD audio). Every single-file and pair case completed with audio analysis.
+- Problems found and fixed: (1) fake formats passed unnoticed; the new report-only `bandwidth` provider flags all four trick files and none of the four genuine lossless files, and both genuine encodes read `consistent_with_bitrate`; (2) a CBR MP3 without gapless information (Jingle Bells) was refused by the decoder length guard for a 439-sample shortfall; the guard now allows two frames when no gapless length exists.
+- Observed, not changed: the free-site MP3s share watermark-like bursts at fixed times, so audfprint reports offset-0 supported matches in 6 of 10 unrelated pairs; this is real shared audio, and the frozen gates are unchanged (`docs/FALSE_MATCH_BENCHMARK_2026-10-21.md`).
+- Real material: Project Rock 1 of 15 files flagged (the 48 kHz edit reference, upsampled from 44.1 kHz); all 25 Lumina WAVs are band-limited (16.9–20.1 kHz), so a flag is never a verdict. Axes are identical with and without the provider.
+
 ## FLAC and MP3 support (2026-10-23, branch feature/flac-mp3-support)
 
-- `REQUIRE_AUDIO_BACKENDS=1`, CPython 3.13.7 on macOS: **372 tests, all passed**. 368 non-GUI tests ran in one process (31 s, no skips); the four `test_builder.GuiTests` cases ran in separate processes.
+- `REQUIRE_AUDIO_BACKENDS=1`, CPython 3.13.7 on macOS: **376 tests, all passed**. 372 non-GUI tests ran in one process (31 s, no skips); the four `test_builder.GuiTests` cases ran in separate processes.
 - New: `tests/test_audio_formats.py` (29 tests) for detection by content (including an ID3v2 tag before `fLaC`), bounded ID3v2, FLAC blocks, kept WAV chunks and MD5, MP3 exact and estimated length, lost sync and tags, evaluator results, C2PA in FLAC and MP3, diagnostics decoding, the public profile and the builder probe. A malformed FLAC named `.wav` is now an input error (read as FLAC) instead of `unsupported`; an Ogg file named `.wav` is still `unsupported`.
 - Checked by hand against reference tools: the FLAC MD5 recomputed from soundfile equals `metaflac --show-md5sum` for 8-, 16- and 24-bit files with 1–3 channels; the MP3 exact sample count equals soundfile's gapless length for 16 LAME and FFmpeg encodes (CBR, VBR, 11.025–48 kHz, MPEG-1, 2 and 2.5); a 20-minute MP3 is walked in 0.07 s and a 299 MiB FLAC MD5 is verified in 1.6 s.
+- Real material: Project Rock Ep01 rerun as FLAC (kept and plain metadata), MP3 320 and 128 kbps and all-FLAC; see `docs/PROJECT_ROCK_FINDINGS_2026-10-22.md` (FLAC with kept metadata identical to WAV; plain FLAC withholds Integrity; MP3 loses only chronology).
+- Real Lumina MP3 (Seed Speech 2.0, 24 and 48 kHz): C2PA in an ID3v2.4 `GEOB` frame, valid, known AI signer (same BytePlus certificate as the WAV output), untrusted; `ai-generated` consistent, `recorded` contradicted. These files have no Xing header; libsndfile mis-estimates such lengths, so the diagnostics reader now decodes only the MPEG frames and refuses truncated output (`decoder_length_mismatch`).
 - WAV unchanged: every example regenerates identically apart from `source_revision` and the `mp3_encoded_queries` calibration note. On the repeated-excerpt example, WAV, FLAC and MP3 versions give the same audfprint offsets (2.0 s and 10.01 s).
 
 ## Version 0.8.1, calibration intervals (2026-10-23)
