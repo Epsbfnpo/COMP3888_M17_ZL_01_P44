@@ -530,7 +530,9 @@ python3 builder_gui.py
 The builder imports and hashes files in the background, provides workflow
 preflight and full assessment, and can save the full machine-readable result.
 Full assessment uses a verified temporary snapshot and the same production
-worker as the command-line evaluator.
+worker as the command-line evaluator. Its preflight
+uses the evaluator's limits (128 artefacts, 512 MiB per object, 1 GiB per
+request), so it refuses exactly what the evaluator would refuse.
 
 Portable exports place files in `objects/` under content-addressed names
 (`objects/<sha256>.<extension>`) accepted by the evaluator. The source files
@@ -564,8 +566,8 @@ needs the audio libraries and the benchmark-only `mir_eval` from
 `requirements-benchmark.txt` (without it, the 5 structure-benchmark cases are
 skipped). The four GUI tests each passed when run in a separate process; run
 them that way, because they can hang inside the full suite on macOS Tk.
-Version 0.8.1 (22 October 2026): the same procedure found 329 tests; all 325
-non-GUI tests passed in one process (29 s) and the four GUI tests passed
+Version 0.8.1 (22 October 2026): the same procedure found 332 tests; all 328
+non-GUI tests passed in one process (31 s) and the four GUI tests passed
 separately (`reports/test-results.txt`, `reports/release.json`).
 `tests/test_builder.py` now also passes on its own: it imports `run` (and so
 c2pa) before its worker tests mock `subprocess.Popen`, because c2pa's import

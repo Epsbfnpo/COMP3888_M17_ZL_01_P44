@@ -1,6 +1,6 @@
 # Physical Similarity Diagnostic Policy
 
-Status: policy-disabled in v0.7.0.
+Status: policy-disabled since v0.7.0; still disabled in v0.8.1.
 
 The active assessment path does not import or invoke
 `PhysicalSimilarityPass`. Exact reconstruction, waveform and feature
@@ -26,7 +26,7 @@ active customer policy.
 ## Historical v0.6 implementation (inactive)
 
 The text below records the former v1 implementation so that its behaviour can
-be reviewed. It is not executed by v0.7.0.
+be reviewed. It has not been executed by any version since v0.7.0.
 
 ## 1. Purpose and evidence boundary
 

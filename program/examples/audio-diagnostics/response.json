@@ -6,7 +6,7 @@
   "system": {
     "name": "COMP3888-music-baseline",
     "version": "0.8.1",
-    "source_revision": "sha256:17f814af455df89d912f1a8ce5d49680fa8dd2296675fda831c0281ecc6fd324"
+    "source_revision": "sha256:be7bfe70c048d0be210d44f91e568470677dae4991eb4cfc54446d37092f54bc"
   },
   "execution_status": "succeeded",
   "axes": {
@@ -417,9 +417,9 @@
       "content_match_is_provenance": false
     }
   ],
-  "processing_ms": 1838.826416991651,
+  "processing_ms": 1815.3831659583375,
   "resource_usage": {
-    "cpu_ms": 3.5189999999999944,
+    "cpu_ms": 3.603000000000023,
     "peak_rss_kib": null
   },
   "error": null,
@@ -1253,7 +1253,7 @@
           "minimum_candidate_matches": 5,
           "support_window_seconds": 0.25
         },
-        "processing_ms": 330.75904194265604,
+        "processing_ms": 323.30970792099833,
         "policy_id": "audio-observations-bounded-v2",
         "policy_version": 2,
         "policy_sha256": "f6069e2b45fad46ade14ba0fa569053e9b76bea87aa78c1f7d41d84e45e550f8",
@@ -1476,7 +1476,7 @@
           "minimum_candidate_matches": 5,
           "support_window_seconds": 0.25
         },
-        "processing_ms": 20.546499988995492,
+        "processing_ms": 18.35900009609759,
         "policy_id": "audio-observations-bounded-v2",
         "policy_version": 2,
         "policy_sha256": "f6069e2b45fad46ade14ba0fa569053e9b76bea87aa78c1f7d41d84e45e550f8",
@@ -1603,7 +1603,7 @@
           "aggregation_seconds": 1.0,
           "candidate_cosine_similarity": 0.9
         },
-        "processing_ms": 509.2617500340566,
+        "processing_ms": 501.99374998919666,
         "policy_id": "audio-observations-bounded-v2",
         "policy_version": 2,
         "policy_sha256": "f6069e2b45fad46ade14ba0fa569053e9b76bea87aa78c1f7d41d84e45e550f8",
@@ -1685,7 +1685,7 @@
         "integrity_contribution": null,
         "content_match_is_provenance": false,
         "parameters": {},
-        "processing_ms": 0.0310409814119339,
+        "processing_ms": 0.029207905754446983,
         "policy_id": "audio-observations-bounded-v2",
         "policy_version": 2,
         "policy_sha256": "f6069e2b45fad46ade14ba0fa569053e9b76bea87aa78c1f7d41d84e45e550f8",
@@ -1778,7 +1778,7 @@
           "section_minimum_seconds": 6.0,
           "section_prominence": 0.03
         },
-        "processing_ms": 531.701875035651,
+        "processing_ms": 528.8623749511316,
         "policy_id": "audio-observations-bounded-v2",
         "policy_version": 2,
         "policy_sha256": "f6069e2b45fad46ade14ba0fa569053e9b76bea87aa78c1f7d41d84e45e550f8",
@@ -1862,7 +1862,7 @@
         "policy_id": "audio-observations-bounded-v2",
         "policy_version": 2,
         "policy_sha256": "f6069e2b45fad46ade14ba0fa569053e9b76bea87aa78c1f7d41d84e45e550f8",
-        "processing_ms": 1613.1668750895187,
+        "processing_ms": 1591.3910419913009,
         "calibration_status_sha256": "7ade764150c802ff947149ecfc813ff6f59300929aa0421e11d4a868aeba7668",
         "aaf_range_tasks": 0,
         "aaf_range_tasks_with_correspondence": 0
