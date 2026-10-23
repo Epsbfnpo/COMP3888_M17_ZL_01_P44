@@ -286,8 +286,7 @@ class AudioIntegrationTests(unittest.TestCase):
         response = self.augment()
         self.assert_core_unchanged(response)
         codes = [row["code"] for row in response["findings"] if row["code"].startswith("AUDIO_")]
-        # The single file is still described once by the per-file bandwidth provider.
-        self.assertEqual(codes, ["AUDIO_BANDWIDTH_OBSERVATION", "AUDIO_DIAGNOSTIC_NOT_APPLICABLE"])
+        self.assertEqual(codes, ["AUDIO_DIAGNOSTIC_NOT_APPLICABLE"])
         self.assertEqual(response["assessment_checks"]["audio_diagnostic_summary"][0]["task_count"], 0)
 
     def test_provider_crash_keeps_earlier_rows_and_its_stderr(self):
@@ -573,7 +572,7 @@ class FingerprintAgreementTests(unittest.TestCase):
 class AudioPolicyTests(unittest.TestCase):
     def test_default_has_all_providers_and_no_development_caps(self):
         policy = load_policy()
-        self.assertEqual(policy["providers"], ["audfprint", "spectromap", "librosa", "music_semantics", "bandwidth"])
+        self.assertEqual(policy["providers"], ["audfprint", "spectromap", "librosa", "music_semantics"])
         self.assertFalse(any("max_" in key or "timeout" in key for params in policy["parameters"].values() for key in params))
 
     def test_protocol_rejects_score_eligibility(self):

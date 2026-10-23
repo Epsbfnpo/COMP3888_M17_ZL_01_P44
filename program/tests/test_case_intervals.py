@@ -77,15 +77,6 @@ class CalibrationStatusIntervalTests(unittest.TestCase):
                 observed = next(item[key] for key in ("false_matches", "detected", "supported") if key in item)
                 self.assertEqual(item["wilson_95"], interval_record(observed, item["pairs"]), f"{provider} {name}")
 
-    def test_encoded_benchmark_runs_carry_intervals(self):
-        for provider, record in self.status["providers"].items():
-            for encoding, rates in (record.get("encoded_false_match_rates") or {}).items():
-                self.assertEqual(rates["split"], "held_out")
-                for name, item in rates["categories"].items():
-                    observed = next(item[key] for key in ("false_matches", "detected", "supported") if key in item)
-                    self.assertEqual(item["wilson_95"], interval_record(observed, item["pairs"]),
-                                     f"{provider} {encoding} {name}")
-
     def test_documented_held_out_counts(self):
         held_out = {entry["measure"]: (entry["count"], entry["cases"])
                     for entry in self.status["providers"]["music_semantics"]["case_counts"]["held_out"]}

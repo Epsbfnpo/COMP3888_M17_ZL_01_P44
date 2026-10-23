@@ -20,8 +20,6 @@ DEFAULTS = {
                         "label_similarity": 0.9, "baseline_shuffles": 20, "minimum_seconds": 8.0, "alignment_grid_seconds": 0.25,
                         "section_aggregation_seconds": 0.5, "section_context_seconds": 12.0,
                         "section_minimum_seconds": 6.0, "section_prominence": 0.03},
-    "bandwidth": {"frame_size": 8192, "spectrum_frames": 600, "level_percentile": 90, "cliff_drop_db": 20.0,
-                  "step_drop_db": 6.0, "flat_floor_spread_db": 3.0, "step_search_top_fraction": 0.9},
 }
 
 
@@ -52,7 +50,7 @@ def load_policy(path=DEFAULT_PATH):
         raise ValueError("Invalid audio parameters.")
     params = {}
     integer_keys = {"sample_rate_hz", "n_fft", "noverlap", "condition", "hop_length", "minimum_candidate_matches",
-                    "phrase_beats", "baseline_shuffles", "frame_size", "spectrum_frames", "level_percentile"}
+                    "phrase_beats", "baseline_shuffles"}
     for name in names:
         supplied = overrides.get(name, {})
         if not isinstance(supplied, dict) or set(supplied) - set(DEFAULTS[name]):
@@ -74,10 +72,5 @@ def load_policy(path=DEFAULT_PATH):
             raise ValueError("Invalid cosine candidate threshold.")
         if name == "music_semantics" and not 0 < params[name]["label_similarity"] <= 1:
             raise ValueError("Invalid section label similarity.")
-        if name == "bandwidth":
-            if not 1 <= params[name]["level_percentile"] <= 100 or params[name]["frame_size"] < 1024:
-                raise ValueError("Invalid bandwidth frame size or level percentile.")
-            if not 0 < params[name]["step_search_top_fraction"] <= 1:
-                raise ValueError("Bandwidth step_search_top_fraction must be in (0, 1].")
     return {**policy, "parameters": params,
             "policy_sha256": hashlib.sha256(raw).hexdigest()}

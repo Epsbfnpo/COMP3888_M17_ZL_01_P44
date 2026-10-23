@@ -4,9 +4,7 @@ import json
 from functools import lru_cache
 from pathlib import Path
 
-PROVIDERS = ("audfprint", "spectromap", "librosa", "music_semantics", "bandwidth")
-# Providers that describe one file rather than compare a declared pair.
-FILE_PROVIDERS = ("bandwidth",)
+PROVIDERS = ("audfprint", "spectromap", "librosa", "music_semantics")
 NON_SCORING = {"scoring_eligible": False, "integrity_contribution": None,
                "content_match_is_provenance": False}
 

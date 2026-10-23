@@ -45,38 +45,6 @@ Absence of a match is still not reported as disagreement with the AAF.
 Findings 6 and 4b need a client decision; 8 needs no code change; 9 waits for
 an FCP XML parser; the missing Ep02/Ep03 final audio must come from the client.
 
-## FLAC and MP3 versions of the Ep01 chain (2026-10-23)
-
-The dataset contains no FLAC or MP3 (all 251 audio files are WAV; the videos
-carry PCM or AAC), so the Ep01 chain (13 recorder takes, 2 sound reports, the
-AAF, the reference and the WIP mix) was transcoded locally and rerun with
-`--audio-analysis` on the FLAC/MP3 branch. Every transcoded object got a new
-SHA-256 and every reference to it was rewritten.
-
-| Variant | Axes and Integrity | Cross-evidence | AAF-range diagnostics | Other differences |
-|---|---|---|---|---|
-| WAV (baseline) | Integrity 1.0 consistent, released; 0 of 122 facts contradicted | 134 recorder-metadata checks pass | 6 of 14 ranges with a correspondence | 13 chronology rows |
-| Takes as FLAC, `flac --keep-foreign-metadata` | Same | Same | Same | 13 more assessed facts (the FLAC MD5 checks, all matched); recorder metadata identical for every take |
-| Takes as FLAC, plain `flac` | Integrity withheld (`insufficient_assessed_layers`) | All 134 recorder-metadata checks gone | No AAF ranges (takes cannot be matched to the AAF), whole-take tasks instead | `FLAC_RECORDER_METADATA_ABSENT` on all 13 takes; no chronology; one AAF take reported as not submitted |
-| Mix as MP3, 320 kbps | Same | Same | Same 6 of 14 | Exact length (39.68 s) from the LAME header; `AUDIO_FORMAT_LIMITED_CHECKS`; no chronology (the MP3 has no BWF date) |
-| Mix as MP3, 128 kbps | Same | Same | Same 6 of 14 | As for 320 kbps |
-| Every audio file as FLAC (kept metadata) | Same | Same | Same | 15 more assessed facts (MD5, all matched) |
-
-Each run took 20–30 s. Conclusions:
-
-- A recorder take delivered as FLAC with its WAV chunks kept supports every
-  check a WAV take does, plus an MD5 of the audio.
-- Plain FLAC encoding is the real risk: the recorder metadata is gone, so the
-  strongest evidence tier disappears and Integrity is withheld. The response
-  says why (`FLAC_RECORDER_METADATA_ABSENT`); nothing is reported as a
-  contradiction. Submitters should be told to use `--keep-foreign-metadata`.
-- An MP3 final mix keeps the recorder evidence of its WAV/FLAC sources and the
-  AAF-range correspondences found here, but loses the chronology comparison;
-  `AUDIO_FORMAT_LIMITED_CHECKS` now names that loss too.
-- These are dialogue-heavy takes; the false-match benchmark showed that MP3
-  can lose weak shared material, so the unchanged 6 of 14 is a case
-  observation, not a recall guarantee.
-
 ## What was run
 
 | Experiment | Input | Result |

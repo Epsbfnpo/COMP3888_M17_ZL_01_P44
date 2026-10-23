@@ -1,12 +1,11 @@
 {
   "policy_id": "audio-observations-bounded-v2",
-  "policy_version": 3,
+  "policy_version": 2,
   "providers": [
     "audfprint",
     "spectromap",
     "librosa",
-    "music_semantics",
-    "bandwidth"
+    "music_semantics"
   ],
   "parameters": {}
 }

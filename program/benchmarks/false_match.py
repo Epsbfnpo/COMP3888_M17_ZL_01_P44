@@ -9,11 +9,7 @@ small sample, never population rates; each carries a 95% Wilson interval. The
 benchmark runs after the gate profile was frozen, so its split is held_out.
 
     python -B benchmarks/false_match.py benchmarks/false_match_lumina_2026-10-21.json \
-        --audio /path/to/clips --out /tmp/false_match.json [--write-status] [--encode flac|mp3]
-
-``--encode`` re-encodes every clip and derived mix with soundfile before it is
-evaluated, so the same pairs are measured as FLAC or MP3 files. Encoded runs
-are never written to the calibration status automatically.
+        --audio /path/to/clips --out /tmp/false_match.json [--write-status]
 """
 
 import argparse
@@ -67,27 +63,14 @@ def make_shared_loop(spec, audio_dir, out_dir):
     return path
 
 
-def encode(path, out_dir, container):
-    """Re-encode a WAV as FLAC (same samples) or MP3 (libsndfile's LAME encoder, VBR default)."""
-    samples, rate = sf.read(str(path), dtype="float64", always_2d=True)
-    target = out_dir / f"{Path(path).stem}.{container}"
-    if container == "flac":
-        sf.write(str(target), samples, rate, format="FLAC", subtype=sf.info(str(path)).subtype)
-    else:
-        sf.write(str(target), samples, rate, format="MP3", subtype="MPEG_LAYER_III")
-    return target
-
-
 def evaluate_pair(source, target, work):
     folder = Path(tempfile.mkdtemp(dir=work))
     (folder / "objects").mkdir()
-    hashes, suffixes = [], []
+    hashes = []
     for path in (source, target):
         digest = sha256(path)
-        suffix = Path(path).suffix.lower()
-        (folder / "objects" / f"{digest}{suffix}").write_bytes(Path(path).read_bytes())
+        (folder / "objects" / f"{digest}.wav").write_bytes(Path(path).read_bytes())
         hashes.append(digest)
-        suffixes.append(suffix)
     if hashes[0] == hashes[1]:
         raise ValueError(f"{source} and {target} are byte-identical")
     request = json.loads((PROGRAM / "examples/valid-generated/request.json").read_text())
@@ -101,7 +84,7 @@ def evaluate_pair(source, target, work):
         {"artefact_hash": hashes[1], "artefact_type": "audio/master",
          "attributes": {"creation_method": "ai-generated"},
          "evidence": [{"hash": hashes[0], "relationship_type": "derived_from", "attributes": {}}]}]
-    request["objects"] = {digest: f"objects/{digest}{suffix}" for digest, suffix in zip(hashes, suffixes)}
+    request["objects"] = {digest: f"objects/{digest}.wav" for digest in hashes}
     core = run.evaluate(copy.deepcopy(request), folder, "native")
     if core["execution_status"] != "succeeded":
         raise RuntimeError(f"core evaluation failed: {core.get('error')}")
@@ -170,11 +153,7 @@ def main():
     parser.add_argument("--out", type=Path, required=True)
     parser.add_argument("--write-status", action="store_true",
                         help="Record the counts as false_match_rates in policies/audio_calibration_status.json")
-    parser.add_argument("--encode", choices=("flac", "mp3"),
-                        help="Re-encode every clip and derived mix before evaluation")
     args = parser.parse_args()
-    if args.encode and args.write_status:
-        parser.error("--write-status records WAV results only; it cannot be combined with --encode")
     manifest = json.loads(args.manifest.read_text())
     with tempfile.TemporaryDirectory() as directory:
         work = Path(directory)
@@ -186,10 +165,6 @@ def main():
             files[clip["id"]] = path
         for spec in manifest.get("derived", []):
             files[spec["id"]] = make_shared_loop(spec, args.audio, work)
-        if args.encode:
-            encoded = work / ("encoded-" + args.encode)
-            encoded.mkdir()
-            files = {name: encode(path, encoded, args.encode) for name, path in files.items()}
         results = []
         for pair in manifest["pairs"]:
             row = {"pair_id": pair["pair_id"], "category": pair["category"],
@@ -203,8 +178,8 @@ def main():
             print(f"{pair['pair_id']:<28} {pair['category']:<26} " + (row.get("error") or " ".join(
                 f"{name}={'Y' if row['observation'][name]['match'] else '-'}" for name in DEFINITIONS)), flush=True)
     summary = summarize(manifest, results)
-    args.out.write_text(json.dumps({"manifest": manifest["benchmark_id"], "encoding": args.encode or "wav",
-                                    "results": results, "summary": summary}, indent=2) + "\n")
+    args.out.write_text(json.dumps({"manifest": manifest["benchmark_id"], "results": results,
+                                    "summary": summary}, indent=2) + "\n")
     if args.write_status:
         status = json.loads(STATUS_PATH.read_text())
         for provider, record in summary.items():
