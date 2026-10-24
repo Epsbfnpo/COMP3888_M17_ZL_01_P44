@@ -1,5 +1,13 @@
 # Verification Record
 
+## Suno as a known AI signer (2026-10-24, branch feature/c2pa-ai-signer-expansion)
+
+- CPython 3.12.2 on macOS, c2pa-python 0.37.10 (`.venv312`): `tests.test_c2pa_integrity` **33 tests, OK (30 passed, 3 skipped without the Suno downloads)**; with `C2PA_SUNO_SAMPLE_DIR` set, the module plus `test_audio_formats.C2paInFlacAndMp3Tests` ran **35 tests, all passed, no skips**.
+- Full non-GUI run in this environment: 378 tests, 2 failures and 10 errors, all from the optional audio packages that are not installed in `.venv312` (scipy, librosa, spectromap). The same run on an unmodified export of `HEAD` gives the same 12 failing tests (369 tests), so none is caused by this change. The 425-test record below used the full audio environment.
+- Samples: two Suno MP3 downloads of separate generations (SHA-256 `b5ea01a4…9b47555` and `22565ec8…5c72f910`). Both manifests, in an ID3v2.4 `GEOB` frame, are valid with no failure codes, declare `trainedAlgorithmicMedia`, carry a DigiCert time-stamp (06:30:04Z and 06:42:55Z) and are signed by the same certificate: `CN=Suno Content Credentials, O=Suno Inc`, issued by `CN=Suno C2PA Root CA, O=Suno Inc`, valid 2026-07-23 to 2028-10-25, fingerprint `Q60v1k3DH0FLokCC25J/xRvIMOGEFTfKG7FAZWzH+2A=`. The SDK allowed-list match accepts that fingerprint and rejects a different one.
+- New: `SunoKnownSignerTests` (6 tests: the shipped entry, a certificate copying Suno's subject and serial number not recognised, attestation strength and AI disclosure identical with and without the entry, `recorded` contradicted, `ai-generated` consistent) and `SunoSampleTests` (3 tests on the real downloads, matched by SHA-256; skipped unless `C2PA_SUNO_SAMPLE_DIR` is set). The audio is not committed.
+- Scoring logic and pinned trust lists unchanged; Suno stays `untrusted` (0.3).
+
 ## WAV focus and FLAC/MP3 scope (2026-10-24, branch feature/merge-main-flac-mp3)
 
 - `REQUIRE_AUDIO_BACKENDS=1`, CPython 3.13.7 on macOS: **425 tests, all passed**. 421 non-GUI tests ran in one process (34 s, no skips); the four `test_builder.GuiTests` cases ran in separate processes.

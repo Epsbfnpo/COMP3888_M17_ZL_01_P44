@@ -316,7 +316,7 @@ the list versions in `assessment_checks.c2pa_trust_configuration`.
 | C2PA Trust List | `c2pa-org/conformance-public` @ `47009ee` (2026-10-17) | Trust anchors; a signer chaining to them is `trusted_c2pa` |
 | C2PA TSA Trust List | same commit | Pinned and recorded only; c2pa-python 0.37.10 has no time-stamp authority setting |
 | Interim Trust List (legacy, frozen) | `contentauth/verify-site` @ `83b2e30`; frozen 2026-01-01 | `trusted_legacy_itl` only when the SDK reports a signing time before the freeze |
-| Known AI signers | `known_ai_signers.json` (BytePlus Lumina certificate, valid until 2028-03-16) | Not a trust list: identifies AI generators whose AI labels are accepted |
+| Known AI signers | `known_ai_signers.json` (BytePlus Lumina certificate, valid until 2028-03-16; Suno certificate, valid 2026-07-23 to 2028-10-25) | Not a trust list: identifies AI generators whose AI labels are accepted |
 
 **Attestation strength** is ordered by what was verified:
 
@@ -378,7 +378,14 @@ value.
 Tested on BytePlus Lumina output (20-21 October 2026): unmodified files are
 valid but untrusted (0.3) with an accepted AI label; files edited after signing
 are invalid with `C2PA_CONTENT_BINDING_FAILED`, and the AI label is still
-accepted. Lumina is one vendor; this does not validate other signers.
+accepted. Two Suno MP3 downloads (24 October 2026, separate generations) carry
+a valid manifest in an ID3 `GEOB` frame, declare `trainedAlgorithmicMedia` and
+are signed by the same certificate (`CN=Suno Content Credentials`, issued by
+Suno's private root): they are recognised as Suno, stay untrusted (0.3), and
+declaring them `recorded` is a contradiction. Each listed signer was checked on
+its own output; this does not validate other signers. See
+[`policies/c2pa_trust/README.md`](program/policies/c2pa_trust/README.md) for the
+evidence and how to add a signer.
 
 ## Integrity weighting and cap
 
@@ -801,7 +808,7 @@ separately (`reports/test-results.txt`, `reports/release.json`).
 `tests/test_builder.py` now also passes on its own: it imports `run` (and so
 c2pa) before its worker tests mock `subprocess.Popen`, because c2pa's import
 calls `platform.processor()`, which spawns a subprocess. The
-24 C2PA tests cover pinned-list hashes, trust status, asymmetric trust, known AI
+33 C2PA tests cover pinned-list hashes, trust status, asymmetric trust, known AI
 signers, the C2PA chunk precondition and every final state. The synthetic tests
 are engineering checks, not real-session accuracy calibration. Run the full dependency-required suite with
 `REQUIRE_AUDIO_BACKENDS=1 python3 -B -m unittest discover -s tests -v`.
@@ -855,7 +862,7 @@ The locations below are relative to `program/`.
 | `tests/test_audio_diagnostics.py` | 41 provider, protocol, score-isolation, insufficient-support and calibration-status tests |
 | `tests/test_case_intervals.py` | 10 tests: interval values and bounds, stored intervals matching their counts, and the benchmark summaries |
 | `tests/test_audio_formats.py` | 29 FLAC and MP3 tests: detection by content, ID3v2, FLAC blocks, kept WAV chunks and MD5, MP3 exact and estimated length, sync loss and tags, evaluator results, C2PA in FLAC and MP3, diagnostics decoding, the public profile and the builder probe |
-| `tests/test_c2pa_integrity.py` | 24 C2PA tests: runtime-signed fixtures, pinned lists, trust status, asymmetric trust, known AI signers, the C2PA chunk precondition and every final state |
+| `tests/test_c2pa_integrity.py` | 33 C2PA tests: runtime-signed fixtures, pinned lists, trust status, asymmetric trust, known AI signers (including Suno by fingerprint only; the three real-sample tests run when `C2PA_SUNO_SAMPLE_DIR` is set), the C2PA chunk precondition and every final state |
 | `reports/audio-diagnostics-verification.json` | Historical 19 October 2026 verification and real-provider example results |
 | `docs/AUDIO_DIAGNOSTICS.md` | Detailed audio setup, usage, output and interpretation |
 | `music_target/scoring_profile.py`, `policies/scoring_profile.json` | Validated three-layer Integrity weights, tier-aware withholding, confidence and severe-contradiction cap |
@@ -873,7 +880,7 @@ The locations below are relative to `program/`.
 3. Obtain genuine successful-creation fixtures; the generated teaching fixture is not validated human-creation ground truth.
 4. Confirm that the internal weighting and interpretation of integrity checks match customer expectations. The project keeps the four dimensions separate and does not add a decision policy.
 5. Agree with CSEC whether the new optional C2PA `validation` fields (`trust_status`, `trust_source`, `revocation_status`, `signer`) need a new response `schema_version`; it currently stays `0.2-candidate`.
-6. Confirm the BytePlus Lumina signing certificate with BytePlus, decide which other AI generators to add to the known AI signer list, and agree how often the pinned C2PA trust lists are reviewed.
+6. Confirm the BytePlus Lumina and Suno signing certificates with the vendors, decide which other AI generators to add to the known AI signer list (ElevenLabs and Stability AI have only expired certificates on the legacy ITL and no verified audio sample), and agree how often the pinned C2PA trust lists are reviewed.
 7. Decide with the client which recordings a workflow requires (every take the AAF edit uses, or a sample), what substitutes are acceptable, and whether `min_supported_asset_share` should gate release. Chronology warnings stay report-only until relationship-specific time rules, time sources and tolerances are agreed. See `program/docs/NEXT_TASKS.md` items 34–37.
 
 These decisions do not block the local executable baseline, but the directory must not yet be described as a complete music-authenticity assessment system.

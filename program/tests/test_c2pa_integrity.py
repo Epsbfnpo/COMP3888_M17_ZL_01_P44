@@ -5,11 +5,13 @@ so no third-party audio or private keys are stored in the repository.
 """
 
 import base64
+import contextlib
 import copy
 import datetime
 import hashlib
 import importlib.util
 import json
+import os
 import shutil
 import struct
 import sys
@@ -93,8 +95,12 @@ def _make_root(common_name="Test Root"):
     return ca, ca_key
 
 
-def _sign(source, target, source_type=AI_SOURCE_TYPE, root=None, mime_type="audio/wav"):
-    """Sign audio with a digital source type claim using a leaf issued by `root` (or a new throwaway CA)."""
+def _sign(source, target, source_type=AI_SOURCE_TYPE, root=None, mime_type="audio/wav", leaf_name=None, serial=None):
+    """Sign audio with a digital source type claim using a leaf issued by `root` (or a new throwaway CA).
+
+    `leaf_name` and `serial` set the leaf's subject and serial number, for
+    certificates that copy another signer's identity fields.
+    """
     import c2pa
     from cryptography import x509
     from cryptography.hazmat.primitives import hashes, serialization
@@ -105,8 +111,8 @@ def _sign(source, target, source_type=AI_SOURCE_TYPE, root=None, mime_type="audi
     name, usage = _name, _usage
     ca, ca_key = root or _make_root()
     leaf_key = ec.generate_private_key(ec.SECP256R1())
-    leaf = (x509.CertificateBuilder().subject_name(name("Test Signer")).issuer_name(ca.subject)
-            .public_key(leaf_key.public_key()).serial_number(x509.random_serial_number())
+    leaf = (x509.CertificateBuilder().subject_name(leaf_name or name("Test Signer")).issuer_name(ca.subject)
+            .public_key(leaf_key.public_key()).serial_number(serial or x509.random_serial_number())
             .not_valid_before(now - datetime.timedelta(days=1)).not_valid_after(now + datetime.timedelta(days=30))
             .add_extension(x509.BasicConstraints(ca=False, path_length=None), critical=True)
             .add_extension(usage(False), critical=True)
@@ -384,6 +390,190 @@ class AsymmetricC2paTrustTests(unittest.TestCase):
         self.assertIn("C2PA_KNOWN_AI_SIGNER", codes)
         self.assertIn("C2PA_CONTENT_BINDING_FAILED", codes)
         self.assertIs(ai_checks[0]["passed"], False)
+
+
+SUNO_FINGERPRINT = "Q60v1k3DH0FLokCC25J/xRvIMOGEFTfKG7FAZWzH+2A="
+# Folder holding the verified Suno downloads (not stored in the repository).
+SUNO_SAMPLE_DIR = os.environ.get("C2PA_SUNO_SAMPLE_DIR")
+
+
+def _shipped_signer(name):
+    from legacy_parsers.c2pa_parser import load_known_ai_signers
+    return next(signer for signer in load_known_ai_signers() if signer["name"] == name)
+
+
+def _evaluate_single(folder, data, creation_method, suffix, known_list=None):
+    """Evaluate one final audio file declared with `creation_method`, optionally with another signer list."""
+    from unittest import mock
+    (folder / "objects").mkdir()
+    digest = hashlib.sha256(data).hexdigest()
+    (folder / "objects" / f"{digest}{suffix}").write_bytes(data)
+    request = json.loads((BASE / "examples/valid-generated/request.json").read_text())
+    if creation_method == "recorded":
+        request["workflow"]["workflow_id"] = "recorded_single_performance_to_final"
+    request["workflow"]["modifiers"] = []
+    request["chain"]["artefacts"] = [{"artefact_hash": digest, "artefact_type": "audio/master",
+                                      "attributes": {"creation_method": creation_method}, "evidence": []}]
+    request["chain"]["final_artefact_hash"] = digest
+    request["objects"] = {digest: f"objects/{digest}{suffix}"}
+    patch = (mock.patch("legacy_parsers.c2pa_parser.KNOWN_AI_SIGNERS_PATH", known_list)
+             if known_list else contextlib.nullcontext())
+    with patch:
+        response = run.evaluate(copy.deepcopy(request), folder, "native")
+    codes = {row["code"]: row for row in response["findings"]}
+    ai_checks = [row for row in response["assessment_checks"]["cross_evidence"]
+                 if row["rule"] == "c2pa_ai_source_type_matches_creation_method"]
+    return response, codes, ai_checks
+
+
+@unittest.skipIf(importlib.util.find_spec("c2pa") is None,
+                 "c2pa-python is a required dependency; see C2paRequirementTests")
+class SunoKnownSignerTests(unittest.TestCase):
+    """Suno is recognised by its signing certificate fingerprint only, and recognition is not trust.
+
+    No Suno private key is available, so a throwaway certificate stands in for
+    Suno's: the shipped Suno entry is copied with only the fingerprint and serial
+    number replaced. The real downloads are checked by SunoSampleTests.
+    """
+
+    @classmethod
+    def setUpClass(cls):
+        from cryptography import x509
+        from cryptography.x509.oid import NameOID
+        cls.temp = tempfile.TemporaryDirectory()
+        folder = Path(cls.temp.name)
+        cls.suno = _shipped_signer("Suno")
+        _tone(folder / "plain.wav")
+        leaf, serial = _sign(folder / "plain.wav", folder / "listed.wav", AI_SOURCE_TYPE)
+        # Suno's subject and serial number on a certificate with a different fingerprint.
+        suno_name = x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, "Suno Content Credentials"),
+                               x509.NameAttribute(NameOID.ORGANIZATION_NAME, "Suno Inc")])
+        _sign(folder / "plain.wav", folder / "impostor.wav", AI_SOURCE_TYPE,
+              leaf_name=suno_name, serial=int(cls.suno["certificate_serial_number"]))
+        cls.files = {name: folder / f"{name}.wav" for name in ("listed", "impostor")}
+        stand_in = dict(cls.suno, certificate_serial_number=serial,
+                        fingerprint_sha256_base64=base64.b64encode(hashlib.sha256(leaf).digest()).decode())
+        cls.lists = {"listed": folder / "listed.json", "unlisted": folder / "unlisted.json"}
+        cls.lists["listed"].write_text(json.dumps({"signers": [stand_in]}))
+        cls.lists["unlisted"].write_text(json.dumps({"signers": []}))
+
+    @classmethod
+    def tearDownClass(cls):
+        cls.temp.cleanup()
+
+    def evaluate(self, creation_method, signer_list):
+        folder = Path(tempfile.mkdtemp(dir=self.temp.name))
+        return _evaluate_single(folder, self.files["listed"].read_bytes(), creation_method, ".wav",
+                                self.lists[signer_list])
+
+    def test_shipped_suno_entry_is_an_exact_certificate_fingerprint(self):
+        from cryptography import x509
+        from cryptography.hazmat.primitives import hashes
+        from legacy_parsers.c2pa_parser import TRUST_DIRECTORY, load_known_ai_signers
+        self.assertEqual(self.suno["fingerprint_sha256_base64"], SUNO_FINGERPRINT)
+        self.assertEqual(base64.b64decode(self.suno["fingerprint_sha256_base64"]).hex(),
+                         self.suno["fingerprint_sha256_hex"])
+        self.assertEqual((self.suno["certificate_subject"], self.suno["certificate_issuer"]),
+                         ("CN=Suno Content Credentials, O=Suno Inc", "CN=Suno C2PA Root CA, O=Suno Inc"))
+        signers = load_known_ai_signers()
+        for field in ("fingerprint_sha256_base64", "certificate_serial_number"):
+            values = [signer[field] for signer in signers]
+            self.assertEqual(len(values), len(set(values)), field)
+        # Recognition only: Suno's private CA is on no pinned trust list.
+        pinned = set()
+        for pem in ("official/C2PA-TRUST-LIST.pem", "itl/anchors.pem", "itl/allowed.pem"):
+            for cert in x509.load_pem_x509_certificates((TRUST_DIRECTORY / pem).read_bytes()):
+                pinned.add(cert.subject.rfc4514_string())
+                pinned.add(cert.fingerprint(hashes.SHA256()).hex())
+        self.assertNotIn(self.suno["fingerprint_sha256_hex"], pinned)
+        self.assertFalse(any("Suno" in item for item in pinned))
+
+    def test_suno_name_and_serial_on_another_certificate_are_not_recognised(self):
+        from legacy_parsers.c2pa_parser import parse_c2pa_file
+        impostor = parse_c2pa_file(str(self.files["impostor"]))
+        self.assertEqual((impostor.signature_info.common_name, impostor.signature_info.cert_serial_number),
+                         ("Suno Content Credentials", self.suno["certificate_serial_number"]))
+        self.assertIsNone(impostor.known_ai_signer)
+        self.assertIsNone(parse_c2pa_file(str(self.files["listed"])).known_ai_signer)
+
+    def test_recognition_does_not_raise_attestation_strength(self):
+        for method in ("recorded", "ai-generated"):
+            listed, unlisted = self.evaluate(method, "listed")[0], self.evaluate(method, "unlisted")[0]
+            for response in (listed, unlisted):
+                self.assertEqual((response["validation"]["trust_status"], response["validation"]["credential_trusted"]),
+                                 ("untrusted", False))
+            self.assertEqual(listed["axes"]["attestation_strength"], unlisted["axes"]["attestation_strength"])
+            self.assertEqual(listed["axes"]["attestation_strength"]["value"], 0.3)
+
+    def test_recognition_does_not_change_ai_disclosure(self):
+        for method in ("recorded", "ai-generated"):
+            listed, unlisted = self.evaluate(method, "listed")[0], self.evaluate(method, "unlisted")[0]
+            self.assertEqual(listed["axes"]["ai_disclosure"], unlisted["axes"]["ai_disclosure"])
+            self.assertEqual(listed["assessment_checks"]["ai_disclosure_coverage"],
+                             unlisted["assessment_checks"]["ai_disclosure_coverage"])
+
+    def test_suno_file_declared_recorded_contradicts_integrity(self):
+        response, codes, ai_checks = self.evaluate("recorded", "listed")
+        self.assertEqual([(row["passed"], row["evidence_tier"], row["known_ai_signer"]) for row in ai_checks],
+                         [(False, "signed_attestation", "Suno")])
+        self.assertTrue(response["assessment_checks"]["integrity_decision"][0]["contradiction_present"])
+        self.assertEqual((codes["C2PA_KNOWN_AI_SIGNER"]["severity"], codes["C2PA_KNOWN_AI_SIGNER"]["known_ai_signer"]),
+                         ("medium", "Suno"))
+
+    def test_suno_file_declared_ai_generated_passes_the_cross_evidence_check(self):
+        response, codes, ai_checks = self.evaluate("ai-generated", "listed")
+        self.assertEqual([(row["passed"], row["evidence_tier"], row["known_ai_signer"]) for row in ai_checks],
+                         [(True, "signed_attestation", "Suno")])
+        self.assertEqual(codes["C2PA_KNOWN_AI_SIGNER"]["severity"], "info")
+        self.assertNotIn("C2PA_SIGNER_UNTRUSTED", codes)
+
+
+@unittest.skipUnless(importlib.util.find_spec("c2pa") and SUNO_SAMPLE_DIR,
+                     "set C2PA_SUNO_SAMPLE_DIR to a folder holding the verified Suno downloads")
+class SunoSampleTests(unittest.TestCase):
+    """The real Suno downloads listed in known_ai_signers.json, matched by SHA-256 (audio not committed)."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.temp = tempfile.TemporaryDirectory()
+        wanted = {item["sha256"] for item in _shipped_signer("Suno")["verified_samples"]}
+        found = {}
+        for path in sorted(Path(SUNO_SAMPLE_DIR).expanduser().iterdir()):
+            if path.is_file():
+                digest = hashlib.sha256(path.read_bytes()).hexdigest()
+                if digest in wanted:
+                    found[digest] = path
+        cls.samples = found
+        cls.missing = wanted - set(found)
+
+    @classmethod
+    def tearDownClass(cls):
+        cls.temp.cleanup()
+
+    def test_every_verified_sample_is_present(self):
+        self.assertEqual(self.missing, set())
+
+    def test_samples_are_recognised_as_suno_but_not_trusted(self):
+        from legacy_parsers.c2pa_parser import parse_c2pa_file
+        for path in self.samples.values():
+            with self.subTest(path.name):
+                result = parse_c2pa_file(str(path))
+                self.assertEqual((result.validation_state, result.trust_status), ("Valid", "untrusted"))
+                self.assertEqual(result.digital_source_types, [AI_SOURCE_TYPE])
+                self.assertEqual((result.known_ai_signer["name"], result.known_ai_signer["fingerprint_sha256_base64"]),
+                                 ("Suno", SUNO_FINGERPRINT))
+
+    def test_samples_declared_recorded_contradict_and_ai_generated_pass(self):
+        for path in self.samples.values():
+            for method, passed in (("recorded", False), ("ai-generated", True)):
+                with self.subTest(path.name, method=method):
+                    folder = Path(tempfile.mkdtemp(dir=self.temp.name))
+                    response, codes, ai_checks = _evaluate_single(folder, path.read_bytes(), method, path.suffix)
+                    self.assertEqual([(row["passed"], row["known_ai_signer"]) for row in ai_checks],
+                                     [(passed, "Suno")])
+                    self.assertEqual(response["axes"]["attestation_strength"]["value"], 0.3)
+                    self.assertEqual(response["assessment_checks"]["integrity_decision"][0]["contradiction_present"],
+                                     not passed)
 
 
 @unittest.skipIf(importlib.util.find_spec("c2pa") is None,
