@@ -316,12 +316,16 @@ def aaf_reference_coverage(data, owner_digest, wav_observations):
     for reference in data.get("references", []):
         key = (reference.get("tape"), reference.get("file_name"))
         used.setdefault(key, set()).add(reference.get("master_mob"))
+    ordered = sorted(used.items(), key=lambda item: (str(item[0][0]), str(item[0][1])))
     missing = [{"tape": tape, "file_name": name, "master_mobs": sorted(mob for mob in mobs if mob)}
-               for (tape, name), mobs in sorted(used.items(), key=lambda item: (str(item[0][0]), str(item[0][1])))
-               if not by_key.get((_normalise(tape), _normalise(name)))]
+               for (tape, name), mobs in ordered if not by_key.get((_normalise(tape), _normalise(name)))]
+    # Several submitted recordings share this identity: bound, but not one-to-one.
+    ambiguous = [{"tape": tape, "file_name": name,
+                  "audio_hashes": sorted(by_key[(_normalise(tape), _normalise(name))])}
+                 for (tape, name), _ in ordered if len(by_key.get((_normalise(tape), _normalise(name)), [])) > 1]
     return {"evidence_hash": owner_digest, "referenced_recordings": len(used),
             "bound_recordings": len(used) - len(missing), "missing_recordings": missing,
-            "scoring_eligible": False, "integrity_contribution": None}
+            "ambiguous_recordings": ambiguous, "scoring_eligible": False, "integrity_contribution": None}
 
 
 def aaf_non_recorder_media(data, owner_digest):

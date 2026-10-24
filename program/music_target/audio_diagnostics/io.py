@@ -1,11 +1,19 @@
-"""Exact-range WAV reading and anti-aliased analysis preprocessing."""
+"""Exact-range audio reading (WAV, FLAC, MP3) and anti-aliased analysis preprocessing."""
 
 import math
+from collections import namedtuple
 from pathlib import Path
 
 import numpy as np
+from music_target.audio_formats import detect
+from music_target.mp3_io import Mp3Error, inspect_mp3
 from music_target.wav_io import inspect_wav, read_frames
 from music_target.time_ranges import content_range_checks
+
+# What the decoder delivers: for MP3 this is the gapless length when the file
+# carries encoder delay and padding, otherwise the padded frame length.
+DecodedAudio = namedtuple("DecodedAudio", "sample_rate channels frame_count duration_seconds")
+DECODE_BLOCK_SECONDS = 10
 
 
 class AnalysisUnavailable(ValueError):
@@ -14,8 +22,62 @@ class AnalysisUnavailable(ValueError):
         self.code = code
 
 
+def _open(path):
+    """(descriptor, frame reader) for a WAV, or a FLAC/MP3 decoded by soundfile."""
+    container = detect(path).container
+    if container not in ("FLAC", "MP3"):
+        descriptor = inspect_wav(Path(path))
+        return descriptor, lambda first, last: (block for _, block in read_frames(path, descriptor, first, last))
+    import io
+    import soundfile
+    source, tolerance = str(path), 0
+    try:
+        if container == "MP3":
+            # libsndfile estimates the length of an MP3 without a Xing header
+            # from the bytes it is given and stops decoding there, so a large
+            # ID3 tag (a C2PA manifest) skews it. Only the MPEG frames are
+            # decoded, and the expected length is the gapless one the file
+            # states, otherwise every frame's samples, as the frame walk measures.
+            mp3 = inspect_mp3(path)
+            with open(path, "rb") as handle:
+                handle.seek(mp3.audio_offset)
+                frames_only = handle.read(mp3.audio_end - mp3.audio_offset)
+            source = None
+            expected = mp3.total_samples or mp3.audio_frames * mp3.samples_per_frame
+            if mp3.total_samples is None:
+                # Without gapless information decoders differ by their start-up
+                # delay (mpg123 drops 529 samples; ffmpeg does not): allow up to
+                # two frames, far less than any real truncation.
+                tolerance = 2 * mp3.samples_per_frame
+        with soundfile.SoundFile(source if source else io.BytesIO(frames_only)) as audio:
+            frames = audio.frames if container == "FLAC" else expected
+            descriptor = DecodedAudio(audio.samplerate, audio.channels, frames, frames / audio.samplerate)
+    except (RuntimeError, soundfile.LibsndfileError, Mp3Error) as exc:
+        raise AnalysisUnavailable("decoder_unavailable", f"The {container} file could not be decoded: {exc}") from None
+
+    def blocks(first, last):
+        size = max(1, descriptor.sample_rate * DECODE_BLOCK_SECONDS)
+        with soundfile.SoundFile(source if source else io.BytesIO(frames_only)) as audio:
+            audio.seek(first)
+            remaining = last - first
+            while remaining > 0:
+                block = audio.read(min(size, remaining), dtype="float32", always_2d=True)
+                if not len(block):
+                    break
+                remaining -= len(block)
+                yield np.ascontiguousarray(block)
+        if remaining > tolerance:
+            # For example a variable-bitrate MP3 without a Xing header, whose
+            # length libsndfile guesses from the first frame: never analyse a
+            # silently truncated signal.
+            raise AnalysisUnavailable("decoder_length_mismatch",
+                                      f"The decoder delivered {last - first - remaining} of {last - first} expected "
+                                      f"samples of this {container} file; the audio was not analysed.")
+    return descriptor, blocks
+
+
 def _decode_mono(path, start, end):
-    descriptor = inspect_wav(Path(path))
+    descriptor, blocks = _open(path)
     start = 0.0 if start is None else start
     end = descriptor.duration_seconds if end is None else end
     checks = content_range_checks(start, end, descriptor.duration_seconds, descriptor.sample_rate)
@@ -24,7 +86,7 @@ def _decode_mono(path, start, end):
     end = min(end, descriptor.duration_seconds)
     first = round(start * descriptor.sample_rate)
     last = min(descriptor.frame_count, round(end * descriptor.sample_rate))
-    chunks = [block for _, block in read_frames(path, descriptor, first, last)]
+    chunks = list(blocks(first, last))
     if not chunks:
         raise AnalysisUnavailable("insufficient_signal", "The selected audio range is empty.")
     frames = np.concatenate(chunks, axis=0)

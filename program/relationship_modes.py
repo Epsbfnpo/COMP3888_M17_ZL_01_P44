@@ -44,7 +44,7 @@ MODE_HELP = {
 # reported as UNKNOWN_FIELD and that relationship's content checks are skipped.
 KNOWN_ATTRIBUTES = frozenset({
     "assertion_origin", "confirmed_by_submitter", "reference_pointer", "claim_rationale",
-    "transformation_description", "derivation_scope", *TIME_FIELDS, "gain",
+    "transformation_description", "transformation", "derivation_scope", *TIME_FIELDS, "gain",
     "fade_in_seconds", "fade_out_seconds", "input_sample_rate_hz", "output_sample_rate_hz",
     "input_bit_depth", "output_bit_depth", "source_format", "target_format"})
 
@@ -82,6 +82,8 @@ def visible(rtype, name):
         return rtype == "edited_from"
     if name == "scope":  # obsolete; kept only if an existing manifest has one
         return False
+    if name == "conversion":
+        return rtype == "derived_from"
     return True
 
 
@@ -138,6 +140,18 @@ def relationship_issues(rel, target, source, endpoint_ok):
                 and attrs[attr] != side[key]:
             errors.append(f"{attr} ({attrs[attr]}) does not match the file ({side[key]})")
 
+    conversion = attrs.get("transformation")
+    if conversion is not None:
+        if conversion != "format_conversion":
+            errors.append("transformation must be 'format_conversion' or absent")
+        elif rtype != "derived_from":
+            errors.append("a format conversion is declared on derived_from only")
+        else:
+            for key in ("sample_rate_hz", "channels"):
+                if s_tech.get(key) is not None and t_tech.get(key) is not None and s_tech[key] != t_tech[key]:
+                    warnings.append(f"format conversion: {key} differs ({s_tech[key]} vs {t_tech[key]}); the "
+                                    "evaluator will report the conversion claim as contradicted.")
+
     import difflib
     for key in attrs:
         if key not in KNOWN_ATTRIBUTES:
@@ -155,8 +169,12 @@ def relationship_issues(rel, target, source, endpoint_ok):
 
 
 def all_warnings(files, rels, endpoint_ok):
+    from wav_probe import format_advice
     by_id = {f["id"]: f for f in files}
-    out = []
+    converted = {rel["target"] for rel in rels
+                 if rel["type"] == "derived_from" and rel["attrs"].get("transformation") == "format_conversion"}
+    out = [f"{f['id']}: {note}" for f in files if f.get("capabilities")
+           for note in format_advice(f["capabilities"], f["type"], f["id"] in converted)]
     for rel in rels:
         if rel["target"] not in by_id or rel["source"] not in by_id:
             continue

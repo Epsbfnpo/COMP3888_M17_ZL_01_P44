@@ -55,8 +55,10 @@ def inspect_files(paths: list[str], progress: Progress, cancel: Event) -> list[d
             if size > RM.MAX_FILE_BYTES:
                 raise ValueError(f"File exceeds the {RM.MAX_FILE_BYTES // 2**20} MiB limit.")
             digest = verified_hash(path, cancel)
-            technical = wav_probe.wav_technical(path) if path.suffix.lower() in (".wav", ".wave") else {}
-            results.append({"path": str(path), "hash": digest, "technical": technical})
+            # File content, not the extension, decides whether this is supported audio.
+            technical = wav_probe.audio_technical(path)
+            results.append({"path": str(path), "hash": digest, "technical": technical,
+                            "capabilities": wav_probe.audio_capabilities(path)})
         except (OSError, ValueError) as exc:
             results.append({"path": str(path), "error": str(exc)})
     return results

@@ -27,7 +27,7 @@
       "propertyNames": { "pattern": "^[0-9a-f]{64}$" },
       "additionalProperties": {
         "type": "string",
-        "pattern": "^objects/[0-9a-f]{64}\\.(?:png|mp4|wav)$"
+        "pattern": "^objects/[0-9a-f]{64}\\.(?:png|mp4|wav|flac|mp3)$"
       }
     },
     "options": {

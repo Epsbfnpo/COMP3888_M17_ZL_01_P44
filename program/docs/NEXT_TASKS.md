@@ -1,6 +1,6 @@
 # Future Work
 
-Updated: 2026-10-14
+Updated: 2026-10-24 (after merging scoring profile default-v6 with FLAC/MP3 support)
 
 This file is the current consolidated roadmap for `v3/program`. It replaces the
 shorter v0.4 task list and incorporates unresolved work from the legacy v3
@@ -21,6 +21,10 @@ cross-evidence checks, hash-binding coverage, and evidence-chain reporting.
   requests and defines one.
 - Keep the non-technical UI and proprietary DAW parsing behind evidence
   validity, calibration, and submission tooling.
+- WAV/BWF is the assessed format (decision of 24 October 2026). FLAC and MP3
+  keep the checks implemented today; every other check on them is reported as
+  not assessed (`limited_checks`, `audio_observations.FORMAT_SCOPE`), and no
+  new FLAC/MP3 features are planned. See "Out of scope" below.
 
 ## Completed P0: disable unreliable signal scoring
 
@@ -67,7 +71,10 @@ fingerprinting or other non-scoring diagnostics.
    separately; structural validity and cryptographic attestation do not inflate
    integrity. Confirm the remaining layer weights, and consider a confidence
    measure that also reflects check results and the amount of evidence, without
-   adding an overall decision policy.
+   adding an overall decision policy. Since default-v6 the Integrity confidence
+   is described as "layers checked"; the Completeness confidence still counts
+   rules rather than rule weights, the Attestation confidence uses fixed
+   levels (0.9, 0.6, 0.3) and the Disclosure confidence is a constant 0.8.
 
 6. Decide whether to restore the legacy prototype's `forge_cost` concept. If it
    is retained, use it only as a separately reported confidence/fabrication-
@@ -88,6 +95,21 @@ fingerprinting or other non-scoring diagnostics.
    with a throwaway certificate and covers valid, edited-after-signing,
    corrupted-certificate and invalid supporting manifests. Real vendor-signed
    fixtures, expired/revoked credentials and a configured trust policy remain.
+   Real AI generator output was checked on 24 October 2026 (Suno, Stability
+   AI, Google Lyria, ElevenLabs, Adobe Firefly; see
+   `policies/c2pa_trust/README.md`). Remaining from that check:
+   - Record SHA-256 hashes and certificate details for the Stability AI,
+     Google Lyria, ElevenLabs and Firefly samples, and add real-sample tests
+     like `SunoSampleTests`.
+   - ElevenLabs: generate MP3s through its API with C2PA signing switched on,
+     verify the certificate on at least two generations, and add it to
+     `known_ai_signers.json` only if it is not already trusted.
+   - Remote manifests (Adobe Firefly): validation is offline, so a manifest
+     the file only references is treated as absent. Options are an optional
+     online mode that fetches the remote manifest, checks it against the
+     file's hash with the same pinned lists and records the URL and retrieval
+     time, or accepting a submitted `.c2pa` sidecar and validating it offline.
+     Needs a client decision on network access.
 
 9. Confirm the DDEX Implementation Licence and schema redistribution rules
    before external deployment.
@@ -142,8 +164,11 @@ fingerprinting or other non-scoring diagnostics.
 
 18. Synchronise examples, README, handoff documentation, schemas, release
     version, source revision, verification report, and test counts after each
-    release. Records and examples were last regenerated for v0.8.1 (22 October
-    2026); `reports/public-results/` still needs the public CSEC bundles to be regenerated.
+    release. Records and examples were last regenerated on 24 October 2026
+    for the merge of default-v6 with FLAC/MP3 support (403 tests);
+    `reports/public-results/` still needs the public CSEC bundles to be
+    regenerated, and the final report and both slide decks still quote 332
+    tests.
 
 ## P2: Engineering quality and broader media support
 
@@ -176,14 +201,27 @@ fingerprinting or other non-scoring diagnostics.
     and at what value, using calibration submissions (see `support_breadth` in
     results). It currently covers recordings only; extend it to mixes, stems,
     masters or individual relationships once real data shows what qualifying
-    evidence those assets carry.
+    evidence those assets carry. Since 24 October 2026 AAF-used takes that
+    were not submitted join the denominator (`not_submitted`, or
+    `unmatched_reference` when a submitted recording has no recorder identity),
+    and `material_coverage` and `support_coverage` are reported separately; on
+    Project Rock Ep01 removing a take now gives 12 of 13. Still open: matching
+    renamed takes through aliases instead of tape and file name only, and
+    whether a workflow requires every AAF-used take (item 34).
+
+20d. Completed (24 October 2026): the workflow policy is loaded once per
+    evaluation in `engine.py` from `workflow_policy.DEFAULT_POLICY_PATH` and
+    passed to scoring, so completeness and `support_breadth` read the same
+    policy.
 
 21. Expand malicious-input tests for WAV chunk abuse, XML bombs, hostile PDFs,
     malformed MIDI, symlink/path attacks, oversized JSON, hash collisions in
     mappings, parser timeouts, and denial-of-service patterns.
 
-22. Prioritise FLAC, AIFF, RF64/BW64, compressed WAV codecs, and other formats
-    from actual client submissions. Integer/float RIFF/WAVE and matching
+22. FLAC and MP3 are accepted with the checks implemented on 24 October 2026
+    (see `FLAC_MP3_SUPPORT_PLAN.md`); work on them is frozen. Other formats
+    (AIFF, RF64/BW64, compressed WAV codecs) are out of scope unless client
+    submissions require them. Integer/float RIFF/WAVE and matching
     EXTENSIBLE SubFormats now share a streaming decoder. Define future
     conversion and resampling rules without hiding transformations from the
     report.
@@ -210,6 +248,88 @@ fingerprinting or other non-scoring diagnostics.
     requests accepted/rejected/needs-review outcomes and supplies thresholds,
     costs, and representative evaluation ground truth. Keep it outside the four
     assessment dimensions.
+
+## Open after the FLAC/MP3 and scoring merge (24 October 2026)
+
+28. Scoring issues still open from `Scoring_System_v0.8.1`: passing checks
+    still dilute a contradiction (one forged timecode among 96 facts gives
+    0.994, released); the equal layer weights are not justified by data; the
+    six severe rules share one 0.25 cap; and reported-but-unscored
+    observations (unsubmitted AAF takes, chronology warnings) need a policy
+    decision with the client.
+
+29. Pin the CSEC version: Git tag, `source_revision`, the G1 and G3
+    thresholds under default-v6, a fresh-environment install check, and the
+    CSEC contact and testing window.
+
+30. Calibrate the report-only `bandwidth` diagnostic on a larger labelled set
+    (genuine lossless, lossy-derived, upsampled, AI-generated, mastered with a
+    low-pass). AI output is band-limited too (25 of 25 Lumina benchmark WAVs),
+    so a flag must stay a heuristic until false-positive rates are known.
+
+32. Decide how to present offset-0 fingerprint matches spread over fixed
+    times (five free-site MP3s share watermark-like bursts and match in 6 of
+    10 unrelated pairs). The match is real shared audio; the report could name
+    the pattern instead of leaving the reader to infer it.
+
+33. Scoring for FLAC and MP3 follows the WAV rules, as the cross-format plan
+    of 24 October recommends: shared analysis, format-specific reading, the
+    FLAC MD5 as an internal check that never adds origin confidence, and
+    missing material reported as insufficient evidence rather than a failure.
+    A plain FLAC take is therefore withheld for lack of recorder evidence, and
+    an MP3 mix now lists its edges as `not_comparable` (`format_has_no_bwf`)
+    in `declared_chronology`. Confirm this treatment with the client; FLAC and MP3 receive no further checks.
+
+34. Required-recording scope for `support_breadth` (client decision): which
+    workflows require every take the AAF edit uses, which allow samples,
+    which substitutes count, deadlines for late submissions, and whether
+    `min_supported_asset_share` gates release. Library effects, music and
+    renders stay classified separately (`aaf_non_recorder_media`).
+
+35. Completed (24 October 2026): cross-file sample identity for declared
+    format conversions between lossless integer files
+    (`music_target/sample_identity.py`, scheme
+    `pcm-int-le-interleaved-sha256-v1`), report-only. Float WAV stays
+    `not_comparable`.
+
+36. Chronology rules before any scoring (client decision): restrict the
+    comparison to relationships with a real causal order (for example
+    `derived_from` versions), separate recording, export, signing and receipt
+    times, record time zone and tolerance, and require a verifiable time source.
+    Until then `DECLARED_SOURCE_NEWER_THAN_TARGET` stays report-only.
+
+39. Workflow `evidence_requirements` (client decision): an optional
+    requirement on `artifact_presence` rules, for example raw takes with
+    `recorder_metadata: required | preferred` or masters with
+    `lossless: required`, giving Completeness `met`, `met_with_limits` or
+    `not_met`. Default `preferred` everywhere until the client chooses. With
+    the WAV focus this is mainly a way to require WAV/BWF recordings.
+
+## Out of scope: FLAC and MP3 beyond the current checks (decided 24 October 2026)
+
+The evaluator focuses on WAV. These FLAC/MP3 items are not planned; the
+checks they would add are reported as not assessed (`limited_checks`, with
+`limitation: program_scope` or `format`) and listed as a limitation in the
+README and the technical manual.
+
+31. MP3 recall for excerpts and mixture components (only one MP3
+    configuration was measured: libsndfile 1.2.2 with LAME 3.100, VBR, about
+    140–163 kbps, false-match and shared-loop pairs). Diagnostics on FLAC and
+    MP3 are marked `format_scope: calibrated_on_wav_only`.
+
+37. FLAC sample count: libsndfile decodes exactly the STREAMINFO count, so it
+    cannot be checked independently with this decoder; a wrong count already
+    fails the MD5 or decoding.
+
+38. Dates in ID3 (`TDRC`) and Vorbis comments: not read (`tag_dates`,
+    `not_implemented_for_format`); chronology uses BWF dates only.
+
+40. `supported_via_conversion` in `support_breadth`: a converted FLAC/MP3 is
+    not counted through its declared WAV original.
+
+41. Decoded-sample integrity for MP3 (`decoded_sample_integrity`,
+    `not_implemented_for_format`): frame headers are walked, samples are not
+    verified.
 
 ## External inputs and decisions still required
 

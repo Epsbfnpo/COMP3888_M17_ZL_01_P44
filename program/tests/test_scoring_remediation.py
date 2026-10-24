@@ -163,6 +163,57 @@ class SupportBreadthTests(unittest.TestCase):
         self.assertFalse(breadth["applicable"])
         self.assertIsNone(breadth["checked_share"])
 
+    def aaf(self, *missing, ambiguous=(), owner="aaf"):
+        return {"evidence_hash": owner, "missing_recordings": [{"tape": tape, "file_name": name}
+                                                               for tape, name in missing],
+                "ambiguous_recordings": [{"tape": tape, "file_name": name} for tape, name in ambiguous]}
+
+    @staticmethod
+    def identified(*hashes):
+        return {digest: {"recorder_metadata": {"present": True, "file_name": f"{digest}.WAV"}} for digest in hashes}
+
+    def test_unsubmitted_aaf_take_joins_the_denominator_once(self):
+        facts = [self.fact("a", True)]
+        native = {"artefacts": [{"artefact_hash": "a", "artefact_type": "audio/raw-take"}]}
+        # The same take used twice in one AAF and once in another counts once.
+        breadth = summarize_support_breadth(native, facts, ("recorder_metadata",), ["audio/raw-take"],
+                                            [self.aaf(("T1", "3T02.WAV")), self.aaf(("t1", "3t02.wav"), owner="b")],
+                                            {"a"}, self.identified("a"))
+        self.assertEqual((breadth["required_recording_count"], breadth["not_submitted"]), (2, 1))
+        self.assertEqual((breadth["material_coverage"], breadth["support_coverage"]), (0.5, 0.5))
+        self.assertEqual(breadth["checked_share"], breadth["support_coverage"])
+        missing = next(item for item in breadth["assets"] if item["status"] == "not_submitted")
+        self.assertEqual((missing["source"], missing["aaf_hashes"]), ("aaf_reference", ["aaf", "b"]))
+        # Missing material is never a contradiction.
+        self.assertEqual(breadth["contradicted"], 0)
+
+    def test_unmatched_reference_is_provisional_when_a_submission_lacks_identity(self):
+        # "b" has no recorder identity (for example a plain FLAC take), so the
+        # unmatched AAF take may be that file: it is pending, not missing.
+        native = {"artefacts": [{"artefact_hash": name, "artefact_type": "audio/raw-take"} for name in "ab"]}
+        breadth = summarize_support_breadth(native, [self.fact("a", True)], ("recorder_metadata",),
+                                            ["audio/raw-take"], [self.aaf(("T1", "3T02.WAV"), ambiguous=[("T1", "X")])],
+                                            {"a", "b"}, self.identified("a"))
+        self.assertEqual((breadth["not_submitted"], breadth["unmatched_references"], breadth["ambiguous_references"]),
+                         (0, 1, 1))
+        self.assertEqual((breadth["required_recording_count"], breadth["coverage_scope"]), (2, "provisional"))
+        self.assertEqual(breadth["material_coverage"], 1.0)
+
+    def test_aaf_takes_do_not_apply_when_the_workflow_requires_no_recordings(self):
+        breadth = summarize_support_breadth(self.native, [], ("recorder_metadata",), [],
+                                            [self.aaf(("T1", "3T02.WAV"))], set(), {})
+        self.assertEqual((breadth["status"], breadth["coverage_scope"], breadth["material_coverage"]),
+                         ("not_applicable", "not_applicable", None))
+
+    def test_engine_loads_the_workflow_policy_once(self):
+        request = json.loads((BASE / "examples/valid-generated/request.json").read_text())
+        real = assessment_passes.load_workflow_policy
+        with mock.patch("music_target.engine.load_workflow_policy", wraps=real) as engine_load, \
+                mock.patch.object(assessment_passes, "load_workflow_policy", wraps=real) as scoring_load:
+            response = run.evaluate(request, BASE / "examples/valid-generated", "native")
+        self.assertEqual(response["execution_status"], "succeeded")
+        self.assertEqual((engine_load.call_count, scoring_load.call_count), (1, 0))
+
     def test_workflow_recording_types_come_from_the_workflow_policy(self):
         policy = load_workflow_policy(DEFAULT_POLICY_PATH)
         self.assertEqual(required_recording_types(policy, "multitrack_recording_mix_master"),

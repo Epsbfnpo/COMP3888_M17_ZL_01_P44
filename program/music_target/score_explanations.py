@@ -43,6 +43,12 @@ def describe_check(check):
         return (f"The graph declares {check.get('declared_sources')} source(s) of {_short(check.get('target_hash'))} "
                 f"with size {shape.get('file_size_bytes')} bytes, {shape.get('frames')} frames at "
                 f"{shape.get('sample_rate_hz')} Hz, but the DAW session uses {check.get('session_samples')} such sample(s).")
+    if rule == "flac_md5_matches_decoded_audio":
+        if check.get("reason_code") == "md5_mismatch":
+            return (f"The decoded audio of FLAC {name} does not match the MD5 stored when it was encoded "
+                    f"({check.get('decoded_frames')} samples decoded; STREAMINFO declares "
+                    f"{check.get('declared_total_samples')}), so the audio was altered or damaged after encoding.")
+        return f"FLAC {name} could not be decoded to verify its MD5: {check.get('reason', 'decoding failed')}"
     if rule.endswith("_scene_take_matches_recorder"):
         return (f"{rule}: {name} is declared as scene/take {'/'.join(map(str, check.get('declared', [])))} "
                 f"but the recorder wrote {'/'.join(map(str, check.get('recorded', [])))}.")

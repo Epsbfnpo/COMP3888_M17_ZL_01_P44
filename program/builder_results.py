@@ -98,6 +98,7 @@ ATTENTION_FINDINGS = {
     "MISSING_OBJECT": ("Missing file", "Locate the original file; confirm its SHA-256 matches the manifest."),
     "PARSER_FAILED": ("Invalid evidence", "Replace or repair the file so its declared format can be parsed."),
     "WAV_PARSER_FAILED": ("Audio not assessed", "Replace or repair this audio with a supported WAV file (integer PCM or IEEE float)."),
+    "AUDIO_PARSER_FAILED": ("Audio not assessed", "Replace or repair this audio with a supported WAV, FLAC or MP3 (MPEG Layer III) file."),
     "CROSS_EVIDENCE_CHECK_UNAVAILABLE": ("Cross-evidence check not assessed", "Provide the supported source fields or bindings needed to compare this evidence."),
     "UNKNOWN_ARTEFACT_TYPE_SKIPPED": ("Evidence not assessed", "Choose a supported artefact type; the evaluator did not infer a type for this file."),
     "UNKNOWN_RELATIONSHIP_TYPE_SKIPPED": ("Relationship not assessed", "Choose a supported relationship type; the evaluator did not infer the submitted relationship."),
@@ -535,11 +536,24 @@ def audio_diagnostic_lines(response, file_names=None):
                     f"{len(metrics.get('source_sections_seconds') or [])} source / "
                     f"{len(metrics.get('target_sections_seconds') or [])} target acoustic sections "
                     "(structure observation; uncalibrated)")))
+    bandwidth = checks.get("audio_bandwidth") or []
+    if bandwidth:
+        lines.append("  Content bandwidth per file (heuristic; uncalibrated):")
+    for row in bandwidth:
+        name = names.get(row.get("source_hash")) or (row.get("source_hash") or "")[:12]
+        assessment = (row.get("metrics") or {}).get("assessment") or {}
+        lines.append(f"    - {name}: " + (_not_completed(row) or assessment.get("reason", "")))
     return lines
 
 
 def _plain_list(values):
     return ", ".join(str(value).replace("_", " ") for value in values or []) or "none"
+
+
+def _interval_text(bounds):
+    if not isinstance(bounds, dict):
+        return ""
+    return f" (95% CI {bounds['lower'] * 100:.0f}-{bounds['upper'] * 100:.0f}%)"
 
 
 def calibration_lines(rows):
@@ -550,7 +564,7 @@ def calibration_lines(rows):
             seen[row["provider"]] = row["calibration"]
     if not seen:
         return lines
-    lines.append("  Calibration (case counts on limited samples, not probabilities):")
+    lines.append("  Calibration (case counts on limited samples with 95% Wilson intervals, not probabilities):")
     for provider, record in seen.items():
         status = str(record.get("status") or "unknown").replace("_", " ")
         text = f"    - {provider}: {status}"
@@ -564,11 +578,12 @@ def calibration_lines(rows):
             for name, item in rates["categories"].items():
                 label = name.replace("_", " ")
                 if "false_matches" in item:
-                    parts.append(f"{label} {item['false_matches']}/{item['pairs']} false")
+                    part = f"{label} {item['false_matches']}/{item['pairs']} false"
                 elif "detected" in item:
-                    parts.append(f"{label} {item['detected']}/{item['pairs']} detected")
+                    part = f"{label} {item['detected']}/{item['pairs']} detected"
                 else:
-                    parts.append(f"{label} {item.get('supported')}/{item['pairs']} supported (unverified)")
+                    part = f"{label} {item.get('supported')}/{item['pairs']} supported (unverified)"
+                parts.append(part + _interval_text(item.get("wilson_95")))
             text += "; benchmark: " + ", ".join(parts)
         lines.append(text)
     return lines

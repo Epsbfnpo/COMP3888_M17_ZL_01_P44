@@ -6,7 +6,8 @@ import json
 from pathlib import Path
 
 import run
-from music_target.contract import public_bundle_request, read_json, source_revision, validate
+from music_target.contract import (PUBLIC_AUDIO_TYPES, public_bundle_request, read_json,
+                                   source_revision, validate)
 
 
 def main():
@@ -29,7 +30,7 @@ def main():
         # Output names use the observed safe directory name, not arbitrary case_id text.
         destination = output / f"{path.parent.name}.response.json"
         destination.write_text(json.dumps(response, indent=2) + "\n")
-        if case["media_type"] == "audio/wav" and response["execution_status"] == "succeeded":
+        if case["media_type"] in PUBLIC_AUDIO_TYPES and response["execution_status"] == "succeeded":
             (output / f"{path.parent.name}.request.json").write_text(json.dumps(request, indent=2) + "\n")
         results.append({"case_id": case["case_id"], "media_type": case["media_type"],
                         "execution_status": response["execution_status"],

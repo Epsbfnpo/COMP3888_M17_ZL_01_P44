@@ -90,12 +90,21 @@ this check is `assert_core_unchanged` in `tests/test_audio_diagnostics.py::Audio
 | PC-23 | Unsupported final type (`examples/unsupported-png`) | `unsupported` | `UNSUPPORTED_INPUT` |
 | PC-24 | **Non-final** object missing | `succeeded` | `MISSING_OBJECT`; that node `not_assessed`; not counted as an integrity contradiction |
 | PC-25 | Non-final WAV corrupted | `succeeded` | `WAV_PARSER_FAILED` isolated to that node; independent evidence still assessed; axes `partial` |
-| PC-26 | FLAC / MP3 bytes saved as `.wav` | `unsupported` (final) / `succeeded` with node isolated (non-final) | Format reported by **content**, not extension |
+| PC-26 | FLAC / MP3 bytes saved as `.wav` | `succeeded` | Evaluated as FLAC / MP3: format decided by **content**, not extension. A malformed FLAC named `.wav` is an input error for FLAC; Ogg, AIFF or RF64 data named `.wav` stays `unsupported` (final) or isolated (non-final) |
 | PC-27 | Misspelled field (`sample_rat_hz`) | `succeeded` | `UNKNOWN_FIELD` with suggested spelling; that relationship's checks disabled, not failed |
 | PC-28 | Unknown non-final `artefact_type` | `succeeded` | Quarantined; reported in `coverage` / `unknown_inputs`; axes `partial` |
 | PC-29 | Malformed JSON / dangling hash / duplicate node | `error` | Clear error message, no stack trace |
 | PC-30 | Evaluation exceeds `options.timeout` | `timeout` | `TIMEOUT` finding |
 | PC-31 | Object over 512 MiB, or bundle over 1 GiB | `unsupported` (final) / isolated (non-final) | `OBJECT_SKIPPED_SIZE_LIMIT` |
+| PC-32 | FLAC and MP3 finals, native and public (`audio/flac`, `audio/mpeg`) | `succeeded` | FLAC MD5 check in file integrity; MP3 bit depth and inexact duration `unavailable`, not contradicted; `AUDIO_FORMAT_LIMITED_CHECKS` for MP3 |
+| PC-33 | Fake formats with `--audio-analysis` (FLAC made from an MP3, re-encoded 320 kbps MP3, upsampled 24/96) | `succeeded` | `audio_bandwidth` row per file and `AUDIO_CONTENT_BAND_LIMITED`; axes identical to the audio-off run (PC-01) |
+| PC-34 | Declared edge from an MP3 (or plain FLAC) to a WAV with `bext` | `succeeded` | `declared_chronology` row with `status: not_comparable` and `reason_code` `format_has_no_bwf` (`bwf_not_kept`); no finding, no score change |
+| PC-35 | Any request with a workflow | `succeeded` | The workflow policy is loaded once (`tests/test_scoring_remediation.py`), so completeness and `support_breadth` use the same policy |
+| PC-36 | FLAC whose STREAMINFO sample count is changed by ±1000 | `succeeded` | Too low: MD5 `mismatched`; too high: `failed` (`audio_not_decodable`); never `matched` |
+| PC-37 | Mixed formats: plain FLAC take, MP3 take, WAV master | `succeeded` | `format_capabilities` rows `not_kept`, `not_supported_by_format`, `present`, with advice for the two takes; axes unchanged by the section |
+| PC-38 | `transformation` other than `format_conversion` | Input error | Request rejected by the native schema; nothing evaluated |
+| PC-39 | WAV and FLAC of the same samples, declared as a conversion, with `--audio-analysis` | `succeeded` | `sample_identity: identical`; `audio_format_conversion.fingerprint: aligned_at_zero`; axes identical to the audio-off run |
+| PC-40 | Any FLAC or MP3 file | `succeeded` | `AUDIO_FORMAT_LIMITED_CHECKS` lists every family not made, each `unavailable` with `limitation` `program_scope`, `format` or `file`; WAV lists none; `format_capabilities.check_scope` is `limited` (WAV `full`); diagnostics rows carry `format_scope` |
 
 ### 2.3 Report consistency
 
@@ -185,5 +194,8 @@ python3 -B check_public.py /path/to/public-bundles
 | PC-20 | valid-generated | off | succeeded | — | succeeded | n/a | ✅ | ✅ | `588d7e5` | default-v4 | n/a | — |
 | PC-20 | valid-generated | on | succeeded | `AUDIO_*` only added | succeeded | ✅ | ✅ | ✅ | `588d7e5` | default-v4 | `…` | — |
 | PC-02 | audio-diagnostics, timeout 1 s | on | succeeded | `caller_timeout` rows | … | … | … | … | … | … | … | … |
+
+The PC-20 rows above were recorded at `588d7e5` under `default-v4`. Rows recorded from 24 October 2026
+use `default-v6`; record the profile in every row and do not compare rows across profiles.
 
 Every row should be reproducible from the recorded input, commit, and policy versions alone.

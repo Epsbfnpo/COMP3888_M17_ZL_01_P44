@@ -38,6 +38,9 @@ DOCUMENT_TYPES = (
 )
 ALL_TYPES = AUDIO_TYPES + DOCUMENT_TYPES
 SUPPORTED = {"audio", *ALL_TYPES}
+# The audio the evaluator reads; the file content, not the extension, decides.
+SUPPORTED_AUDIO_TEXT = ("WAV with integer PCM 8/16/24/32-bit or IEEE float 32/64-bit, including "
+                        "WAVE_FORMAT_EXTENSIBLE; FLAC; or MP3 (MPEG Layer III)")
 
 _RAW = {"audio/raw-take", "audio/raw-track"}
 ENDPOINTS = {  # relationship -> (allowed target types, allowed source types)
@@ -47,7 +50,8 @@ ENDPOINTS = {  # relationship -> (allowed target types, allowed source types)
     "comped_from": ({"audio/edited-take"}, {"audio/raw-take"}),
     "stemmed_from": ({"audio/stem"},
                      {"audio/raw-track", "audio/edited-take", "audio/sample"}),
-    "mixed_from": ({"audio/mix"}, {"audio/stem", "audio/raw-track",
+    # Dialogue post-production mixes recorder takes directly (as the evaluator allows).
+    "mixed_from": ({"audio/mix"}, {"audio/stem", "audio/raw-take", "audio/raw-track",
                                    "audio/edited-take", "audio/sample"}),
     "mastered_from": ({"audio/master"}, {"audio/mix"}),
     "rendered_from": (set(AUDIO_TYPES),
@@ -282,9 +286,8 @@ def build_chain(files, rels) -> dict:
             raise ValueError(f"'{f['id']}' and '{seen[f['hash']]}' have identical content")
         seen[f["hash"]] = f["id"]
         if f["type"].startswith("audio/") and not f["technical"]:
-            raise ValueError(f"'{f['id']}' is typed as audio but could not be read as a supported WAV "
-                             "(integer PCM 8/16/24/32-bit or IEEE float 32/64-bit, including "
-                             "WAVE_FORMAT_EXTENSIBLE); the evaluator would reject it")
+            raise ValueError(f"'{f['id']}' is typed as audio but could not be read as supported audio "
+                             f"({SUPPORTED_AUDIO_TEXT}); the evaluator would reject it")
         if f.get("path") and Path(f["path"]).is_file():
             size = Path(f["path"]).stat().st_size
             total += size

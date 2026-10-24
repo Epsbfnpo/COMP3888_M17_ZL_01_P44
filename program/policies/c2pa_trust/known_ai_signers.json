@@ -10,6 +10,21 @@
       "certificate_serial_number": "8582448330129485046574301241",
       "valid_until": "2028-03-16",
       "source": "Extracted from Lumina audio output on 2026-10-21. Confirm with BytePlus before relying on it for production."
+    },
+    {
+      "name": "Suno",
+      "fingerprint_sha256_base64": "Q60v1k3DH0FLokCC25J/xRvIMOGEFTfKG7FAZWzH+2A=",
+      "fingerprint_sha256_hex": "43ad2fd64dc31f414ba24082db927fc51bc830e1841537ca1bb140656cc7fb60",
+      "certificate_subject": "CN=Suno Content Credentials, O=Suno Inc",
+      "certificate_issuer": "CN=Suno C2PA Root CA, O=Suno Inc",
+      "certificate_serial_number": "547358005804277742387428136699666740607377968407",
+      "valid_from": "2026-07-23",
+      "valid_until": "2028-10-25",
+      "verified_samples": [
+        {"sha256": "b5ea01a45ac1710701656607c071750541e91b499e37f166621c949fd9b47555", "format": "audio/mpeg", "signed": "2026-10-24T06:30:04Z"},
+        {"sha256": "22565ec82ae499ec3b86ad52f1f1408a7ed655ed5e2cf1afdf8f53e85c72f910", "format": "audio/mpeg", "signed": "2026-10-24T06:42:55Z"}
+      ],
+      "source": "Extracted on 2026-10-24 from two Suno MP3 downloads of separate generations (Suno chirp-goose-t1). Both manifests validate, declare trainedAlgorithmicMedia and carry a DigiCert time-stamp. Suno's root CA is private and on no pinned trust list, so the signer stays untrusted. The audio is not stored in the repository."
     }
   ]
 }

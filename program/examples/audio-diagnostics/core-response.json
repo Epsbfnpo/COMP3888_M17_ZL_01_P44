@@ -6,7 +6,7 @@
   "system": {
     "name": "COMP3888-music-baseline",
     "version": "0.8.1",
-    "source_revision": "sha256:be7bfe70c048d0be210d44f91e568470677dae4991eb4cfc54446d37092f54bc"
+    "source_revision": "sha256:b354426d2a75bbf3c48f551d15f6404677dea509dac1812d4fecd226ab7efe64"
   },
   "execution_status": "succeeded",
   "axes": {
@@ -20,7 +20,7 @@
       "availability": "partial",
       "value": null,
       "confidence": 0.267,
-      "reasoning": "Integrity has 1/3 score-eligible evidence layers; missing evidence reduces availability and confidence but is never treated as contradiction. Numeric release requires at least 2 populated contributing layer(s) and an assessed qualifying cross-evidence fact (signed_attestation, recorder_metadata); the value is withheld (insufficient_assessed_layers). An ordinary contradiction never releases a value. No qualifying cross-evidence was assessed for this submission. Structural validity and cryptographic attestation are reported separately and do not raise integrity. Legacy signal comparisons are disabled by policy and do not produce findings or affect integrity.",
+      "reasoning": "Integrity has 1/3 score-eligible evidence layers; missing evidence reduces availability and confidence but is never treated as contradiction. Integrity confidence reflects how many of the three evidence layers were checked. To see how many checks passed, refer to the integrity value and the layer results. Numeric release requires at least 2 populated contributing layer(s) and an assessed qualifying cross-evidence fact (signed_attestation, recorder_metadata); the value is withheld (insufficient_assessed_layers). An ordinary contradiction never releases a value. No qualifying cross-evidence was assessed for this submission. The files and claims have been checked against each other, but this does not guarantee who created the material, when it was recorded or that the recording session took place. Signed origin evidence, where available, is shown in attestation_strength. Structural validity and cryptographic attestation are reported separately and do not raise integrity. Legacy signal comparisons are disabled by policy and do not produce findings or affect integrity.",
       "status": "insufficient_evidence"
     },
     "attestation_strength": {
@@ -322,9 +322,9 @@
       ]
     }
   ],
-  "processing_ms": 221.41600004397333,
+  "processing_ms": 225.56683304719627,
   "resource_usage": {
-    "cpu_ms": 3.9510000000000103,
+    "cpu_ms": 3.813000000000011,
     "peak_rss_kib": null
   },
   "error": null,
@@ -534,8 +534,8 @@
   "assessment_checks": {
     "scoring_profile": [
       {
-        "profile_id": "default-v4",
-        "profile_version": 4
+        "profile_id": "default-v6",
+        "profile_version": 6
       }
     ],
     "bound_file_integrity": [
@@ -571,7 +571,9 @@
         "relationship_type": "excerpted_from"
       }
     ],
+    "declared_file_properties": [],
     "relationship_integrity": [],
+    "declaration_scored_facts": [],
     "relationship_range_validation": [],
     "integrity_layers": [
       {
@@ -580,7 +582,7 @@
         "value": 1.0,
         "contributes_to_integrity": true,
         "check_count": 2,
-        "reason": "SHA-256 binding, cached WAV technical checks, and parser readability of submitted files.",
+        "reason": "SHA-256 binding and parser readability of submitted files; no submitter claims are compared here.",
         "manual_review_reasons": [],
         "weight": 1.0
       },
@@ -600,7 +602,7 @@
         "value": null,
         "contributes_to_integrity": true,
         "check_count": 0,
-        "reason": "Submitted relationship parameters compared with cached source and target media observations.",
+        "reason": "Submitted file technical claims and relationship parameters compared with measured media; one vote per declared file property, and any failed claim keeps that fact failed.",
         "manual_review_reasons": [],
         "weight": 1.0
       },
@@ -725,6 +727,42 @@
     "cross_evidence": [],
     "cross_evidence_scored_facts": [],
     "cross_evidence_audit": [],
+    "evidence_sources": [
+      {
+        "document_count": 0,
+        "fact_count": 0,
+        "known_common_sources": [],
+        "identified_signers": [],
+        "independent_source_count": null,
+        "independence": "unknown",
+        "subjects_with_multiple_documents": [],
+        "origin_fields": [],
+        "scoring_effect": "none_report_only"
+      }
+    ],
+    "support_breadth": [
+      {
+        "applicable": false,
+        "status": "not_applicable",
+        "relevant_asset_types": [],
+        "relevant_asset_count": 0,
+        "required_recording_count": 0,
+        "supported": 0,
+        "contradicted": 0,
+        "no_qualifying_evidence": 0,
+        "not_submitted": 0,
+        "unmatched_references": 0,
+        "ambiguous_references": 0,
+        "coverage_scope": "not_applicable",
+        "material_coverage": null,
+        "support_coverage": null,
+        "checked_share": null,
+        "assets": [],
+        "min_supported_asset_share": null,
+        "requirement": "not_set",
+        "scoring_effect": "none_report_only"
+      }
+    ],
     "c2pa_attestation_records": [
       {
         "scope": "supporting",
@@ -832,6 +870,56 @@
         "target_values": {},
         "scoring_policy": "disabled; no signal result contributes to integrity",
         "content_match_is_provenance": false
+      }
+    ],
+    "declared_chronology": [
+      {
+        "source_hash": "22bf064117b015ad6b47b7e649c83c5378ff26c1def988d09e1edb3ec6cfecfe",
+        "target_hash": "8699068584ba01947d52e5f55a973a86adf3c465c32621d1fe4b7c1f8304b638",
+        "relationship_type": "excerpted_from",
+        "status": "not_comparable",
+        "reason_code": "no_origination_date",
+        "undated": [
+          "source",
+          "target"
+        ],
+        "source_newer_than_target": null,
+        "scoring_eligible": false,
+        "integrity_contribution": null
+      }
+    ],
+    "format_capabilities": [
+      {
+        "hash": "22bf064117b015ad6b47b7e649c83c5378ff26c1def988d09e1edb3ec6cfecfe",
+        "type": "audio/raw-track",
+        "format": "WAV",
+        "lossless": true,
+        "recorder_metadata": "absent",
+        "exact_duration": true,
+        "bit_depth": true,
+        "origination_date": false,
+        "embedded_c2pa": false,
+        "check_scope": "full",
+        "limited_checks": [],
+        "advice": [],
+        "scoring_eligible": false,
+        "integrity_contribution": null
+      },
+      {
+        "hash": "8699068584ba01947d52e5f55a973a86adf3c465c32621d1fe4b7c1f8304b638",
+        "type": "audio/sample",
+        "format": "WAV",
+        "lossless": true,
+        "recorder_metadata": "absent",
+        "exact_duration": true,
+        "bit_depth": true,
+        "origination_date": false,
+        "embedded_c2pa": false,
+        "check_scope": "full",
+        "limited_checks": [],
+        "advice": [],
+        "scoring_eligible": false,
+        "integrity_contribution": null
       }
     ],
     "score_explanations": [

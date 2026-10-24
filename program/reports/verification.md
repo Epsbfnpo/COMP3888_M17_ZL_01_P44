@@ -1,5 +1,85 @@
 # Verification Record
 
+## Suno as a known AI signer (2026-10-24, branch feature/c2pa-ai-signer-expansion)
+
+- CPython 3.12.2 on macOS, c2pa-python 0.37.10 (`.venv312`): `tests.test_c2pa_integrity` **33 tests, OK (30 passed, 3 skipped without the Suno downloads)**; with `C2PA_SUNO_SAMPLE_DIR` set, the module plus `test_audio_formats.C2paInFlacAndMp3Tests` ran **35 tests, all passed, no skips**.
+- Full non-GUI run in this environment: 378 tests, 2 failures and 10 errors, all from the optional audio packages that are not installed in `.venv312` (scipy, librosa, spectromap). The same run on an unmodified export of `HEAD` gives the same 12 failing tests (369 tests), so none is caused by this change. The 425-test record below used the full audio environment.
+- Samples: two Suno MP3 downloads of separate generations (SHA-256 `b5ea01a4…9b47555` and `22565ec8…5c72f910`). Both manifests, in an ID3v2.4 `GEOB` frame, are valid with no failure codes, declare `trainedAlgorithmicMedia`, carry a DigiCert time-stamp (06:30:04Z and 06:42:55Z) and are signed by the same certificate: `CN=Suno Content Credentials, O=Suno Inc`, issued by `CN=Suno C2PA Root CA, O=Suno Inc`, valid 2026-07-23 to 2028-10-25, fingerprint `Q60v1k3DH0FLokCC25J/xRvIMOGEFTfKG7FAZWzH+2A=`. The SDK allowed-list match accepts that fingerprint and rejects a different one.
+- New: `SunoKnownSignerTests` (6 tests: the shipped entry, a certificate copying Suno's subject and serial number not recognised, attestation strength and AI disclosure identical with and without the entry, `recorded` contradicted, `ai-generated` consistent) and `SunoSampleTests` (3 tests on the real downloads, matched by SHA-256; skipped unless `C2PA_SUNO_SAMPLE_DIR` is set). The audio is not committed.
+- Scoring logic and pinned trust lists unchanged; Suno stays `untrusted` (0.3).
+
+## Other AI music generators (2026-10-24, branch feature/c2pa-ai-signer-expansion)
+
+Original output from four more generators was checked against the evaluator. No
+fingerprint was added; the details are in `policies/c2pa_trust/README.md`.
+
+- **Stability AI** (WAV): valid manifest, trusted certificate, explicit
+  AI-generation declaration. Handled correctly by trust validation.
+- **Google Lyria** (MP3): valid, trusted Google manifest with explicit
+  AI-generation metadata. Handled correctly by trust validation.
+- **ElevenLabs** (WAV): no C2PA manifest, so the file reads as `absent`.
+  ElevenLabs documents signing only for opt-in MP3 output from its API, so no
+  current certificate could be verified. Recorded as a limitation.
+- **Adobe Firefly** (WAV): references a valid remotely hosted manifest. The
+  evaluator validates offline with remote manifest fetching off, so the file
+  reads as `absent`. Recorded as a limitation; a fingerprint would not change
+  this.
+- Not yet recorded: the samples' SHA-256 hashes and signing certificate
+  details, and automated tests on these samples (the audio is not committed).
+
+## WAV focus and FLAC/MP3 scope (2026-10-24, branch feature/merge-main-flac-mp3)
+
+- `REQUIRE_AUDIO_BACKENDS=1`, CPython 3.13.7 on macOS: **425 tests, all passed**. 421 non-GUI tests ran in one process (34 s, no skips); the four `test_builder.GuiTests` cases ran in separate processes.
+- Decision: WAV is the assessed format; FLAC and MP3 keep the checks implemented today, and every other check is reported as not assessed. `FORMAT_SCOPE` in `music_target/audio_observations.py` is the single list; new tests require every check family and every declarable technical field to have a status for FLAC and MP3, check the per-file `limited_checks` (a plain FLAC lists recorder metadata, BWF chronology and tag dates; WAV lists none) and the WAV-only calibration note on diagnostics rows. The MP3 test now expects seven families with their limitation.
+- Example responses: every `axes` object identical to main.
+
+## Mixed-format evidence (2026-10-24, branch feature/merge-main-flac-mp3)
+
+- `REQUIRE_AUDIO_BACKENDS=1`, CPython 3.13.7 on macOS: **422 tests, all passed**. 418 non-GUI tests ran in one process (35 s, no skips); the four `test_builder.GuiTests` cases ran in separate processes.
+- New: `tests/test_format_conversion.py` (13 tests): one canonical sample digest for WAV and FLAC of the same integer samples (16-bit, 24-bit, unsigned 8-bit WAV against signed 8-bit FLAC), a changed sample, float WAV not digested; conversion checks for WAV→FLAC, a resampled target, WAV→MP3 and a non-`derived_from` edge; an unknown `transformation` value rejected; capability rows and advice, removed once the original is declared; the diagnostics alignment summary; the builder probe, advice and conversion checks.
+- Writing the same float signal with libsndfile gives different integer samples in WAV and in FLAC (95 951 of 96 123 frames differ at 16 bits), so the identity tests write integer samples.
+- Real files: the SoniqTools Bach WAV and FLAC are sample-identical at 16/44.1 and 24/96; WAV→320 kbps MP3 and 128 kbps MP3→fake FLAC pass the parameter checks and are not sample-compared; the fake 24/96 FLAC upsampled from CD audio, declared as a conversion of the CD WAV, fails the sample-rate and bit-depth checks.
+- Example responses: every `axes` object identical to main; they gain `format_capabilities` rows.
+
+## Cross-format review changes (2026-10-24, branch feature/merge-main-flac-mp3)
+
+- `REQUIRE_AUDIO_BACKENDS=1`, CPython 3.13.7 on macOS: **409 tests, all passed**. 405 non-GUI tests ran in one process (33 s, no skips); the four `test_builder.GuiTests` cases ran in separate processes.
+- New tests: AAF-used takes in the support-breadth denominator (counted once across AAFs), provisional coverage when a submitted take has no recorder identity, not applicable without required recordings, the workflow policy loaded once, undated MP3 and FLAC edges as `not_comparable`, a wrong STREAMINFO sample count never passing the MD5 check, and the decoder versions in the audio summary. The AAF missing-take test now checks that only the reasoning changes, not the scores.
+- Example responses: axes and Integrity reasoning identical to main for `valid-generated`, `csec-wav` and `wav-match`.
+- Project Rock Ep01: Integrity unchanged in every variant. With one AAF-used take removed, `support_breadth` reads 12 of 13 (`not_submitted: 1`) instead of 12/12; plain FLAC takes give 13 `unmatched_reference` with provisional coverage; the MP3 mix lists 13 `not_comparable` chronology rows (`format_has_no_bwf`).
+
+## Merge of main (scoring default-v6) with FLAC/MP3 support (2026-10-24, branch feature/merge-main-flac-mp3)
+
+- `REQUIRE_AUDIO_BACKENDS=1`, CPython 3.13.7 on macOS: **403 tests, all passed**. 399 non-GUI tests ran in one process (32 s, no skips); the four `test_builder.GuiTests` cases ran in separate processes.
+- Conflicts: `music_target/assessment_passes.py` (both branches added a helper in the same place; both kept) and five example responses (regenerated). No other file conflicted.
+- FLAC and MP3 technical claims use the same `technical.*` rules as WAV, so after the merge they are scored in declaration consistency (`declared_file_properties`, one fact per declared property); claims MP3 cannot measure stay unavailable facts and are not counted. The FLAC MD5 check carries no submitter claim and stays in file integrity. A new assertion in `tests/test_audio_formats.py` checks this.
+- WAV examples: every `axes` object is identical to main. Testing_music pairs: every fingerprint, semantics and bandwidth row and every axis is identical to the FLAC/MP3 branch.
+- Project Rock Ep01 format variants rerun on the merged code: same conclusions as on 23 October; assessed facts are 96 instead of 122 because `one_vote_per_claim` merges the sound-report and AAF scene/take and track-name claims for each of the 13 takes. `support_breadth` reads 13/13 for the WAV, kept-metadata FLAC and MP3 variants and 0/13 for plain FLAC takes, whose recorder metadata is lost.
+
+## Testing_music run and content bandwidth (2026-10-24, branch feature/flac-mp3-support)
+
+- `REQUIRE_AUDIO_BACKENDS=1`, CPython 3.13.7 on macOS: **386 tests, all passed**. 382 non-GUI tests ran in one process (32 s, no skips); the four `test_builder.GuiTests` cases ran in separate processes.
+- New: `tests/test_bandwidth.py` (9 tests: assessment rules, detector on synthetic low-passed, floor-masked and upsampled noise, block-size invariance, insufficient signal, evaluator axes unchanged) and one builder test for the per-file bandwidth lines.
+- Material: 11 downloaded files (6 free-site MP3s, Bach as 16/44.1 and 24/96 WAV and FLAC, one Lumina 16 kHz MP3) and 7 locally made files (genuine 128 and 320 kbps MP3s, a fake 320 kbps MP3 from 128, a fake FLAC from 128, a fake 24/96 FLAC and WAV from CD audio). Every single-file and pair case completed with audio analysis.
+- Problems found and fixed: (1) fake formats passed unnoticed; the new report-only `bandwidth` provider flags all four trick files and none of the four genuine lossless files, and both genuine encodes read `consistent_with_bitrate`; (2) a CBR MP3 without gapless information (Jingle Bells) was refused by the decoder length guard for a 439-sample shortfall; the guard now allows two frames when no gapless length exists.
+- Observed, not changed: the free-site MP3s share watermark-like bursts at fixed times, so audfprint reports offset-0 supported matches in 6 of 10 unrelated pairs; this is real shared audio, and the frozen gates are unchanged (`docs/FALSE_MATCH_BENCHMARK_2026-10-21.md`).
+- Real material: Project Rock 1 of 15 files flagged (the 48 kHz edit reference, upsampled from 44.1 kHz); all 25 Lumina WAVs are band-limited (16.9–20.1 kHz), so a flag is never a verdict. Axes are identical with and without the provider.
+
+## FLAC and MP3 support (2026-10-23, branch feature/flac-mp3-support)
+
+- `REQUIRE_AUDIO_BACKENDS=1`, CPython 3.13.7 on macOS: **376 tests, all passed**. 372 non-GUI tests ran in one process (31 s, no skips); the four `test_builder.GuiTests` cases ran in separate processes.
+- New: `tests/test_audio_formats.py` (29 tests) for detection by content (including an ID3v2 tag before `fLaC`), bounded ID3v2, FLAC blocks, kept WAV chunks and MD5, MP3 exact and estimated length, lost sync and tags, evaluator results, C2PA in FLAC and MP3, diagnostics decoding, the public profile and the builder probe. A malformed FLAC named `.wav` is now an input error (read as FLAC) instead of `unsupported`; an Ogg file named `.wav` is still `unsupported`.
+- Checked by hand against reference tools: the FLAC MD5 recomputed from soundfile equals `metaflac --show-md5sum` for 8-, 16- and 24-bit files with 1–3 channels; the MP3 exact sample count equals soundfile's gapless length for 16 LAME and FFmpeg encodes (CBR, VBR, 11.025–48 kHz, MPEG-1, 2 and 2.5); a 20-minute MP3 is walked in 0.07 s and a 299 MiB FLAC MD5 is verified in 1.6 s.
+- Real material: Project Rock Ep01 rerun as FLAC (kept and plain metadata), MP3 320 and 128 kbps and all-FLAC; see `docs/PROJECT_ROCK_FINDINGS_2026-10-22.md` (FLAC with kept metadata identical to WAV; plain FLAC withholds Integrity; MP3 loses only chronology).
+- Real Lumina MP3 (Seed Speech 2.0, 24 and 48 kHz): C2PA in an ID3v2.4 `GEOB` frame, valid, known AI signer (same BytePlus certificate as the WAV output), untrusted; `ai-generated` consistent, `recorded` contradicted. These files have no Xing header; libsndfile mis-estimates such lengths, so the diagnostics reader now decodes only the MPEG frames and refuses truncated output (`decoder_length_mismatch`).
+- WAV unchanged: every example regenerates identically apart from `source_revision` and the `mp3_encoded_queries` calibration note. On the repeated-excerpt example, WAV, FLAC and MP3 versions give the same audfprint offsets (2.0 s and 10.01 s).
+
+## Version 0.8.1, calibration intervals (2026-10-23)
+
+- `REQUIRE_AUDIO_BACKENDS=1`, CPython 3.13.7 on macOS: **342 tests, all passed**. 338 non-GUI tests ran in one process (30 s, no skips); the four `test_builder.GuiTests` cases ran in separate processes.
+- New: `music_target/case_intervals.py` (95% Wilson score intervals) and `tests/test_case_intervals.py` (10 tests). Every count in `policies/audio_calibration_status.json` now carries `wilson_95` and sits under `development`, `held_out` or `real_material`; a test recomputes every stored interval from its count. `benchmarks/audio_calibration.py` and `benchmarks/false_match.py` output the intervals; the builder shows them beside the benchmark counts.
+- No score, gate or finding changed. The status file is hashed into `source_revision`, so all example responses were regenerated; in `examples/audio-diagnostics/response.json` only the attached `calibration` objects, the status hash, `source_revision` and timings differ.
+
 ## Version 0.8.1 (2026-10-22)
 
 - `REQUIRE_AUDIO_BACKENDS=1`, CPython 3.13.7 on macOS: **332 tests, all passed**. 328 non-GUI tests ran in one process (31 s, no skips); the four `test_builder.GuiTests` cases ran in separate processes. Details: `reports/test-results.txt` and `reports/release.json`.

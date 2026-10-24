@@ -6,7 +6,8 @@ policies/workflow_evidence_policy.json (next to this file, or in the current
 directory) and asks for it if it cannot be found.
 
 Nothing is inferred: types, roles, the final artefact and every relationship
-are exactly what you declare. Hashes and WAV technical data come from the files.
+are exactly what you declare. Hashes and audio technical data (WAV, FLAC, MP3)
+come from the files.
 """
 
 from __future__ import annotations
@@ -24,6 +25,18 @@ import manifest_logic as L
 import relationship_modes as RM
 import wav_probe
 import builder_operations as operations
+
+
+def technical_summary(tech):
+    """One line of measured audio properties; fields a format lacks are left out."""
+    if not tech:
+        return "no supported audio data"
+    parts = [f"{tech['duration_seconds']} s" if tech.get("duration_seconds") is not None
+             else "length not stated in the file",
+             f"{tech['sample_rate_hz']} Hz", f"{tech['channels']} ch"]
+    if tech.get("bit_depth") is not None:
+        parts.append(f"{tech['bit_depth']}-bit")
+    return ", ".join(parts)
 from builder_results import (
     INSUFFICIENT_SUPPORT_LABEL, attention_items, attention_workflow_results, audio_diagnostic_lines,
     axis_value_label, music_semantics_lines)
@@ -87,10 +100,7 @@ class FileDialog(Dialog):
         ttk.Label(self.body, text=name, font=("TkDefaultFont", 10, "bold")).grid(
             row=self._row, column=0, columnspan=2, sticky="w")
         self._row += 1
-        tech = entry["technical"]
-        info = (f"sha256 {entry['hash'][:16]}…   "
-                + (f"{tech['duration_seconds']} s, {tech['sample_rate_hz']} Hz, "
-                   f"{tech['channels']} ch, {tech['bit_depth']}-bit" if tech else "no WAV data"))
+        info = f"sha256 {entry['hash'][:16]}…   " + technical_summary(entry["technical"])
         ttk.Label(self.body, text=info).grid(row=self._row, column=0, columnspan=2,
                                              sticky="w", pady=(0, 6))
         self._row += 1
@@ -176,6 +186,9 @@ class RelDialog(Dialog):
             if attrs.get(key) is not None:
                 self.vars[name].set(str(attrs.pop(key)))
         self.confirmed = tk.BooleanVar(value=bool(attrs.pop("confirmed_by_submitter", False)))
+        self.conversion = tk.BooleanVar(value=attrs.get("transformation") == "format_conversion")
+        if self.conversion.get():
+            attrs.pop("transformation")
 
         ids = list(self.files)
         v = self.vars
@@ -211,6 +224,8 @@ class RelDialog(Dialog):
             ("origin", "assertion_origin", ttk.Entry(self.body, textvariable=v["origin"])),
             ("confirmed", "confirmed_by_submitter",
              ttk.Checkbutton(self.body, variable=self.confirmed)),
+            ("conversion", "same audio, other file format",
+             ttk.Checkbutton(self.body, variable=self.conversion)),
             ("extra", "other attributes (JSON)", self.extra_text),
         ]
         self.labels = {name: ttk.Label(self.body, text=label) for name, label, _ in self.order}
@@ -258,7 +273,8 @@ class RelDialog(Dialog):
         s = self.files.get(self.vars["source"].get())
         span = RM.suggest_range(t, s)
         if span is None:
-            messagebox.showinfo("Ranges", "Choose target and source WAV files first.", parent=self)
+            messagebox.showinfo("Ranges", "Choose target and source audio files with known "
+                                "durations first.", parent=self)
             return
         for name in ("ss", "ts"):
             self.vars[name].set(str(span[0]))
@@ -277,6 +293,8 @@ class RelDialog(Dialog):
                 attrs["assertion_origin"] = v["origin"]
             if self.confirmed.get():
                 attrs["confirmed_by_submitter"] = True
+            if self.conversion.get() and v["type"] == "derived_from":
+                attrs["transformation"] = "format_conversion"
             if v["scope"]:  # legacy value from an older manifest; kept, not offered
                 attrs["derivation_scope"] = v["scope"]
             for key, name in self.NUMERIC.items():
@@ -769,7 +787,8 @@ class App(tk.Tk):
                     f"{Path(selected).name} does not match the declared SHA-256 for "
                     f"{entry['id']}. The manifest identity was not changed.")
             entry["path"] = str(Path(selected).resolve())
-            entry["technical"] = wav_probe.wav_technical(selected)
+            entry["technical"] = wav_probe.audio_technical(selected)
+            entry["capabilities"] = wav_probe.audio_capabilities(selected)
             self.refresh()
         except (OSError, ValueError) as exc:
             messagebox.showerror("Cannot locate original", str(exc), parent=self)
@@ -789,19 +808,22 @@ class App(tk.Tk):
             entry = {"id": f"file-{self._counter}", "path": str(path), "hash": digest,
                      "type": "", "creation_method": "", "role": "", "final": False,
                      "production": {}, "extra": {},
-                     "technical": result["technical"]}
+                     "technical": result["technical"],
+                     "capabilities": result.get("capabilities") or {}}
             dialog = FileDialog(self, entry, {f["id"] for f in self.files}, self.roles())
             if dialog.result is None:
                 continue
             self.files.append({**entry, **dialog.result})
             if dialog.result["final"]:
                 self._only_final(len(self.files) - 1)
+            advice = wav_probe.format_advice(entry["capabilities"], dialog.result["type"])
+            if advice:
+                messagebox.showinfo("Format note", f"{path.name}:\n\n" + "\n\n".join(advice), parent=self)
             if dialog.result["type"].startswith("audio/") and not entry["technical"]:
                 messagebox.showwarning(
-                    "Unsupported WAV",
-                    f"{path.name} is typed as audio but could not be read as a supported WAV "
-                    "(integer PCM 8/16/24/32-bit or IEEE float 32/64-bit, including "
-                    "WAVE_FORMAT_EXTENSIBLE); the evaluator will reject it.")
+                    "Unsupported audio",
+                    f"{path.name} is typed as audio but could not be read as supported audio: "
+                    f"{L.SUPPORTED_AUDIO_TEXT}. The evaluator will reject it.")
         self.refresh()
 
     def edit_file(self):
@@ -1029,7 +1051,7 @@ class App(tk.Tk):
                     "creation_method": attrs.pop("creation_method", ""),
                     "role": production.pop("role", ""), "production": production,
                     "technical": attrs.pop("technical", {}) or
-                                 (wav_probe.wav_technical(path) if path and path.is_file() else {}),
+                                 (wav_probe.audio_technical(path) if path and path.is_file() else {}),
                     "extra": attrs,
                     "final": digest == chain["final_artefact_hash"]})
             rels = [{"target": alias[a["artefact_hash"]], "source": alias[e["hash"]],

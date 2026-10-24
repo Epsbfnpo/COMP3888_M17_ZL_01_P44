@@ -322,7 +322,18 @@ class ProductionDocumentTests(unittest.TestCase):
         aaf_complete = store(self.folder, aaf_bytes(Path(tempfile.mkdtemp(dir=self.folder)), complete_refs), "aaf")
         complete = run.evaluate(self.request([(aaf_complete, "project/aaf", "aaf")]), self.folder, "native")
         self.assertFalse(any(row["code"] == "AAF_REFERENCED_TAKES_NOT_SUBMITTED" for row in complete["findings"]))
-        self.assertEqual(baseline["axes"], complete["axes"])
+        # Scores are unchanged; only the reasoning names the missing material.
+        strip = lambda axes: {name: {k: v for k, v in axis.items() if k != "reasoning"} for name, axis in axes.items()}
+        self.assertEqual(strip(baseline["axes"]), strip(complete["axes"]))
+        # The unsubmitted take joins the required recordings, so it cannot be
+        # left out to raise the share; it is missing material, not a contradiction.
+        breadth = baseline["assessment_checks"]["support_breadth"][0]
+        self.assertEqual((breadth["required_recording_count"], breadth["not_submitted"], breadth["contradicted"]),
+                         (2, 1, 0))
+        self.assertEqual((breadth["material_coverage"], breadth["support_coverage"], breadth["coverage_scope"]),
+                         (0.5, 0.5, "confirmed"))
+        self.assertEqual(complete["assessment_checks"]["support_breadth"][0]["support_coverage"], 1.0)
+        self.assertIn("1 recording the AAF edit uses was not submitted", baseline["axes"]["integrity"]["reasoning"])
 
     def test_aaf_library_media_is_listed_without_scoring(self):
         library = ["BOOM Library - horse trotting.wav"]

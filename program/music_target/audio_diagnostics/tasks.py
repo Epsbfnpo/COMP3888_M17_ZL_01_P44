@@ -30,7 +30,8 @@ def _aaf_ranges(response):
     recorders = {}
     for row in response.get("findings", []):
         recorder = row.get("recorder_metadata") or {}
-        if row.get("code") == "WAV_OBSERVATION" and recorder.get("present") and recorder.get("file_name"):
+        if (row.get("code") in {"WAV_OBSERVATION", "AUDIO_OBSERVATION"} and recorder.get("present")
+                and recorder.get("file_name")):
             recorders.setdefault((_norm(recorder.get("tape")), _norm(recorder["file_name"])), []).append(
                 (row["evidence_hash"], recorder))
     ranges = {}
@@ -61,7 +62,7 @@ def build_tasks(native, response):
     bound = {row["evidence_hash"] for row in response.get("assessment_checks", {}).get("bound_file_integrity", [])
              if row.get("rule") == "object_hash_bound" and row.get("passed") is True}
     failed = {row.get("evidence_hash") for row in response["findings"]
-              if row["code"] in {"WAV_PARSER_FAILED", "OBJECT_CHANGED_DURING_EVALUATION"}}
+              if row["code"] in {"WAV_PARSER_FAILED", "AUDIO_PARSER_FAILED", "OBJECT_CHANGED_DURING_EVALUATION"}}
     sheets = [row["parser_result"] for row in response["findings"]
               if row["code"] == "PARSER_OBSERVATION" and row.get("parser") == "comp-sheet"
               and row.get("parser_status") in {"parsed", "partial"} and row.get("parser_result")]
@@ -127,6 +128,23 @@ def build_tasks(native, response):
                 elif variant["range_source"] == DERIVED:
                     variant["range_source"] = "declared"
                 tasks.append(variant)
+    return tasks
+
+
+def file_tasks(native, response):
+    """One whole-file task per bound, parseable audio artefact, for per-file providers."""
+    bound = {row["evidence_hash"] for row in response.get("assessment_checks", {}).get("bound_file_integrity", [])
+             if row.get("rule") == "object_hash_bound" and row.get("passed") is True}
+    failed = {row.get("evidence_hash") for row in response["findings"]
+              if row["code"] in {"WAV_PARSER_FAILED", "AUDIO_PARSER_FAILED", "OBJECT_CHANGED_DURING_EVALUATION"}}
+    tasks = []
+    for node in native["artefacts"]:
+        digest = node["artefact_hash"]
+        if is_audio(node) and digest in bound and digest not in failed:
+            tasks.append({"task_id": "file:" + digest + ":0", "relation_id": "file:" + digest,
+                          "source_hash": digest, "target_hash": digest, "relationship_type": "single_file",
+                          "attributes": {key: None for key in RANGE_FIELDS}, "selection_id": None,
+                          "range_source": "whole_file", "unavailable_reason": None})
     return tasks
 
 

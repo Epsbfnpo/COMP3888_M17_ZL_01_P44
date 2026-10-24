@@ -4,7 +4,7 @@
 **Modules in scope:** `music_target/evidence_audit.py` (fact aggregation), `music_target/evidence_tiers.py`,
 `music_target/assessment_passes.py` (`assess_axes`, release gate, severe cap),
 `music_target/scoring_profile.py`, `music_target/score_explanations.py`, `music_target/recorder_metadata.py`.
-**Policy in scope:** `policies/scoring_profile.json` — **`profile_id: default-v4`, `profile_version: 4`**.
+**Policy in scope:** `policies/scoring_profile.json` — **`profile_id: default-v6`, `profile_version: 6`** (updated 24 October 2026; the plan was first written for default-v4).
 **Deliverable:** a *Test Report* plus a *Policy Expectation Table* (templates at the end of this file).
 
 > This group tests the car's **dashboard**: given sensor inputs, does the gauge compute and display
@@ -14,10 +14,17 @@
 
 ## 0. Pin the policy version first
 
-Every expected value in this plan assumes **`default-v4`**. Under v4:
+Every expected value in this plan assumes **`default-v6`**. Under v6:
 
 - Integrity is the weighted mean of three layers: `file_integrity`, `declaration_consistency`,
   `cross_evidence_support`, all weight **1.0**.
+- `file_integrity` holds only checks with no submitter claim: hash binding, parser readability and the
+  FLAC MD5 of the decoded audio. Declared technical values (`technical.*_matches_observed`, for WAV,
+  FLAC and MP3) are scored in `declaration_consistency`, one fact per declared file property
+  (`declaration_scored_facts`).
+- With `one_vote_per_claim`, the same claim about one recording in several documents (sound report and
+  AAF scene/take or track names) is one cross-evidence fact.
+- `evidence_sources` and `support_breadth` are report-only; `min_supported_asset_share` is not set.
 - A number is released only if at least **2** layers are assessed **and** qualifying cross-evidence
   (`signed_attestation` or `recorder_metadata` tier) was assessed.
 - An **ordinary** contradiction never releases a withheld number.
@@ -25,7 +32,10 @@ Every expected value in this plan assumes **`default-v4`**. Under v4:
   releases `min(weighted_mean, 0.25)` even when the value would otherwise be withheld.
 - Confidence uses ceiling 0.8 over 3 layers.
 
-Each test must record the `profile_id` it was written against. **Do not mix v3 and v4 expectations.**
+Each test must record the `profile_id` it was written against. **Do not mix v4 and v6 expectations.**
+Cases SU-01 to SU-13 and SI-01 to SI-08 hold under v6 unless they use a declared technical value: such a
+value now moves `declaration_consistency`, not `file_integrity` (SI-04 is unaffected, because it uses a
+relationship claim).
 If the profile changes, the expected values in this plan must be reviewed, not silently updated.
 
 ---
@@ -64,6 +74,18 @@ Skip audio and document parsing. Feed already-decided check results straight int
 | SU-11 | Unavailable tier cannot promote | Assessed `submitter_document` + unassessed (`passed: None`) `signed_attestation` | `assessed_evidence_tiers == ["submitter_document"]` |
 | SU-12 | Profile validation | Duplicate key, unknown layer, weight ≤ 0, cap outside [0, 1], rules without cap, `denominator_layers ≠ 3` | Each raises `ScoringProfileError` |
 | SU-13 | Profile without severe release (v3 behaviour) | Remove `release_capped_value_on_severe_contradiction` | Severe case returns `null`, `severe_contradiction_release: disabled` |
+| SU-14 | One vote per declared property (v6) | A file's own sample-rate claim and an edge's output sample-rate claim on the same file, both wrong | One fact, `observation_count: 2`, `passed: False`; one contradiction |
+| SU-15 | Technical claims leave file integrity (v6) | A wrong declared sample rate on a bound file | `bound_file_integrity` has no `technical.*` rule; `declared_file_properties` has it; `TECHNICAL_CLAIM_MISMATCH` finding |
+| SU-16 | One vote per repeated claim (v6) | Sound report and AAF give the same scene/take for one take | One fact with `document_count: 2`; either one failing fails the fact; different takes or other rules never merge |
+| SU-17 | Independence never guessed (v6) | Any submission with documents | `evidence_sources[0].independence == "unknown"`, `independent_source_count` is `null`, uploader listed as known common source |
+| SU-18 | Breadth gate (v6) | `min_supported_asset_share` set to 1.0 and one required recording without qualifying evidence | Value `null`, `release_reason: insufficient_support_breadth`; a contradicted recording counts as checked |
+| SU-19 | Profile validation (v6) | `one_vote_per_claim` not boolean; `min_supported_asset_share` outside (0, 1] | Each raises `ScoringProfileError` |
+| SU-20 | AAF take joins the denominator | One submitted take supported; the AAF also uses one take that no submission matches (listed in two AAFs, different case) | `required_recording_count: 2`, `not_submitted: 1`, `material_coverage` and `support_coverage` 0.5; `contradicted: 0` |
+| SU-21 | Unmatched reference is provisional | As SU-20, but one submitted take has no recorder identity | `unmatched_references: 1`, `not_submitted: 0`, `coverage_scope: provisional` |
+| SU-22 | No required recordings | Workflow without required recording types; AAF lists missing takes | `status: not_applicable`, coverage `null` (never 0/0 shown as complete) |
+| SU-23 | Format conversion claim | `derived_from` WAV → FLAC with `transformation: format_conversion`, same parameters | Four `format_conversion_*_preserved` checks pass and appear in `relationship_integrity` (declaration consistency) |
+| SU-24 | Contradicted conversion | Same, target resampled to 44.1 kHz | `format_conversion_sample_rate_preserved` fails; contradiction count ≥ 1; `sample_identity: not_comparable` |
+| SU-25 | Sample identity is report-only | Same parameters, one sample changed | `sample_identity: different`, `FORMAT_CONVERSION_SAMPLES_DIFFER` with `scoring_eligible: false`; contradiction count 0 |
 
 ### 2.2 Worked example — SU-02 / SU-03 fact aggregation
 
@@ -155,6 +177,8 @@ check, or put evidence in the wrong tier.*
 | SI-06 | Required evidence removed | `insufficient_evidence` status; no number released |
 | SI-07 | Explanation consistency | For every response: the numbers in `score_explanations` equal the numbers in `axes` and `integrity_layers` |
 | SI-08 | Creation-method disclosure | Complete "recorded" and complete "ai-generated" declarations both give 1.0; `content_ai_detection_performed: false` |
+| SI-09 | FLAC and MP3 layers (v6) | MP3 master declaring bit depth, duration, sample rate and channels; FLAC master with a corrupted `STREAMINFO` MD5 | MP3: bit depth and duration are `unavailable` facts that are not counted, sample rate passes in `declaration_consistency`; FLAC: `flac_md5_matches_decoded_audio` fails in `file_integrity` (`FILE_INTEGRITY_CONTRADICTION`) |
+| SI-10 | Breadth on Project Rock Ep01 (v6) | Ep01 chain; the same with one AAF-used take removed; takes as plain FLAC | 13/13 supported; 12 of 13 with 1 `not_submitted` and a sentence in the reasoning; 0/13 supported, 13 `unmatched_references`, `coverage_scope: provisional`. Integrity values unchanged in all three |
 
 ### 3.2 Worked example — SI-03 "change one fact, watch the score move"
 
@@ -219,9 +243,11 @@ the source file (SI-05). Existing examples to copy from: `tests/test_scoring_rem
 
 For each rule in the profile, write one short scenario and ask the team "is this the outcome we want?"
 
-| Policy item | Scenario to review | Current v4 outcome | Team decision |
+| Policy item | Scenario to review | Current v6 outcome | Team decision |
 |---|---|---|---|
 | Equal layer weights | File integrity perfect, declarations half wrong | 0.75 | keep / change |
+| Every AAF-used take is a required recording | An AAF-used take is not submitted | 12 of 13 supported (report only), value released | keep / change |
+| Breadth gate | Set `min_supported_asset_share`? At what value? | Not set (report only) | keep / change |
 | Severe cap = 0.25 | Hash mismatch on a supporting file, everything else perfect | 0.25 | keep / change |
 | Severe releases without qualifying support | Hash mismatch, no recorder metadata | 0.25 released (v3 withheld) | keep / change |
 | Recorder metadata counts as qualifying | Unsigned BWF timecode agrees with sound report | Released, with info finding | keep / change |
