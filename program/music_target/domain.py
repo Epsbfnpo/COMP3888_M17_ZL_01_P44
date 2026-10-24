@@ -79,6 +79,8 @@ RELATIONSHIP_ATTRIBUTES = {
     "reference_pointer": Attribute(AttributeTypes.Any, None),
     "claim_rationale": Attribute(AttributeTypes.Any, None),
     "transformation_description": Attribute(AttributeTypes.Any, None),
+    # "format_conversion" on derived_from: the same audio in another file format.
+    "transformation": Attribute(AttributeTypes.Any, None),
     "derivation_scope": Attribute(AttributeTypes.Any, None),
     "source_start_seconds": Attribute(AttributeTypes.Any, None),
     "source_end_seconds": Attribute(AttributeTypes.Any, None),

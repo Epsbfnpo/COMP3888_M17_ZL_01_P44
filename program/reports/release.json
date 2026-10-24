@@ -1,12 +1,12 @@
 {
   "target_version": "0.8.1",
   "date": "2026-10-24",
-  "source_revision": "sha256:bf4270500aa889e80fd0719a668f6887f1fc3f51f8a2a13dfba6c24451673a56",
+  "source_revision": "sha256:b354426d2a75bbf3c48f551d15f6404677dea509dac1812d4fecd226ab7efe64",
   "python": "3.13.7",
   "platform": "Darwin",
-  "tests_discovered": 409,
-  "tests_run": 409,
-  "non_gui_tests_one_process": 405,
+  "tests_discovered": 425,
+  "tests_run": 425,
+  "non_gui_tests_one_process": 421,
   "gui_tests_separate_processes": 4,
   "failures": 0,
   "errors": 0,
@@ -49,7 +49,9 @@
     "Checked real Lumina MP3 (C2PA in ID3 GEOB, known AI signer); diagnostics decode only MPEG frames and refuse truncated MP3 decoding (libsndfile length estimate without a Xing header)",
     "Report-only per-file content bandwidth provider (audio_bandwidth): flags MP3 content below its bitrate, lossless files band-limited like a lossy encode, and upsampled files; never scored. MP3 without gapless information decodes with a two-frame length tolerance",
     "Merged scoring profile default-v6 (score-fix): file technical claims scored in declaration consistency with one vote per declared property; one vote per repeated claim across documents; report-only evidence_sources and support_breadth with an optional min_supported_asset_share gate; Integrity confidence described as layers checked. FLAC and MP3 technical claims follow the same layer; the FLAC MD5 check stays in file integrity",
-    "Cross-format review (24 October 2026): support_breadth counts AAF-used recorder takes that were not submitted (not_submitted, or unmatched_reference with provisional coverage when a submitted recording has no recorder identity) and reports material_coverage and support_coverage over one denominator; undated audio edges are listed in declared_chronology as not_comparable with a reason; the audio summary records the decoder versions; the MP3 not-tested label is split into the tested configuration and the rest; the workflow policy is loaded once per evaluation. Report-only: no score or profile change"
+    "Cross-format review (24 October 2026): support_breadth counts AAF-used recorder takes that were not submitted (not_submitted, or unmatched_reference with provisional coverage when a submitted recording has no recorder identity) and reports material_coverage and support_coverage over one denominator; undated audio edges are listed in declared_chronology as not_comparable with a reason; the audio summary records the decoder versions; the MP3 not-tested label is split into the tested configuration and the rest; the workflow policy is loaded once per evaluation. Report-only: no score or profile change",
+    "Mixed-format evidence: report-only format_capabilities per audio file (recorder metadata present, not kept or not supported by the format; exact length; bit depth; BWF date; embedded C2PA) with advice; derived_from edges may declare transformation=format_conversion, whose sample rate, channel, bit-depth and length checks are scored in declaration consistency; lossless integer files are compared by a canonical sample SHA-256 (report-only, FORMAT_CONVERSION_SAMPLES_DIFFER); audio diagnostics add audio_format_conversion (alignment at 0 s and target bandwidth); the desktop builder shows format notes on import and a format-conversion option on derived_from",
+    "WAV focus (decision of 24 October 2026): FORMAT_SCOPE in audio_observations states per check family whether FLAC and MP3 implement it; every FLAC or MP3 file lists the families not made in limited_checks (AUDIO_FORMAT_LIMITED_CHECKS, now also for FLAC), each unavailable with limitation program_scope, format or file; format_capabilities gains check_scope (full for WAV, limited for FLAC/MP3); audio diagnostics rows on FLAC/MP3 carry format_scope calibrated_on_wav_only; the builder notes the limited scope. No score change"
   ],
   "revision_scope": "SHA-256 of runtime Python, requirements, policy JSON, JSON schemas, and bundled XSD files. Documentation, tests and reports excluded."
 }

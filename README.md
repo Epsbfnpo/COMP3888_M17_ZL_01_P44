@@ -33,7 +33,9 @@ is lossy, so checks that need a bit depth, recorder metadata or an exact length
 are reported as unavailable rather than as contradictions. See
 [FLAC and MP3](#flac-and-mp3) below. Scoring follows the same rules as WAV
 under the `default-v6` profile: technical claims are scored in declaration
-consistency, and the FLAC MD5 check in file integrity.
+consistency, and the FLAC MD5 check in file integrity. **WAV is the assessed
+format**: FLAC and MP3 keep the checks implemented today, and every other
+check on them is reported as not assessed (see the scope limitation below).
 
 The [technical manual](Manual_layout_check.docx) describes the whole program;
 its Section 8 covers the C2PA work in detail and Section 10 lists the known
@@ -567,6 +569,24 @@ artefact, and they neither raise nor lower completeness.
 
 ## FLAC and MP3
 
+**Scope limitation.** The evaluator is designed and calibrated for WAV/BWF. FLAC and MP3 files are
+accepted and receive the checks implemented today: hash binding, structure,
+declared technical values, the FLAC MD5, recorder metadata kept in FLAC with
+`--keep-foreign-metadata`, embedded C2PA, declared format conversions and the
+optional audio diagnostics. Every other check is reported as not assessed,
+never as a contradiction and never in a score. Each FLAC or MP3 file lists
+them in `limited_checks` (also in `AUDIO_FORMAT_LIMITED_CHECKS` and
+`format_capabilities`) with `limitation`: `program_scope` where only WAV is
+implemented (a limitation of this program, for example dates in ID3 or Vorbis
+tags, or MP3 decoded-sample integrity), `format` where the format holds no
+such information (MP3 bit depth or recorder metadata), or `file` where this
+file lacks it (a plain FLAC without BWF chunks, an MP3 without a Xing/LAME
+header). Audio diagnostics on FLAC and MP3 use thresholds calibrated on WAV
+only (`format_scope: calibrated_on_wav_only`). For a full assessment, submit
+WAV; a delivered FLAC or MP3 can be declared `derived_from` its WAV original
+with `transformation: format_conversion`. No further FLAC or MP3 checks are
+planned.
+
 The file content, not the extension, decides the format
 (`music_target/audio_formats.py`). An ID3v2 tag before the audio does not
 decide it: the bytes after the tags do, because the C2PA SDK writes an ID3v2
@@ -597,8 +617,8 @@ produce); otherwise `duration_seconds` is `null` and only
 `estimated_duration_seconds` is given. MP3 has no bit depth and no standard
 place for recorder metadata. Declared fields that cannot be measured give
 checks with `passed: null` and `status: unavailable`, never contradictions,
-and each MP3 gets the informational `AUDIO_FORMAT_LIMITED_CHECKS` listing the
-check families not run. ID3v1, APEv2 and appended ID3v2 tags are excluded from
+and each FLAC or MP3 file gets the informational `AUDIO_FORMAT_LIMITED_CHECKS`
+listing the check families not run, with their limitation. ID3v1, APEv2 and appended ID3v2 tags are excluded from
 the audio; compressed or encrypted ID3 frames are not decoded.
 
 Real Lumina MP3 output (Seed Speech 2.0, Format mp3) was checked on 24
@@ -641,6 +661,43 @@ On the Project Rock Ep01 chain transcoded locally, FLAC takes encoded with
 the recorder evidence, so Integrity was withheld; an MP3 final mix (320 or
 128 kbps) changed nothing except the chronology comparison
 ([findings](program/docs/PROJECT_ROCK_FINDINGS_2026-10-22.md)).
+
+### Mixing formats in one submission
+
+Every role accepts WAV, FLAC and MP3. The format never lowers a score; it
+decides which checks can run.
+
+- `assessment_checks.format_capabilities` lists, for each audio file, whether
+  it carries recorder metadata (`present`, `not_kept` for a plain FLAC,
+  `not_supported_by_format` for MP3, `absent`), an exact length, a bit depth,
+  a BWF date and an embedded C2PA manifest, with advice for recordings that
+  lost their recorder evidence. It is report-only.
+- A `derived_from` edge may declare `"transformation": "format_conversion"`:
+  the target is the same audio as the source in another file format, for
+  example the original WAV take and the delivered FLAC or MP3. The claim is
+  checked against both files (`format_conversion_sample_rate_preserved`,
+  `..._channels_preserved`, `..._bit_depth_preserved` between lossless files,
+  `..._duration_preserved` within one sample for lossless files and one MPEG
+  frame for MP3), and these checks are scored in declaration consistency like
+  other relationship claims. A length that is not exact (an MP3 without a
+  Xing/LAME header) is `unavailable`. Declared on another relationship type
+  the flag is ignored (`FORMAT_CONVERSION_NOT_APPLIED`).
+- Between lossless integer files with the same rate, channels and bit depth,
+  `assessment_checks.format_conversions[].sample_identity` compares the
+  decoded samples exactly with a canonical SHA-256
+  (`pcm-int-le-interleaved-sha256-v1`: signed little-endian integers,
+  channels interleaved, as FLAC's MD5 is defined). `identical` describes an
+  exact content relation, not provenance; `different` adds the report-only
+  `FORMAT_CONVERSION_SAMPLES_DIFFER`. Float WAV, lossy files and differing
+  parameters are `not_comparable`. The SoniqTools Bach WAV and FLAC (16/44.1
+  and 24/96) are identical; the fake 24/96 FLAC upsampled from CD audio,
+  declared as a conversion, fails the rate and bit-depth checks.
+- With `--audio-analysis`, `assessment_checks.audio_format_conversion` adds,
+  per conversion, whether audfprint supports alignment at 0 s and the
+  target's bandwidth assessment (report-only).
+- The desktop builder shows the same capability notes when a file is added
+  and before saving, and offers "same audio, other file format" on
+  `derived_from` relationships.
 
 ## Run the native example
 
@@ -735,8 +792,12 @@ four GUI tests passed separately. After merging main (scoring profile
 passed in one process (32 s) and the four GUI tests passed separately. After
 the cross-format review changes (AAF coverage, undated chronology rows, decoder
 versions) it found 409 tests; all 405 non-GUI tests passed in one process
-(33 s) and the four GUI tests passed separately (`reports/test-results.txt`,
-`reports/release.json`).
+(33 s) and the four GUI tests passed separately. With mixed-format evidence
+(format capabilities, declared format conversions, sample identity) it found
+422 tests; all 418 non-GUI tests passed in one process (35 s) and the four GUI
+tests passed separately. After the WAV-focus scope change it found 425 tests;
+all 421 non-GUI tests passed in one process (34 s) and the four GUI tests passed
+separately (`reports/test-results.txt`, `reports/release.json`).
 `tests/test_builder.py` now also passes on its own: it imports `run` (and so
 c2pa) before its worker tests mock `subprocess.Popen`, because c2pa's import
 calls `platform.processor()`, which spawns a subprocess. The

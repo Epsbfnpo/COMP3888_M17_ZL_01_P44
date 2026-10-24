@@ -47,6 +47,79 @@ def audio_technical(path) -> dict:
     return wav_technical(path)
 
 
+_RECORDINGS = ("audio/raw-take", "audio/raw-track")
+
+
+def _wav_chunk_ids(path) -> set:
+    """RIFF chunk ids of a WAV, read from the headers only."""
+    ids = set()
+    path = Path(path)
+    size = path.stat().st_size
+    with path.open("rb") as f:
+        if f.read(12)[8:12] != b"WAVE":
+            return ids
+        position = 12
+        while position + 8 <= size and len(ids) < 1024:
+            f.seek(position)
+            header = f.read(8)
+            if len(header) < 8:
+                break
+            ids.add(header[:4])
+            position += 8 + struct.unpack_from("<I", header, 4)[0]
+            position += position & 1
+    return ids
+
+
+def audio_capabilities(path) -> dict:
+    """What evidence a supported audio file can carry; {} if unsupported or unreadable.
+
+    The same categories the evaluator reports in ``format_capabilities``.
+    """
+    try:
+        detected = detect(path)
+        if detected.container == "FLAC":
+            flac = inspect_flac(path, detected)
+            kept = {chunk_id for chunk_id, _ in flac.foreign_chunks}
+            return {"format": "FLAC", "lossless": True, "exact_duration": flac.duration_seconds is not None,
+                    "recorder_metadata": "present" if kept & {b"bext", b"iXML"} else "not_kept"}
+        if detected.container == "MP3":
+            mp3 = inspect_mp3(path, detected)
+            return {"format": "MP3", "lossless": False, "exact_duration": mp3.duration_seconds is not None,
+                    "recorder_metadata": "not_supported_by_format"}
+        if not wav_technical(path):
+            return {}
+        present = _wav_chunk_ids(path) & {b"bext", b"iXML"}
+        return {"format": "WAV", "lossless": True, "exact_duration": True,
+                "recorder_metadata": "present" if present else "absent"}
+    except (OSError, FlacError, Mp3Error):
+        return {}
+
+
+def format_advice(capabilities: dict, artefact_type: str, converted: bool = False) -> list:
+    """Short advice for the builder, matching the evaluator's ``format_capabilities`` advice.
+
+    ``converted`` is true when the file is declared derived_from an original with
+    transformation=format_conversion, which already supplies the original.
+    """
+    advice = []
+    recorder = capabilities.get("recorder_metadata")
+    if artefact_type in _RECORDINGS and not converted:
+        if recorder == "not_kept":
+            advice.append("This FLAC recording carries no recorder metadata. Re-encode it from the original "
+                          "WAV with flac --keep-foreign-metadata, or add the original WAV and declare this file "
+                          "derived_from it as a format conversion.")
+        elif recorder == "not_supported_by_format":
+            advice.append("MP3 cannot carry recorder metadata. Add the original WAV or FLAC and declare this "
+                          "file derived_from it as a format conversion.")
+    if capabilities.get("format") == "MP3" and not capabilities.get("exact_duration"):
+        advice.append("This MP3 has no Xing/LAME header, so its exact length cannot be checked.")
+    if capabilities.get("format") in ("FLAC", "MP3"):
+        advice.append(f"{capabilities['format']} is accepted with limited checks: the evaluator is designed for "
+                      "WAV, and checks it implements for WAV only are reported as not assessed. Submit WAV for "
+                      "a full assessment.")
+    return advice
+
+
 def wav_technical(path) -> dict:
     """Objective fields {duration_seconds, sample_rate_hz, channels, bit_depth}; {} if unsupported."""
     try:

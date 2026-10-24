@@ -11,6 +11,7 @@ MD5 check (``verify_md5``); inspection needs the standard library only.
 
 from __future__ import annotations
 
+import dataclasses
 import hashlib
 import struct
 import time
@@ -265,7 +266,9 @@ def verify_md5(path, descriptor: FlacDescriptor, deadline=None, block_frames=655
                 "reason": "soundfile is not installed, so the audio could not be decoded."}
     bits = descriptor.bits_per_sample
     width = (bits + 7) // 8
-    digest, frames = hashlib.md5(), 0
+    # The same canonical bytes give the sample SHA-256 used to compare files
+    # (music_target/sample_identity.py), at no extra decoding cost.
+    digest, sample_sha256, frames = hashlib.md5(), hashlib.sha256(), 0
     path = Path(path)
     stat = path.stat()
     if stat.st_size != descriptor.file_size or stat.st_mtime_ns != descriptor.mtime_ns:
@@ -288,14 +291,30 @@ def verify_md5(path, descriptor: FlacDescriptor, deadline=None, block_frames=655
                     return {**record, "status": "unavailable", "reason_code": "caller_deadline",
                             "reason": "The caller's time limit was reached before the audio was fully decoded."}
                 values = (block >> (32 - bits)).astype("<i4").reshape(-1)
-                digest.update(values.view(np.uint8).reshape(-1, 4)[:, :width].tobytes())
+                canonical = values.view(np.uint8).reshape(-1, 4)[:, :width].tobytes()
+                digest.update(canonical)
+                sample_sha256.update(canonical)
                 frames += len(block)
     except (RuntimeError, soundfile.LibsndfileError) as exc:
         return {**record, "status": "failed", "reason_code": "audio_not_decodable",
                 "reason": f"The audio frames could not be decoded: {exc}"}
     decoded = digest.hexdigest()
-    record.update(decoded_md5=decoded, decoded_frames=frames)
+    record.update(decoded_md5=decoded, decoded_frames=frames, sample_sha256=sample_sha256.hexdigest())
     if decoded == descriptor.md5:
         return {**record, "status": "matched"}
     return {**record, "status": "mismatched", "reason_code": "md5_mismatch",
             "reason": "The decoded audio does not match the MD5 stored when the file was encoded."}
+
+
+def flac_sample_digest(path, descriptor: FlacDescriptor, deadline=None) -> dict:
+    """SHA-256 of the canonical decoded samples, also when STREAMINFO stores no MD5."""
+    if descriptor.md5 is not None:
+        result = verify_md5(path, descriptor, deadline)
+    else:
+        # verify_md5 needs a stored MD5 to compare with; decode with a placeholder.
+        result = verify_md5(path, dataclasses.replace(descriptor, md5="0" * 32), deadline)
+    if result.get("sample_sha256") is None:
+        return {"status": "unavailable", "reason_code": result.get("reason_code", "not_decoded"),
+                "reason": result.get("reason")}
+    return {"status": "computed", "sha256": result["sample_sha256"], "frames": result["decoded_frames"],
+            "bits": descriptor.bits_per_sample}

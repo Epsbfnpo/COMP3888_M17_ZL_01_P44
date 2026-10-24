@@ -6,7 +6,7 @@
   "system": {
     "name": "COMP3888-music-baseline",
     "version": "0.8.1",
-    "source_revision": "sha256:bf4270500aa889e80fd0719a668f6887f1fc3f51f8a2a13dfba6c24451673a56"
+    "source_revision": "sha256:b354426d2a75bbf3c48f551d15f6404677dea509dac1812d4fecd226ab7efe64"
   },
   "execution_status": "succeeded",
   "axes": {
@@ -455,9 +455,9 @@
       "content_match_is_provenance": false
     }
   ],
-  "processing_ms": 2637.653792044148,
+  "processing_ms": 2502.3143750149757,
   "resource_usage": {
-    "cpu_ms": 3.7739999999999996,
+    "cpu_ms": 3.4780000000000086,
     "peak_rss_kib": null
   },
   "error": null,
@@ -1021,6 +1021,40 @@
         "integrity_contribution": null
       }
     ],
+    "format_capabilities": [
+      {
+        "hash": "22bf064117b015ad6b47b7e649c83c5378ff26c1def988d09e1edb3ec6cfecfe",
+        "type": "audio/raw-track",
+        "format": "WAV",
+        "lossless": true,
+        "recorder_metadata": "absent",
+        "exact_duration": true,
+        "bit_depth": true,
+        "origination_date": false,
+        "embedded_c2pa": false,
+        "check_scope": "full",
+        "limited_checks": [],
+        "advice": [],
+        "scoring_eligible": false,
+        "integrity_contribution": null
+      },
+      {
+        "hash": "8699068584ba01947d52e5f55a973a86adf3c465c32621d1fe4b7c1f8304b638",
+        "type": "audio/sample",
+        "format": "WAV",
+        "lossless": true,
+        "recorder_metadata": "absent",
+        "exact_duration": true,
+        "bit_depth": true,
+        "origination_date": false,
+        "embedded_c2pa": false,
+        "check_scope": "full",
+        "limited_checks": [],
+        "advice": [],
+        "scoring_eligible": false,
+        "integrity_contribution": null
+      }
+    ],
     "score_explanations": [
       {
         "axis": "completeness",
@@ -1345,7 +1379,7 @@
           "minimum_candidate_matches": 5,
           "support_window_seconds": 0.25
         },
-        "processing_ms": 483.6350000696257,
+        "processing_ms": 455.2115829428658,
         "policy_id": "audio-observations-bounded-v2",
         "policy_version": 3,
         "policy_sha256": "802922f116cc4e5a96222efc6db0aa64b628351edf10f3b8126f5ee52d80bf54",
@@ -1606,7 +1640,8 @@
               "material": "the same 23 pairs (--encode flac)",
               "measured": "identical to WAV"
             }
-          ]
+          ],
+          "format_scope": "wav"
         }
       },
       {
@@ -1774,7 +1809,7 @@
           "minimum_candidate_matches": 5,
           "support_window_seconds": 0.25
         },
-        "processing_ms": 21.121792029589415,
+        "processing_ms": 20.274166949093342,
         "policy_id": "audio-observations-bounded-v2",
         "policy_version": 3,
         "policy_sha256": "802922f116cc4e5a96222efc6db0aa64b628351edf10f3b8126f5ee52d80bf54",
@@ -1803,7 +1838,8 @@
           "not_tested": [
             "all"
           ],
-          "false_match_rates": null
+          "false_match_rates": null,
+          "format_scope": "wav"
         }
       }
     ],
@@ -1917,7 +1953,7 @@
           "aggregation_seconds": 1.0,
           "candidate_cosine_similarity": 0.9
         },
-        "processing_ms": 849.1371250711381,
+        "processing_ms": 833.2654580008239,
         "policy_id": "audio-observations-bounded-v2",
         "policy_version": 3,
         "policy_sha256": "802922f116cc4e5a96222efc6db0aa64b628351edf10f3b8126f5ee52d80bf54",
@@ -1931,7 +1967,8 @@
           "not_tested": [
             "all"
           ],
-          "false_match_rates": null
+          "false_match_rates": null,
+          "format_scope": "wav"
         }
       }
     ],
@@ -2000,7 +2037,7 @@
         "integrity_contribution": null,
         "content_match_is_provenance": false,
         "parameters": {},
-        "processing_ms": 0.038707978092134,
+        "processing_ms": 0.03120803739875555,
         "policy_id": "audio-observations-bounded-v2",
         "policy_version": 3,
         "policy_sha256": "802922f116cc4e5a96222efc6db0aa64b628351edf10f3b8126f5ee52d80bf54",
@@ -2200,7 +2237,8 @@
               },
               "same_as_wav": false
             }
-          }
+          },
+          "format_scope": "wav"
         }
       }
     ],
@@ -2243,7 +2281,7 @@
           "section_minimum_seconds": 6.0,
           "section_prominence": 0.03
         },
-        "processing_ms": 565.2639999752864,
+        "processing_ms": 533.0199589952826,
         "policy_id": "audio-observations-bounded-v2",
         "policy_version": 3,
         "policy_sha256": "802922f116cc4e5a96222efc6db0aa64b628351edf10f3b8126f5ee52d80bf54",
@@ -2524,7 +2562,8 @@
               "material": "the same 23 pairs (--encode flac)",
               "measured": "identical to WAV"
             }
-          ]
+          ],
+          "format_scope": "wav"
         }
       }
     ],
@@ -2585,7 +2624,7 @@
           "flat_floor_spread_db": 3.0,
           "step_search_top_fraction": 0.9
         },
-        "processing_ms": 14.110540971159935,
+        "processing_ms": 13.655000017024577,
         "policy_id": "audio-observations-bounded-v2",
         "policy_version": 3,
         "policy_sha256": "802922f116cc4e5a96222efc6db0aa64b628351edf10f3b8126f5ee52d80bf54",
@@ -2675,7 +2714,8 @@
             "speech",
             "sample_rates_below_32_khz_for_mp3"
           ],
-          "false_match_rates": null
+          "false_match_rates": null,
+          "format_scope": "wav"
         }
       },
       {
@@ -2734,7 +2774,7 @@
           "flat_floor_spread_db": 3.0,
           "step_search_top_fraction": 0.9
         },
-        "processing_ms": 10.862916009500623,
+        "processing_ms": 10.35662495996803,
         "policy_id": "audio-observations-bounded-v2",
         "policy_version": 3,
         "policy_sha256": "802922f116cc4e5a96222efc6db0aa64b628351edf10f3b8126f5ee52d80bf54",
@@ -2824,7 +2864,8 @@
             "speech",
             "sample_rates_below_32_khz_for_mp3"
           ],
-          "false_match_rates": null
+          "false_match_rates": null,
+          "format_scope": "wav"
         }
       }
     ],
@@ -2850,7 +2891,7 @@
         "policy_version": 3,
         "policy_sha256": "802922f116cc4e5a96222efc6db0aa64b628351edf10f3b8126f5ee52d80bf54",
         "file_task_count": 2,
-        "processing_ms": 2385.4903749888763,
+        "processing_ms": 2266.345000010915,
         "calibration_status_sha256": "d97705b6f4e3c3a6593b673733b6e4922ec0cbdc91dbbb5bfd64d52a883be7f4",
         "decoders": {
           "soundfile": "0.14.0",

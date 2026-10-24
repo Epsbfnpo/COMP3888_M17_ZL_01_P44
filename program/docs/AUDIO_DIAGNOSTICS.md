@@ -62,6 +62,10 @@ It appends only `AUDIO_*` findings and the following object arrays:
 - `assessment_checks.audio_bandwidth`: one row per bound audio file, giving
   where its decoded audio stops compared with its container and bitrate (see
   below);
+- `assessment_checks.audio_format_conversion`: for each `derived_from` edge
+  declared as a format conversion, whether audfprint supports whole-file
+  alignment within 0.1 s of 0 and the target's bandwidth assessment, beside
+  the core `format_conversions` checks;
 - `assessment_checks.audio_diagnostic_summary`: policy/version, task counts
   (pair tasks and `file_task_count`), decoder versions, diagnostic runtime,
   and the explicit non-scoring boundary.
@@ -144,6 +148,9 @@ frames of such files (439 samples on a 2-minute CBR file). The
 optional libraries do not silently extend the evaluator's accepted file
 formats. Silence and mono
 channel cancellation are reported as unavailable, never as contradictions.
+Every threshold was calibrated on WAV; each row that reads a FLAC or MP3 file
+carries `calibration.format_scope: calibrated_on_wav_only` with the endpoint
+formats and a note, and no FLAC/MP3 calibration is planned.
 
 Too little usable signal is a normal analytical outcome, not a failure to run.
 Rows that are unavailable because of `silent_signal`, `insufficient_signal`,

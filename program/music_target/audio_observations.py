@@ -13,17 +13,78 @@ import dataclasses
 from music_target.recorder_metadata import recorder_fields_from_chunks
 from music_target.wav_parser import _parse_bext, _parse_list_info
 
-# Check families a lossy format cannot support, and why (reported, not scored).
-MP3_LIMITED_CHECKS = (
-    ("bit_depth", "MP3 has no bit depth; declared bit depths are not compared."),
-    ("recorder_metadata", "MP3 has no standard field for recorder metadata (bext/iXML), so sound-report "
-                          "and AAF comparisons with recorder fields, and chronology checks on BWF origination "
-                          "dates, are not possible."),
-    ("lossless_content", "MP3 is lossy: decoded samples differ from the original recording, so audio "
-                         "diagnostics compare an approximation of the source."),
-)
-MP3_DURATION_LIMIT = ("exact_duration", "The MP3 has no Xing/Info header with encoder delay and padding, "
-                                        "so its exact length is unknown; duration comparisons are not made.")
+# The evaluator is designed and calibrated for WAV/BWF. FLAC and MP3 receive
+# the checks implemented today; every other check family is reported as not
+# assessed, never as a contradiction and never in a score. Each entry says,
+# per format, whether the family is implemented ("implemented"), implemented
+# only when the file carries the information ("if_in_file"), not implemented
+# by this program ("not_implemented_for_format", a program limitation), or
+# impossible for the format ("format_cannot_carry").
+FORMAT_SCOPE = {
+    "hash_binding": {"WAV": "implemented", "FLAC": "implemented", "MP3": "implemented"},
+    "container_structure": {"WAV": "implemented", "FLAC": "implemented", "MP3": "implemented"},
+    "declared_technical_values": {"WAV": "implemented", "FLAC": "implemented", "MP3": "implemented"},
+    "declared_bit_depth": {"WAV": "implemented", "FLAC": "implemented", "MP3": "format_cannot_carry"},
+    "declared_duration": {"WAV": "implemented", "FLAC": "if_in_file", "MP3": "if_in_file"},
+    "decoded_sample_integrity": {"WAV": "implemented", "FLAC": "if_in_file", "MP3": "not_implemented_for_format"},
+    "recorder_metadata": {"WAV": "implemented", "FLAC": "if_in_file", "MP3": "format_cannot_carry"},
+    "bwf_chronology": {"WAV": "implemented", "FLAC": "if_in_file", "MP3": "format_cannot_carry"},
+    "tag_dates": {"WAV": "not_applicable", "FLAC": "not_implemented_for_format",
+                  "MP3": "not_implemented_for_format"},
+    "embedded_c2pa": {"WAV": "implemented", "FLAC": "implemented", "MP3": "implemented"},
+    "lossless_content": {"WAV": "implemented", "FLAC": "implemented", "MP3": "format_cannot_carry"},
+}
+# Which family each declarable technical field belongs to.
+TECHNICAL_FAMILY = {"sample_rate_hz": "declared_technical_values", "channels": "declared_technical_values",
+                    "file_size_bytes": "declared_technical_values", "format": "declared_technical_values",
+                    "codec_subtype": "declared_technical_values", "bit_depth": "declared_bit_depth",
+                    "duration_seconds": "declared_duration"}
+LIMITATION_OF = {"not_implemented_for_format": "program_scope", "format_cannot_carry": "format",
+                 "not_in_file": "file"}
+_REASONS = {
+    ("declared_bit_depth", "MP3"): "MP3 has no bit depth; declared bit depths are not compared.",
+    ("declared_duration", "FLAC"): "STREAMINFO does not record the total number of samples, so the length "
+                                   "is unknown and duration claims are not compared.",
+    ("declared_duration", "MP3"): "The MP3 has no Xing/Info header with encoder delay and padding, so its "
+                                  "exact length is unknown; duration comparisons are not made.",
+    ("decoded_sample_integrity", "FLAC"): "The encoder stored no MD5 of the audio in STREAMINFO, so the decoded "
+                                          "samples cannot be checked against it.",
+    ("decoded_sample_integrity", "MP3"): "This evaluator walks the MP3 frame headers but does not decode or "
+                                         "verify the audio samples; that check is implemented for WAV and "
+                                         "FLAC only.",
+    ("recorder_metadata", "FLAC"): "This FLAC carries no WAV chunks (bext/iXML), so sound-report and AAF "
+                                   "comparisons with recorder fields are not possible.",
+    ("recorder_metadata", "MP3"): "MP3 has no standard field for recorder metadata (bext/iXML), so "
+                                  "sound-report and AAF comparisons with recorder fields are not possible.",
+    ("bwf_chronology", "FLAC"): "Without kept BWF chunks there is no origination date to compare.",
+    ("bwf_chronology", "MP3"): "MP3 carries no BWF origination date to compare.",
+    ("tag_dates", "FLAC"): "Dates in Vorbis comments are not read; this evaluator compares BWF dates only.",
+    ("tag_dates", "MP3"): "Dates in ID3 tags (TDRC) are not read; this evaluator compares BWF dates only.",
+    ("lossless_content", "MP3"): "MP3 is lossy: decoded samples differ from the original recording, so samples "
+                                 "are never compared exactly and audio diagnostics compare an approximation.",
+}
+
+
+def limited_checks(container, *, exact_duration=True, md5_stored=True, recorder_kept=True):
+    """Check families not assessed on this FLAC or MP3 file, each as an unavailable row with its reason.
+
+    The keyword arguments say whether the file carries what an ``if_in_file``
+    family needs. Families implemented for the format are not listed.
+    """
+    present = {"declared_duration": exact_duration, "decoded_sample_integrity": md5_stored,
+               "recorder_metadata": recorder_kept, "bwf_chronology": recorder_kept}
+    rows = []
+    for family, scope in FORMAT_SCOPE.items():
+        status = scope[container]
+        if status == "if_in_file":
+            if present.get(family, True):
+                continue
+            status = "not_in_file"
+        if status in ("implemented", "not_applicable"):
+            continue
+        rows.append({"check_family": family, "status": "unavailable", "reason_code": status,
+                     "limitation": LIMITATION_OF[status], "reason": _REASONS[(family, container)]})
+    return rows
 
 
 def flac_observed(descriptor):
@@ -112,14 +173,6 @@ def mp3_embedded(descriptor):
         "info": {},
         "warnings": list(descriptor.warnings),
     }
-
-
-def mp3_limited_checks(descriptor):
-    """Check families not run on this MP3, with reasons."""
-    limits = list(MP3_LIMITED_CHECKS)
-    if descriptor.duration_seconds is None:
-        limits.append(MP3_DURATION_LIMIT)
-    return [{"check_family": name, "reason": reason} for name, reason in limits]
 
 
 MP3_RECORDER = {"present": False, "bwf_kind": None, "warnings": [], "not_applicable": True,

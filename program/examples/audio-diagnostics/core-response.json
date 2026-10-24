@@ -6,7 +6,7 @@
   "system": {
     "name": "COMP3888-music-baseline",
     "version": "0.8.1",
-    "source_revision": "sha256:bf4270500aa889e80fd0719a668f6887f1fc3f51f8a2a13dfba6c24451673a56"
+    "source_revision": "sha256:b354426d2a75bbf3c48f551d15f6404677dea509dac1812d4fecd226ab7efe64"
   },
   "execution_status": "succeeded",
   "axes": {
@@ -322,9 +322,9 @@
       ]
     }
   ],
-  "processing_ms": 237.23579104989767,
+  "processing_ms": 225.56683304719627,
   "resource_usage": {
-    "cpu_ms": 3.8149999999999853,
+    "cpu_ms": 3.813000000000011,
     "peak_rss_kib": null
   },
   "error": null,
@@ -884,6 +884,40 @@
           "target"
         ],
         "source_newer_than_target": null,
+        "scoring_eligible": false,
+        "integrity_contribution": null
+      }
+    ],
+    "format_capabilities": [
+      {
+        "hash": "22bf064117b015ad6b47b7e649c83c5378ff26c1def988d09e1edb3ec6cfecfe",
+        "type": "audio/raw-track",
+        "format": "WAV",
+        "lossless": true,
+        "recorder_metadata": "absent",
+        "exact_duration": true,
+        "bit_depth": true,
+        "origination_date": false,
+        "embedded_c2pa": false,
+        "check_scope": "full",
+        "limited_checks": [],
+        "advice": [],
+        "scoring_eligible": false,
+        "integrity_contribution": null
+      },
+      {
+        "hash": "8699068584ba01947d52e5f55a973a86adf3c465c32621d1fe4b7c1f8304b638",
+        "type": "audio/sample",
+        "format": "WAV",
+        "lossless": true,
+        "recorder_metadata": "absent",
+        "exact_duration": true,
+        "bit_depth": true,
+        "origination_date": false,
+        "embedded_c2pa": false,
+        "check_scope": "full",
+        "limited_checks": [],
+        "advice": [],
         "scoring_eligible": false,
         "integrity_contribution": null
       }

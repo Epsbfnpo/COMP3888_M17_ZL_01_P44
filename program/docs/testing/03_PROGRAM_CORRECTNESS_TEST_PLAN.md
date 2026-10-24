@@ -101,6 +101,10 @@ this check is `assert_core_unchanged` in `tests/test_audio_diagnostics.py::Audio
 | PC-34 | Declared edge from an MP3 (or plain FLAC) to a WAV with `bext` | `succeeded` | `declared_chronology` row with `status: not_comparable` and `reason_code` `format_has_no_bwf` (`bwf_not_kept`); no finding, no score change |
 | PC-35 | Any request with a workflow | `succeeded` | The workflow policy is loaded once (`tests/test_scoring_remediation.py`), so completeness and `support_breadth` use the same policy |
 | PC-36 | FLAC whose STREAMINFO sample count is changed by ±1000 | `succeeded` | Too low: MD5 `mismatched`; too high: `failed` (`audio_not_decodable`); never `matched` |
+| PC-37 | Mixed formats: plain FLAC take, MP3 take, WAV master | `succeeded` | `format_capabilities` rows `not_kept`, `not_supported_by_format`, `present`, with advice for the two takes; axes unchanged by the section |
+| PC-38 | `transformation` other than `format_conversion` | Input error | Request rejected by the native schema; nothing evaluated |
+| PC-39 | WAV and FLAC of the same samples, declared as a conversion, with `--audio-analysis` | `succeeded` | `sample_identity: identical`; `audio_format_conversion.fingerprint: aligned_at_zero`; axes identical to the audio-off run |
+| PC-40 | Any FLAC or MP3 file | `succeeded` | `AUDIO_FORMAT_LIMITED_CHECKS` lists every family not made, each `unavailable` with `limitation` `program_scope`, `format` or `file`; WAV lists none; `format_capabilities.check_scope` is `limited` (WAV `full`); diagnostics rows carry `format_scope` |
 
 ### 2.3 Report consistency
 

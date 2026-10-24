@@ -6,7 +6,7 @@
   "system": {
     "name": "COMP3888-music-baseline",
     "version": "0.8.1",
-    "source_revision": "sha256:bf4270500aa889e80fd0719a668f6887f1fc3f51f8a2a13dfba6c24451673a56"
+    "source_revision": "sha256:b354426d2a75bbf3c48f551d15f6404677dea509dac1812d4fecd226ab7efe64"
   },
   "execution_status": "succeeded",
   "axes": {
@@ -180,9 +180,9 @@
       "message": "No workflow was supplied; completeness is legacy declared-object availability only."
     }
   ],
-  "processing_ms": 236.32054193876684,
+  "processing_ms": 223.81029196549207,
   "resource_usage": {
-    "cpu_ms": 2.687999999999996,
+    "cpu_ms": 2.588000000000007,
     "peak_rss_kib": null
   },
   "error": null,
@@ -485,6 +485,24 @@
         "target_values": {},
         "scoring_policy": "disabled; no signal result contributes to integrity",
         "content_match_is_provenance": false
+      }
+    ],
+    "format_capabilities": [
+      {
+        "hash": "746c90b6d8f6306ce93c347477103c16027d71a4072cf12d10a9f7246ce93d18",
+        "type": "audio",
+        "format": "WAV",
+        "lossless": true,
+        "recorder_metadata": "absent",
+        "exact_duration": true,
+        "bit_depth": true,
+        "origination_date": false,
+        "embedded_c2pa": false,
+        "check_scope": "full",
+        "limited_checks": [],
+        "advice": [],
+        "scoring_eligible": false,
+        "integrity_contribution": null
       }
     ],
     "score_explanations": [

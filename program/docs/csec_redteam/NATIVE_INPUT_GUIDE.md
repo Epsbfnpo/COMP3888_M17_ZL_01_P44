@@ -111,7 +111,11 @@ Optional edge attributes include `source_start_seconds`, `source_end_seconds`,
 `target_start_seconds`, `target_end_seconds`, `gain`, `fade_in_seconds`,
 `fade_out_seconds`, input/output sample rate and bit depth, source/target
 format and `assertion_origin`. Declared values are compared with what can be
-measured; the evaluator never infers missing ones.
+measured; the evaluator never infers missing ones. On `derived_from`,
+`"transformation": "format_conversion"` declares that only the file format
+changed (for example a WAV take and its FLAC or MP3); its rate, channel, bit
+depth and length checks are scored, and lossless integer pairs are compared
+sample by sample (report-only). Any other value is an input error.
 
 ### Workflows and modifiers
 
@@ -214,6 +218,8 @@ Schema: `schemas/scoring-response.schema.json`.
 | `assessment_checks.evidence_sources` (v6) | Document and fact counts, the uploader as known common source, trusted signers; `independence` is always `unknown`; not scored |
 | `assessment_checks.support_breadth` (v6) | For each recording the workflow requires, including AAF-used takes not submitted: `supported`, `contradicted`, `no_qualifying_evidence`, `not_submitted` or `unmatched_reference`; `material_coverage` and `support_coverage`; not scored unless the profile sets a minimum share |
 | `assessment_checks.declared_chronology` | BWF origination order per audio edge; `status: not_comparable` with a reason when a file has no date; not scored |
+| `assessment_checks.format_capabilities` | Per audio file: `check_scope` (`full` for WAV, `limited` for FLAC/MP3), `limited_checks`, recorder metadata (`present`, `not_kept`, `not_supported_by_format`, `absent`), exact length, bit depth, BWF date, embedded C2PA, advice; not scored |
+| `assessment_checks.format_conversions` | Per declared format conversion: direction, the scored parameter checks and `sample_identity` (`identical`, `different`, `not_comparable`, `unavailable`) |
 | `workflow_assessment.rule_results` | Each workflow expectation: `satisfied`, `missing`, `not_applicable`, `not_assessed` |
 | `validation` | C2PA state of the final artefact (`validation_state`, signature and trust fields) |
 | `findings` | Coded findings with severity and evidence hash |

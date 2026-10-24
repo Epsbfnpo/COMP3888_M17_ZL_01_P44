@@ -3,6 +3,27 @@
 Status: **implemented on branch `feature/flac-mp3-support` (23 October 2026)**,
 Steps 0–4 below. Authors: Hongjie Deng, for William Alexander.
 
+**Scope decision (24 October 2026): WAV is the assessed format; FLAC and MP3
+work is frozen.** The evaluator is designed and calibrated for WAV/BWF. FLAC and MP3 files are
+accepted and receive the checks implemented today: hash binding, structure,
+declared technical values, the FLAC MD5, recorder metadata kept in FLAC with
+`--keep-foreign-metadata`, embedded C2PA, declared format conversions and the
+optional audio diagnostics. Every other check is reported as not assessed,
+never as a contradiction and never in a score. Each FLAC or MP3 file lists
+them in `limited_checks` (also in `AUDIO_FORMAT_LIMITED_CHECKS` and
+`format_capabilities`) with `limitation`: `program_scope` where only WAV is
+implemented (a limitation of this program, for example dates in ID3 or Vorbis
+tags, or MP3 decoded-sample integrity), `format` where the format holds no
+such information (MP3 bit depth or recorder metadata), or `file` where this
+file lacks it (a plain FLAC without BWF chunks, an MP3 without a Xing/LAME
+header). Audio diagnostics on FLAC and MP3 use thresholds calibrated on WAV
+only (`format_scope: calibrated_on_wav_only`). For a full assessment, submit
+WAV; a delivered FLAC or MP3 can be declared `derived_from` its WAV original
+with `transformation: format_conversion`. No further FLAC or MP3 checks are
+planned. The scope of every check family per
+format is the table `FORMAT_SCOPE` in `music_target/audio_observations.py`; a
+test fails if a family or a declarable technical field has no stated status.
+
 ## Implementation status
 
 | Step | Done | Where |
@@ -43,6 +64,13 @@ Differences from the plan below:
   free-text fields have no defined vocabulary ("wav", "WAV", "audio/wav"), so
   comparing them would create false contradictions. The artefact-level
   `technical.format` claim is compared, with the values `WAV`, `FLAC`, `MP3`.
+  A conversion between formats is declared instead with the enumerated
+  `transformation: "format_conversion"` on `derived_from` (24 October 2026):
+  its rate, channel, bit-depth and length checks are scored in declaration
+  consistency, lossless integer pairs get an exact sample comparison
+  (report-only), and every audio file gets a report-only
+  `format_capabilities` row with advice. See the README section "Mixing
+  formats in one submission".
 - **False-match benchmark on FLAC and MP3** (`benchmarks/false_match.py --encode`,
   23 October 2026): FLAC identical to WAV; MP3 no false match, but shared-loop
   recall fell (half gain 0/4 instead of 1/4, full gain 3/4 instead of 4/4).
@@ -106,8 +134,8 @@ examples regenerate identically apart from `source_revision` and the new
 
 ## Review of the cross-format improvement plan (24 October 2026)
 
-The team's plan "跨格式音频分析与证据评分改进方案" (24 October 2026) was checked
-against the merged program. Each proposal was adopted, deferred or rejected:
+The team's plan "Cross-Format Audio Analysis and Evidence Scoring Improvement
+Plan" (24 October 2026) was checked against the merged program. Each proposal was adopted, deferred or rejected:
 
 | Proposal | Decision | What changed or why not |
 |---|---|---|
@@ -119,7 +147,8 @@ against the merged program. Each proposal was adopted, deferred or rejected:
 | Bandwidth table as exploratory only | Already in place | `exploratory_uncalibrated`, messages name the alternatives |
 | FLAC MD5 as an internal check, never origin proof | Already in place | Stays in file integrity, one check per file; unavailable is never a failure |
 | Show sample count apart from the MD5 | Rejected for now | libsndfile decodes exactly the STREAMINFO count, so the comparison is not independent; a wrong count already fails the MD5 or decoding (`NEXT_TASKS.md` item 37) |
-| Cross-file sample identity and sample-digest cache keys | Deferred | New report-only feature; needs canonical rules for 8-bit, EXTENSIBLE and float WAV (item 35) |
+| Cross-file sample identity | Adopted later the same day | `sample_identity.py`: canonical sample SHA-256 for WAV (8-bit centred, EXTENSIBLE shifted) and FLAC (computed in the MD5 decode); float WAV not comparable; report-only |
+| Sample-digest cache keys | Deferred | Analysis results are not cached across files today |
 | AAF-used takes in the coverage denominator; material and support coverage | Adopted | `support_breadth`: `not_submitted`, `unmatched_reference`, `coverage_scope`, `material_coverage`, `support_coverage`; report-only |
 | Missing AAF take is not a contradiction, no per-item penalty | Already in place, kept | The gate stays off; a missing take only lowers coverage |
 | Which recordings a workflow requires | Client decision | `NEXT_TASKS.md` item 34 |

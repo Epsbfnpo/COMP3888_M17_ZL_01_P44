@@ -186,6 +186,9 @@ class RelDialog(Dialog):
             if attrs.get(key) is not None:
                 self.vars[name].set(str(attrs.pop(key)))
         self.confirmed = tk.BooleanVar(value=bool(attrs.pop("confirmed_by_submitter", False)))
+        self.conversion = tk.BooleanVar(value=attrs.get("transformation") == "format_conversion")
+        if self.conversion.get():
+            attrs.pop("transformation")
 
         ids = list(self.files)
         v = self.vars
@@ -221,6 +224,8 @@ class RelDialog(Dialog):
             ("origin", "assertion_origin", ttk.Entry(self.body, textvariable=v["origin"])),
             ("confirmed", "confirmed_by_submitter",
              ttk.Checkbutton(self.body, variable=self.confirmed)),
+            ("conversion", "same audio, other file format",
+             ttk.Checkbutton(self.body, variable=self.conversion)),
             ("extra", "other attributes (JSON)", self.extra_text),
         ]
         self.labels = {name: ttk.Label(self.body, text=label) for name, label, _ in self.order}
@@ -288,6 +293,8 @@ class RelDialog(Dialog):
                 attrs["assertion_origin"] = v["origin"]
             if self.confirmed.get():
                 attrs["confirmed_by_submitter"] = True
+            if self.conversion.get() and v["type"] == "derived_from":
+                attrs["transformation"] = "format_conversion"
             if v["scope"]:  # legacy value from an older manifest; kept, not offered
                 attrs["derivation_scope"] = v["scope"]
             for key, name in self.NUMERIC.items():
@@ -781,6 +788,7 @@ class App(tk.Tk):
                     f"{entry['id']}. The manifest identity was not changed.")
             entry["path"] = str(Path(selected).resolve())
             entry["technical"] = wav_probe.audio_technical(selected)
+            entry["capabilities"] = wav_probe.audio_capabilities(selected)
             self.refresh()
         except (OSError, ValueError) as exc:
             messagebox.showerror("Cannot locate original", str(exc), parent=self)
@@ -800,13 +808,17 @@ class App(tk.Tk):
             entry = {"id": f"file-{self._counter}", "path": str(path), "hash": digest,
                      "type": "", "creation_method": "", "role": "", "final": False,
                      "production": {}, "extra": {},
-                     "technical": result["technical"]}
+                     "technical": result["technical"],
+                     "capabilities": result.get("capabilities") or {}}
             dialog = FileDialog(self, entry, {f["id"] for f in self.files}, self.roles())
             if dialog.result is None:
                 continue
             self.files.append({**entry, **dialog.result})
             if dialog.result["final"]:
                 self._only_final(len(self.files) - 1)
+            advice = wav_probe.format_advice(entry["capabilities"], dialog.result["type"])
+            if advice:
+                messagebox.showinfo("Format note", f"{path.name}:\n\n" + "\n\n".join(advice), parent=self)
             if dialog.result["type"].startswith("audio/") and not entry["technical"]:
                 messagebox.showwarning(
                     "Unsupported audio",

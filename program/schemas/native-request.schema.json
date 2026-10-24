@@ -213,6 +213,7 @@
                         "reference_pointer": { "type": ["string", "null"] },
                         "claim_rationale": { "type": ["string", "null"] },
                         "transformation_description": { "type": ["string", "null"] },
+                        "transformation": { "enum": ["format_conversion", null] },
                         "derivation_scope": {
                           "enum": ["linear_edit", "linear_stem", "linear_mix", "master_similarity", null]
                         },

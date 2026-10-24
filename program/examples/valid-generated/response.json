@@ -6,7 +6,7 @@
   "system": {
     "name": "COMP3888-music-baseline",
     "version": "0.8.1",
-    "source_revision": "sha256:bf4270500aa889e80fd0719a668f6887f1fc3f51f8a2a13dfba6c24451673a56"
+    "source_revision": "sha256:b354426d2a75bbf3c48f551d15f6404677dea509dac1812d4fecd226ab7efe64"
   },
   "execution_status": "succeeded",
   "axes": {
@@ -803,9 +803,9 @@
       ]
     }
   ],
-  "processing_ms": 238.51695808116347,
+  "processing_ms": 248.71504202019423,
   "resource_usage": {
-    "cpu_ms": 4.754000000000008,
+    "cpu_ms": 6.3290000000000015,
     "peak_rss_kib": null
   },
   "error": null,
@@ -1966,6 +1966,72 @@
           "target"
         ],
         "source_newer_than_target": null,
+        "scoring_eligible": false,
+        "integrity_contribution": null
+      }
+    ],
+    "format_capabilities": [
+      {
+        "hash": "7580f3a09b8a02bdfc6520235e92f6c8318dd3b52002b7eb8a430abc2c007dea",
+        "type": "audio/raw-track",
+        "format": "WAV",
+        "lossless": true,
+        "recorder_metadata": "absent",
+        "exact_duration": true,
+        "bit_depth": true,
+        "origination_date": false,
+        "embedded_c2pa": false,
+        "check_scope": "full",
+        "limited_checks": [],
+        "advice": [],
+        "scoring_eligible": false,
+        "integrity_contribution": null
+      },
+      {
+        "hash": "6aacc6b93785fbbefb186285e5f9c9ce49a6ccc7c2af664fc2f2a21416001ea0",
+        "type": "audio/stem",
+        "format": "WAV",
+        "lossless": true,
+        "recorder_metadata": "absent",
+        "exact_duration": true,
+        "bit_depth": true,
+        "origination_date": false,
+        "embedded_c2pa": false,
+        "check_scope": "full",
+        "limited_checks": [],
+        "advice": [],
+        "scoring_eligible": false,
+        "integrity_contribution": null
+      },
+      {
+        "hash": "bc1dd3c26ef5f4d97fbb41e653e93a09c940b53c75229594d82c928727134ca0",
+        "type": "audio/mix",
+        "format": "WAV",
+        "lossless": true,
+        "recorder_metadata": "absent",
+        "exact_duration": true,
+        "bit_depth": true,
+        "origination_date": false,
+        "embedded_c2pa": false,
+        "check_scope": "full",
+        "limited_checks": [],
+        "advice": [],
+        "scoring_eligible": false,
+        "integrity_contribution": null
+      },
+      {
+        "hash": "746c90b6d8f6306ce93c347477103c16027d71a4072cf12d10a9f7246ce93d18",
+        "type": "audio/master",
+        "format": "WAV",
+        "lossless": true,
+        "recorder_metadata": "absent",
+        "exact_duration": true,
+        "bit_depth": true,
+        "origination_date": false,
+        "embedded_c2pa": false,
+        "check_scope": "full",
+        "limited_checks": [],
+        "advice": [],
         "scoring_eligible": false,
         "integrity_contribution": null
       }

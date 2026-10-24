@@ -197,6 +197,24 @@ def _calibration(provider, status):
     return {"profile_id": status.get("profile_id"), **copy.deepcopy(record)}
 
 
+def _formats(response):
+    return {row["hash"]: row["format"]
+            for row in (response.get("assessment_checks") or {}).get("format_capabilities") or []}
+
+
+def _format_scope(row, formats):
+    """Thresholds were calibrated on WAV; say so on every row that reads FLAC or MP3."""
+    endpoints = [formats.get(row.get("source_hash")), formats.get(row.get("target_hash"))]
+    if row.get("source_hash") == row.get("target_hash"):
+        endpoints = endpoints[:1]
+    other = sorted({name for name in endpoints if name and name != "WAV"})
+    if not other:
+        return {"format_scope": "wav"}
+    return {"format_scope": "calibrated_on_wav_only", "endpoint_formats": endpoints,
+            "format_scope_note": f"Thresholds were calibrated on WAV only; this row reads {', '.join(other)}, "
+                                 "for which they are not calibrated (a limitation of this program)."}
+
+
 def _decoder_versions():
     """The FLAC/MP3 decoder in use; results may depend on its version."""
     try:
@@ -206,12 +224,46 @@ def _decoder_versions():
     return {"soundfile": soundfile.__version__, "libsndfile": soundfile.__libsndfile_version__}
 
 
+# A format conversion keeps the timeline, so its audio should line up at 0 s.
+CONVERSION_OFFSET_TOLERANCE_SECONDS = 0.1
+
+
+def _conversion_corroboration(response, rows):
+    """For each declared format conversion: whole-file fingerprint offset and target bandwidth.
+
+    Report-only context beside the core checks of ``format_conversions``.
+    """
+    out = []
+    for conversion in (response.get("assessment_checks") or {}).get("format_conversions") or []:
+        if conversion.get("status") != "assessed":
+            continue
+        source, target = conversion["source_hash"], conversion["target_hash"]
+        fingerprint = [row for row in rows if row["provider"] == "audfprint" and row.get("range_source") == "whole_file"
+                       and (row["source_hash"], row["target_hash"]) == (source, target)]
+        offsets = sorted({round(match["source_minus_target_offset_seconds"], 3) for row in fingerprint
+                          for match in row["matches"]
+                          if (match.get("support_assessment") or {}).get("status") == "supported_within_profile"})
+        aligned = any(abs(offset) <= CONVERSION_OFFSET_TOLERANCE_SECONDS for offset in offsets)
+        bandwidth = next((row for row in rows if row["provider"] == "bandwidth" and row["source_hash"] == target
+                          and row["status"] != "unavailable"), None)
+        out.append({
+            "source_hash": source, "target_hash": target, "direction": conversion.get("direction"),
+            "fingerprint": ("not_run" if not fingerprint else
+                            "aligned_at_zero" if aligned else "no_supported_alignment_at_zero"),
+            "supported_offsets_seconds": offsets,
+            "target_bandwidth": ((bandwidth.get("metrics") or {}).get("assessment") or {}).get("status")
+                                if bandwidth else None,
+            "scoring_eligible": False, "integrity_contribution": None})
+    return out
+
+
 def _attach(response, rows, summary):
     # Copy-on-append: do not feed any observations back through core assessors.
     combined = copy.deepcopy(response)
     status, status_sha256 = _calibration_status()
     # Every row states how far its provider has been calibrated, beside the result.
-    rows = [{**row, "calibration": _calibration(row["provider"], status)} for row in rows]
+    rows = [{**row, "calibration": {**_calibration(row["provider"], status),
+                                    **_format_scope(row, _formats(response))}} for row in rows]
     summary = {**summary, "calibration_status_sha256": status_sha256, "decoders": _decoder_versions()}
     checks = combined.setdefault("assessment_checks", {})
     checks["audio_fingerprint"] = [row for row in rows if row["provider"] in ("audfprint", "spectromap")]
@@ -220,6 +272,9 @@ def _attach(response, rows, summary):
     checks["audio_semantics"] = [row for row in rows if row["provider"] == "music_semantics"]
     checks["audio_bandwidth"] = [row for row in rows if row["provider"] == "bandwidth"]
     checks["audio_diagnostic_summary"] = [summary]
+    corroboration = _conversion_corroboration(response, rows)
+    if corroboration:
+        checks["audio_format_conversion"] = corroboration
     detail_keys = {"librosa": "audio_structure", AGREEMENT: "audio_fingerprint_agreement",
                    "music_semantics": "audio_semantics", "bandwidth": "audio_bandwidth"}
     observation_codes = {"librosa": "AUDIO_STRUCTURE_OBSERVATION",

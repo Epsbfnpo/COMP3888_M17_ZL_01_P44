@@ -1,5 +1,19 @@
 # Verification Record
 
+## WAV focus and FLAC/MP3 scope (2026-10-24, branch feature/merge-main-flac-mp3)
+
+- `REQUIRE_AUDIO_BACKENDS=1`, CPython 3.13.7 on macOS: **425 tests, all passed**. 421 non-GUI tests ran in one process (34 s, no skips); the four `test_builder.GuiTests` cases ran in separate processes.
+- Decision: WAV is the assessed format; FLAC and MP3 keep the checks implemented today, and every other check is reported as not assessed. `FORMAT_SCOPE` in `music_target/audio_observations.py` is the single list; new tests require every check family and every declarable technical field to have a status for FLAC and MP3, check the per-file `limited_checks` (a plain FLAC lists recorder metadata, BWF chronology and tag dates; WAV lists none) and the WAV-only calibration note on diagnostics rows. The MP3 test now expects seven families with their limitation.
+- Example responses: every `axes` object identical to main.
+
+## Mixed-format evidence (2026-10-24, branch feature/merge-main-flac-mp3)
+
+- `REQUIRE_AUDIO_BACKENDS=1`, CPython 3.13.7 on macOS: **422 tests, all passed**. 418 non-GUI tests ran in one process (35 s, no skips); the four `test_builder.GuiTests` cases ran in separate processes.
+- New: `tests/test_format_conversion.py` (13 tests): one canonical sample digest for WAV and FLAC of the same integer samples (16-bit, 24-bit, unsigned 8-bit WAV against signed 8-bit FLAC), a changed sample, float WAV not digested; conversion checks for WAV→FLAC, a resampled target, WAV→MP3 and a non-`derived_from` edge; an unknown `transformation` value rejected; capability rows and advice, removed once the original is declared; the diagnostics alignment summary; the builder probe, advice and conversion checks.
+- Writing the same float signal with libsndfile gives different integer samples in WAV and in FLAC (95 951 of 96 123 frames differ at 16 bits), so the identity tests write integer samples.
+- Real files: the SoniqTools Bach WAV and FLAC are sample-identical at 16/44.1 and 24/96; WAV→320 kbps MP3 and 128 kbps MP3→fake FLAC pass the parameter checks and are not sample-compared; the fake 24/96 FLAC upsampled from CD audio, declared as a conversion of the CD WAV, fails the sample-rate and bit-depth checks.
+- Example responses: every `axes` object identical to main; they gain `format_capabilities` rows.
+
 ## Cross-format review changes (2026-10-24, branch feature/merge-main-flac-mp3)
 
 - `REQUIRE_AUDIO_BACKENDS=1`, CPython 3.13.7 on macOS: **409 tests, all passed**. 405 non-GUI tests ran in one process (33 s, no skips); the four `test_builder.GuiTests` cases ran in separate processes.

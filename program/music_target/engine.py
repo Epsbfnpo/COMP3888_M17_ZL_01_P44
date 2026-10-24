@@ -13,8 +13,9 @@ from music_target import domain
 from music_target.assessment_passes import assess_axes, parse_bound_artefacts
 from music_target.audio_formats import detect
 from music_target.audio_observations import (MP3_RECORDER, flac_embedded, flac_observed, flac_recorder,
-                                             mp3_embedded, mp3_limited_checks, mp3_observed)
+                                             limited_checks, mp3_embedded, mp3_observed)
 from music_target.flac_io import FlacError, UnsupportedFlac, inspect_flac, verify_md5
+from music_target.format_conversion import FORMAT_CONVERSION, conversion_checks
 from music_target.mp3_io import Mp3Error, UnsupportedMp3, inspect_mp3
 from music_target.wav_io import UnsupportedWav, WavError, inspect_wav
 from music_target.recorder_metadata import recorder_fields
@@ -199,10 +200,13 @@ def _evaluate_other(artefact, path, detected):
         md5 = verify_md5(path, descriptor, deadline)
         result["checks"] = checks + [_md5_check(artefact.artefact_hash, md5)]
         result["flac_md5"] = md5
+        result["limited_checks"] = limited_checks(
+            "FLAC", exact_duration=descriptor.duration_seconds is not None, md5_stored=descriptor.md5 is not None,
+            recorder_kept=recorder.get("foreign_metadata_kept") is not False)
     else:
-        result["limited_checks"] = mp3_limited_checks(descriptor)
-        notes.append("MP3 is lossy; checks that need a bit depth, recorder metadata or an exact "
-                     "length are reported as unavailable.")
+        result["limited_checks"] = limited_checks("MP3", exact_duration=descriptor.duration_seconds is not None)
+    notes.append("The evaluator is designed for WAV; checks not made on this file are listed in "
+                 "limited_checks and reported as unavailable.")
     if skipped_claims:
         result["technical_claims_skipped"] = "input_error"
     return None, result, notes
@@ -336,6 +340,15 @@ class RelationshipIntegrityPass(EvidencePass):
                                "passed": attrs[attr] == observed[key],
                                "declared": attrs[attr], "observed": observed[key]})
 
+        conversion = None
+        if attrs.get("transformation") == FORMAT_CONVERSION:
+            conversion_scored, conversion = conversion_checks(
+                source, target, source_result, target_result,
+                evidence.relationship_type.relationship_type_name, getattr(chain, "_deadline", None))
+            checks.extend(conversion_scored)
+            for check in conversion.get("checks", []):
+                check.update({"source_hash": source.artefact_hash, "target_hash": target.artefact_hash})
+
         for check in checks + range_details:
             check.update({"source_hash": source.artefact_hash,
                           "target_hash": target.artefact_hash,
@@ -353,6 +366,9 @@ class RelationshipIntegrityPass(EvidencePass):
                             if checks else None),
                   "checks": checks,
                   "range_validation_details": range_details}
+        if conversion is not None:
+            result["format_conversion"] = {"source_hash": source.artefact_hash,
+                                           "target_hash": target.artefact_hash, **conversion}
         if (source_observed.get("duration_seconds") is not None and
                 target_observed.get("duration_seconds") is not None):
             result["duration_delta_seconds"] = (
@@ -371,22 +387,26 @@ _RECORDING_TYPES = {"audio/raw-take", "audio/raw-track"}
 def _format_findings(digest, observation, artefact_type):
     """Report-only notes on what a FLAC or MP3 file allows the evaluator to check."""
     container = observation.get("audio_format")
-    if container == "MP3":
-        return [{**finding("AUDIO_FORMAT_LIMITED_CHECKS",
-                           "MP3 is lossy, so some checks cannot be made on this file; they are listed "
-                           "in limited_checks and reported as unavailable, not as contradictions.", digest),
-                 "audio_format": "MP3", "limited_checks": observation.get("limited_checks", []),
-                 "scoring_eligible": False, "integrity_contribution": None}]
+    notes = []
+    if container in ("FLAC", "MP3") and observation.get("limited_checks"):
+        notes.append({**finding("AUDIO_FORMAT_LIMITED_CHECKS",
+                                f"The evaluator is designed and calibrated for WAV. Some checks were not made on "
+                                f"this {container} file; they are listed in limited_checks with the reason "
+                                "(program_scope: implemented for WAV only; format: the format cannot carry it; "
+                                "file: this file does not carry it) and reported as unavailable, never as "
+                                "contradictions.", digest),
+                      "audio_format": container, "limited_checks": observation["limited_checks"],
+                      "scoring_eligible": False, "integrity_contribution": None})
     recorder = observation.get("recorder_metadata") or {}
     if (container == "FLAC" and artefact_type in _RECORDING_TYPES
             and recorder.get("foreign_metadata_kept") is False):
-        return [{**finding("FLAC_RECORDER_METADATA_ABSENT",
+        return notes + [{**finding("FLAC_RECORDER_METADATA_ABSENT",
                            "This FLAC recording carries no WAV chunks (bext/iXML). A recorder writes them "
                            "into the WAV; plain FLAC encoding drops them unless the encoder keeps foreign "
                            "metadata (flac --keep-foreign-metadata). Recorder comparisons are not possible; "
                            "this is not a contradiction.", digest),
                  "audio_format": "FLAC", "scoring_eligible": False, "integrity_contribution": None}]
-    return []
+    return notes
 
 
 def collect_results(final_artefact):

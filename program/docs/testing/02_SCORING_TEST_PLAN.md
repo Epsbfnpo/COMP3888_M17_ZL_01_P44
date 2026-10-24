@@ -83,6 +83,9 @@ Skip audio and document parsing. Feed already-decided check results straight int
 | SU-20 | AAF take joins the denominator | One submitted take supported; the AAF also uses one take that no submission matches (listed in two AAFs, different case) | `required_recording_count: 2`, `not_submitted: 1`, `material_coverage` and `support_coverage` 0.5; `contradicted: 0` |
 | SU-21 | Unmatched reference is provisional | As SU-20, but one submitted take has no recorder identity | `unmatched_references: 1`, `not_submitted: 0`, `coverage_scope: provisional` |
 | SU-22 | No required recordings | Workflow without required recording types; AAF lists missing takes | `status: not_applicable`, coverage `null` (never 0/0 shown as complete) |
+| SU-23 | Format conversion claim | `derived_from` WAV → FLAC with `transformation: format_conversion`, same parameters | Four `format_conversion_*_preserved` checks pass and appear in `relationship_integrity` (declaration consistency) |
+| SU-24 | Contradicted conversion | Same, target resampled to 44.1 kHz | `format_conversion_sample_rate_preserved` fails; contradiction count ≥ 1; `sample_identity: not_comparable` |
+| SU-25 | Sample identity is report-only | Same parameters, one sample changed | `sample_identity: different`, `FORMAT_CONVERSION_SAMPLES_DIFFER` with `scoring_eligible: false`; contradiction count 0 |
 
 ### 2.2 Worked example — SU-02 / SU-03 fact aggregation
 

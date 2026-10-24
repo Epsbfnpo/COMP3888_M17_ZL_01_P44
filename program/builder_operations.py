@@ -57,7 +57,8 @@ def inspect_files(paths: list[str], progress: Progress, cancel: Event) -> list[d
             digest = verified_hash(path, cancel)
             # File content, not the extension, decides whether this is supported audio.
             technical = wav_probe.audio_technical(path)
-            results.append({"path": str(path), "hash": digest, "technical": technical})
+            results.append({"path": str(path), "hash": digest, "technical": technical,
+                            "capabilities": wav_probe.audio_capabilities(path)})
         except (OSError, ValueError) as exc:
             results.append({"path": str(path), "error": str(exc)})
     return results

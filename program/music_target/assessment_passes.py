@@ -1301,6 +1301,93 @@ def declared_chronology(native, wav_observations, bound_hashes):
     return rows, findings
 
 
+_RECORDINGS = {"audio/raw-take", "audio/raw-track"}
+
+
+def format_conversions(relationship_observations):
+    """Report rows and findings for edges declared as format conversions."""
+    rows, findings = [], []
+    for observation in relationship_observations:
+        record = observation.get("format_conversion")
+        if not record:
+            continue
+        rows.append(record)
+        identity = record.get("sample_identity") or {}
+        if record.get("status") == "ignored":
+            findings.append(_finding(
+                "FORMAT_CONVERSION_NOT_APPLIED",
+                "transformation=format_conversion is only checked on derived_from edges; it was ignored here.",
+                record["target_hash"], "low", scoring_eligible=False, integrity_contribution=None,
+                source_hash=record["source_hash"], relationship_type=record["relationship_type"]))
+        elif identity.get("status") == "different":
+            findings.append(_finding(
+                "FORMAT_CONVERSION_SAMPLES_DIFFER",
+                f"The {record['source_format']} and {record['target_format']} files are declared as the same audio "
+                "in another format, but their decoded samples differ. This is reported, not scored; the declared "
+                "properties are checked in declaration consistency.",
+                record["target_hash"], "low", scoring_eligible=False, integrity_contribution=None,
+                source_hash=record["source_hash"]))
+    return rows, findings
+
+
+def _recorder_capability(observation):
+    observed = observation.get("observed") or {}
+    recorder = observation.get("recorder_metadata") or {}
+    if observed.get("format") == "MP3":
+        return "not_supported_by_format"
+    if recorder.get("present"):
+        return "present"
+    if observed.get("format") == "FLAC" and recorder.get("foreign_metadata_kept") is False:
+        return "not_kept"
+    return "absent"
+
+
+def format_capabilities(native, wav_observations, c2pa_records, conversion_rows):
+    """Which evidence each submitted audio file can carry, given its format. Report-only.
+
+    The format never lowers a score; it decides which checks can run. The
+    evaluator is designed for WAV (``check_scope: full``); FLAC and MP3 receive
+    the checks implemented today (``limited``), and ``limited_checks`` names the
+    families not made, as listed in ``audio_observations.FORMAT_SCOPE``. A file the
+    submitter also supplied in an original format, declared as a format
+    conversion, gets no advice to supply it.
+    """
+    manifests = {record.get("asset_hash"): bool(record.get("manifest_present")) for record in c2pa_records}
+    converted = {row["target_hash"] for row in conversion_rows if row.get("status") == "assessed"}
+    rows = []
+    for node in native["artefacts"]:
+        digest = node["artefact_hash"]
+        observation = wav_observations.get(digest) or {}
+        observed = observation.get("observed") or {}
+        if observation.get("status") != "parsed" or not observed.get("format"):
+            continue
+        audio_format = observed["format"]
+        recorder = _recorder_capability(observation)
+        row = {"hash": digest, "type": node["artefact_type"], "format": audio_format,
+               "lossless": audio_format in ("WAV", "FLAC"), "recorder_metadata": recorder,
+               "exact_duration": observed.get("duration_seconds") is not None,
+               "bit_depth": observed.get("bit_depth") is not None,
+               "origination_date": _bwf_stamp(observation) is not None,
+               "embedded_c2pa": manifests.get(digest),
+               # WAV receives every check; FLAC and MP3 the ones implemented today.
+               "check_scope": "full" if audio_format == "WAV" else "limited",
+               "limited_checks": [item["check_family"] for item in observation.get("limited_checks", [])],
+               "advice": [], "scoring_eligible": False, "integrity_contribution": None}
+        recording = node["artefact_type"] in _RECORDINGS and digest not in converted
+        if recording and recorder == "not_kept":
+            row["advice"].append("Re-encode from the original WAV with flac --keep-foreign-metadata, or submit "
+                                 "the original WAV as well and declare this file derived_from it with "
+                                 "transformation=format_conversion.")
+        elif recording and recorder == "not_supported_by_format":
+            row["advice"].append("MP3 cannot carry recorder metadata. Submit the original WAV or FLAC as well "
+                                 "and declare this file derived_from it with transformation=format_conversion.")
+        if audio_format == "MP3" and not row["exact_duration"]:
+            row["advice"].append("This MP3 has no Xing/LAME header, so its exact length is unknown. Encoders "
+                                 "such as LAME and FFmpeg write one by default.")
+        rows.append(row)
+    return rows
+
+
 def assess_axes(native, chain, bound_hashes, missing_hashes, wav_observations,
                 relationship_observations, parser_observations, workflow_input,
                 scoring_profile=None, workflow_policy=None):
@@ -1636,6 +1723,8 @@ def assess_axes(native, chain, bound_hashes, missing_hashes, wav_observations,
         for digest, observation in wav_observations.items()
         if digest in bound_hashes and (observation.get("recorder_metadata") or {}).get("present") is True]
     chronology, chronology_findings = declared_chronology(native, wav_observations, bound_hashes)
+    conversions, conversion_findings = format_conversions(relationship_observations)
+    capabilities = format_capabilities(native, wav_observations, c2pa_attestation_records, conversions)
     unlinked_media = sum(item["media_count"] for item in aaf_media)
     if unlinked_media and ai.get("reasoning"):
         ai["reasoning"] += (f" Coverage counts submitted artefacts only; the submitted AAF also references "
@@ -1685,10 +1774,14 @@ def assess_axes(native, chain, bound_hashes, missing_hashes, wav_observations,
         checks["severe_contradiction_cap"] = [cap_record]
     if chronology:
         checks["declared_chronology"] = chronology
+    if conversions:
+        checks["format_conversions"] = conversions
+    if capabilities:
+        checks["format_capabilities"] = capabilities
     if aaf_coverage:
         checks["aaf_reference_coverage"] = aaf_coverage
         checks["aaf_non_recorder_media"] = aaf_media
     findings = (file_findings + declared_findings + rel_findings + cross_findings +
                 sample_data_findings + metadata_findings + aaf_findings + chronology_findings +
-                attestation_findings + ai_findings)
+                conversion_findings + attestation_findings + ai_findings)
     return integrity, attestation, ai, validation, checks, findings

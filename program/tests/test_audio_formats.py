@@ -460,8 +460,12 @@ class EvaluatorTests(unittest.TestCase):
         self.assertEqual((facts["bit_depth"]["status"], facts["sample_rate_hz"]["passed"]), ("unavailable", True))
         self.assertEqual(observation["recorder_metadata"]["not_applicable"], True)
         limited = next(row for row in response["findings"] if row["code"] == "AUDIO_FORMAT_LIMITED_CHECKS")
-        families = {item["check_family"] for item in limited["limited_checks"]}
-        self.assertEqual(families, {"bit_depth", "recorder_metadata", "lossless_content", "exact_duration"})
+        families = {item["check_family"]: item["limitation"] for item in limited["limited_checks"]}
+        self.assertEqual(families, {"declared_bit_depth": "format", "declared_duration": "file",
+                                    "decoded_sample_integrity": "program_scope", "recorder_metadata": "format",
+                                    "bwf_chronology": "format", "tag_dates": "program_scope",
+                                    "lossless_content": "format"})
+        self.assertTrue(all(item["status"] == "unavailable" for item in limited["limited_checks"]))
         self.assertEqual(response["assessment_checks"]["integrity_decision"][0]["contradiction_count"], 0)
 
     def test_mp3_with_gapless_header_compares_its_exact_duration(self):
