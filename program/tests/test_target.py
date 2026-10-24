@@ -1596,7 +1596,7 @@ class TargetTests(unittest.TestCase):
         for name in ("structural_validity", "physical_similarity", "cryptographic_attestation"):
             self.assertIsNone(layers[name]["weight"])
         profile = result["assessment_checks"]["scoring_profile"][0]
-        self.assertEqual(profile, {"profile_id": "default-v4", "profile_version": 4})
+        self.assertEqual(profile, {"profile_id": "default-v6", "profile_version": 6})
         # No severe rule failed, so no cap record or cap sentence appears.
         self.assertNotIn("severe_contradiction_cap", result["assessment_checks"])
         self.assertNotIn("severe contradiction", result["axes"]["integrity"]["reasoning"])
@@ -1667,16 +1667,16 @@ class TargetTests(unittest.TestCase):
         default_integrity, *_ = assess_axes(
             native, chain, {final_hash}, set(), wav_observations, [],
             parser_observations, workflow_input, scoring_profile=eligible_profile)
-        # file_integrity: 1 of 2 checks passes (0.5); cross_evidence_support:
-        # the one rin-overlap check passes (1.0); declaration_consistency has
-        # no checks and stays unavailable. Equal default weights reproduce
-        # the plain mean of the two populated layers.
-        self.assertAlmostEqual(default_integrity["value"], (0.5 + 1.0) / 2)
+        # file_integrity: object_hash_bound passes (1.0); declaration_consistency:
+        # the sample-rate claim fails (0.0); cross_evidence_support: the one
+        # rin-overlap check passes (1.0). Equal default weights reproduce the
+        # plain mean of the three populated layers.
+        self.assertAlmostEqual(default_integrity["value"], (1.0 + 0.0 + 1.0) / 3)
 
         skewed_profile = {
             "profile_id": "test-skewed", "profile_version": 1,
             "integrity": {
-                "layer_weights": {"file_integrity": 3.0, "declaration_consistency": 1.0,
+                "layer_weights": {"file_integrity": 1.0, "declaration_consistency": 3.0,
                                   "cross_evidence_support": 1.0},
                 "withholding_rule": {"min_components_for_substantive_mean": 2,
                                     "require_substantive_support_or_contradiction": True},
@@ -1686,12 +1686,51 @@ class TargetTests(unittest.TestCase):
         skewed_integrity, *_ = assess_axes(
             native, chain, {final_hash}, set(), wav_observations, [],
             parser_observations, workflow_input, scoring_profile=skewed_profile)
-        # Weighting file_integrity's 0.5 three times as heavily as
-        # cross_evidence_support's 1.0 pulls the weighted mean down from the
-        # plain average -- proving the profile's weights actually drive the
+        # Weighting declaration_consistency's 0.0 three times as heavily as
+        # the other layers' 1.0 pulls the weighted mean down from the plain
+        # average -- proving the profile's weights actually drive the
         # computation rather than being reported but unused.
-        self.assertAlmostEqual(skewed_integrity["value"], (0.5 * 3 + 1.0 * 1) / 4)
+        self.assertAlmostEqual(skewed_integrity["value"], (1.0 + 0.0 * 3 + 1.0) / 5)
         self.assertLess(skewed_integrity["value"], default_integrity["value"])
+
+    def test_file_and_relationship_claim_on_one_property_count_once(self):
+        source_hash, final_hash = "c" * 64, "a" * 64
+        native = {"artefacts": [
+            {"artefact_hash": source_hash, "artefact_type": "audio/stem", "attributes": {}, "evidence": []},
+            {"artefact_hash": final_hash, "artefact_type": "audio/final", "attributes": {}, "evidence": []}],
+            "final_artefact_hash": final_hash}
+        # The final's own sample-rate claim and the edge's output sample-rate
+        # claim both compare against the final's one measured sample rate.
+        wav_observations = {final_hash: {"checks": [
+            {"rule": "technical.sample_rate_hz_matches_observed", "passed": False,
+             "evidence_hash": final_hash, "declared": 48000, "observed": 44100},
+            {"rule": "technical.channels_matches_observed", "passed": True, "evidence_hash": final_hash}]}}
+        relationship_observations = [{"checks": [
+            {"rule": "output_sample_rate_hz_matches_file", "passed": False, "declared": 48000,
+             "observed": 44100, "source_hash": source_hash, "target_hash": final_hash,
+             "relationship_type": "mixed_from"},
+            {"rule": "input_sample_rate_hz_matches_file", "passed": True, "declared": 44100,
+             "observed": 44100, "source_hash": source_hash, "target_hash": final_hash,
+             "relationship_type": "mixed_from"}]}]
+        chain = types.SimpleNamespace(artefacts={final_hash: types.SimpleNamespace(),
+                                                 source_hash: types.SimpleNamespace()})
+        _, _, _, _, checks, _ = assess_axes(
+            native, chain, {source_hash, final_hash}, set(), wav_observations,
+            relationship_observations, {}, {})
+        layers = {item["layer"]: item for item in checks["integrity_layers"]}
+        # File integrity holds only hash binding: no submitter claims.
+        self.assertEqual({item["rule"] for item in checks["bound_file_integrity"]}, {"object_hash_bound"})
+        self.assertEqual(layers["file_integrity"]["value"], 1.0)
+        # Three facts: final sample rate (two failing claims, one fact), final
+        # channels, and stem sample rate -- not four separate votes.
+        facts = checks["declaration_scored_facts"]
+        self.assertEqual(layers["declaration_consistency"]["check_count"], 3)
+        self.assertAlmostEqual(layers["declaration_consistency"]["value"], 2 / 3)
+        merged = next(fact for fact in facts
+                      if fact["identity"] == {"file_hash": final_hash, "property": "sample_rate_hz"})
+        self.assertEqual(merged["observation_count"], 2)
+        self.assertFalse(merged["passed"])
+        self.assertEqual(checks["integrity_decision"][0]["contradiction_count"], 1)
 
     def test_severe_contradiction_caps_the_weighted_mean(self):
         final_hash = "a" * 64
@@ -1710,32 +1749,33 @@ class TargetTests(unittest.TestCase):
         workflow_input = {"declarations": {"contributors": ["Jane Doe"]}}
         chain = types.SimpleNamespace(artefacts={final_hash: types.SimpleNamespace()})
 
-        # Qualify these arithmetic fixtures explicitly; default-v4 release
+        # Qualify these arithmetic fixtures explicitly; default-profile release
         # without qualifying evidence is covered by separate regression tests.
         eligible_profile = copy.deepcopy(load_default_scoring_profile())
         del eligible_profile["integrity"]["withholding_rule"]["substantive_support_tiers"]
         integrity, _, _, _, checks, _ = assess_axes(
             native, chain, set(), set(), wav_observations, [],
             parser_observations, workflow_input, scoring_profile=eligible_profile)
-        # file_integrity = 0.5 (1 of 2 checks), cross_evidence_support = 1.0;
-        # the plain weighted mean would be 0.75, but object_hash_bound is on
+        # file_integrity = 0.0 (object_hash_bound fails), declaration_consistency
+        # = 1.0 (the sample-rate claim passes), cross_evidence_support = 1.0;
+        # the plain weighted mean would be 0.667, but object_hash_bound is on
         # the default profile's severe list, so it is capped at 0.25 instead.
         self.assertAlmostEqual(integrity["value"], 0.25)
         # The cap is explained, not silent.
         self.assertIn("A severe contradiction (object_hash_bound) capped Integrity at 0.25; "
-                      "the weighted mean was 0.750.", integrity["reasoning"])
+                      "the weighted mean was 0.667.", integrity["reasoning"])
         record = checks["severe_contradiction_cap"][0]
         self.assertEqual(record["triggered_rules"], ["object_hash_bound"])
         # The structured explanation names the cap and the failed check.
         from music_target.score_explanations import build
         explanation = build({"axes": {"integrity": integrity}, "assessment_checks": checks})[0]
         self.assertTrue(explanation["cap_applied"])
-        self.assertAlmostEqual(explanation["weighted_mean"], 0.75)
-        self.assertIn("Capped at 0.25 by severe rule(s) object_hash_bound; the weighted mean was 0.750.",
+        self.assertAlmostEqual(explanation["weighted_mean"], 2 / 3)
+        self.assertIn("Capped at 0.25 by severe rule(s) object_hash_bound; the weighted mean was 0.667.",
                       explanation["statements"])
         self.assertIn("object_hash_bound", " ".join(item["rule"] for item in explanation["contradictions"]))
         self.assertIn("Contradictions: object_hash_bound failed", integrity["reasoning"])
-        self.assertAlmostEqual(record["weighted_mean"], 0.75)
+        self.assertAlmostEqual(record["weighted_mean"], 2 / 3)
         self.assertTrue(record["value_lowered"])
 
     def test_severe_contradiction_cap_does_not_raise_an_already_low_value(self):
@@ -1753,7 +1793,7 @@ class TargetTests(unittest.TestCase):
         workflow_input = {"declarations": {"contributors": ["Someone Else"]}}
         chain = types.SimpleNamespace(artefacts={final_hash: types.SimpleNamespace()})
 
-        # Qualify these arithmetic fixtures explicitly; default-v4 release
+        # Qualify these arithmetic fixtures explicitly; default-profile release
         # without qualifying evidence is covered by separate regression tests.
         eligible_profile = copy.deepcopy(load_default_scoring_profile())
         del eligible_profile["integrity"]["withholding_rule"]["substantive_support_tiers"]
@@ -1945,8 +1985,12 @@ class TargetTests(unittest.TestCase):
         failed_wav_checks = [item for item in observation["checks"] if not item["passed"]]
         self.assertEqual([item["rule"] for item in failed_wav_checks],
                          ["technical.sample_rate_hz_matches_observed"])
-        bound_checks = result["assessment_checks"]["bound_file_integrity"]
-        self.assertEqual(sum(item == failed_wav_checks[0] for item in bound_checks), 1)
+        # A technical claim is a submitter declaration: it is scored in
+        # declaration consistency, never in file integrity.
+        declared_checks = result["assessment_checks"]["declared_file_properties"]
+        self.assertEqual(sum(item == failed_wav_checks[0] for item in declared_checks), 1)
+        self.assertFalse(any(item["rule"].startswith("technical.") for item in
+                             result["assessment_checks"]["bound_file_integrity"]))
         self.assertFalse(any(item["rule"].startswith("technical.") for item in
                              result["assessment_checks"]["relationship_integrity"]))
 
@@ -2836,7 +2880,7 @@ class ScoringProfileTests(unittest.TestCase):
 
     def test_default_profile_loads_and_validates(self):
         profile = load_default_scoring_profile()
-        self.assertEqual(profile["profile_id"], "default-v4")
+        self.assertEqual(profile["profile_id"], "default-v6")
         self.assertEqual(profile["integrity"]["layer_weights"],
                          {"file_integrity": 1.0, "declaration_consistency": 1.0,
                           "cross_evidence_support": 1.0})

@@ -7,7 +7,9 @@ import math
 import re
 from pathlib import Path
 
-from music_target.evidence_audit import audit_cross_evidence, aggregate_cross_evidence
+from music_target.evidence_audit import (audit_cross_evidence, aggregate_cross_evidence, aggregate_declarations,
+                                         summarize_evidence_sources, summarize_support_breadth)
+from music_target.workflow_policy import DEFAULT_POLICY_PATH, load_workflow_policy, required_recording_types
 
 from legacy_parsers.c2pa_parser import parse_c2pa_file, trust_configuration_record
 from legacy_parsers.ern_parser import parse_ern_file
@@ -130,8 +132,26 @@ def parse_bound_artefacts(native, chain, wav_observations):
     return observations, findings
 
 
+def _is_declared_property_check(item):
+    return item["rule"].startswith("technical.")
+
+
+def _declared_file_property_results(native, wav_observations):
+    """Submitted technical claims (sample rate, channels, ...) against measured WAV properties.
+
+    These compare a submitter's claim with the file, so they belong to
+    declaration consistency alongside relationship claims, not to file integrity.
+    """
+    checks = [dict(item) for node in native["artefacts"]
+              for item in (wav_observations.get(node["artefact_hash"]) or {}).get("checks", [])
+              if _is_declared_property_check(item)]
+    findings = [_finding("TECHNICAL_CLAIM_MISMATCH", item["rule"], item["evidence_hash"], "medium")
+                for item in checks if item.get("passed") is False]
+    return checks, findings
+
+
 class BoundFileIntegrityPass:
-    """Aggregate file binding, cached WAV checks, and parser readability."""
+    """Aggregate file binding, non-claim WAV checks, and parser readability."""
 
     @staticmethod
     def evaluate(native, bound_hashes, missing_hashes, wav_observations,
@@ -153,7 +173,8 @@ class BoundFileIntegrityPass:
                                "evidence_hash": digest})
             wav_result = wav_observations.get(digest)
             if wav_result:
-                checks.extend(dict(item) for item in wav_result.get("checks", []))
+                checks.extend(dict(item) for item in wav_result.get("checks", [])
+                              if not _is_declared_property_check(item))
             parser = parser_observations.get(digest)
             if (parser and parser["status"] == "failed" and
                     not (wav_result and wav_result.get("status") == "parser_failed")):
@@ -163,10 +184,7 @@ class BoundFileIntegrityPass:
         passed = sum(item["passed"] for item in eligible)
         for item in checks:
             if item.get("passed") is False:
-                code = ("TECHNICAL_CLAIM_MISMATCH"
-                        if item["rule"].startswith("technical.")
-                        else "FILE_INTEGRITY_CONTRADICTION")
-                findings.append(_finding(code, item["rule"],
+                findings.append(_finding("FILE_INTEGRITY_CONTRADICTION", item["rule"],
                                          item["evidence_hash"], "medium"))
         value = passed / len(eligible) if eligible else None
         return value, checks, findings
@@ -1085,6 +1103,14 @@ def _layer(name, status, value, contributes, reason, check_count,
     }
 
 
+def _relevant_recording_types(workflow_input):
+    """Recording types the selected workflow requires; none without a workflow."""
+    workflow_id = (workflow_input or {}).get("workflow_id")
+    if not workflow_id:
+        return []
+    return required_recording_types(load_workflow_policy(DEFAULT_POLICY_PATH), workflow_id)
+
+
 def _boolean_status(checks, successful_status="corroborated"):
     eligible = [item for item in checks if isinstance(item.get("passed"), bool)]
     if not eligible:
@@ -1261,6 +1287,7 @@ def assess_axes(native, chain, bound_hashes, missing_hashes, wav_observations,
         parser_observations)
     rel_value, rel_checks, rel_findings = _relationship_integrity_results(
         relationship_observations)
+    declared_checks, declared_findings = _declared_file_property_results(native, wav_observations)
     cross_value, cross_checks, cross_findings = ExpandedCrossEvidencePass.evaluate(
         native, workflow_input, parser_observations, wav_observations)
     structural_checks = StructuralValidityPass.evaluate(native)
@@ -1275,8 +1302,14 @@ def assess_axes(native, chain, bound_hashes, missing_hashes, wav_observations,
     ai, ai_findings = AIDisclosurePass.evaluate(native)
 
     file_status, file_layer_value = _boolean_status(file_checks)
-    declaration_status, declaration_layer_value = _boolean_status(rel_checks)
-    cross_facts = aggregate_cross_evidence(cross_checks)
+    declaration_facts = aggregate_declarations(declared_checks + rel_checks)
+    declaration_status, declaration_layer_value = _boolean_status(declaration_facts)
+    cross_facts = aggregate_cross_evidence(
+        cross_checks, one_vote_per_claim=integrity_profile.get("one_vote_per_claim", False))
+    evidence_sources = summarize_evidence_sources(
+        cross_facts, parser_observations, wav_observations,
+        [record["signer"] for record in c2pa_attestation_records
+         if record.get("manifest_present") and c2pa_signer_trusted(record) and record.get("signer")])
     cross_status, cross_layer_value = _boolean_status(cross_facts)
     crypto = validation.get("cryptographically_valid")
     if crypto is False:
@@ -1290,15 +1323,17 @@ def assess_axes(native, chain, bound_hashes, missing_hashes, wav_observations,
 
     layers = [
         _layer("file_integrity", file_status, file_layer_value, True,
-               "SHA-256 binding, cached WAV technical checks, and parser readability of submitted files.",
+               "SHA-256 binding and parser readability of submitted files; no submitter claims are compared here.",
                len(file_checks), weight=layer_weights["file_integrity"]),
         _layer("structural_validity", "corroborated", 1.0, False,
                "Graph, references, cycles, connectivity, and endpoint roles passed before assessment; this is not content proof.",
                len(structural_checks)),
         _layer("declaration_consistency", declaration_status,
                declaration_layer_value, True,
-               "Submitted relationship parameters compared with cached source and target media observations.",
-               len(rel_checks), weight=layer_weights["declaration_consistency"]),
+               "Submitted file technical claims and relationship parameters compared with measured media; "
+               "one vote per declared file property, and any failed claim keeps that fact failed.",
+               sum(isinstance(item.get("passed"), bool) for item in declaration_facts),
+               weight=layer_weights["declaration_consistency"]),
         _layer("physical_similarity", "unavailable", None, False,
                "Legacy signal comparisons are disabled by policy and never contribute to integrity.",
                0),
@@ -1340,14 +1375,27 @@ def assess_axes(native, chain, bound_hashes, missing_hashes, wav_observations,
     # a severe failure is computed by the evaluator itself and needs none, so
     # (when the profile enables it) it releases a value no higher than the cap.
     severe_release = withholding_rule.get("release_capped_value_on_severe_contradiction", False)
-    triggered = (sorted({item["rule"] for item in file_checks + rel_checks + cross_checks
+    triggered = (sorted({item["rule"] for item in file_checks + declared_checks + rel_checks + cross_checks
                          if item.get("passed") is False and item["rule"] in severe_contradiction_rules})
                  if severe_contradiction_rules and severe_contradiction_cap is not None else [])
     # A final manifest the SDK could not read cannot be checked against the file,
     # so evidence about other nodes must not release a number for the final.
     final_attestation_unreadable = validation.get("validation_state") == "manifest_not_read"
+    # Breadth: how many of the workflow's recordings have qualifying evidence.
+    # It only gates release when the profile sets a minimum share.
+    support_breadth = summarize_support_breadth(native, cross_facts, support_tiers,
+                                                _relevant_recording_types(workflow_input))
+    min_share = withholding_rule.get("min_supported_asset_share")
+    breadth_met = (min_share is None or not support_breadth["applicable"]
+                   or support_breadth["checked_share"] >= min_share)
+    support_breadth.update({
+        "min_supported_asset_share": min_share,
+        "requirement": ("not_set" if min_share is None else "not_applicable" if not support_breadth["applicable"]
+                        else "met" if breadth_met else "not_met"),
+        "scoring_effect": "none_report_only" if min_share is None else "numeric_release_gate"})
     threshold_met = (len(components) >= min_components and
-                     (substantive_support or not require_support) and not final_attestation_unreadable)
+                     (substantive_support or not require_support) and not final_attestation_unreadable
+                     and breadth_met)
     qualifying_facts = [{"rule": item["rule"], "identity": item["identity"],
                          "evidence_tiers": sorted(set(item["assessed_evidence_tiers"]) & set(support_tiers))}
                         for item in cross_facts if isinstance(item.get("passed"), bool)
@@ -1385,6 +1433,8 @@ def assess_axes(native, chain, bound_hashes, missing_hashes, wav_observations,
         rule_description += " and an assessed qualifying cross-evidence fact"
         if tiers_restricted:
             rule_description += f" ({', '.join(support_tiers)})"
+    if min_share is not None:
+        rule_description += f" and qualifying evidence checked for at least {min_share:.0%} of the workflow's recordings"
     if not components:
         release_reason = "no_assessed_layers"
     elif threshold_met:
@@ -1395,6 +1445,8 @@ def assess_axes(native, chain, bound_hashes, missing_hashes, wav_observations,
         release_reason = "final_attestation_unreadable"
     elif len(components) < min_components:
         release_reason = "insufficient_assessed_layers"
+    elif (substantive_support or not require_support) and not breadth_met:
+        release_reason = "insufficient_support_breadth"
     else:
         release_reason = "insufficient_qualifying_cross_evidence"
     decision = {"status": ("contradicted" if contradiction_present else
@@ -1409,7 +1461,8 @@ def assess_axes(native, chain, bound_hashes, missing_hashes, wav_observations,
                 "severe_contradiction_release": "capped_value" if severe_release else "disabled",
                 "score_semantics": "assessed_check_consistency_not_provenance_authentication",
                 # Counted once here; reasoning, explanations and the desktop view read these.
-                **fact_counts({"file_integrity": file_checks, "declaration_consistency": rel_checks,
+                **fact_counts({"file_integrity": file_checks,
+                               "declaration_consistency": [fact["representative_check"] for fact in declaration_facts],
                                "cross_evidence_support": [fact["representative_check"] for fact in cross_facts]})}
     withholding_clause = (f"Numeric release requires {rule_description}; "
                           + ("the rule permitted this value. " if threshold_met and integrity_value is not None else
@@ -1436,10 +1489,39 @@ def assess_axes(native, chain, bound_hashes, missing_hashes, wav_observations,
                           f"{cap_record['cap']:g} cap, which therefore did not change it. ")
     # Name every contradiction behind the value, with what was compared, so a
     # reader can see exactly which check failed and by how much.
-    failed = [item for item in file_checks + rel_checks +
-              [fact["representative_check"] for fact in cross_facts] if item.get("passed") is False]
+    failed = [item for item in file_checks +
+              [fact["representative_check"] for fact in declaration_facts + cross_facts]
+              if item.get("passed") is False]
     contradiction_clause = ("Contradictions: " + " ".join(describe_check(item) for item in failed) + " "
                             if failed else "")
+    # Agreement between documents from one uploader is not independent support.
+    document_count = evidence_sources[0]["document_count"]
+    cross_consistent = not any(fact.get("passed") is False for fact in cross_facts)
+    if document_count == 1:
+        sources_clause = ("This document was provided and uploaded by the user. "
+                          + ("It is consistent with the other submitted files, but it cannot be confirmed "
+                             "if it is independently true. " if cross_consistent else
+                             "It cannot be confirmed if it is independently true. "))
+    elif document_count > 1:
+        sources_clause = (f"These {document_count} documents were provided and uploaded by the same user. "
+                          + ("They are consistent with each other, but it cannot be confirmed "
+                             "if they are independently true. " if cross_consistent else
+                             "It cannot be confirmed if they are independently true. "))
+    else:
+        sources_clause = ""
+    # Name how much of the workflow's recordings the strong evidence covers.
+    recordings, missing = support_breadth["relevant_asset_count"], support_breadth["no_qualifying_evidence"]
+    checked = recordings - missing
+    if not recordings:
+        breadth_clause = ""
+    elif recordings == 1:
+        breadth_clause = ("Strong evidence was checked for the recording. " if checked else
+                          "No strong evidence was checked for the recording. ")
+    elif not missing:
+        breadth_clause = f"Strong evidence was checked for all {recordings} recordings. "
+    else:
+        breadth_clause = (f"Strong evidence was checked for {checked} of {recordings} recordings; "
+                          f"{missing} {'has' if missing == 1 else 'have'} no strong evidence. ")
     # Many honest facts dilute one contradiction in the mean, so the count
     # leads the reasoning: a reader of the number alone would miss it.
     summary = contradiction_summary(decision)
@@ -1448,9 +1530,16 @@ def assess_axes(native, chain, bound_hashes, missing_hashes, wav_observations,
         integrity_availability, integrity_value, integrity_confidence,
         (f"{count_clause}"
          f"Integrity has {len(components)}/{denominator_layers} score-eligible evidence layers; missing evidence reduces availability and confidence but is never treated as contradiction. "
+         "Integrity confidence reflects how many of the three evidence layers were checked. "
+         "To see how many checks passed, refer to the integrity value and the layer results. "
          f"{withholding_clause}"
          f"{cap_clause}"
          f"{contradiction_clause}"
+         f"{sources_clause}"
+         f"{breadth_clause}"
+         "The files and claims have been checked against each other, but this does not guarantee who created "
+         "the material, when it was recorded or that the recording session took place. "
+         "Signed origin evidence, where available, is shown in attestation_strength. "
          "Structural validity and cryptographic attestation are reported separately and do not raise integrity. "
          "Legacy signal comparisons are disabled by policy and do not produce findings or affect integrity."))
     # Lets a reader of axes alone tell a contradicted submission from one
@@ -1519,7 +1608,9 @@ def assess_axes(native, chain, bound_hashes, missing_hashes, wav_observations,
                              "profile_version": scoring_profile["profile_version"]}],
         "bound_file_integrity": file_checks,
         "structural_validity": structural_checks,
+        "declared_file_properties": declared_checks,
         "relationship_integrity": rel_checks,
+        "declaration_scored_facts": declaration_facts,
         "relationship_range_validation": [dict(check) for observation in relationship_observations
                                            for check in observation.get("range_validation_details", [])],
         "integrity_layers": layers,
@@ -1529,6 +1620,8 @@ def assess_axes(native, chain, bound_hashes, missing_hashes, wav_observations,
         "cross_evidence": cross_checks,
         "cross_evidence_scored_facts": cross_facts,
         "cross_evidence_audit": audit_cross_evidence(cross_checks),
+        "evidence_sources": evidence_sources,
+        "support_breadth": [support_breadth],
         "c2pa_attestation_records": c2pa_attestation_records,
         # Pinned trust list versions, so every result can be reproduced and explained.
         "c2pa_trust_configuration": [trust_configuration_record()],
@@ -1542,7 +1635,7 @@ def assess_axes(native, chain, bound_hashes, missing_hashes, wav_observations,
     if aaf_coverage:
         checks["aaf_reference_coverage"] = aaf_coverage
         checks["aaf_non_recorder_media"] = aaf_media
-    findings = (file_findings + rel_findings + cross_findings +
+    findings = (file_findings + declared_findings + rel_findings + cross_findings +
                 sample_data_findings + metadata_findings + aaf_findings + chronology_findings +
                 attestation_findings + ai_findings)
     return integrity, attestation, ai, validation, checks, findings

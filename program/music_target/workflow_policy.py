@@ -27,6 +27,20 @@ def _no_duplicates(items):
     return result
 
 
+DEFAULT_POLICY_PATH = Path(__file__).resolve().parents[1] / "policies" / "workflow_evidence_policy.json"
+
+#: Asset types where recorder or signed evidence about a performance can exist.
+RECORDING_TYPES = ("audio/raw-take", "audio/raw-track")
+
+
+def required_recording_types(policy, workflow_id):
+    """Recording types the workflow requires; empty when there are none or the workflow is unknown."""
+    workflow = next((item for item in policy["workflows"] if item.get("workflow_id") == workflow_id), None)
+    required = {name for rule in (workflow or {}).get("required", [])
+                if rule.get("kind") == "artifact_presence" for name in rule.get("artifact_types", [])}
+    return sorted(required & set(RECORDING_TYPES))
+
+
 def load_workflow_policy(path):
     path = Path(path)
     policy = json.loads(path.read_text(), object_pairs_hook=_no_duplicates)

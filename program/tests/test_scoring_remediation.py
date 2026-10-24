@@ -13,7 +13,10 @@ sys.path.insert(0, str(BASE))
 import run
 from music_target.contract import validate
 from music_target.assessment_passes import AIDisclosurePass, assess_axes
-from music_target.evidence_audit import aggregate_cross_evidence
+from unittest import mock
+from music_target import assessment_passes
+from music_target.evidence_audit import aggregate_cross_evidence, summarize_evidence_sources, summarize_support_breadth
+from music_target.workflow_policy import DEFAULT_POLICY_PATH, load_workflow_policy, required_recording_types
 from music_target.scoring_profile import load_default_scoring_profile, load_scoring_profile, ScoringProfileError
 import test_production_documents as pd
 from test_audio_diagnostics import fixture
@@ -62,6 +65,122 @@ class FactAggregationTests(unittest.TestCase):
             {"rule": "same_fact", "audio_hash": "take", "passed": None, "evidence_tier": "signed_attestation"}])
         self.assertEqual(facts[0]["assessed_evidence_tiers"], ["submitter_document"])
         self.assertEqual(facts[0]["passed"], True)
+
+
+class OneVotePerClaimTests(unittest.TestCase):
+    def rows(self, report_passed=True, aaf_passed=True, aaf_take="take"):
+        return [{"rule": "sound_report_scene_take_matches_recorder", "audio_hash": "take",
+                 "evidence_hash": "report", "evidence_tier": "recorder_metadata", "passed": report_passed},
+                {"rule": "aaf_scene_take_matches_recorder", "audio_hash": aaf_take,
+                 "evidence_hash": "aaf", "evidence_tier": "recorder_metadata", "passed": aaf_passed}]
+
+    def test_same_claim_in_two_documents_is_one_fact(self):
+        self.assertEqual(len(aggregate_cross_evidence(self.rows())), 2)
+        facts = aggregate_cross_evidence(self.rows(), one_vote_per_claim=True)
+        self.assertEqual(len(facts), 1)
+        self.assertEqual(facts[0]["identity"], {"audio_hash": "take", "claim": "scene_take"})
+        self.assertEqual(facts[0]["document_count"], 2)
+        self.assertEqual(facts[0]["delivered_by"], "submitter")
+
+    def test_either_document_disagreeing_fails_the_merged_fact(self):
+        for report_passed, aaf_passed in ((False, True), (True, False)):
+            facts = aggregate_cross_evidence(self.rows(report_passed, aaf_passed), one_vote_per_claim=True)
+            self.assertIs(facts[0]["passed"], False)
+            self.assertTrue(facts[0]["conflicting_outcomes"])
+
+    def test_different_recordings_and_other_rules_are_never_merged(self):
+        self.assertEqual(len(aggregate_cross_evidence(self.rows(aaf_take="other"), one_vote_per_claim=True)), 2)
+        rows = self.rows() + [
+            {"rule": "sound_report_start_timecode_matches_recorder", "audio_hash": "take",
+             "evidence_hash": "report", "passed": True},
+            {"rule": "aaf_source_range_within_recorded_timecode", "audio_hash": "take",
+             "evidence_hash": "aaf", "passed": True}]
+        self.assertEqual(len(aggregate_cross_evidence(rows, one_vote_per_claim=True)), 3)
+
+    def test_checks_without_a_repeated_claim_aggregate_exactly_as_before(self):
+        rows = [{"rule": "sound_report_scene_take_matches_recorder", "audio_hash": "take",
+                 "evidence_hash": "report", "passed": True},
+                {"rule": "rin_contributors_overlap_submitter_declaration", "passed": False},
+                {"rule": "midi_tempo_matches_declaration", "evidence_hash": "midi", "passed": True}]
+        self.assertEqual([fact["passed"] for fact in aggregate_cross_evidence(rows)],
+                         [fact["passed"] for fact in aggregate_cross_evidence(rows, one_vote_per_claim=True)])
+        self.assertEqual(len(aggregate_cross_evidence(rows)), len(aggregate_cross_evidence(rows, True)))
+
+    def test_profile_flag_must_be_boolean(self):
+        with tempfile.TemporaryDirectory() as directory:
+            profile = copy.deepcopy(load_default_scoring_profile())
+            self.assertIs(profile["integrity"]["one_vote_per_claim"], True)
+            profile["integrity"]["one_vote_per_claim"] = "yes"
+            path = Path(directory) / "profile.json"
+            path.write_text(json.dumps(profile))
+            with self.assertRaises(ScoringProfileError):
+                load_scoring_profile(path)
+
+    def test_summary_separates_documents_facts_and_sources_and_never_guesses_independence(self):
+        facts = aggregate_cross_evidence(self.rows(), one_vote_per_claim=True) + aggregate_cross_evidence(
+            [{"rule": "sound_report_start_timecode_matches_recorder", "audio_hash": "take",
+              "evidence_hash": "report", "passed": True}])
+        parsers = {"aaf": {"parser": "aaf"}, "daw": {"parser": "daw-session",
+                                                     "data": {"metadata": {"creator": "Ableton Live 11.3"}}}}
+        wavs = {"take": {"embedded_metadata": {"info": {"software": "Recorder OS 9"},
+                                               "broadcast_extension": {"originator": "Recorder"}}}}
+        summary = summarize_evidence_sources(facts, parsers, wavs, [])[0]
+        self.assertEqual((summary["document_count"], summary["fact_count"]), (2, 2))
+        self.assertIsNone(summary["independent_source_count"])
+        self.assertEqual(summary["independence"], "unknown")
+        self.assertEqual(summary["known_common_sources"][0]["source"], "submitter")
+        self.assertEqual(summary["known_common_sources"][0]["document_hashes"], ["aaf", "report"])
+        self.assertEqual(summary["subjects_with_multiple_documents"],
+                         [{"subject_hash": "take", "document_count": 2, "fact_count": 2}])
+        self.assertEqual(summary["origin_fields"],
+                         [{"hash": "take", "software": "Recorder OS 9", "originator": "Recorder"}])
+        self.assertEqual(summary["scoring_effect"], "none_report_only")
+        empty = summarize_evidence_sources([], {}, {}, [])[0]
+        self.assertEqual((empty["document_count"], empty["known_common_sources"]), (0, []))
+
+
+class SupportBreadthTests(unittest.TestCase):
+    native = {"artefacts": [{"artefact_hash": name, "artefact_type": kind}
+                            for name, kind in (("a", "audio/raw-take"), ("b", "audio/raw-take"),
+                                               ("c", "audio/raw-track"), ("m", "audio/master"))]}
+
+    def fact(self, subject, passed, tier="recorder_metadata"):
+        return {"identity": {"audio_hash": subject, "rule": "r"}, "passed": passed,
+                "assessed_evidence_tiers": [tier]}
+
+    def test_supported_contradicted_and_missing_are_kept_apart(self):
+        facts = [self.fact("a", True), self.fact("b", False), self.fact("c", True, tier="submitter_document")]
+        breadth = summarize_support_breadth(self.native, facts, ("recorder_metadata",),
+                                            ["audio/raw-take", "audio/raw-track"])
+        self.assertEqual({item["hash"]: item["status"] for item in breadth["assets"]},
+                         {"a": "supported", "b": "contradicted", "c": "no_qualifying_evidence"})
+        self.assertEqual((breadth["supported"], breadth["contradicted"], breadth["no_qualifying_evidence"]), (1, 1, 1))
+        # A contradiction was checked, so it counts as covered, never as missing.
+        self.assertAlmostEqual(breadth["checked_share"], 2 / 3)
+
+    def test_no_relevant_recordings_is_not_applicable(self):
+        breadth = summarize_support_breadth(self.native, [], ("recorder_metadata",), [])
+        self.assertFalse(breadth["applicable"])
+        self.assertIsNone(breadth["checked_share"])
+
+    def test_workflow_recording_types_come_from_the_workflow_policy(self):
+        policy = load_workflow_policy(DEFAULT_POLICY_PATH)
+        self.assertEqual(required_recording_types(policy, "multitrack_recording_mix_master"),
+                         ["audio/raw-take", "audio/raw-track"])
+        self.assertEqual(required_recording_types(policy, "mastering_service_only"), [])
+        self.assertEqual(required_recording_types(policy, "no_such_workflow"), [])
+
+    def test_share_must_be_a_number_in_range(self):
+        self.assertNotIn("min_supported_asset_share",
+                         load_default_scoring_profile()["integrity"]["withholding_rule"])
+        for share in (0, 1.5, True, "half"):
+            with tempfile.TemporaryDirectory() as directory:
+                profile = copy.deepcopy(load_default_scoring_profile())
+                profile["integrity"]["withholding_rule"]["min_supported_asset_share"] = share
+                path = Path(directory) / "profile.json"
+                path.write_text(json.dumps(profile))
+                with self.assertRaises(ScoringProfileError):
+                    load_scoring_profile(path)
 
 
 class ProductionScoringRegressionTests(unittest.TestCase):
@@ -130,6 +249,98 @@ class ProductionScoringRegressionTests(unittest.TestCase):
         decision = response["assessment_checks"]["integrity_decision"][0]
         self.assertEqual(decision["release_reason"], "qualifying_cross_evidence")
         self.assertEqual(decision["status"], "consistent")
+
+    def aaf(self):
+        data = pd.aaf_bytes(Path(tempfile.mkdtemp(dir=self.folder)), [
+            ("24Y12M18", "2T01.WAV", "2", "01", pd.TRACKS, "2024-12-18", 31783.5, 25)])
+        return pd.store(self.folder, data, "aaf"), "project/aaf", "aaf"
+
+    def test_report_and_aaf_repeating_scene_take_and_tracks_count_once(self):
+        response = self.score([self.report(True, "consistent"), self.aaf()])
+        checks = response["assessment_checks"]
+        facts = checks["cross_evidence_scored_facts"]
+        for claim in ("scene_take", "track_names"):
+            merged = [fact for fact in facts if fact["identity"].get("claim") == claim]
+            self.assertEqual(len(merged), 1, claim)
+            self.assertEqual(merged[0]["document_count"], 2)
+        # Without one vote per claim the same checks would add two more votes.
+        self.assertEqual(len(aggregate_cross_evidence(checks["cross_evidence"])), len(facts) + 2)
+        sources = checks["evidence_sources"][0]
+        self.assertEqual(sources["document_count"], 2)
+        self.assertEqual(sources["independence"], "unknown")
+        self.assertEqual(sources["subjects_with_multiple_documents"][0]["subject_hash"], self.harness.take)
+        self.assertIn("These 2 documents were provided and uploaded by the same user. They are consistent "
+                      "with each other, but it cannot be confirmed if they are independently true.",
+                      response["axes"]["integrity"]["reasoning"])
+
+    def test_a_single_document_scores_exactly_as_before(self):
+        response = self.score([self.report(True, "consistent")])
+        cross = response["assessment_checks"]["cross_evidence"]
+        # Only the merged facts' identity label differs; every scored outcome is the same.
+        scored = [[(fact["rule"], fact["passed"], fact["assessed_evidence_tiers"], fact["observation_count"])
+                   for fact in aggregate_cross_evidence(cross, one_vote_per_claim=merge)] for merge in (False, True)]
+        self.assertEqual(scored[0], scored[1])
+        self.assertIn("This document was provided and uploaded by the user. It is consistent with the other "
+                      "submitted files, but it cannot be confirmed if it is independently true.",
+                      response["axes"]["integrity"]["reasoning"])
+
+    def test_source_sentence_does_not_call_contradicted_documents_consistent(self):
+        reasoning = self.score([self.report(False, "incorrect timecode")])["axes"]["integrity"]["reasoning"]
+        self.assertIn("This document was provided and uploaded by the user. It cannot be confirmed if it is "
+                      "independently true.", reasoning)
+        self.assertNotIn("It is consistent", reasoning)
+
+    def score_with(self, documents, share=None, extra_take=False):
+        request = pd.ProductionDocumentTests.request(self.harness, documents)
+        if extra_take:
+            # A second recording with no document about it.
+            other = pd.recorder_wav(self.folder, "2T02.WAV", "24Y12M18", "2", "02", pd.TRACKS, 31900.0,
+                                    "2024-12-18", seed=7)
+            request["chain"]["artefacts"].insert(1, {"artefact_hash": other, "artefact_type": "audio/raw-take",
+                                                     "attributes": {}, "evidence": []})
+            request["chain"]["artefacts"][-1]["evidence"].append(
+                {"hash": other, "relationship_type": "derived_from", "attributes": {}})
+            request["objects"][other] = f"objects/{other}.wav"
+        profile = copy.deepcopy(load_default_scoring_profile())
+        if share is not None:
+            profile["integrity"]["withholding_rule"]["min_supported_asset_share"] = share
+        with mock.patch.object(assessment_passes, "load_default_scoring_profile", return_value=profile):
+            response = run.evaluate(request, self.folder, "native")
+        validate(response, "scoring-response.schema.json")
+        self.assertEqual(response["execution_status"], "succeeded", response.get("error"))
+        return response
+
+    def test_breadth_is_reported_without_changing_the_score(self):
+        response = self.score_with([self.report(True, "consistent")], extra_take=True)
+        breadth = response["assessment_checks"]["support_breadth"][0]
+        self.assertEqual((breadth["relevant_asset_count"], breadth["supported"], breadth["no_qualifying_evidence"]),
+                         (2, 1, 1))
+        self.assertEqual((breadth["requirement"], breadth["scoring_effect"]), ("not_set", "none_report_only"))
+        self.assertEqual(response["assessment_checks"]["integrity_decision"][0]["numeric_release"], "released")
+        self.assertIn("Strong evidence was checked for 1 of 2 recordings; 1 has no strong evidence.",
+                      response["axes"]["integrity"]["reasoning"])
+
+    def test_optional_share_withholds_for_missing_evidence_only(self):
+        documents = [self.report(True, "consistent")]
+        withheld = self.score_with(documents, share=1.0, extra_take=True)
+        decision = withheld["assessment_checks"]["integrity_decision"][0]
+        self.assertIsNone(withheld["axes"]["integrity"]["value"])
+        self.assertEqual(decision["release_reason"], "insufficient_support_breadth")
+        self.assertEqual(withheld["assessment_checks"]["support_breadth"][0]["requirement"], "not_met")
+        released = self.score_with(documents, share=0.5, extra_take=True)
+        self.assertIsNotNone(released["axes"]["integrity"]["value"])
+        self.assertEqual(released["assessment_checks"]["support_breadth"][0]["requirement"], "met")
+        # Same value as with no share set: the gate only decides release.
+        self.assertEqual(released["axes"]["integrity"]["value"],
+                         self.score_with(documents, extra_take=True)["axes"]["integrity"]["value"])
+
+    def test_contradicted_recording_counts_as_checked_not_missing(self):
+        plain = self.score_with([self.report(False, "incorrect timecode")])
+        gated = self.score_with([self.report(False, "incorrect timecode")], share=1.0)
+        breadth = gated["assessment_checks"]["support_breadth"][0]
+        self.assertEqual((breadth["contradicted"], breadth["requirement"]), (1, "met"))
+        self.assertEqual(gated["axes"]["integrity"]["value"], plain["axes"]["integrity"]["value"])
+        self.assertEqual(gated["assessment_checks"]["integrity_decision"][0]["status"], "contradicted")
 
     def test_metadata_contradiction_remains_scored_and_clearly_marked(self):
         response = self.score([self.report(False, "incorrect timecode")])

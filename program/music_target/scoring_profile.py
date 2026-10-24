@@ -20,6 +20,9 @@ is a ceiling, not an override -- it only ever pulls the mean down toward the
 cap, never below where it already was. The two keys are optional but must
 be given together; a profile that defines neither leaves Integrity as the
 plain weighted mean.
+
+``one_vote_per_claim`` (optional, default false) makes the same claim about
+one recording, repeated in several documents, a single cross-evidence fact.
 """
 
 from __future__ import annotations
@@ -44,10 +47,10 @@ DEFAULT_PROFILE_PATH = Path(__file__).resolve().parents[1] / "policies" / "scori
 
 _PROFILE_KEYS = {"profile_id", "profile_version", "description", "integrity"}
 _INTEGRITY_KEYS = {"layer_weights", "layer_weight_rationale", "withholding_rule", "confidence_formula",
-                   "severe_contradiction_rules", "severe_contradiction_cap"}
+                   "severe_contradiction_rules", "severe_contradiction_cap", "one_vote_per_claim"}
 _WITHHOLDING_RULE_KEYS = {"min_components_for_substantive_mean", "require_substantive_support_or_contradiction",
                           "substantive_support_tiers", "require_substantive_support",
-                          "release_capped_value_on_severe_contradiction"}
+                          "release_capped_value_on_severe_contradiction", "min_supported_asset_share"}
 _CONFIDENCE_FORMULA_KEYS = {"ceiling", "denominator_layers"}
 
 
@@ -160,6 +163,13 @@ def load_scoring_profile(path):
     if not isinstance(rule.get("release_capped_value_on_severe_contradiction", False), bool):
         raise ScoringProfileError(
             "integrity.withholding_rule.release_capped_value_on_severe_contradiction must be a boolean.")
+    # Optional and off when absent: the share of the workflow's recordings that
+    # must have qualifying evidence checked (supported or contradicted).
+    share = rule.get("min_supported_asset_share")
+    if share is not None and (type(share) not in (int, float) or isinstance(share, bool)
+                              or not math.isfinite(share) or not (0 < share <= 1)):
+        raise ScoringProfileError(
+            "integrity.withholding_rule.min_supported_asset_share must be a number in (0, 1].")
     # Optional: which evidence tiers count as substantive support. Absent means
     # every assessed cross-evidence check counts (the original rule).
     tiers = rule.get("substantive_support_tiers")
@@ -213,6 +223,9 @@ def load_scoring_profile(path):
                 or not math.isfinite(cap) or not (0 <= cap <= 1)):
             raise ScoringProfileError(
                 "integrity.severe_contradiction_cap must be a finite number in [0, 1].")
+
+    if not isinstance(integrity.get("one_vote_per_claim", False), bool):
+        raise ScoringProfileError("integrity.one_vote_per_claim must be a boolean.")
 
     return profile
 

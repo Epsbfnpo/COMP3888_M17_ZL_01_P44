@@ -65,8 +65,9 @@ fingerprinting or other non-scoring diagnostics.
    File integrity, structural validity, declaration consistency, physical
    similarity, CrossEvidence, and cryptographic attestation are now visible
    separately; structural validity and cryptographic attestation do not inflate
-   integrity. Confirm the remaining score-eligible layer weights and confidence
-   model without adding an overall decision policy.
+   integrity. Confirm the remaining layer weights, and consider a confidence
+   measure that also reflects check results and the amount of evidence, without
+   adding an overall decision policy.
 
 6. Decide whether to restore the legacy prototype's `forge_cost` concept. If it
    is retained, use it only as a separately reported confidence/fabrication-
@@ -161,6 +162,21 @@ fingerprinting or other non-scoring diagnostics.
     path, hash or path format errors) are not assessed in
     `BoundFileIntegrityPass` (`object_hash_bound` with `passed: null`), so an
     input error does not lower the file-integrity layer.
+
+20b. Detect documents that share an origin. `evidence_sources` currently
+    records only the uploader as a known common source and lists the
+    creator/software fields already parsed (WAV, DAW). Using collected real
+    documents, also read the sound-report recorder line, the AAF
+    identification, the RIN/ERN message sender and the C2PA claim generator;
+    design name-matching rules from that data; then group documents that share
+    an origin under `known_common_sources`. Independence stays unknown unless
+    it can be shown.
+
+20c. Choose whether to enable `withholding_rule.min_supported_asset_share`
+    and at what value, using calibration submissions (see `support_breadth` in
+    results). It currently covers recordings only; extend it to mixes, stems,
+    masters or individual relationships once real data shows what qualifying
+    evidence those assets carry.
 
 21. Expand malicious-input tests for WAV chunk abuse, XML bombs, hostile PDFs,
     malformed MIDI, symlink/path attacks, oversized JSON, hash collisions in

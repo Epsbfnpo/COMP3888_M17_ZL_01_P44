@@ -88,6 +88,8 @@ def _layer_checks(assessment_checks):
     for layer, key in LAYER_CHECKS.items():
         if layer == "cross_evidence_support" and "cross_evidence_scored_facts" in assessment_checks:
             checks = [fact["representative_check"] for fact in assessment_checks["cross_evidence_scored_facts"]]
+        elif layer == "declaration_consistency" and "declaration_scored_facts" in assessment_checks:
+            checks = [fact["representative_check"] for fact in assessment_checks["declaration_scored_facts"]]
         else:
             checks = assessment_checks.get(key) or []
         for check in checks:

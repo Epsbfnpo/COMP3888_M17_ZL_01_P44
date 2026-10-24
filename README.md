@@ -60,7 +60,7 @@ below are relative to that directory.
 - The MIDI parser extracts channel and meta events, notes, tempo, time signatures, controllers, and duration in seconds when it can be calculated.
 - CompSheet and CueSheet parsers support strict JSON, CSV, delimited text, and PDF text extraction. See [`program/docs/SHEET_FORMATS.md`](program/docs/SHEET_FORMATS.md).
 - Runs file, relationship, and cross-evidence analysis through the actual `EvidenceChain` and `Pipeline` implementations.
-- `WavMetadataPass` emits standardised technical checks once per audio artefact. `BoundFileIntegrityPass` consumes those cached checks instead of repeating the same comparisons.
+- `WavMetadataPass` emits standardised technical checks once per audio artefact. The checks that compare submitted technical claims with the file (`technical.*_matches_observed`) are scored in declaration consistency (`declared_file_properties`); `BoundFileIntegrityPass` keeps only hash binding and parser readability.
 - A non-final WAV parser failure is isolated to that node: the program emits `WAV_PARSER_FAILED`, marks only dependent checks unavailable, and continues with independent evidence. An unsupported final WAV still returns `unsupported`.
 - `RelationshipIntegrityPass` is a registered libevchain `EvidencePass`. It compares only submitter-declared edge parameters with cached source and target observations and replaces the former diagnostic-only `MusicRelationshipPass`.
 - The core assessment does not execute the legacy `PhysicalSimilarityPass`, exact reconstruction, waveform comparison, landmark/DTW matching, source-contribution analysis, residual modelling, master continuity, or excerpt search.
@@ -139,9 +139,11 @@ The program does not infer relationships or fill in missing relationship
 parameters. It evaluates only graph edges and transformation parameters supplied
 in the submission. Missing evidence lowers assessment availability and
 confidence; it is not a contradiction and does not directly lower the integrity
-value. The legacy signal layer is disabled for every relationship because its
-narrow assumptions can produce misleading results for legitimate production
-material. No range, offset, gain, channel matrix, contribution, or content
+value. Integrity confidence reflects how many of the three evidence layers were
+checked. To see how many checks passed, refer to the integrity value, the layer
+results (`assessment_checks.integrity_layers`) and the findings. The legacy
+signal layer is disabled for every relationship because its narrow assumptions
+can produce misleading results for legitimate production material. No range, offset, gain, channel matrix, contribution, or content
 similarity is estimated by the core assessment. When explicitly enabled, the
 separate diagnostic workers may estimate candidate offsets and feature
 correspondences; these observations never replace submitted parameters.
@@ -348,8 +350,29 @@ accepted. Lumina is one vendor; this does not validate other signers.
 
 The active profile is `policies/scoring_profile.json`. Integrity combines three
 available score-eligible layers: `file_integrity`, `declaration_consistency` and
-`cross_evidence_support`, each with default weight 1.0. The default withholding
-rule (`default-v4`) requires at least two populated layers and an assessed
+`cross_evidence_support`, each with default weight 1.0. `file_integrity` holds
+only checks with no submitter claim (hash binding, parser readability).
+`declaration_consistency` holds every comparison of a submitted claim with a
+measured property: a file's own technical claims and a relationship's declared
+ranges and input/output sample rate and bit depth. A property claimed for the
+same file in more than one place is one fact, and it fails if any claim fails
+(`declaration_scored_facts`). With `one_vote_per_claim` (on in `default-v6`),
+the same claim about one recording repeated in several documents (sound report
+and AAF scene/take or track names) is one cross-evidence fact, since all
+documents were uploaded by the same user and their independence is unknown.
+`assessment_checks.evidence_sources` reports the document count, fact count,
+the known common source (the uploader), any trusted C2PA signers, recordings
+that several documents agree about and the creator/software fields already
+read from WAV and DAW files; `independence` stays `unknown` and the section
+never changes a score. `assessment_checks.support_breadth` reports, for each
+recording the selected workflow requires (`audio/raw-take`, `audio/raw-track`),
+whether qualifying evidence was checked and agreed (`supported`), checked and
+disagreed (`contradicted`), or was not found (`no_qualifying_evidence`). It is
+report-only by default; an optional
+`withholding_rule.min_supported_asset_share` withholds the value
+(`insufficient_support_breadth`) when too few recordings were checked, counting
+contradicted recordings as checked. The default withholding rule (`default-v6`)
+requires at least two populated layers and an assessed
 cross-evidence fact from an allowed tier (`signed_attestation` or
 `recorder_metadata`). An ordinary contradiction never releases a number; it is
 reported and sets `axes.integrity.status` and `integrity_decision.status` to
@@ -358,6 +381,11 @@ contradiction is computed by the evaluator and needs no independent support, so
 it releases `min(weighted mean, 0.25)` with `release_reason`
 `severe_contradiction_cap`.
 Confidence is `0.8 * populated_layers / 3`; it is not a probability of authorship.
+Integrity shows that the files and claims have been checked against each other,
+but this does not guarantee who created the material, when it was recorded or
+that the recording session took place. See
+[C2PA provenance and trust](#c2pa-provenance-and-trust) for signed origin
+evidence.
 
 ### Evidence tiers
 
