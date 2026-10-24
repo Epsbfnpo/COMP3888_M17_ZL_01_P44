@@ -1,12 +1,12 @@
 {
   "target_version": "0.8.1",
-  "date": "2026-10-22",
-  "source_revision": "sha256:be7bfe70c048d0be210d44f91e568470677dae4991eb4cfc54446d37092f54bc",
+  "date": "2026-10-24",
+  "source_revision": "sha256:bf4270500aa889e80fd0719a668f6887f1fc3f51f8a2a13dfba6c24451673a56",
   "python": "3.13.7",
   "platform": "Darwin",
-  "tests_discovered": 332,
-  "tests_run": 332,
-  "non_gui_tests_one_process": 328,
+  "tests_discovered": 409,
+  "tests_run": 409,
+  "non_gui_tests_one_process": 405,
   "gui_tests_separate_processes": 4,
   "failures": 0,
   "errors": 0,
@@ -31,7 +31,8 @@
     "charset-normalizer": "3.5.2",
     "idna": "3.20",
     "urllib3": "2.8.0",
-    "toml": "0.10.2"
+    "toml": "0.10.2",
+    "soundfile": "0.14.0"
   },
   "changes_since_0_8_0": [
     "Recorder metadata only for files that name their recording; DAW and library BWF reported as daw_or_library",
@@ -41,7 +42,14 @@
     "Audio diagnostics analyse AAF-declared source ranges; AUDIO_AAF_RANGE_CORRESPONDENCE observations",
     "DECLARED_SOURCE_NEWER_THAN_TARGET chronology warning from BWF origination fields, not scored",
     "test_builder.py imports run before mocking subprocess.Popen",
-    "Desktop builder preflight limits match the evaluator (512 MiB per object, 1 GiB per request); duplicate and editor-backup files removed"
+    "Desktop builder preflight limits match the evaluator (512 MiB per object, 1 GiB per request); duplicate and editor-backup files removed",
+    "95% Wilson intervals on every audio calibration and false-match case count, split into development, held-out and real material; benchmark scripts report them; not scored",
+    "FLAC and MP3 (MPEG Layer III) evaluated by content in native and public requests: FLAC metadata blocks, kept WAV chunks as recorder metadata and a decoded-audio MD5 check; MP3 frame walking with exact or estimated length and unavailable checks for what MP3 cannot carry; diagnostics decode both; soundfile is a core requirement",
+    "False-match benchmark can re-encode pairs as FLAC or MP3 (--encode); FLAC identical to WAV, MP3 no false match but lower shared-loop recall",
+    "Checked real Lumina MP3 (C2PA in ID3 GEOB, known AI signer); diagnostics decode only MPEG frames and refuse truncated MP3 decoding (libsndfile length estimate without a Xing header)",
+    "Report-only per-file content bandwidth provider (audio_bandwidth): flags MP3 content below its bitrate, lossless files band-limited like a lossy encode, and upsampled files; never scored. MP3 without gapless information decodes with a two-frame length tolerance",
+    "Merged scoring profile default-v6 (score-fix): file technical claims scored in declaration consistency with one vote per declared property; one vote per repeated claim across documents; report-only evidence_sources and support_breadth with an optional min_supported_asset_share gate; Integrity confidence described as layers checked. FLAC and MP3 technical claims follow the same layer; the FLAC MD5 check stays in file integrity",
+    "Cross-format review (24 October 2026): support_breadth counts AAF-used recorder takes that were not submitted (not_submitted, or unmatched_reference with provisional coverage when a submitted recording has no recorder identity) and reports material_coverage and support_coverage over one denominator; undated audio edges are listed in declared_chronology as not_comparable with a reason; the audio summary records the decoder versions; the MP3 not-tested label is split into the tested configuration and the rest; the workflow policy is loaded once per evaluation. Report-only: no score or profile change"
   ],
   "revision_scope": "SHA-256 of runtime Python, requirements, policy JSON, JSON schemas, and bundled XSD files. Documentation, tests and reports excluded."
 }

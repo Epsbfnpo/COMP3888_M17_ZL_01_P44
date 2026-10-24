@@ -14,15 +14,20 @@ import threading
 import time
 
 from .agreement import AGREEMENT, expected_rows
-from .contracts import NON_SCORING, unavailable, validate_result
+from .contracts import FILE_PROVIDERS, NON_SCORING, unavailable, validate_result
 from .policy import load_policy
-from .tasks import build_tasks
+from .tasks import build_tasks, file_tasks
 
 STDERR_TAIL_CHARACTERS = 2000
 # Too little usable signal is a normal analytical outcome, not a failure to run.
 INSUFFICIENT_SUPPORT_REASONS = frozenset({
     "silent_signal", "insufficient_signal", "insufficient_landmarks", "insufficient_peaks",
     "insufficient_spectral_frames", "channel_cancellation"})
+
+
+# Bandwidth assessments where the content does not support what the file claims.
+BAND_LIMIT_FLAGS = {"band_limit_like_lossy_encoding", "consistent_with_upsampling",
+                    "content_band_lower_than_bitrate_suggests"}
 
 
 def _insufficient_support(row, rows):
@@ -44,7 +49,8 @@ def _snapshot(root, relative, digest, directory, deadline):
     path = (root / relative).resolve(strict=True)
     if not path.is_relative_to(root) or not path.is_file():
         raise ValueError("Audio file no longer resolves to a regular file inside the bundle root.")
-    target = directory / (digest + ".wav")
+    # Keep the submitted extension; readers decide the format from content.
+    target = directory / (digest + (Path(relative).suffix.lower() or ".audio"))
     hasher = hashlib.sha256()
     with path.open("rb") as source, target.open("wb") as destination:
         while True:
@@ -186,8 +192,18 @@ def _calibration(provider, status):
     record = (status.get("providers") or {}).get(provider)
     if record is None:
         return {"status": "exploratory_uncalibrated", "summary": "No calibration record for this provider.",
-                "sample": None, "transforms_tested": [], "not_tested": ["all"], "false_match_rates": None}
+                "sample": None, "case_counts": None, "transforms_tested": [], "not_tested": ["all"],
+                "false_match_rates": None}
     return {"profile_id": status.get("profile_id"), **copy.deepcopy(record)}
+
+
+def _decoder_versions():
+    """The FLAC/MP3 decoder in use; results may depend on its version."""
+    try:
+        import soundfile
+    except ImportError:
+        return None
+    return {"soundfile": soundfile.__version__, "libsndfile": soundfile.__libsndfile_version__}
 
 
 def _attach(response, rows, summary):
@@ -196,18 +212,20 @@ def _attach(response, rows, summary):
     status, status_sha256 = _calibration_status()
     # Every row states how far its provider has been calibrated, beside the result.
     rows = [{**row, "calibration": _calibration(row["provider"], status)} for row in rows]
-    summary = {**summary, "calibration_status_sha256": status_sha256}
+    summary = {**summary, "calibration_status_sha256": status_sha256, "decoders": _decoder_versions()}
     checks = combined.setdefault("assessment_checks", {})
     checks["audio_fingerprint"] = [row for row in rows if row["provider"] in ("audfprint", "spectromap")]
     checks["audio_structure"] = [row for row in rows if row["provider"] == "librosa"]
     checks["audio_fingerprint_agreement"] = [row for row in rows if row["provider"] == AGREEMENT]
     checks["audio_semantics"] = [row for row in rows if row["provider"] == "music_semantics"]
+    checks["audio_bandwidth"] = [row for row in rows if row["provider"] == "bandwidth"]
     checks["audio_diagnostic_summary"] = [summary]
     detail_keys = {"librosa": "audio_structure", AGREEMENT: "audio_fingerprint_agreement",
-                   "music_semantics": "audio_semantics"}
+                   "music_semantics": "audio_semantics", "bandwidth": "audio_bandwidth"}
     observation_codes = {"librosa": "AUDIO_STRUCTURE_OBSERVATION",
                          AGREEMENT: "AUDIO_FINGERPRINT_AGREEMENT_OBSERVATION",
-                         "music_semantics": "AUDIO_SEMANTIC_OBSERVATION"}
+                         "music_semantics": "AUDIO_SEMANTIC_OBSERVATION",
+                         "bandwidth": "AUDIO_BANDWIDTH_OBSERVATION"}
     for row in rows:
         if _insufficient_support(row, rows):
             code, outcome = "AUDIO_INSUFFICIENT_SUPPORT", "insufficient_support"
@@ -223,6 +241,10 @@ def _attach(response, rows, summary):
                        "music_semantics": " aligned phrase(s) for "}.get(row["provider"], " content candidate(s) for ")
             message = (row["provider"] + ": " + str(len(row["matches"])) + counted +
                        row["relationship_type"] + ". " + row["message"])
+            if row["provider"] == "bandwidth" and row["status"] != "unavailable":
+                edge = row["metrics"].get("content_edge_hz")
+                message = ("bandwidth: " + (f"audio content stops at {edge / 1000:.1f} kHz. " if edge else
+                                            "no sharp band limit found. ") + row["message"])
         combined["findings"].append({"code": code, "severity": "info", "message": message, "outcome": outcome,
                                      "diagnostic_id": row["diagnostic_id"], "provider": row["provider"],
                                      "source_hash": row["source_hash"], "target_hash": row["target_hash"],
@@ -232,6 +254,18 @@ def _attach(response, rows, summary):
                                      "relationship_type": row["relationship_type"],
                                      "detail_key": detail_keys.get(row["provider"], "audio_fingerprint"),
                                      **NON_SCORING})
+        if row["provider"] == "bandwidth" and row["status"] != "unavailable":
+            assessment = row["metrics"].get("assessment") or {}
+            if assessment.get("status") in BAND_LIMIT_FLAGS:
+                # A claim the content does not support (lossless, hi-res or a
+                # bitrate). Reported for review; never scored.
+                combined["findings"].append({
+                    "code": "AUDIO_CONTENT_BAND_LIMITED", "severity": "low",
+                    "message": assessment["reason"] + " This is a heuristic content observation, not a verdict, "
+                               "and it does not change any score.",
+                    "evidence_hash": row["source_hash"], "diagnostic_id": row["diagnostic_id"],
+                    "assessment": assessment["status"], "content_edge_hz": row["metrics"].get("content_edge_hz"),
+                    "detail_key": "audio_bandwidth", **NON_SCORING})
     # An AAF-range task compares only the seconds the edit says it used, so a
     # fingerprint match there is content agreeing with the AAF declaration.
     # Absence is not reported as disagreement: weak dialogue can be missed.
@@ -264,7 +298,10 @@ def _attach(response, rows, summary):
         # than leaving the report silently empty.
         combined["findings"].append({"code": "AUDIO_DIAGNOSTIC_NOT_APPLICABLE", "severity": "info",
                                      "message": "No declared audio-to-audio relationships were retained for "
-                                                "analysis, so audio diagnostics produced no observations.",
+                                                "analysis, so no content comparisons were made"
+                                                + ("; each file's bandwidth was still measured." if
+                                                   summary.get("file_task_count") else
+                                                   ", and audio diagnostics produced no observations."),
                                      "detail_key": "audio_diagnostic_summary", **NON_SCORING})
     return combined
 
@@ -283,13 +320,19 @@ def augment_response(response, request, root, mode, policy_path, deadline):
         else:
             from music_target.contract import to_native
             native, _ = to_native(copy.deepcopy(request), mode, include_report=True)
-            tasks = build_tasks(native, response)
-            summary.update(task_count=len(tasks), relationship_count=len({row["relation_id"] for row in tasks}))
+            # Pair providers compare declared edges; file providers describe each bound file once.
+            pair_providers = [name for name in policy["providers"] if name not in FILE_PROVIDERS]
+            file_providers = [name for name in policy["providers"] if name in FILE_PROVIDERS]
+            tasks = build_tasks(native, response) if pair_providers else []
+            files = file_tasks(native, response) if file_providers else []
+            summary.update(task_count=len(tasks), relationship_count=len({row["relation_id"] for row in tasks}),
+                           file_task_count=len(files))
             root = Path(root).resolve(strict=True)
             snapshots = {}
             failures = {}
             with tempfile.TemporaryDirectory(prefix="music-audio-observations-") as directory:
-                for task in tasks:
+                for task, providers in ([(item, pair_providers) for item in tasks] +
+                                        [(item, file_providers) for item in files]):
                     task = dict(task)
                     problem = task.get("unavailable_reason")
                     for role in ("source", "target"):
@@ -308,9 +351,9 @@ def augment_response(response, request, root, mode, policy_path, deadline):
                         task[role + "_path"] = snapshots.get(digest)
                     if problem:
                         values = [unavailable(task, provider, problem, "Diagnostic unavailable: " + problem + "; no core score was changed.")
-                                  for provider in policy["providers"]]
+                                  for provider in providers]
                     else:
-                        values = _run_task(task, policy["providers"], policy["parameters"], deadline)
+                        values = _run_task(task, providers, policy["parameters"], deadline)
                     for value in values:
                         value.update({key: policy[key] for key in ("policy_id", "policy_version", "policy_sha256")})
                         rows.append(value)

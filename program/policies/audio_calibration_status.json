@@ -1,6 +1,16 @@
 {
-  "description": "Calibration evidence attached to every audio diagnostic row. Figures are case counts from docs/AUDIO_CALIBRATION_2026-10-20.md and docs/AUDIO_DIAGNOSTICS.md, not probabilities. The frozen gate profile (audio_calibration_profile.json) is unchanged. false_match_rates are filled by benchmarks/false_match.py.",
+  "description": "Calibration evidence attached to every audio diagnostic row. Figures are case counts from docs/AUDIO_CALIBRATION_2026-10-20.md, docs/FALSE_MATCH_BENCHMARK_2026-10-21.md and docs/PROJECT_ROCK_FINDINGS_2026-10-22.md, each with a 95% Wilson interval, not probabilities. The frozen gate profile (audio_calibration_profile.json) is unchanged. false_match_rates are filled by benchmarks/false_match.py.",
   "profile_id": "bounded-audio-2026-10-20-v2",
+  "intervals": {
+    "method": "wilson_score",
+    "confidence": 0.95,
+    "splits": {
+      "development": "Cases used to choose or revise the frozen gates.",
+      "held_out": "Cases evaluated only after the gates were frozen; never used for tuning.",
+      "real_material": "Production material never used for tuning, with ground truth from production documents."
+    },
+    "note": "An interval describes the uncertainty of one small count, not a population rate. Cases derived from one source family or one session are not independent, so the real uncertainty is wider."
+  },
   "providers": {
     "audfprint": {
       "status": "bounded_calibration",
@@ -10,18 +20,83 @@
         "held_out_cases": 16,
         "controls": 6
       },
+      "case_counts": {
+        "development": [
+          {
+            "measure": "Mixture components and excerpts found at the correct offset (error <= 0.1 s, density 40)",
+            "count": 26,
+            "cases": 28,
+            "wilson_95": {
+              "lower": 0.774,
+              "upper": 0.98
+            }
+          },
+          {
+            "measure": "Distinct-recording controls with a supported offset",
+            "count": 0,
+            "cases": 21,
+            "wilson_95": {
+              "lower": 0.0,
+              "upper": 0.155
+            }
+          }
+        ],
+        "held_out": [
+          {
+            "measure": "Mixture components and excerpts found at the correct offset (error <= 0.1 s, density 40), original four held-out Lumina families",
+            "count": 15,
+            "cases": 16,
+            "wilson_95": {
+              "lower": 0.717,
+              "upper": 0.989
+            }
+          },
+          {
+            "measure": "Distinct-recording controls with a supported offset",
+            "count": 0,
+            "cases": 6,
+            "wilson_95": {
+              "lower": 0.0,
+              "upper": 0.39
+            }
+          }
+        ],
+        "real_material": [
+          {
+            "measure": "Project Rock Ep01 AAF-used takes with a supported match, whole-take comparison",
+            "count": 2,
+            "cases": 13,
+            "wilson_95": {
+              "lower": 0.043,
+              "upper": 0.422
+            }
+          },
+          {
+            "measure": "Project Rock Ep01 AAF-range tasks with a supported match inside the used range",
+            "count": 0,
+            "cases": 14,
+            "wilson_95": {
+              "lower": 0.0,
+              "upper": 0.215
+            },
+            "note": "One task (6T03) had a candidate below the support gates; 14 tasks cover 13 takes."
+          }
+        ]
+      },
       "transforms_tested": [
         "excerpt",
         "mixture_component",
         "unrelated_same_genre_tempo_key",
         "same_prompt_regeneration",
-        "shared_loop_gain_0.5_and_1.0"
+        "shared_loop_gain_0.5_and_1.0",
+        "flac_and_mp3_encoded_false_match_pairs"
       ],
       "not_tested": [
         "covers",
         "pitch_shift",
         "time_stretch",
-        "alternate_takes"
+        "alternate_takes",
+        "mp3_encoded_queries_beyond_tested_configuration"
       ],
       "false_match_rates": {
         "benchmark": "false_match_lumina_2026-10-21",
@@ -30,29 +105,170 @@
         "categories": {
           "same_genre_tempo_key": {
             "pairs": 5,
-            "false_matches": 0
+            "false_matches": 0,
+            "wilson_95": {
+              "lower": 0.0,
+              "upper": 0.434
+            }
           },
           "same_prompt_regeneration": {
             "pairs": 4,
-            "false_matches": 0
+            "false_matches": 0,
+            "wilson_95": {
+              "lower": 0.0,
+              "upper": 0.49
+            }
           },
           "cover_prompts_melody_unverified": {
             "pairs": 6,
-            "false_matches": 0
+            "false_matches": 0,
+            "wilson_95": {
+              "lower": 0.0,
+              "upper": 0.39
+            }
           },
           "shared_loop": {
             "pairs": 4,
             "detected": 1,
-            "note": "The loop is real shared audio; a fingerprint match does not mean one song derives from the other."
+            "note": "The loop is real shared audio; a fingerprint match does not mean one song derives from the other.",
+            "wilson_95": {
+              "lower": 0.046,
+              "upper": 0.699
+            }
           },
           "shared_loop_full_gain": {
             "pairs": 4,
             "detected": 4,
-            "note": "The loop is real shared audio; a fingerprint match does not mean one song derives from the other."
+            "note": "The loop is real shared audio; a fingerprint match does not mean one song derives from the other.",
+            "wilson_95": {
+              "lower": 0.51,
+              "upper": 1.0
+            }
           }
         },
-        "scope": "Case counts on a small Lumina sample; not a population false-positive rate."
-      }
+        "scope": "Case counts on a small Lumina sample; not a population false-positive rate.",
+        "split": "held_out"
+      },
+      "encoded_false_match_rates": {
+        "flac": {
+          "benchmark": "false_match_lumina_2026-10-21",
+          "date": "2026-10-23",
+          "split": "held_out",
+          "encoding": "FLAC, samples identical to the WAV clips",
+          "categories": {
+            "same_genre_tempo_key": {
+              "pairs": 5,
+              "false_matches": 0,
+              "wilson_95": {
+                "lower": 0.0,
+                "upper": 0.434
+              }
+            },
+            "same_prompt_regeneration": {
+              "pairs": 4,
+              "false_matches": 0,
+              "wilson_95": {
+                "lower": 0.0,
+                "upper": 0.49
+              }
+            },
+            "cover_prompts_melody_unverified": {
+              "pairs": 6,
+              "false_matches": 0,
+              "wilson_95": {
+                "lower": 0.0,
+                "upper": 0.39
+              }
+            },
+            "shared_loop": {
+              "pairs": 4,
+              "detected": 1,
+              "note": "The loop is real shared audio; a fingerprint match does not mean one song derives from the other.",
+              "wilson_95": {
+                "lower": 0.046,
+                "upper": 0.699
+              }
+            },
+            "shared_loop_full_gain": {
+              "pairs": 4,
+              "detected": 4,
+              "note": "The loop is real shared audio; a fingerprint match does not mean one song derives from the other.",
+              "wilson_95": {
+                "lower": 0.51,
+                "upper": 1.0
+              }
+            }
+          },
+          "same_as_wav": true
+        },
+        "mp3": {
+          "benchmark": "false_match_lumina_2026-10-21",
+          "date": "2026-10-23",
+          "split": "held_out",
+          "encoding": "MP3 by libsndfile 1.2.2 (LAME 3.100, VBR, about 140-163 kbps average)",
+          "categories": {
+            "same_genre_tempo_key": {
+              "pairs": 5,
+              "false_matches": 0,
+              "wilson_95": {
+                "lower": 0.0,
+                "upper": 0.434
+              }
+            },
+            "same_prompt_regeneration": {
+              "pairs": 4,
+              "false_matches": 0,
+              "wilson_95": {
+                "lower": 0.0,
+                "upper": 0.49
+              }
+            },
+            "cover_prompts_melody_unverified": {
+              "pairs": 6,
+              "false_matches": 0,
+              "wilson_95": {
+                "lower": 0.0,
+                "upper": 0.39
+              }
+            },
+            "shared_loop": {
+              "pairs": 4,
+              "detected": 0,
+              "note": "The loop is real shared audio; a fingerprint match does not mean one song derives from the other.",
+              "wilson_95": {
+                "lower": 0.0,
+                "upper": 0.49
+              }
+            },
+            "shared_loop_full_gain": {
+              "pairs": 4,
+              "detected": 3,
+              "note": "The loop is real shared audio; a fingerprint match does not mean one song derives from the other.",
+              "wilson_95": {
+                "lower": 0.301,
+                "upper": 0.954
+              }
+            }
+          },
+          "same_as_wav": false
+        }
+      },
+      "encoded_configurations_tested": [
+        {
+          "format": "MP3",
+          "encoder": "libsndfile 1.2.2 with LAME 3.100",
+          "mode": "VBR, about 140-163 kbps average",
+          "material": "the 23 Lumina benchmark pairs, 15 unrelated and 8 with a shared loop (benchmarks/false_match.py --encode mp3)",
+          "measured": "false matches and shared-loop detection only"
+        },
+        {
+          "format": "FLAC",
+          "encoder": "libsndfile 1.2.2",
+          "mode": "lossless, samples identical to the WAV clips",
+          "material": "the same 23 pairs (--encode flac)",
+          "measured": "identical to WAV"
+        }
+      ]
     },
     "music_semantics": {
       "status": "bounded_calibration",
@@ -65,6 +281,86 @@
         "controls": 51,
         "section_recordings": 16
       },
+      "case_counts": {
+        "development": [
+          {
+            "measure": "Known DSP derivatives supported (7 Lumina families)",
+            "count": 59,
+            "cases": 63,
+            "wilson_95": {
+              "lower": 0.848,
+              "upper": 0.975
+            }
+          },
+          {
+            "measure": "Supported derivatives with the correct transposition",
+            "count": 59,
+            "cases": 59,
+            "wilson_95": {
+              "lower": 0.939,
+              "upper": 1.0
+            }
+          },
+          {
+            "measure": "Independent-generation controls and a sustained tone supported",
+            "count": 0,
+            "cases": 22,
+            "wilson_95": {
+              "lower": 0.0,
+              "upper": 0.149
+            }
+          },
+          {
+            "measure": "Version-one held-out derivatives supported (reused as regression cases)",
+            "count": 31,
+            "cases": 36,
+            "wilson_95": {
+              "lower": 0.713,
+              "upper": 0.939
+            },
+            "note": "These families exposed the N04_fast error that shaped version two, so they are not held out for it."
+          },
+          {
+            "measure": "Version-one held-out controls supported (reused as regression cases)",
+            "count": 0,
+            "cases": 7,
+            "wilson_95": {
+              "lower": 0.0,
+              "upper": 0.354
+            }
+          }
+        ],
+        "held_out": [
+          {
+            "measure": "Known DSP derivatives supported (8 SALAMI families)",
+            "count": 57,
+            "cases": 72,
+            "wilson_95": {
+              "lower": 0.684,
+              "upper": 0.869
+            }
+          },
+          {
+            "measure": "Supported derivatives with the correct transposition",
+            "count": 57,
+            "cases": 57,
+            "wilson_95": {
+              "lower": 0.937,
+              "upper": 1.0
+            }
+          },
+          {
+            "measure": "Distinct-recording controls and a sustained tone supported",
+            "count": 0,
+            "cases": 29,
+            "wilson_95": {
+              "lower": 0.0,
+              "upper": 0.117
+            }
+          }
+        ],
+        "real_material": []
+      },
       "transforms_tested": [
         "pitch_shift",
         "time_stretch_0.8_to_1.35",
@@ -73,13 +369,15 @@
         "mixture",
         "unrelated_same_genre_tempo_key",
         "same_prompt_regeneration",
-        "shared_loop_between_different_songs"
+        "shared_loop_between_different_songs",
+        "flac_and_mp3_encoded_false_match_pairs"
       ],
       "not_tested": [
         "covers",
         "reorchestrations",
         "nonuniform_speed_changes",
-        "alternate_takes"
+        "alternate_takes",
+        "mp3_encoded_queries_beyond_tested_configuration"
       ],
       "false_match_rates": {
         "benchmark": "false_match_lumina_2026-10-21",
@@ -88,33 +386,188 @@
         "categories": {
           "same_genre_tempo_key": {
             "pairs": 5,
-            "false_matches": 0
+            "false_matches": 0,
+            "wilson_95": {
+              "lower": 0.0,
+              "upper": 0.434
+            }
           },
           "same_prompt_regeneration": {
             "pairs": 4,
-            "false_matches": 0
+            "false_matches": 0,
+            "wilson_95": {
+              "lower": 0.0,
+              "upper": 0.49
+            }
           },
           "cover_prompts_melody_unverified": {
             "pairs": 6,
             "supported": 0,
-            "note": "Whether these clips share a composition is unverified, so musical correspondence is reported without classifying it as true or false."
+            "note": "Whether these clips share a composition is unverified, so musical correspondence is reported without classifying it as true or false.",
+            "wilson_95": {
+              "lower": 0.0,
+              "upper": 0.39
+            }
           },
           "shared_loop": {
             "pairs": 4,
-            "false_matches": 0
+            "false_matches": 0,
+            "wilson_95": {
+              "lower": 0.0,
+              "upper": 0.49
+            }
           },
           "shared_loop_full_gain": {
             "pairs": 4,
-            "false_matches": 0
+            "false_matches": 0,
+            "wilson_95": {
+              "lower": 0.0,
+              "upper": 0.49
+            }
           }
         },
-        "scope": "Case counts on a small Lumina sample; not a population false-positive rate."
-      }
+        "scope": "Case counts on a small Lumina sample; not a population false-positive rate.",
+        "split": "held_out"
+      },
+      "encoded_false_match_rates": {
+        "flac": {
+          "benchmark": "false_match_lumina_2026-10-21",
+          "date": "2026-10-23",
+          "split": "held_out",
+          "encoding": "FLAC, samples identical to the WAV clips",
+          "categories": {
+            "same_genre_tempo_key": {
+              "pairs": 5,
+              "false_matches": 0,
+              "wilson_95": {
+                "lower": 0.0,
+                "upper": 0.434
+              }
+            },
+            "same_prompt_regeneration": {
+              "pairs": 4,
+              "false_matches": 0,
+              "wilson_95": {
+                "lower": 0.0,
+                "upper": 0.49
+              }
+            },
+            "cover_prompts_melody_unverified": {
+              "pairs": 6,
+              "supported": 0,
+              "note": "Whether these clips share a composition is unverified, so musical correspondence is reported without classifying it as true or false.",
+              "wilson_95": {
+                "lower": 0.0,
+                "upper": 0.39
+              }
+            },
+            "shared_loop": {
+              "pairs": 4,
+              "false_matches": 0,
+              "wilson_95": {
+                "lower": 0.0,
+                "upper": 0.49
+              }
+            },
+            "shared_loop_full_gain": {
+              "pairs": 4,
+              "false_matches": 0,
+              "wilson_95": {
+                "lower": 0.0,
+                "upper": 0.49
+              }
+            }
+          },
+          "same_as_wav": true
+        },
+        "mp3": {
+          "benchmark": "false_match_lumina_2026-10-21",
+          "date": "2026-10-23",
+          "split": "held_out",
+          "encoding": "MP3 by libsndfile 1.2.2 (LAME 3.100, VBR, about 140-163 kbps average)",
+          "categories": {
+            "same_genre_tempo_key": {
+              "pairs": 5,
+              "false_matches": 0,
+              "wilson_95": {
+                "lower": 0.0,
+                "upper": 0.434
+              }
+            },
+            "same_prompt_regeneration": {
+              "pairs": 4,
+              "false_matches": 0,
+              "wilson_95": {
+                "lower": 0.0,
+                "upper": 0.49
+              }
+            },
+            "cover_prompts_melody_unverified": {
+              "pairs": 6,
+              "supported": 0,
+              "note": "Whether these clips share a composition is unverified, so musical correspondence is reported without classifying it as true or false.",
+              "wilson_95": {
+                "lower": 0.0,
+                "upper": 0.39
+              }
+            },
+            "shared_loop": {
+              "pairs": 4,
+              "false_matches": 0,
+              "wilson_95": {
+                "lower": 0.0,
+                "upper": 0.49
+              }
+            },
+            "shared_loop_full_gain": {
+              "pairs": 4,
+              "false_matches": 0,
+              "wilson_95": {
+                "lower": 0.0,
+                "upper": 0.49
+              }
+            }
+          },
+          "same_as_wav": true
+        }
+      },
+      "encoded_configurations_tested": [
+        {
+          "format": "MP3",
+          "encoder": "libsndfile 1.2.2 with LAME 3.100",
+          "mode": "VBR, about 140-163 kbps average",
+          "material": "the 23 Lumina benchmark pairs, 15 unrelated and 8 with a shared loop (benchmarks/false_match.py --encode mp3)",
+          "measured": "false matches and shared-loop detection only"
+        },
+        {
+          "format": "FLAC",
+          "encoder": "libsndfile 1.2.2",
+          "mode": "lossless, samples identical to the WAV clips",
+          "material": "the same 23 pairs (--encode flac)",
+          "measured": "identical to WAV"
+        }
+      ]
     },
     "spectromap": {
       "status": "exploratory_uncalibrated",
       "summary": "Upstream peak pairing on fixed windows; no thresholds have been calibrated. Candidate offsets are observations only.",
       "sample": null,
+      "case_counts": {
+        "development": [],
+        "held_out": [],
+        "real_material": [
+          {
+            "measure": "Project Rock Ep01 AAF-range tasks with a correspondence inside the used range",
+            "count": 6,
+            "cases": 14,
+            "wilson_95": {
+              "lower": 0.214,
+              "upper": 0.674
+            },
+            "note": "Exploratory provider without calibrated gates; 14 tasks cover 13 takes."
+          }
+        ]
+      },
       "transforms_tested": [],
       "not_tested": [
         "all"
@@ -125,6 +578,7 @@
       "status": "exploratory_uncalibrated",
       "summary": "Per-file feature sections and repetitions; cross-file similarity is a summary only because unrelated material scored as high as related material on real recordings.",
       "sample": null,
+      "case_counts": null,
       "transforms_tested": [],
       "not_tested": [
         "all"
@@ -138,11 +592,36 @@
         "true_takes": 29,
         "controls": 33
       },
+      "case_counts": {
+        "development": [],
+        "held_out": [],
+        "real_material": [
+          {
+            "measure": "Project Rock true takes with an agreed offset inside the final master",
+            "count": 2,
+            "cases": 29,
+            "wilson_95": {
+              "lower": 0.019,
+              "upper": 0.22
+            }
+          },
+          {
+            "measure": "Project Rock unrelated controls with an agreed offset",
+            "count": 0,
+            "cases": 33,
+            "wilson_95": {
+              "lower": 0.0,
+              "upper": 0.104
+            }
+          }
+        ]
+      },
       "transforms_tested": [
         "take_inside_final_master",
         "unrelated_same_genre_tempo_key",
         "same_prompt_regeneration",
-        "shared_loop_gain_0.5_and_1.0"
+        "shared_loop_gain_0.5_and_1.0",
+        "flac_and_mp3_encoded_false_match_pairs"
       ],
       "not_tested": [
         "covers"
@@ -154,29 +633,241 @@
         "categories": {
           "same_genre_tempo_key": {
             "pairs": 5,
-            "false_matches": 0
+            "false_matches": 0,
+            "wilson_95": {
+              "lower": 0.0,
+              "upper": 0.434
+            }
           },
           "same_prompt_regeneration": {
             "pairs": 4,
-            "false_matches": 0
+            "false_matches": 0,
+            "wilson_95": {
+              "lower": 0.0,
+              "upper": 0.49
+            }
           },
           "cover_prompts_melody_unverified": {
             "pairs": 6,
-            "false_matches": 0
+            "false_matches": 0,
+            "wilson_95": {
+              "lower": 0.0,
+              "upper": 0.39
+            }
           },
           "shared_loop": {
             "pairs": 4,
             "detected": 1,
-            "note": "The loop is real shared audio; a fingerprint match does not mean one song derives from the other."
+            "note": "The loop is real shared audio; a fingerprint match does not mean one song derives from the other.",
+            "wilson_95": {
+              "lower": 0.046,
+              "upper": 0.699
+            }
           },
           "shared_loop_full_gain": {
             "pairs": 4,
             "detected": 4,
-            "note": "The loop is real shared audio; a fingerprint match does not mean one song derives from the other."
+            "note": "The loop is real shared audio; a fingerprint match does not mean one song derives from the other.",
+            "wilson_95": {
+              "lower": 0.51,
+              "upper": 1.0
+            }
           }
         },
-        "scope": "Case counts on a small Lumina sample; not a population false-positive rate."
+        "scope": "Case counts on a small Lumina sample; not a population false-positive rate.",
+        "split": "held_out"
+      },
+      "encoded_false_match_rates": {
+        "flac": {
+          "benchmark": "false_match_lumina_2026-10-21",
+          "date": "2026-10-23",
+          "split": "held_out",
+          "encoding": "FLAC, samples identical to the WAV clips",
+          "categories": {
+            "same_genre_tempo_key": {
+              "pairs": 5,
+              "false_matches": 0,
+              "wilson_95": {
+                "lower": 0.0,
+                "upper": 0.434
+              }
+            },
+            "same_prompt_regeneration": {
+              "pairs": 4,
+              "false_matches": 0,
+              "wilson_95": {
+                "lower": 0.0,
+                "upper": 0.49
+              }
+            },
+            "cover_prompts_melody_unverified": {
+              "pairs": 6,
+              "false_matches": 0,
+              "wilson_95": {
+                "lower": 0.0,
+                "upper": 0.39
+              }
+            },
+            "shared_loop": {
+              "pairs": 4,
+              "detected": 1,
+              "note": "The loop is real shared audio; a fingerprint match does not mean one song derives from the other.",
+              "wilson_95": {
+                "lower": 0.046,
+                "upper": 0.699
+              }
+            },
+            "shared_loop_full_gain": {
+              "pairs": 4,
+              "detected": 4,
+              "note": "The loop is real shared audio; a fingerprint match does not mean one song derives from the other.",
+              "wilson_95": {
+                "lower": 0.51,
+                "upper": 1.0
+              }
+            }
+          },
+          "same_as_wav": true
+        },
+        "mp3": {
+          "benchmark": "false_match_lumina_2026-10-21",
+          "date": "2026-10-23",
+          "split": "held_out",
+          "encoding": "MP3 by libsndfile 1.2.2 (LAME 3.100, VBR, about 140-163 kbps average)",
+          "categories": {
+            "same_genre_tempo_key": {
+              "pairs": 5,
+              "false_matches": 0,
+              "wilson_95": {
+                "lower": 0.0,
+                "upper": 0.434
+              }
+            },
+            "same_prompt_regeneration": {
+              "pairs": 4,
+              "false_matches": 0,
+              "wilson_95": {
+                "lower": 0.0,
+                "upper": 0.49
+              }
+            },
+            "cover_prompts_melody_unverified": {
+              "pairs": 6,
+              "false_matches": 0,
+              "wilson_95": {
+                "lower": 0.0,
+                "upper": 0.39
+              }
+            },
+            "shared_loop": {
+              "pairs": 4,
+              "detected": 0,
+              "note": "The loop is real shared audio; a fingerprint match does not mean one song derives from the other.",
+              "wilson_95": {
+                "lower": 0.0,
+                "upper": 0.49
+              }
+            },
+            "shared_loop_full_gain": {
+              "pairs": 4,
+              "detected": 3,
+              "note": "The loop is real shared audio; a fingerprint match does not mean one song derives from the other.",
+              "wilson_95": {
+                "lower": 0.301,
+                "upper": 0.954
+              }
+            }
+          },
+          "same_as_wav": false
+        }
       }
+    },
+    "bandwidth": {
+      "status": "exploratory_uncalibrated",
+      "summary": "Per-file content band limit from a 90th-percentile spectrum: a sharp cliff (>= 20 dB) or a step into a flat noise floor (>= 6 dB). Thresholds were set on the SoniqTools Bach clip, locally made trick files and six 320 kbps MP3s from a free-music site. Every Lumina music WAV tested is band-limited at 17.4-19.9 kHz by the generator, so a band limit is not evidence of a lossy history.",
+      "sample": {
+        "development_files": 17,
+        "real_material_files": 40
+      },
+      "case_counts": {
+        "development": [
+          {
+            "measure": "Genuine lossless files (SoniqTools Bach WAV/FLAC, 16/44.1 and 24/96) with no band limit flagged",
+            "count": 4,
+            "cases": 4,
+            "wilson_95": {
+              "lower": 0.51,
+              "upper": 1.0
+            }
+          },
+          {
+            "measure": "Trick files flagged (MP3 saved as FLAC, 128 kbps re-encoded at 320, CD upsampled to 96 kHz FLAC and WAV)",
+            "count": 4,
+            "cases": 4,
+            "wilson_95": {
+              "lower": 0.51,
+              "upper": 1.0
+            }
+          },
+          {
+            "measure": "Genuine LAME 128 and 320 kbps encodes reported consistent with their bitrate",
+            "count": 2,
+            "cases": 2,
+            "wilson_95": {
+              "lower": 0.342,
+              "upper": 1.0
+            }
+          },
+          {
+            "measure": "320 kbps MP3s from a free-music site flagged as below their bitrate",
+            "count": 6,
+            "cases": 6,
+            "wilson_95": {
+              "lower": 0.61,
+              "upper": 1.0
+            },
+            "note": "Five stop at 16.5-16.8 kHz (a 128 kbps low-pass); one stops at 18.2 kHz. Their history is inferred, not known."
+          }
+        ],
+        "held_out": [],
+        "real_material": [
+          {
+            "measure": "Project Rock recorder takes, mixes and reference flagged",
+            "count": 1,
+            "cases": 15,
+            "wilson_95": {
+              "lower": 0.012,
+              "upper": 0.298
+            },
+            "note": "The edit-reference WAV (48 kHz) stops at 22.05 kHz and is reported as resampled up from 44.1 kHz; the reference videos in the dataset carry 44.1 kHz audio."
+          },
+          {
+            "measure": "Lumina music WAVs (AI generator output) reported as band-limited like a lossy encoding",
+            "count": 25,
+            "cases": 25,
+            "wilson_95": {
+              "lower": 0.867,
+              "upper": 1.0
+            },
+            "note": "The generator's output is band-limited at 17.4-19.9 kHz; this is the documented false-positive risk."
+          }
+        ]
+      },
+      "transforms_tested": [
+        "mp3_saved_as_flac",
+        "mp3_reencoded_at_higher_bitrate",
+        "cd_upsampled_to_96_khz",
+        "genuine_lossless",
+        "genuine_mp3_128_and_320"
+      ],
+      "not_tested": [
+        "aac_or_opus_sources",
+        "low_pass_mastering",
+        "vinyl_or_tape_transfers",
+        "speech",
+        "sample_rates_below_32_khz_for_mp3"
+      ],
+      "false_match_rates": null
     }
   },
   "false_match_updated": "2026-10-21"

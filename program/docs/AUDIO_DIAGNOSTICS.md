@@ -44,7 +44,7 @@ providers append an informational diagnostic-unavailable finding while the
 successful core response is retained.
 
 The enabled pipeline runs the existing scoring worker first, then prepares
-verified temporary WAV snapshots and starts **one isolated worker per task**.
+verified temporary audio snapshots and starts **one isolated worker per task**.
 That worker runs every policy provider in turn and writes one JSON line per
 provider as soon as it finishes. Each file range is decoded once and each
 analysis rate resampled once, and the shared arrays are read-only. If the
@@ -59,19 +59,24 @@ It appends only `AUDIO_*` findings and the following object arrays:
   phrase form) compared across versions (see below);
 - `assessment_checks.audio_fingerprint_agreement`: offsets where both
   fingerprint algorithms voted (see below);
-- `assessment_checks.audio_diagnostic_summary`: policy/version, task counts,
-  diagnostic runtime, and the explicit non-scoring boundary.
+- `assessment_checks.audio_bandwidth`: one row per bound audio file, giving
+  where its decoded audio stops compared with its container and bitrate (see
+  below);
+- `assessment_checks.audio_diagnostic_summary`: policy/version, task counts
+  (pair tasks and `file_task_count`), decoder versions, diagnostic runtime,
+  and the explicit non-scoring boundary.
 
 When the graph has no retained audio-to-audio relationships, one
 `AUDIO_DIAGNOSTIC_NOT_APPLICABLE` info finding says so, instead of the report
-being silently empty.
+being silently empty. Per-file providers still run on every bound audio file,
+and the message then says that each file's bandwidth was still measured.
 
 Every record has `scoring_eligible: false`, `integrity_contribution: null`, and
 `content_match_is_provenance: false`. Protocol validation rejects attempts to
 change these fields. No diagnostics are fed into parser observations, cross
 evidence, the scored boolean checks, or integrity layers.
 
-The four providers have different roles:
+The five providers have different roles:
 
 | Provider | Measurements |
 |---|---|
@@ -79,6 +84,7 @@ The four providers have different roles:
 | SpectroMap | Upstream peak detection run on fixed-duration time windows; exact local peak-pair vocabulary and offset voting; records the frequency/time grid, overlap, peak window and pair zone |
 | librosa | Chroma, MFCC and energy features; time aggregation; candidate boundaries and repetitions within each file. Cross-file similarity is a summary only (`best_feature_cosine_quantiles`), because on real recordings unrelated material scored as high as related material |
 | music_semantics | Per-file chroma/MFCC novelty boundaries; beat-chroma DTW across all 12 transpositions, a best-of-12 shuffled reference, independent time-grid tempo verification and bounded support/abstention. Fixed-phrase form remains a legacy diagnostic |
+| bandwidth | Per file, not per pair: the 90th-percentile spectrum over the whole file, the frequency where the content stops, and how that compares with the container, sample rate and MP3 bitrate. Heuristic and uncalibrated |
 
 The upstream audfprint extraction files are vendored unmodified with their
 MIT notice and original source notices. The integration passes sample arrays
@@ -117,8 +123,26 @@ partial ranges are not completed: `incomplete_declared_ranges` names the
 missing fields. Time measurements are converted back to the original file's
 timeline.
 
-Only currently supported WAV encodings are accepted. The optional libraries do
-not silently extend the evaluator's accepted file formats. Silence and mono
+The formats the core accepts are analysed: supported WAV encodings are read
+directly, and FLAC and MP3 are decoded with soundfile (libsndfile). FLAC decodes
+to the same samples as the WAV it came from. For MP3 the decoder's gapless
+length is used when the file carries encoder delay and padding, otherwise its
+padded frame length; decoded MP3 samples approximate the original, and
+the calibration status lists the one tested MP3 configuration (libsndfile
+1.2.2 with LAME 3.100, VBR, false-match and shared-loop pairs only) under
+`encoded_configurations_tested` and
+`mp3_encoded_queries_beyond_tested_configuration` under `not_tested`. The
+summary records the decoder (`decoders`: soundfile and libsndfile versions),
+because decoded FLAC and MP3 samples depend on it. Decoded audio is not peak
+normalised before analysis.
+Only the MPEG frames are passed to the decoder, and a decode that stops short
+of the expected length is `unavailable` with `decoder_length_mismatch`, never
+silently truncated. Without gapless information (no Xing/Info header) the
+expected length is the frame count times the samples per frame, and a
+shortfall of up to two frames is accepted: libsndfile drops part of the last
+frames of such files (439 samples on a 2-minute CBR file). The
+optional libraries do not silently extend the evaluator's accepted file
+formats. Silence and mono
 channel cancellation are reported as unavailable, never as contradictions.
 
 Too little usable signal is a normal analytical outcome, not a failure to run.
@@ -136,9 +160,15 @@ Every row also carries a `calibration` object from
 `policies/audio_calibration_status.json`: `status` (`bounded_calibration` for
 audfprint and music_semantics; `exploratory_uncalibrated` for SpectroMap,
 librosa and fingerprint agreement), a summary with case counts, `sample`,
-`transforms_tested`, `not_tested` and `false_match_rates` from
-`benchmarks/false_match.py` (see `FALSE_MATCH_BENCHMARK_2026-10-21.md`). The
-frozen gate profile is unchanged. The summary records the status file's
+`case_counts`, `transforms_tested`, `not_tested` and `false_match_rates` from
+`benchmarks/false_match.py` (see `FALSE_MATCH_BENCHMARK_2026-10-21.md`).
+`case_counts` lists each count under `development`, `held_out` or
+`real_material` with `measure`, `count`, `cases` and a 95% Wilson interval
+`wilson_95` (`lower`, `upper`); every false-match category carries the same
+interval, and the record is marked `split: held_out`. The status file's
+`intervals` object defines the splits. An interval is not a population rate,
+and cases from one family are not independent (see the interval table in
+`AUDIO_CALIBRATION_2026-10-20.md`). The frozen gate profile is unchanged. The summary records the status file's
 SHA-256 as `calibration_status_sha256`.
 
 Provider failures stay structured. A result that breaks the protocol inside
@@ -227,7 +257,8 @@ No candidate does not establish source absence. Weak mixture components can
 still be hidden. Two algorithms reading the same audio do not become independent
 sources of provenance evidence.
 
-The audio policy is `audio-observations-bounded-v2`, version 2. All three
+The audio policy is `audio-observations-bounded-v2`, version 3 (version 3
+adds the `bandwidth` provider). All three
 non-scoring fields remain fixed. `librosa` is adapter 1.2: sections and repetitions use per-file feature scaling, while `mean_best_feature_cosine` uses a joint pair scale. Historical example
 responses retain their old meanings and are not current expected outputs.
 
@@ -244,6 +275,55 @@ and never scores. On the Project Rock data it found 2 of 29 true takes inside
 the final masters (`1T04` at 8.45 s and `6T03` at 3.61 s, where audfprint alone
 had 4 votes, below its threshold) and 0 of 33 controls. It adds precision, not
 recall.
+
+**Content bandwidth (per-file, report-only).** A lossy encoder removes
+everything above its low-pass frequency, and the gap survives decoding. A WAV
+or FLAC made from an MP3 still stops where the MP3 did, an MP3 re-encoded at a
+higher bitrate still stops where the lower bitrate did, and audio resampled up
+to 96 kHz has nothing above the original Nyquist frequency. These are the
+"trick files" listed by SoniqTools' test-audio page. The provider decodes the
+file once and takes the 90th-percentile power spectrum of up to 600 frames of
+8192 samples, spaced evenly over the whole file (silent frames are skipped).
+Levels are relative to the 1–4 kHz median. It looks for two kinds of edge:
+
+- a `sharp_cliff`: a drop of at least 20 dB, with everything above at least
+  12 dB below the level just under the edge;
+- a `step_into_flat_floor`: a drop of at least 6 dB into a floor whose 500 Hz
+  bands vary by at most 3 dB. This catches a lossy decode re-quantised to
+  16 bits, where dither fills the removed band (the SoniqTools fake FLAC drops
+  only about 8 dB). The step search stops at 0.9 of the Nyquist frequency,
+  where anti-alias filters roll off.
+
+The edge is refined to where the smoothed level first falls halfway between
+the levels below and above. `metrics.assessment.status` is then one of:
+
+| Status | Meaning |
+|---|---|
+| `content_band_lower_than_bitrate_suggests` | MP3 whose content stops more than 1.5 kHz below the typical LAME/FFmpeg low-pass for its bitrate (320 kbps → 20 kHz, 128 kbps → 16.5 kHz, …) |
+| `consistent_with_bitrate` | MP3 whose content reaches what its bitrate usually keeps |
+| `not_assessed` | MP3 below 32 kHz, or a bitrate with no typical low-pass |
+| `band_limit_like_lossy_encoding` | WAV or FLAC that stops at 11–20.5 kHz with a lossy-like edge. The message names the alternatives: made from an MP3 or similar, resampled up, or generated or filtered to this bandwidth |
+| `consistent_with_upsampling` | WAV or FLAC that stops at 0.90–1.01 of a lower standard rate's Nyquist frequency; `likely_source_rate_hz` names that rate |
+| `band_limited` | Any other edge below the Nyquist frequency |
+| `no_band_limit_found` | No edge found |
+
+Each flagged file also gets an `AUDIO_CONTENT_BAND_LIMITED` finding (severity
+low, non-scoring, with the file's `evidence_hash`, the assessment and
+`content_edge_hz`). Rows stay `inconclusive`; too little non-silent audio is
+`unavailable` with `insufficient_signal`.
+
+A band limit says where the audio stops, not why or who made the file. AI
+generators produce band-limited audio natively: all 25 Lumina benchmark WAVs
+stop at 17.4–19.9 kHz and are reported as `band_limit_like_lossy_encoding`, as
+are 6 of 7 other Lumina exports (12.6–19.3 kHz). Mastering low-passes, speech,
+old recordings and very quiet material can look the same, and no band limit
+does not show that a file is original. The thresholds were set on the
+SoniqTools Bach clip, locally made trick files and six free-site MP3s, so the
+calibration status is `exploratory_uncalibrated`. The counts are in the
+`bandwidth` record of `policies/audio_calibration_status.json`. On Project
+Rock, 14 of 15 files show no band limit; the 48 kHz edit reference stops at
+22.05 kHz and is reported as resampled up from 44.1 kHz, which matches the
+44.1 kHz audio in the dataset's reference videos.
 
 The previously proposed development caps (30 seconds per diagnostic run,
 10 seconds per provider, 16 relations, 600 seconds per file, 64 MiB active PCM,
@@ -262,7 +342,8 @@ Run validation, including actual installed providers:
 REQUIRE_AUDIO_BACKENDS=1 python -B -m unittest discover -s tests -v
 ```
 
-Tests cover musical semantics on synthetic songs (transposition, tempo,
+Tests cover content bandwidth on synthetic low-passed, floor-masked and
+upsampled noise (`tests/test_bandwidth.py`), musical semantics on synthetic songs (transposition, tempo,
 form, unrelated and reordered versions), a demo that differs from its master
 leaving every core result unchanged, the per-task worker (one decode per file, rows kept after a timeout
 or crash, real misbehaving child processes), fingerprint agreement including

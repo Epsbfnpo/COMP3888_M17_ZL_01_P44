@@ -277,16 +277,33 @@ class FinalC2paAttentionTests(unittest.TestCase):
         self.assertEqual(len(statuses), 1)
 
 
+class BandwidthLineTests(unittest.TestCase):
+    def test_each_file_gets_its_bandwidth_reason(self):
+        reason = "The audio stops at 16.4 kHz, but a 320 kbps MP3 usually reaches about 20.0 kHz."
+        rows = [_row("bandwidth", source_hash=SOURCE, target_hash=SOURCE, relationship_type="single_file",
+                     metrics={"assessment": {"status": "content_band_lower_than_bitrate_suggests", "reason": reason}}),
+                _row("bandwidth", source_hash=TARGET, target_hash=TARGET, relationship_type="single_file",
+                     status="unavailable", reason_code="decoder_length_mismatch", message="Not decoded.")]
+        lines = audio_diagnostic_lines({"assessment_checks": {
+            "audio_diagnostic_summary": [{"completed_provider_tasks": 1}], "audio_bandwidth": rows}},
+            {SOURCE: "song.mp3", TARGET: "other.mp3"})
+        text = "\n".join(lines)
+        self.assertIn("Content bandwidth per file (heuristic; uncalibrated):", text)
+        self.assertIn("- song.mp3: " + reason, text)
+        self.assertIn("- other.mp3: not run (decoder_length_mismatch): Not decoded.", text)
+
+
 class CalibrationLineTests(unittest.TestCase):
     def test_calibration_is_listed_once_per_provider(self):
         calibration = {"status": "bounded_calibration", "transforms_tested": ["excerpt"],
                        "not_tested": ["covers"], "false_match_rates": {"categories": {
-                           "same_prompt_regeneration": {"pairs": 4, "false_matches": 0}}}}
+                           "same_prompt_regeneration": {"pairs": 4, "false_matches": 0,
+                                                        "wilson_95": {"lower": 0.0, "upper": 0.49}}}}}
         rows = [_row("audfprint", calibration=calibration), _row("spectromap", calibration={
             "status": "exploratory_uncalibrated", "transforms_tested": [], "not_tested": ["all"]})]
         lines = audio_diagnostic_lines({"assessment_checks": {
             "audio_diagnostic_summary": [{"completed_provider_tasks": 2}], "audio_fingerprint": rows}}, {})
         text = "\n".join(lines)
         self.assertIn("- audfprint: bounded calibration; tested: excerpt; not tested: covers; "
-                      "benchmark: same prompt regeneration 0/4 false", text)
+                      "benchmark: same prompt regeneration 0/4 false (95% CI 0-49%)", text)
         self.assertIn("- spectromap: exploratory uncalibrated", text)

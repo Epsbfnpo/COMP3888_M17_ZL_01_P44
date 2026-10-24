@@ -33,13 +33,62 @@ Findings 7 and 10 were implemented in version 0.8.1. Neither changes a score.
 | Ep01 chain, chronology | No check | `declared_chronology` compares 13 take-to-mix edges; none is reversed, so no `DECLARED_SOURCE_NEWER_THAN_TARGET` |
 | Audio on/off parity | Held | Still holds with both new records |
 
-Restricting the take to its used seconds helped SpectroMap (6 takes) but left
-audfprint with one supported match (6T03) instead of two (5T15, 6T11) in the
-whole-take run, because a few seconds of dialogue give it fewer landmarks.
+Restricting the take to its used seconds helped SpectroMap (6 of 14 tasks) but
+left audfprint with one candidate (6T03, below the support gates) instead of two
+supported matches (5T15, 6T11) in the whole-take run, because a few seconds of
+dialogue give it fewer landmarks. With 95% Wilson intervals: SpectroMap 6/14
+(21–67%), audfprint supported 0/14 (0–22%) in the used ranges and 2/13 (4–42%)
+over whole takes. These counts are recorded as `real_material` in
+`policies/audio_calibration_status.json`.
 Absence of a match is still not reported as disagreement with the AAF.
 
 Findings 6 and 4b need a client decision; 8 needs no code change; 9 waits for
 an FCP XML parser; the missing Ep02/Ep03 final audio must come from the client.
+
+## FLAC and MP3 versions of the Ep01 chain (2026-10-23)
+
+The dataset contains no FLAC or MP3 (all 251 audio files are WAV; the videos
+carry PCM or AAC), so the Ep01 chain (13 recorder takes, 2 sound reports, the
+AAF, the reference and the WIP mix) was transcoded locally and rerun with
+`--audio-analysis` on the FLAC/MP3 branch. Every transcoded object got a new
+SHA-256 and every reference to it was rewritten.
+
+| Variant | Axes and Integrity | Cross-evidence | AAF-range diagnostics | Other differences |
+|---|---|---|---|---|
+| WAV (baseline) | Integrity 1.0 consistent, released; 0 of 122 facts contradicted | 134 recorder-metadata checks pass | 6 of 14 ranges with a correspondence | 13 chronology rows |
+| Takes as FLAC, `flac --keep-foreign-metadata` | Same | Same | Same | 13 more assessed facts (the FLAC MD5 checks, all matched); recorder metadata identical for every take |
+| Takes as FLAC, plain `flac` | Integrity withheld (`insufficient_assessed_layers`) | All 134 recorder-metadata checks gone | No AAF ranges (takes cannot be matched to the AAF), whole-take tasks instead | `FLAC_RECORDER_METADATA_ABSENT` on all 13 takes; no chronology; one AAF take reported as not submitted |
+| Mix as MP3, 320 kbps | Same | Same | Same 6 of 14 | Exact length (39.68 s) from the LAME header; `AUDIO_FORMAT_LIMITED_CHECKS`; no chronology (the MP3 has no BWF date) |
+| Mix as MP3, 128 kbps | Same | Same | Same 6 of 14 | As for 320 kbps |
+| Every audio file as FLAC (kept metadata) | Same | Same | Same | 15 more assessed facts (MD5, all matched) |
+
+Each run took 20–30 s. The counts in this table were measured under
+`default-v4`. Rerun on 24 October 2026 after merging `default-v6`, every
+variant gives the same axes, statuses and release reasons; assessed facts are
+96 instead of 122 for WAV (109 for kept-metadata FLAC takes, 111 for all-FLAC),
+because the sound-report and AAF claims about each take now count once.
+`support_breadth` reads 13/13 for every variant except plain FLAC takes:
+none of their 13 AAF references can be matched, because the takes lost their
+recorder identity, so they are `unmatched_reference` and the coverage is
+`provisional`. With the cross-format review changes the chain with one
+AAF-used take removed reads 12 of 13 (`not_submitted: 1`) instead of 12/12,
+and the MP3 mix lists its 13 take edges as `not_comparable`
+(`format_has_no_bwf`) in `declared_chronology`.
+
+Conclusions:
+
+- A recorder take delivered as FLAC with its WAV chunks kept supports every
+  check a WAV take does, plus an MD5 of the audio.
+- Plain FLAC encoding is the real risk: the recorder metadata is gone, so the
+  strongest evidence tier disappears and Integrity is withheld. The response
+  says why (`FLAC_RECORDER_METADATA_ABSENT`); nothing is reported as a
+  contradiction. Submitters should be told to use `--keep-foreign-metadata`.
+- An MP3 final mix keeps the recorder evidence of its WAV/FLAC sources and the
+  AAF-range correspondences found here, but loses the chronology comparison;
+  `AUDIO_FORMAT_LIMITED_CHECKS` now names that loss too.
+- These are dialogue-heavy takes; the false-match benchmark showed that MP3
+  can lose weak shared material, so the unchanged 6 of 14 is a case
+  observation, not a recall guarantee.
 
 ## What was run
 

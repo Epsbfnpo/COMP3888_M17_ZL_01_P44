@@ -2,10 +2,10 @@
 
 Externalises the per-layer weights, withholding rule, and confidence
 formula that ``assess_axes()`` applies when combining the Integrity axis.
-The shipped default-v4 profile retains the existing layer weights and
-confidence formula. It aggregates cross-evidence by fact and keeps the
-release gate for ordinary contradictions; a severe contradiction releases a
-value no higher than the cap. Other profiles are explicit,
+The shipped default-v6 profile retains the existing layer weights and
+confidence formula. It aggregates cross-evidence by fact (one vote per
+repeated claim) and keeps the release gate for ordinary contradictions; a
+severe contradiction releases a value no higher than the cap. Other profiles are explicit,
 reviewable configuration choices.
 
 ``physical_similarity`` is intentionally not a weightable layer here: it is

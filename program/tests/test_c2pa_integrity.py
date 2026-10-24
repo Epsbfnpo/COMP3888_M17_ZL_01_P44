@@ -93,8 +93,8 @@ def _make_root(common_name="Test Root"):
     return ca, ca_key
 
 
-def _sign(source, target, source_type=AI_SOURCE_TYPE, root=None):
-    """Sign a WAV with a digital source type claim using a leaf issued by `root` (or a new throwaway CA)."""
+def _sign(source, target, source_type=AI_SOURCE_TYPE, root=None, mime_type="audio/wav"):
+    """Sign audio with a digital source type claim using a leaf issued by `root` (or a new throwaway CA)."""
     import c2pa
     from cryptography import x509
     from cryptography.hazmat.primitives import hashes, serialization
@@ -118,12 +118,12 @@ def _sign(source, target, source_type=AI_SOURCE_TYPE, root=None):
     key = leaf_key.private_bytes(serialization.Encoding.PEM, serialization.PrivateFormat.PKCS8,
                                  serialization.NoEncryption())
     manifest = {"claim_generator_info": [{"name": "c2pa-test-fixture", "version": "1.0"}],
-                "title": "fixture.wav", "format": "audio/wav",
+                "title": "fixture", "format": mime_type,
                 "assertions": [{"label": "c2pa.actions", "data": {"actions": [
                     {"action": "c2pa.created", "digitalSourceType": source_type}]}}]}
     signer = c2pa.Signer.from_info(c2pa.C2paSignerInfo(alg=b"es256", sign_cert=chain, private_key=key, ta_url=None))
     with open(source, "rb") as src, open(target, "w+b") as dst:
-        c2pa.Builder(json.dumps(manifest)).sign(signer, "audio/wav", src, dst)
+        c2pa.Builder(json.dumps(manifest)).sign(signer, mime_type, src, dst)
     return leaf.public_bytes(serialization.Encoding.DER), str(leaf.serial_number)
 
 

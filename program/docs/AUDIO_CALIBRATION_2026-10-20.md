@@ -73,6 +73,58 @@ read alongside abstention counts. Neither 57/57 correct supported pitch estimate
 controls implies 100% population accuracy. The section bootstrap reflects paired differences in these
 8 recordings only, not all music genres.
 
+## 95% Wilson Intervals by Split (added 2026-10-23)
+
+Each case count now carries a 95% Wilson score interval, recorded under `case_counts` in
+`policies/audio_calibration_status.json` and computed by `music_target/case_intervals.py`. Wilson is
+used because it stays inside 0–100% and gives a usable upper bound for 0 of n, where the plain normal
+approximation gives a zero-width interval. Counts are split by how the cases were used:
+
+- **development**: cases used to choose or revise the frozen gates;
+- **held_out**: cases evaluated only after the gates were frozen and never used for tuning;
+- **real_material**: Project Rock production material, never used for tuning, with ground truth from
+  the AAF and sound reports (see PROJECT_ROCK_FINDINGS_2026-10-22.md).
+
+| Provider | Split | Measure | Count | 95% Wilson interval |
+|---|---|---|---|---|
+| music_semantics | development | Known DSP derivatives supported (7 Lumina families) | 59/63 | 84.8–97.5% |
+| music_semantics | development | Supported derivatives with the correct transposition | 59/59 | 93.9–100% |
+| music_semantics | development | Independent-generation controls and a sustained tone supported | 0/22 | 0–14.9% |
+| music_semantics | development | Version-one held-out derivatives supported (regression reuse) | 31/36 | 71.3–93.9% |
+| music_semantics | development | Version-one held-out controls supported (regression reuse) | 0/7 | 0–35.4% |
+| music_semantics | held_out | Known DSP derivatives supported (8 SALAMI families) | 57/72 | 68.4–86.9% |
+| music_semantics | held_out | Supported derivatives with the correct transposition | 57/57 | 93.7–100% |
+| music_semantics | held_out | Distinct-recording controls and a sustained tone supported | 0/29 | 0–11.7% |
+| audfprint | development | Mixtures and excerpts found at the correct offset (density 40) | 26/28 | 77.4–98.0% |
+| audfprint | development | Distinct-recording controls with a supported offset | 0/21 | 0–15.5% |
+| audfprint | held_out | Mixtures and excerpts found (original four held-out families) | 15/16 | 71.7–98.9% |
+| audfprint | held_out | Distinct-recording controls with a supported offset | 0/6 | 0–39.0% |
+| audfprint | real_material | Project Rock AAF-used takes with a supported match, whole take | 2/13 | 4.3–42.2% |
+| audfprint | real_material | Project Rock AAF-range tasks with a supported match in the used range | 0/14 | 0–21.5% |
+| SpectroMap (exploratory) | real_material | Project Rock AAF-range tasks with a correspondence in the used range | 6/14 | 21.4–67.4% |
+| fingerprint agreement (exploratory) | real_material | Project Rock true takes with an agreed offset in the final master | 2/29 | 1.9–22.0% |
+| fingerprint agreement (exploratory) | real_material | Project Rock unrelated controls with an agreed offset | 0/33 | 0–10.4% |
+
+The version-one held-out families are listed under development: their N04_fast failure shaped version
+two, so they are regression cases, not held out for it. The false-match benchmark of 21 October
+(FALSE_MATCH_BENCHMARK_2026-10-21.md) ran after the freeze and is recorded as held-out with its own
+intervals. The 14 Project Rock AAF-range tasks cover 13 takes; one task (6T03) had an audfprint
+candidate below the support gates.
+
+How to read the intervals:
+
+- The held-out figures, not the development figures, describe the frozen profile. Development counts
+  were used to set the gates and are optimistic.
+- Zero false supports in 29 held-out controls is consistent with a true rate of up to 11.7%; it does
+  not show that the rate is zero. The rule-of-three shortcut (3/n, about 10%) understates this bound.
+- Cases derived from one source family share material, and Project Rock tasks share one session, so
+  the cases are not independent and the real uncertainty is wider than these intervals.
+- The real-material recall is much lower than the controlled recall: dialogue takes inside a finished
+  mix give the fingerprint few landmarks. A missing match is never read as evidence against a
+  declared relationship.
+- `benchmarks/audio_calibration.py` now prints and stores the same counts with intervals in the
+  `summary` of its output, and `benchmarks/false_match.py` adds `wilson_95` to every category.
+
 ## Interface, Thresholds and Reproduction
 
 The audio policy is now audio-observations-bounded-v2/version 2; the music_semantics and audfprint

@@ -52,7 +52,7 @@ def parse_bound_artefacts(native, chain, wav_observations):
             if kind.startswith("audio/") or kind == "audio":
                 wav_result = wav_observations.get(digest)
                 wav_failed = ((wav_result or {}).get("status") == "parser_failed")
-                parsed = {"parser": "wav",
+                parsed = {"parser": ((wav_result or {}).get("audio_format") or "wav").lower(),
                           "status": "failed" if wav_failed else "parsed",
                           "data": wav_result}
                 # C2PA may be embedded in the media itself. Attempt once per
@@ -137,10 +137,11 @@ def _is_declared_property_check(item):
 
 
 def _declared_file_property_results(native, wav_observations):
-    """Submitted technical claims (sample rate, channels, ...) against measured WAV properties.
+    """Submitted technical claims (sample rate, channels, ...) against measured audio properties.
 
     These compare a submitter's claim with the file, so they belong to
     declaration consistency alongside relationship claims, not to file integrity.
+    WAV, FLAC and MP3 observations share the ``technical.*`` rule names.
     """
     checks = [dict(item) for node in native["artefacts"]
               for item in (wav_observations.get(node["artefact_hash"]) or {}).get("checks", [])
@@ -150,8 +151,15 @@ def _declared_file_property_results(native, wav_observations):
     return checks, findings
 
 
+def _observed_duration(wav_observations, digest):
+    """Measured duration of a bound audio file, or None (not bound, unparsed, or unknown for the format)."""
+    if not digest:
+        return None
+    return ((wav_observations.get(digest) or {}).get("observed") or {}).get("duration_seconds")
+
+
 class BoundFileIntegrityPass:
-    """Aggregate file binding, non-claim WAV checks, and parser readability."""
+    """Aggregate file binding, non-claim audio checks (such as the FLAC MD5), and parser readability."""
 
     @staticmethod
     def evaluate(native, bound_hashes, missing_hashes, wav_observations,
@@ -262,9 +270,8 @@ class CrossEvidencePass:
                                        "passed": (source, target) in comp_edges,
                                        "selection_id": selection["selection_id"],
                                        "source_hash": source, "target_hash": target})
-                    if (target and target in wav_observations and
-                            selection.get("target_end_seconds") is not None):
-                        duration = wav_observations[target]["observed"]["duration_seconds"]
+                    duration = _observed_duration(wav_observations, target)
+                    if duration is not None and selection.get("target_end_seconds") is not None:
                         checks.append({"rule": "comp_sheet_target_range_within_audio",
                                        "passed": selection["target_end_seconds"] <= duration,
                                        "selection_id": selection["selection_id"],
@@ -276,8 +283,8 @@ class CrossEvidencePass:
                         checks.append({"rule": "cue_sheet_asset_exists_in_graph",
                                        "passed": asset in graph_hashes,
                                        "cue_id": cue["cue_id"], "asset_hash": asset})
-                    if asset and asset in wav_observations:
-                        duration = wav_observations[asset]["observed"]["duration_seconds"]
+                    duration = _observed_duration(wav_observations, asset)
+                    if duration is not None:
                         checks.append({"rule": "cue_sheet_range_within_audio",
                                        "passed": cue["end_seconds"] <= duration,
                                        "cue_id": cue["cue_id"], "asset_hash": asset})
@@ -296,25 +303,34 @@ def _unavailable_check(rule, reason, **extra):
 
 
 def _reconcile_with_c2pa_chunk(c2pa, wav_result):
-    """Use the WAV parser's chunk list as ground truth for whether a manifest exists.
+    """Use the container parser as ground truth for whether a manifest exists.
 
-    A reader failure means a damaged manifest only when the file really carries a
-    C2PA chunk; otherwise the SDK failed for another reason and there is simply no
-    manifest. A C2PA chunk the SDK finds no manifest in is unreadable, not absent.
+    WAV keeps a manifest in a ``C2PA`` chunk; FLAC and MP3 in an ID3v2 ``GEOB``
+    frame of type application/c2pa. A reader failure means a damaged manifest
+    only when the file really carries one; otherwise the SDK failed for another
+    reason and there is simply no manifest. A manifest location the SDK finds no
+    manifest in is unreadable, not absent.
     """
     metadata = (wav_result or {}).get("embedded_metadata")
     if not c2pa.get("sdk_available") or not isinstance(metadata, dict):
-        return c2pa  # chunk list unknown (WAV parser failed): keep the SDK result
-    has_chunk = any(item.get("chunk_id") == "C2PA" for item in metadata.get("other_chunks") or [])
+        return c2pa  # container unknown (parser failed): keep the SDK result
+    if "c2pa_container_present" in metadata:
+        has_chunk = bool(metadata["c2pa_container_present"])
+    else:
+        has_chunk = any(item.get("chunk_id") == "C2PA" for item in metadata.get("other_chunks") or [])
     c2pa["c2pa_chunk_present"] = has_chunk
     warnings = list(c2pa.get("warnings") or [])
     if not c2pa.get("reader_succeeded") and not has_chunk:
         c2pa.update(reader_succeeded=True, present=False)
-        warnings.append("The C2PA SDK could not read this file, but it has no C2PA chunk; "
+        warnings.append("The C2PA SDK could not read this file, but it has no C2PA manifest location; "
+                        "treated as having no manifest." if "c2pa_container_present" in metadata else
+                        "The C2PA SDK could not read this file, but it has no C2PA chunk; "
                         "treated as having no manifest.")
     elif c2pa.get("reader_succeeded") and not c2pa.get("present") and has_chunk:
         c2pa["reader_succeeded"] = False
-        warnings.append("The file has a C2PA chunk, but the SDK found no readable manifest in it.")
+        warnings.append("The file has a C2PA manifest location, but the SDK found no readable manifest in it."
+                        if "c2pa_container_present" in metadata else
+                        "The file has a C2PA chunk, but the SDK found no readable manifest in it.")
     c2pa["warnings"] = warnings
     return c2pa
 
@@ -595,9 +611,8 @@ class ExpandedCrossEvidencePass:
                                        "passed": (source, target) in comp_edges,
                                        "selection_id": selection["selection_id"],
                                        "source_hash": source, "target_hash": target})
-                    if (target and target in wav_observations and
-                            selection.get("target_end_seconds") is not None):
-                        duration = wav_observations[target]["observed"]["duration_seconds"]
+                    duration = _observed_duration(wav_observations, target)
+                    if duration is not None and selection.get("target_end_seconds") is not None:
                         checks.append({"rule": "comp_sheet_target_range_within_audio",
                                        "passed": selection["target_end_seconds"] <= duration,
                                        "selection_id": selection["selection_id"],
@@ -609,8 +624,8 @@ class ExpandedCrossEvidencePass:
                         checks.append({"rule": "cue_sheet_asset_exists_in_graph",
                                        "passed": asset in graph_hashes,
                                        "cue_id": cue["cue_id"], "asset_hash": asset})
-                    if asset and asset in wav_observations:
-                        duration = wav_observations[asset]["observed"]["duration_seconds"]
+                    duration = _observed_duration(wav_observations, asset)
+                    if duration is not None:
                         checks.append({"rule": "cue_sheet_range_within_audio",
                                        "passed": cue["end_seconds"] <= duration,
                                        "cue_id": cue["cue_id"], "asset_hash": asset})
@@ -1103,12 +1118,16 @@ def _layer(name, status, value, contributes, reason, check_count,
     }
 
 
-def _relevant_recording_types(workflow_input):
-    """Recording types the selected workflow requires; none without a workflow."""
+def _relevant_recording_types(workflow_input, workflow_policy=None):
+    """Recording types the selected workflow requires; none without a workflow.
+
+    The engine passes the policy it already loaded for completeness; direct
+    callers without one get the shipped default policy.
+    """
     workflow_id = (workflow_input or {}).get("workflow_id")
     if not workflow_id:
         return []
-    return required_recording_types(load_workflow_policy(DEFAULT_POLICY_PATH), workflow_id)
+    return required_recording_types(workflow_policy or load_workflow_policy(DEFAULT_POLICY_PATH), workflow_id)
 
 
 def _boolean_status(checks, successful_status="corroborated"):
@@ -1225,12 +1244,25 @@ def _bwf_stamp(observation):
     return date, time if _BWF_TIME.match(time) else None
 
 
+def _undated_reason(observation):
+    """Why an audio file carries no comparable BWF origination date."""
+    audio_format = ((observation or {}).get("observed") or {}).get("format")
+    if audio_format == "MP3":
+        return "format_has_no_bwf"
+    if audio_format == "FLAC" and not ((observation or {}).get("embedded_metadata") or {}).get("broadcast_extension"):
+        return "bwf_not_kept"
+    return "no_origination_date"
+
+
 def declared_chronology(native, wav_observations, bound_hashes):
     """Declared audio edges whose source's BWF origination is later than its target's.
 
     BWF dates can be reset or rewritten, so a reversed order is reported for
     review and never scored. Same-day files are compared by time only when
-    both carry one.
+    both carry one. When either audio file has no date (an MP3, a FLAC encoded
+    without its WAV chunks, a WAV without ``bext``), the edge is listed as
+    ``not_comparable`` instead of being left out, so a missing comparison is
+    visible; no time is guessed.
     """
     rows, findings = [], []
     for target in native["artefacts"]:
@@ -1238,13 +1270,22 @@ def declared_chronology(native, wav_observations, bound_hashes):
             source_hash, target_hash = edge["hash"], target["artefact_hash"]
             if source_hash not in bound_hashes or target_hash not in bound_hashes:
                 continue
+            if source_hash not in wav_observations or target_hash not in wav_observations:
+                continue  # not an audio-to-audio edge
             source, later = _bwf_stamp(wav_observations.get(source_hash)), _bwf_stamp(wav_observations.get(target_hash))
             if source is None or later is None:
+                undated = [side for side, stamp in (("source", source), ("target", later)) if stamp is None]
+                rows.append({"source_hash": source_hash, "target_hash": target_hash,
+                             "relationship_type": edge["relationship_type"], "status": "not_comparable",
+                             "reason_code": _undated_reason(wav_observations[source_hash if undated[0] == "source"
+                                                                             else target_hash]),
+                             "undated": undated, "source_newer_than_target": None,
+                             "scoring_eligible": False, "integrity_contribution": None})
                 continue
             newer = source[0] > later[0] or (source[0] == later[0] and source[1] is not None
                                               and later[1] is not None and source[1] > later[1])
             row = {"source_hash": source_hash, "target_hash": target_hash,
-                   "relationship_type": edge["relationship_type"],
+                   "relationship_type": edge["relationship_type"], "status": "compared",
                    "source_origination": " ".join(part for part in source if part),
                    "target_origination": " ".join(part for part in later if part),
                    "source_newer_than_target": newer, "scoring_eligible": False, "integrity_contribution": None}
@@ -1262,7 +1303,7 @@ def declared_chronology(native, wav_observations, bound_hashes):
 
 def assess_axes(native, chain, bound_hashes, missing_hashes, wav_observations,
                 relationship_observations, parser_observations, workflow_input,
-                scoring_profile=None):
+                scoring_profile=None, workflow_policy=None):
     # A caller-supplied profile lets integrity layer weighting be configured
     # without touching this function; the default profile's values are
     # defined to reproduce today's hardcoded behaviour exactly. An
@@ -1381,10 +1422,39 @@ def assess_axes(native, chain, bound_hashes, missing_hashes, wav_observations,
     # A final manifest the SDK could not read cannot be checked against the file,
     # so evidence about other nodes must not release a number for the final.
     final_attestation_unreadable = validation.get("validation_state") == "manifest_not_read"
+    aaf_coverage, aaf_media, aaf_findings = [], [], []
+    for owner_digest, parsed in sorted(parser_observations.items()):
+        if parsed.get("parser") != "aaf" or not parsed.get("data") or owner_digest not in bound_hashes:
+            continue
+        coverage = aaf_reference_coverage(parsed["data"], owner_digest, wav_observations)
+        media = aaf_non_recorder_media(parsed["data"], owner_digest)
+        aaf_coverage.append(coverage)
+        aaf_media.append(media)
+        if coverage["missing_recordings"]:
+            names = ", ".join(f"{item['tape']}/{item['file_name']}" for item in coverage["missing_recordings"])
+            aaf_findings.append(_finding(
+                "AAF_REFERENCED_TAKES_NOT_SUBMITTED",
+                f"The AAF edit uses {coverage['referenced_recordings']} recorder takes; "
+                f"{coverage['bound_recordings']} are bound in this submission. Not submitted: {names}. "
+                "This is reported, not scored.",
+                owner_digest, "low", scoring_eligible=False, integrity_contribution=None,
+                missing_recordings=coverage["missing_recordings"]))
+        if media["media_count"]:
+            aaf_findings.append(_finding(
+                "AAF_REFERENCES_NON_RECORDER_MEDIA",
+                f"The AAF edit references {media['media_count']} media items that are not recorder takes "
+                "(for example library effects, music or renders). The evaluator cannot link them to submitted "
+                "files and makes no licensing determination; they are listed in "
+                "assessment_checks.aaf_non_recorder_media.",
+                owner_digest, "info", scoring_eligible=False, integrity_contribution=None,
+                media_count=media["media_count"]))
     # Breadth: how many of the workflow's recordings have qualifying evidence.
     # It only gates release when the profile sets a minimum share.
+    # AAF-used takes that were not submitted join the denominator, so leaving a
+    # hard-to-check take out cannot raise the share.
     support_breadth = summarize_support_breadth(native, cross_facts, support_tiers,
-                                                _relevant_recording_types(workflow_input))
+                                                _relevant_recording_types(workflow_input, workflow_policy),
+                                                aaf_coverage, bound_hashes, wav_observations)
     min_share = withholding_rule.get("min_supported_asset_share")
     breadth_met = (min_share is None or not support_breadth["applicable"]
                    or support_breadth["checked_share"] >= min_share)
@@ -1510,7 +1580,8 @@ def assess_axes(native, chain, bound_hashes, missing_hashes, wav_observations,
     else:
         sources_clause = ""
     # Name how much of the workflow's recordings the strong evidence covers.
-    recordings, missing = support_breadth["relevant_asset_count"], support_breadth["no_qualifying_evidence"]
+    recordings = support_breadth["required_recording_count"]
+    missing = support_breadth["no_qualifying_evidence"] + support_breadth["not_submitted"]
     checked = recordings - missing
     if not recordings:
         breadth_clause = ""
@@ -1522,6 +1593,14 @@ def assess_axes(native, chain, bound_hashes, missing_hashes, wav_observations,
     else:
         breadth_clause = (f"Strong evidence was checked for {checked} of {recordings} recordings; "
                           f"{missing} {'has' if missing == 1 else 'have'} no strong evidence. ")
+    unsubmitted, pending = support_breadth["not_submitted"], support_breadth["unmatched_references"]
+    if unsubmitted:
+        breadth_clause += (f"{unsubmitted} {'recording' if unsubmitted == 1 else 'recordings'} the AAF edit uses "
+                           f"{'was' if unsubmitted == 1 else 'were'} not submitted, so the result covers only the "
+                           "checked material. ")
+    if pending:
+        breadth_clause += (f"{pending} AAF {'reference' if pending == 1 else 'references'} could not be matched "
+                           "to a submitted recording, so this coverage is provisional. ")
     # Many honest facts dilute one contradiction in the mean, so the count
     # leads the reasoning: a reader of the number alone would miss it.
     summary = contradiction_summary(decision)
@@ -1556,32 +1635,6 @@ def assess_axes(native, chain, bound_hashes, missing_hashes, wav_observations,
                  metadata_sources=(observation.get("recorder_metadata") or {}).get("sources", []))
         for digest, observation in wav_observations.items()
         if digest in bound_hashes and (observation.get("recorder_metadata") or {}).get("present") is True]
-    aaf_coverage, aaf_media, aaf_findings = [], [], []
-    for owner_digest, parsed in sorted(parser_observations.items()):
-        if parsed.get("parser") != "aaf" or not parsed.get("data") or owner_digest not in bound_hashes:
-            continue
-        coverage = aaf_reference_coverage(parsed["data"], owner_digest, wav_observations)
-        media = aaf_non_recorder_media(parsed["data"], owner_digest)
-        aaf_coverage.append(coverage)
-        aaf_media.append(media)
-        if coverage["missing_recordings"]:
-            names = ", ".join(f"{item['tape']}/{item['file_name']}" for item in coverage["missing_recordings"])
-            aaf_findings.append(_finding(
-                "AAF_REFERENCED_TAKES_NOT_SUBMITTED",
-                f"The AAF edit uses {coverage['referenced_recordings']} recorder takes; "
-                f"{coverage['bound_recordings']} are bound in this submission. Not submitted: {names}. "
-                "This is reported, not scored.",
-                owner_digest, "low", scoring_eligible=False, integrity_contribution=None,
-                missing_recordings=coverage["missing_recordings"]))
-        if media["media_count"]:
-            aaf_findings.append(_finding(
-                "AAF_REFERENCES_NON_RECORDER_MEDIA",
-                f"The AAF edit references {media['media_count']} media items that are not recorder takes "
-                "(for example library effects, music or renders). The evaluator cannot link them to submitted "
-                "files and makes no licensing determination; they are listed in "
-                "assessment_checks.aaf_non_recorder_media.",
-                owner_digest, "info", scoring_eligible=False, integrity_contribution=None,
-                media_count=media["media_count"]))
     chronology, chronology_findings = declared_chronology(native, wav_observations, bound_hashes)
     unlinked_media = sum(item["media_count"] for item in aaf_media)
     if unlinked_media and ai.get("reasoning"):

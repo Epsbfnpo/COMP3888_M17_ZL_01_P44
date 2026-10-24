@@ -4,7 +4,9 @@ Field recorders write scene, take, tape, track names and start timecode into
 the file at record time (iXML is the cross-vendor standard; Sound Devices
 also mirrors fields as ``sKEY=value`` lines in the bext description). These
 are observations of the bound file, classified as ``recorder_metadata``
-for production-document consistency checks. The file does not authenticate
+for production-document consistency checks. A FLAC encoded with
+``flac --keep-foreign-metadata`` keeps the same chunks, so FLAC takes are read
+by the same code (``recorder_fields_from_chunks``). The file does not authenticate
 who wrote those fields; the evaluator reports that limitation without
 penalising the score.
 """
@@ -24,7 +26,7 @@ def _bext_fields(description):
 
 
 def _ixml(path, descriptor):
-    """Parse the iXML chunk, refusing DTDs so no entity can be expanded."""
+    """Read the iXML chunk of a WAV and parse it."""
     try:
         chunk = next((item for item in iter_chunks(path, descriptor) if item.chunk_id == b"iXML"), None)
         if chunk is None:
@@ -32,6 +34,13 @@ def _ixml(path, descriptor):
         raw = read_chunk(path, chunk)
     except (OSError, WavError) as exc:
         return {}, "iXML chunk could not be read: " + str(exc)
+    return _parse_ixml(raw)
+
+
+def _parse_ixml(raw):
+    """Parse iXML bytes, refusing DTDs so no entity can be expanded."""
+    if raw is None:
+        return {}, None
     if b"<!DOCTYPE" in raw.upper() or b"<!ENTITY" in raw.upper():
         return {}, "iXML chunk declares a DTD or entity and was not parsed."
     try:
@@ -61,6 +70,16 @@ def recorder_fields(path, descriptor, embedded_metadata):
     """
     bext = (embedded_metadata or {}).get("broadcast_extension") or {}
     ixml, warning = _ixml(path, descriptor)
+    return _recorder_fields(bext, ixml, warning, descriptor.sample_rate, descriptor.duration_seconds)
+
+
+def recorder_fields_from_chunks(bext, ixml_raw, sample_rate, duration_seconds):
+    """Recorder metadata from a parsed ``bext`` dict and raw iXML bytes (FLAC kept chunks)."""
+    ixml, warning = _parse_ixml(ixml_raw)
+    return _recorder_fields(bext or {}, ixml, warning, sample_rate, duration_seconds)
+
+
+def _recorder_fields(bext, ixml, warning, rate, duration_seconds):
     warnings = [warning] if warning else []
     if not bext and not ixml:
         return {"present": False, "bwf_kind": None, "warnings": warnings}
@@ -68,7 +87,6 @@ def recorder_fields(path, descriptor, embedded_metadata):
     bext_tracks = {int(key[3:]): value for key, value in described.items()
                    if key.startswith("TRK") and key[3:].isdigit() and value}
     time_reference = bext.get("time_reference")
-    rate = descriptor.sample_rate
     reference_seconds = (time_reference / rate) if isinstance(time_reference, int) and rate else None
     sources = sorted(name for name, present in (("bext", bool(bext)), ("iXML", bool(ixml))) if present)
     identity = (described.get("FILENAME"), ixml.get("tape") or described.get("TAPE"),
@@ -95,7 +113,7 @@ def recorder_fields(path, descriptor, embedded_metadata):
         "tracks": {str(key): value for key, value in sorted((ixml.get("tracks") or bext_tracks).items())},
         "origination_date": bext.get("origination_date") or None,
         "start_timecode_seconds": reference_seconds,
-        "duration_seconds": descriptor.duration_seconds,
+        "duration_seconds": duration_seconds,
         "timecode_rate": ixml.get("timecode_rate"),
         "timecode_flag": ixml.get("timecode_flag"),
         "sources": sources,

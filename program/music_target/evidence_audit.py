@@ -185,27 +185,68 @@ def _fact_subjects(fact):
     return subjects
 
 
-def summarize_support_breadth(native, facts, support_tiers, relevant_types):
-    """How many of the workflow's recordings have qualifying evidence.
+def summarize_support_breadth(native, facts, support_tiers, relevant_types, aaf_coverage=(),
+                              bound_hashes=None, wav_observations=None):
+    """How many of the workflow's required recordings were submitted and have qualifying evidence.
 
-    Contradicted evidence was checked, so it is never counted as missing.
+    Required recordings are the submitted artefacts of the workflow's recording
+    types plus recorder takes an AAF edit uses that no submitted recording
+    matches. An unmatched AAF take is ``not_submitted`` only when every
+    submitted recording carries a recorder identity; otherwise it may be one of
+    the unidentified files, so it is an ``unmatched_reference`` and the coverage
+    is provisional. A take used several times counts once. Contradicted
+    evidence was checked, so it is never counted as missing; a recording that
+    was not submitted is missing material, not a contradiction.
     """
     qualifying = [fact for fact in facts if isinstance(fact.get("passed"), bool)
                   and set(fact.get("assessed_evidence_tiers") or ()) & set(support_tiers)]
+    wav_observations = wav_observations or {}
     assets = []
     for node in native["artefacts"]:
         if node["artefact_type"] not in relevant_types:
             continue
-        outcomes = [fact["passed"] for fact in qualifying if node["artefact_hash"] in _fact_subjects(fact)]
+        digest = node["artefact_hash"]
+        outcomes = [fact["passed"] for fact in qualifying if digest in _fact_subjects(fact)]
         status = ("contradicted" if False in outcomes else
                   "supported" if outcomes else "no_qualifying_evidence")
-        assets.append({"hash": node["artefact_hash"], "type": node["artefact_type"], "status": status})
-    counts = {status: sum(item["status"] == status for item in assets)
-              for status in ("supported", "contradicted", "no_qualifying_evidence")}
-    return {"applicable": bool(assets), "relevant_asset_types": list(relevant_types),
-            "relevant_asset_count": len(assets), **counts,
-            "checked_share": ((counts["supported"] + counts["contradicted"]) / len(assets) if assets else None),
-            "assets": assets}
+        recorder = (wav_observations.get(digest) or {}).get("recorder_metadata") or {}
+        assets.append({"hash": digest, "type": node["artefact_type"], "status": status,
+                       "bound": bound_hashes is None or digest in bound_hashes,
+                       "recorder_identity": bool(recorder.get("present") and recorder.get("file_name"))})
+    unidentified = sum(not item["recorder_identity"] for item in assets)
+    references, ambiguous = {}, set()
+    if "audio/raw-take" in relevant_types:
+        for record in aaf_coverage or ():
+            for item in record.get("missing_recordings", []):
+                key = (str(item.get("tape") or "").casefold(), str(item.get("file_name") or "").casefold())
+                references.setdefault(key, {"tape": item.get("tape"), "file_name": item.get("file_name"),
+                                            "type": "audio/raw-take", "source": "aaf_reference",
+                                            "aaf_hashes": set()})["aaf_hashes"].add(record["evidence_hash"])
+            ambiguous.update((item.get("tape"), item.get("file_name"))
+                             for item in record.get("ambiguous_recordings", []))
+    for item in references.values():
+        item["status"] = "unmatched_reference" if unidentified else "not_submitted"
+        item["aaf_hashes"] = sorted(item["aaf_hashes"])
+    referenced = sorted(references.values(), key=lambda item: (str(item["tape"]), str(item["file_name"])))
+    statuses = ("supported", "contradicted", "no_qualifying_evidence", "not_submitted", "unmatched_reference")
+    counts = {status: sum(item["status"] == status for item in assets + referenced) for status in statuses}
+    required = len(assets) + counts["not_submitted"]
+    checked = counts["supported"] + counts["contradicted"]
+    return {"applicable": bool(required), "status": "assessed" if required else "not_applicable",
+            "relevant_asset_types": list(relevant_types),
+            "relevant_asset_count": len(assets), "required_recording_count": required,
+            "supported": counts["supported"], "contradicted": counts["contradicted"],
+            "no_qualifying_evidence": counts["no_qualifying_evidence"],
+            "not_submitted": counts["not_submitted"], "unmatched_references": counts["unmatched_reference"],
+            "ambiguous_references": len(ambiguous),
+            "coverage_scope": ("not_applicable" if not required else
+                               "provisional" if counts["unmatched_reference"] else "confirmed"),
+            # Two different questions over one denominator: was the material
+            # submitted, and does it carry the qualifying evidence the policy names.
+            "material_coverage": (sum(item["bound"] for item in assets) / required if required else None),
+            "support_coverage": checked / required if required else None,
+            "checked_share": checked / required if required else None,
+            "assets": assets + referenced}
 
 
 def audit_cross_evidence(checks):

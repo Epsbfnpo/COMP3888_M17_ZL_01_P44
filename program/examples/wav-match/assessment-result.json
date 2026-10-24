@@ -6,7 +6,7 @@
   "system": {
     "name": "COMP3888-music-baseline",
     "version": "0.8.1",
-    "source_revision": "sha256:4defb9da102238512c01cfff9fb020b23014d1abea5317dea984724a6a05e327"
+    "source_revision": "sha256:bf4270500aa889e80fd0719a668f6887f1fc3f51f8a2a13dfba6c24451673a56"
   },
   "execution_status": "succeeded",
   "axes": {
@@ -1233,9 +1233,9 @@
       "message": "multitrack.sources: Found 0 usable bound matching artefact(s); minimum is 2."
     }
   ],
-  "processing_ms": 276.38375002425164,
+  "processing_ms": 296.49779200553894,
   "resource_usage": {
-    "cpu_ms": 53.13999999999999,
+    "cpu_ms": 53.24300000000004,
     "peak_rss_kib": null
   },
   "error": null,
@@ -2852,14 +2852,22 @@
     "support_breadth": [
       {
         "applicable": false,
+        "status": "not_applicable",
         "relevant_asset_types": [
           "audio/raw-take",
           "audio/raw-track"
         ],
         "relevant_asset_count": 0,
+        "required_recording_count": 0,
         "supported": 0,
         "contradicted": 0,
         "no_qualifying_evidence": 0,
+        "not_submitted": 0,
+        "unmatched_references": 0,
+        "ambiguous_references": 0,
+        "coverage_scope": "not_applicable",
+        "material_coverage": null,
+        "support_coverage": null,
         "checked_share": null,
         "assets": [],
         "min_supported_asset_share": null,
@@ -3048,6 +3056,50 @@
         "target_values": {},
         "scoring_policy": "disabled; no signal result contributes to integrity",
         "content_match_is_provenance": false
+      }
+    ],
+    "declared_chronology": [
+      {
+        "source_hash": "133c934683b5f977ce77d1ead96ce4451162ad75e3bea2432bd6fbbe3f6e0c7b",
+        "target_hash": "0a2c29f42e0570d270f27d268062dab5ab30d86a0ed720b31f8b6735cd268190",
+        "relationship_type": "mixed_from",
+        "status": "not_comparable",
+        "reason_code": "no_origination_date",
+        "undated": [
+          "source",
+          "target"
+        ],
+        "source_newer_than_target": null,
+        "scoring_eligible": false,
+        "integrity_contribution": null
+      },
+      {
+        "source_hash": "945f4de7b584607c94a44a16f297ec3b6bf5f5f1e2624edb28eebcdcff60f744",
+        "target_hash": "0a2c29f42e0570d270f27d268062dab5ab30d86a0ed720b31f8b6735cd268190",
+        "relationship_type": "mixed_from",
+        "status": "not_comparable",
+        "reason_code": "no_origination_date",
+        "undated": [
+          "source",
+          "target"
+        ],
+        "source_newer_than_target": null,
+        "scoring_eligible": false,
+        "integrity_contribution": null
+      },
+      {
+        "source_hash": "50e40ffe2e928e74d937ca4eaeba9a35160800972eaf25adb71ce31e147ea129",
+        "target_hash": "0a2c29f42e0570d270f27d268062dab5ab30d86a0ed720b31f8b6735cd268190",
+        "relationship_type": "mixed_from",
+        "status": "not_comparable",
+        "reason_code": "no_origination_date",
+        "undated": [
+          "source",
+          "target"
+        ],
+        "source_newer_than_target": null,
+        "scoring_eligible": false,
+        "integrity_contribution": null
       }
     ],
     "score_explanations": [
