@@ -55,7 +55,7 @@ below are relative to that directory.
 
 1. [Technical manual](Manual_layout_check.docx): the complete program description; Section 8 covers C2PA provenance, trust and findings, and Section 10 lists the known limitations.
 2. [CSEC handoff](program/docs/03_CSEC_HANDOFF.md): integration instructions and supported boundaries.
-3. [C2PA trust lists](program/policies/c2pa_trust/README.md): pinned lists, known AI signers and the update procedure.
+3. [C2PA trust lists](program/policies/c2pa_trust/README.md): pinned lists, known AI signers, the AI music generators checked (Suno, Stability AI, Google Lyria, ElevenLabs, Adobe Firefly) with their limitations, and the update procedure.
 4. [Physical diagnostic policy](program/docs/PHYSICAL_SIMILARITY.md): disabled legacy signal checks and the separate non-scoring boundary.
 5. [Audio diagnostics](program/docs/AUDIO_DIAGNOSTICS.md): optional dependencies, execution, providers and output fields.
 6. [False-match benchmark](program/docs/FALSE_MATCH_BENCHMARK_2026-10-21.md): unrelated-but-similar Lumina pairs and their results.
@@ -386,6 +386,25 @@ declaring them `recorded` is a contradiction. Each listed signer was checked on
 its own output; this does not validate other signers. See
 [`policies/c2pa_trust/README.md`](program/policies/c2pa_trust/README.md) for the
 evidence and how to add a signer.
+
+**AI music generators checked (24 October 2026).** Original output from five
+generators was checked. A fingerprint is added to `known_ai_signers.json` only
+when it is verified on real output and changes the result, because an
+unverified one could label audio wrongly.
+
+| Generator | Result in the evaluator | Fingerprint added? |
+|---|---|---|
+| Suno (two MP3s) | Valid manifest with an AI label, Suno's private certificate: recognised as Suno, `untrusted` (0.3) | Yes |
+| Stability AI (WAV) | Valid manifest with an AI-generation declaration, trusted certificate: handled by trust validation | No, not needed |
+| Google Lyria (MP3) | Valid, trusted Google manifest with AI-generation metadata: handled by trust validation | No, not needed |
+| ElevenLabs (WAV) | No manifest in the file: `absent`. ElevenLabs signs only MP3 from its API, and only when the caller opts in | No, no certificate could be verified |
+| Adobe Firefly (WAV) | The file references a valid manifest hosted remotely; validation is offline and does not fetch it, so the file reads as `absent` | No, a fingerprint would not change the result |
+
+Two limitations follow. AI audio that carries no manifest looks the same as
+an unsigned human recording to C2PA, and a manifest hosted remotely is not
+read. Possible solutions (verifying a signed ElevenLabs API output, an
+optional online mode or a submitted `.c2pa` sidecar for remote manifests) are
+in the [trust-list README](program/policies/c2pa_trust/README.md#ai-music-generators-checked-24-october-2026).
 
 ## Integrity weighting and cap
 
@@ -880,7 +899,7 @@ The locations below are relative to `program/`.
 3. Obtain genuine successful-creation fixtures; the generated teaching fixture is not validated human-creation ground truth.
 4. Confirm that the internal weighting and interpretation of integrity checks match customer expectations. The project keeps the four dimensions separate and does not add a decision policy.
 5. Agree with CSEC whether the new optional C2PA `validation` fields (`trust_status`, `trust_source`, `revocation_status`, `signer`) need a new response `schema_version`; it currently stays `0.2-candidate`.
-6. Confirm the BytePlus Lumina and Suno signing certificates with the vendors, decide which other AI generators to add to the known AI signer list (ElevenLabs and Stability AI have only expired certificates on the legacy ITL and no verified audio sample), and agree how often the pinned C2PA trust lists are reviewed.
+6. Confirm the BytePlus Lumina and Suno signing certificates with the vendors, decide which other AI generators to add to the known AI signer list (Stability AI and Google Lyria need no entry because their certificates are already trusted; ElevenLabs needs a signed MP3 from its opt-in API workflow before a certificate can be verified; Adobe Firefly needs remote manifest support rather than an entry), decide whether an optional online mode may fetch remote manifests, and agree how often the pinned C2PA trust lists are reviewed.
 7. Decide with the client which recordings a workflow requires (every take the AAF edit uses, or a sample), what substitutes are acceptable, and whether `min_supported_asset_share` should gate release. Chronology warnings stay report-only until relationship-specific time rules, time sources and tolerances are agreed. See `program/docs/NEXT_TASKS.md` items 34–37.
 
 These decisions do not block the local executable baseline, but the directory must not yet be described as a complete music-authenticity assessment system.

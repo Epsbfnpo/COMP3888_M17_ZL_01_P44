@@ -95,6 +95,21 @@ fingerprinting or other non-scoring diagnostics.
    with a throwaway certificate and covers valid, edited-after-signing,
    corrupted-certificate and invalid supporting manifests. Real vendor-signed
    fixtures, expired/revoked credentials and a configured trust policy remain.
+   Real AI generator output was checked on 24 October 2026 (Suno, Stability
+   AI, Google Lyria, ElevenLabs, Adobe Firefly; see
+   `policies/c2pa_trust/README.md`). Remaining from that check:
+   - Record SHA-256 hashes and certificate details for the Stability AI,
+     Google Lyria, ElevenLabs and Firefly samples, and add real-sample tests
+     like `SunoSampleTests`.
+   - ElevenLabs: generate MP3s through its API with C2PA signing switched on,
+     verify the certificate on at least two generations, and add it to
+     `known_ai_signers.json` only if it is not already trusted.
+   - Remote manifests (Adobe Firefly): validation is offline, so a manifest
+     the file only references is treated as absent. Options are an optional
+     online mode that fetches the remote manifest, checks it against the
+     file's hash with the same pinned lists and records the URL and retrieval
+     time, or accepting a submitted `.c2pa` sidecar and validating it offline.
+     Needs a client decision on network access.
 
 9. Confirm the DDEX Implementation Licence and schema redistribution rules
    before external deployment.

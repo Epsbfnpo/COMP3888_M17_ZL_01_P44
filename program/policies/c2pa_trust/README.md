@@ -45,6 +45,42 @@ are replaced, so a new certificate needs a new entry. To recheck the Suno
 downloads, run `C2PA_SUNO_SAMPLE_DIR=<folder> python -B -m unittest
 tests.test_c2pa_integrity.SunoSampleTests` from `program/`.
 
+## AI music generators checked (24 October 2026)
+
+Five AI audio generators were checked on their own original output to decide
+whether each needs an entry in `known_ai_signers.json`. An entry is added only
+when it changes the result and the certificate was verified on real output; an
+unverified or unnecessary fingerprint could label human or AI audio wrongly.
+
+| Generator | Output checked | What was found | How the evaluator treats it | Action |
+|---|---|---|---|---|
+| Suno | Two MP3s from separate generations | Valid manifest declaring AI generation, signed by Suno's own certificate (private root, on no trust list) | Recognised as Suno through `known_ai_signers.json`; signer `untrusted` (0.3); AI label accepted | Fingerprint added (see the table above) |
+| Stability AI | One signed WAV | Valid manifest with an explicit AI-generation declaration, signed by a certificate that chains to the pinned trust lists | Trusted signer; AI label accepted through ordinary trust validation | None needed: trust validation already handles it |
+| Google Lyria | One MP3 | Valid manifest signed by Google, trusted, with explicit AI-generation metadata | Trusted signer; AI label accepted through ordinary trust validation | None needed |
+| ElevenLabs | One WAV | No C2PA manifest in the file. ElevenLabs documents C2PA signing only for MP3 output from its API, and only when the caller opts in | `absent` (0.0, not evidence against the file); nothing identifies it as AI | Not added: no current certificate could be verified (limitation 1 below) |
+| Adobe Firefly | One WAV | The file carries no embedded manifest; it references a valid manifest hosted remotely by Adobe | `absent`: validation runs offline with remote manifest fetching switched off, so the remote manifest is never read | Not added: a fingerprint cannot help while the manifest is not read (limitation 2 below) |
+
+The Stability AI, Google Lyria, ElevenLabs and Firefly samples are not stored
+in the repository, and their SHA-256 hashes and certificate details were not
+recorded. Record them before relying on these results, as was done for Suno.
+
+**Limitations and possible solutions**
+
+1. *AI output without a manifest (ElevenLabs).* Audio from a generator that
+   does not embed C2PA, or from a workflow where signing is off, reads as
+   `absent`, exactly like an unsigned human recording. C2PA alone cannot
+   identify it. Possible solutions: generate a signed ElevenLabs MP3 through
+   its API with C2PA switched on, verify the certificate on at least two
+   generations and add it if it is not already trusted; rely on the audio
+   diagnostics and the submitter's declaration for unsigned files.
+2. *Remote manifests (Adobe Firefly).* The evaluator never fetches a manifest
+   from the internet, so a remotely hosted manifest is treated as absent.
+   Possible solutions: an optional online mode that downloads the remote
+   manifest, verifies it against the file's hash with the same pinned trust
+   lists and records the URL and retrieval time in the result; or accept a
+   submitted copy of the manifest file (a `.c2pa` sidecar) as evidence and
+   validate it offline against the audio.
+
 ## Updating a list
 
 1. Pick the new commit of the source repository and download each file from that commit (not from `main`).

@@ -8,6 +8,25 @@
 - New: `SunoKnownSignerTests` (6 tests: the shipped entry, a certificate copying Suno's subject and serial number not recognised, attestation strength and AI disclosure identical with and without the entry, `recorded` contradicted, `ai-generated` consistent) and `SunoSampleTests` (3 tests on the real downloads, matched by SHA-256; skipped unless `C2PA_SUNO_SAMPLE_DIR` is set). The audio is not committed.
 - Scoring logic and pinned trust lists unchanged; Suno stays `untrusted` (0.3).
 
+## Other AI music generators (2026-10-24, branch feature/c2pa-ai-signer-expansion)
+
+Original output from four more generators was checked against the evaluator. No
+fingerprint was added; the details are in `policies/c2pa_trust/README.md`.
+
+- **Stability AI** (WAV): valid manifest, trusted certificate, explicit
+  AI-generation declaration. Handled correctly by trust validation.
+- **Google Lyria** (MP3): valid, trusted Google manifest with explicit
+  AI-generation metadata. Handled correctly by trust validation.
+- **ElevenLabs** (WAV): no C2PA manifest, so the file reads as `absent`.
+  ElevenLabs documents signing only for opt-in MP3 output from its API, so no
+  current certificate could be verified. Recorded as a limitation.
+- **Adobe Firefly** (WAV): references a valid remotely hosted manifest. The
+  evaluator validates offline with remote manifest fetching off, so the file
+  reads as `absent`. Recorded as a limitation; a fingerprint would not change
+  this.
+- Not yet recorded: the samples' SHA-256 hashes and signing certificate
+  details, and automated tests on these samples (the audio is not committed).
+
 ## WAV focus and FLAC/MP3 scope (2026-10-24, branch feature/merge-main-flac-mp3)
 
 - `REQUIRE_AUDIO_BACKENDS=1`, CPython 3.13.7 on macOS: **425 tests, all passed**. 421 non-GUI tests ran in one process (34 s, no skips); the four `test_builder.GuiTests` cases ran in separate processes.
