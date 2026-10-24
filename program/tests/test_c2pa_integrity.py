@@ -243,6 +243,13 @@ class C2paValidationFailureTests(unittest.TestCase):
         self.assertFalse(decision["severe_contradiction_present"])
         self.assertIn("CROSS_EVIDENCE_CONTRADICTION", self.codes(response))
 
+    def test_origin_status_for_edited_unsigned_and_unreadable_files(self):
+        for label, expected in (("edited", "signature_invalid"), ("plain", "not_authenticated"),
+                                ("unreadable", "not_checked")):
+            response, hashes = self.evaluate(label)
+            files = {row["hash"]: row for row in response["assessment_checks"]["origin_authentication"][0]["files"]}
+            self.assertEqual(files[hashes[label]]["status"], expected, label)
+
     def test_corrupted_signing_certificate_is_reported_as_an_invalid_signature(self):
         response, _ = self.evaluate("certificate_corrupted")
         finding = self.codes(response).get("C2PA_SIGNATURE_INVALID")
@@ -458,6 +465,16 @@ class PinnedTrustListTests(unittest.TestCase):
         self.assertEqual(record["lists"]["official"]["commit"], "a" * 40)
         self.assertEqual(record["revocation_status"], "not_checked")
 
+    def test_origin_status_names_the_trusted_and_the_unknown_signer(self):
+        for label, expected in (("official", "signed_by_trusted_signer"), ("unknown", "signed_untrusted")):
+            response = self.evaluate(label)
+            origin = response["assessment_checks"]["origin_authentication"][0]
+            self.assertEqual(origin["files"][0]["status"], expected, label)
+            self.assertTrue(origin["files"][0]["c2pa_checked"])
+            self.assertEqual(origin["counts"]["signed_by_trusted_signer"], int(label == "official"))
+            self.assertIn(f"{int(label == 'official')} of 1 submitted files",
+                          response["axes"]["integrity"]["reasoning"])
+
     def test_unknown_signer_scores_below_every_trusted_state(self):
         response = self.evaluate("unknown")
         validation, axis = response["validation"], response["axes"]["attestation_strength"]
@@ -521,3 +538,44 @@ class C2paChunkPreconditionTests(unittest.TestCase):
         from music_target.assessment_passes import _reconcile_with_c2pa_chunk
         c2pa = {"sdk_available": True, "reader_succeeded": False, "present": False, "warnings": []}
         self.assertIs(_reconcile_with_c2pa_chunk(dict(c2pa), {"status": "parser_failed"})["reader_succeeded"], False)
+
+
+class OriginAuthenticationTests(unittest.TestCase):
+    """Per-file origin status: only an embedded, valid manifest identifies who signed a file."""
+
+    @staticmethod
+    def record(asset, source_kind="embedded", state="Trusted", trust="trusted_c2pa", present=True, **extra):
+        return {"asset_hash": asset, "source_kind": source_kind, "manifest_present": present,
+                "validation_state": state, "trust_status": trust, "signer": "Signer", **extra}
+
+    def status(self, records, asset="a"):
+        from music_target.assessment_passes import summarize_origin_authentication
+        native = {"artefacts": [{"artefact_hash": "a", "artefact_type": "audio/master"},
+                                {"artefact_hash": "doc", "artefact_type": "text/sound-report"}]}
+        files = {row["hash"]: row for row in summarize_origin_authentication(native, records)[0]["files"]}
+        return files[asset]
+
+    def test_a_trusted_separate_manifest_linked_by_the_graph_does_not_authenticate(self):
+        row = self.status([self.record("a", source_kind="standalone")])
+        self.assertEqual(row["status"], "linked_manifest_not_verified")
+        self.assertFalse(row["c2pa_checked"])
+
+    def test_an_invalid_manifest_wins_over_a_trusted_one(self):
+        records = [self.record("a"), self.record("a", state="Invalid", trust="invalid")]
+        self.assertEqual(self.status(records)["status"], "signature_invalid")
+
+    def test_known_ai_signer_and_unverified_manifests_have_their_own_status(self):
+        ai = self.record("a", state="Valid", trust="untrusted", known_ai_signer="Tool")
+        self.assertEqual(self.status([ai])["status"], "signed_by_known_ai_signer")
+        unclear = self.record("a", state="manifest_parsed", trust=None)
+        self.assertEqual(self.status([unclear])["status"], "signature_not_verified")
+
+    def test_unchecked_is_not_reported_as_absent(self):
+        missing_sdk = self.record("a", state="sdk_unavailable", trust=None, present=False)
+        self.assertEqual(self.status([missing_sdk])["status"], "not_checked")
+        absent = self.record("a", state="manifest_absent", trust=None, present=False)
+        self.assertEqual(self.status([absent])["status"], "not_authenticated")
+
+    def test_files_never_read_for_c2pa_are_marked_unchecked(self):
+        row = self.status([self.record("a")], asset="doc")
+        self.assertEqual((row["status"], row["c2pa_checked"]), ("not_authenticated", False))

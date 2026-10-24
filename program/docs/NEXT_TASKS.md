@@ -178,6 +178,19 @@ fingerprinting or other non-scoring diagnostics.
     masters or individual relationships once real data shows what qualifying
     evidence those assets carry.
 
+20d. Attestation strength trusts a separate (standalone) C2PA manifest that is
+    linked to the final artefact only through the declared graph.
+    `_c2pa_records` binds a standalone manifest to an asset from the
+    submitter's graph edges, and `parse_c2pa_file` reads the manifest file on
+    its own, so its content binding to the final's bytes is never checked.
+    A trusted standalone manifest linked to any final file therefore yields
+    `trusted_c2pa` and attestation strength 1.0. Decide whether standalone
+    manifests should be validated against the asset's bytes (check whether
+    the pinned c2pa-python version can read a sidecar together with its
+    asset), or be capped as unverified. Fixing this
+    changes attestation scores; `origin_authentication` already reports such
+    files as `linked_manifest_not_verified`.
+
 21. Expand malicious-input tests for WAV chunk abuse, XML bombs, hostile PDFs,
     malformed MIDI, symlink/path attacks, oversized JSON, hash collisions in
     mappings, parser timeouts, and denial-of-service patterns.

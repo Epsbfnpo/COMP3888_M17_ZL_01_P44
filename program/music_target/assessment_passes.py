@@ -740,6 +740,65 @@ class ExpandedCrossEvidencePass:
         return value, checks, findings
 
 
+ORIGIN_STATUSES = ("signed_by_trusted_signer", "signed_by_known_ai_signer", "signed_untrusted",
+                   "signature_not_verified", "signature_invalid", "linked_manifest_not_verified",
+                   "not_checked", "not_authenticated")
+
+
+def _origin_status(records):
+    """Origin status of one file from the C2PA records bound to it.
+
+    Only a manifest embedded in the file counts: the SDK checks it against the
+    file's own bytes. A separate manifest is linked through the declared graph,
+    so it is reported but never authenticates the file.
+    """
+    embedded = [item for item in records if item["source_kind"] == "embedded"]
+    present = [item for item in embedded if item["manifest_present"]]
+
+    def state(item):
+        return str(item.get("validation_state") or "").casefold()
+
+    # Invalid wins, as for attestation strength; a trusted signer cannot rescue it.
+    if any(state(item) == "invalid" or item.get("trust_status") == "invalid" for item in present):
+        return "signature_invalid", None
+    for status, matches in (
+            ("signed_by_trusted_signer", c2pa_signer_trusted),
+            ("signed_by_known_ai_signer", lambda item: bool(item.get("known_ai_signer"))),
+            ("signed_untrusted", lambda item: item.get("trust_status") == "untrusted" or state(item) == "valid")):
+        record = next((item for item in present if matches(item)), None)
+        if record:
+            return status, record
+    if present:
+        return "signature_not_verified", present[0]
+    linked = next((item for item in records if item["source_kind"] == "standalone" and item["manifest_present"]),
+                  None)
+    if linked:
+        return "linked_manifest_not_verified", linked
+    if any(item["validation_state"] in ("sdk_unavailable", "manifest_not_read") for item in embedded):
+        return "not_checked", None
+    return "not_authenticated", None
+
+
+def summarize_origin_authentication(native, records):
+    """Per-file origin evidence, reported separately from Integrity. Never changes a score."""
+    files = []
+    for node in native["artefacts"]:
+        digest = node["artefact_hash"]
+        bound = [item for item in records if item["asset_hash"] == digest]
+        status, record = _origin_status(bound)
+        files.append({"hash": digest, "type": node["artefact_type"], "status": status,
+                      "c2pa_checked": any(item["source_kind"] == "embedded" for item in bound),
+                      "signer": (record or {}).get("signer"),
+                      "known_ai_signer": (record or {}).get("known_ai_signer")})
+    return [{"file_count": len(files),
+             "counts": {status: sum(item["status"] == status for item in files) for status in ORIGIN_STATUSES},
+             "files": files,
+             "basis": ("Only a C2PA manifest embedded in a file and checked against its bytes can identify who "
+                       "signed it. A trusted signature shows who signed, not that the claims are true or who "
+                       "made the recording."),
+             "scoring_effect": "none_report_only"}]
+
+
 class C2PAAttestationPass:
     """Assess only the final artefact while reporting every C2PA record."""
 
@@ -1306,6 +1365,7 @@ def assess_axes(native, chain, bound_hashes, missing_hashes, wav_observations,
     declaration_status, declaration_layer_value = _boolean_status(declaration_facts)
     cross_facts = aggregate_cross_evidence(
         cross_checks, one_vote_per_claim=integrity_profile.get("one_vote_per_claim", False))
+    origin_authentication = summarize_origin_authentication(native, c2pa_attestation_records)
     evidence_sources = summarize_evidence_sources(
         cross_facts, parser_observations, wav_observations,
         [record["signer"] for record in c2pa_attestation_records
@@ -1509,6 +1569,12 @@ def assess_axes(native, chain, bound_hashes, missing_hashes, wav_observations,
                              "It cannot be confirmed if they are independently true. "))
     else:
         sources_clause = ""
+    # Origin is reported per file, separately from consistency.
+    origin = origin_authentication[0]
+    signed = origin["counts"]["signed_by_trusted_signer"]
+    origin_clause = (f"{signed} of {origin['file_count']} submitted files "
+                     f"{'has' if signed == 1 else 'have'} origin evidence from a trusted signer "
+                     "(see origin_authentication). ")
     # Name how much of the workflow's recordings the strong evidence covers.
     recordings, missing = support_breadth["relevant_asset_count"], support_breadth["no_qualifying_evidence"]
     checked = recordings - missing
@@ -1540,6 +1606,7 @@ def assess_axes(native, chain, bound_hashes, missing_hashes, wav_observations,
          "The files and claims have been checked against each other, but this does not guarantee who created "
          "the material, when it was recorded or that the recording session took place. "
          "Signed origin evidence, where available, is shown in attestation_strength. "
+         f"{origin_clause}"
          "Structural validity and cryptographic attestation are reported separately and do not raise integrity. "
          "Legacy signal comparisons are disabled by policy and do not produce findings or affect integrity."))
     # Lets a reader of axes alone tell a contradicted submission from one
@@ -1623,6 +1690,7 @@ def assess_axes(native, chain, bound_hashes, missing_hashes, wav_observations,
         "evidence_sources": evidence_sources,
         "support_breadth": [support_breadth],
         "c2pa_attestation_records": c2pa_attestation_records,
+        "origin_authentication": origin_authentication,
         # Pinned trust list versions, so every result can be reproduced and explained.
         "c2pa_trust_configuration": [trust_configuration_record()],
         "physical_similarity": physical_similarity,

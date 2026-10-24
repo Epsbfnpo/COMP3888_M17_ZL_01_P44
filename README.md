@@ -24,6 +24,17 @@ can alter a score: such edges are no longer skipped. See
 [Evidence tiers](#evidence-tiers) below and
 [`program/docs/PROJECT_ROCK_FINDINGS_2026-10-22.md`](program/docs/PROJECT_ROCK_FINDINGS_2026-10-22.md).
 
+A scoring review on 23–24 October 2026 followed. It moves file technical
+claims (sample rate, channels, bit depth, duration) from file integrity to
+declaration consistency and counts a property claimed in several places once
+(profile `default-v5`), and counts the same scene/take or track-name claim made
+in both a sound report and an AAF once (`default-v6`). It also relabels
+Integrity confidence as the number of layers checked, states that consistency
+does not prove who made the material or when, and adds three report-only
+sections: `evidence_sources`, `support_breadth` and `origin_authentication`.
+Only the first two changes can alter a score. See
+[Integrity weighting and cap](#integrity-weighting-and-cap) below.
+
 The [technical manual](Manual_layout_check.docx) describes the whole program;
 its Section 8 covers the C2PA work in detail and Section 10 lists the known
 limitations. The runnable evaluator is in
@@ -318,6 +329,14 @@ document, cannot qualify Integrity for release, and reports
 the claims are true. Known-signer fingerprints are base64 SHA-256 digests of
 the signing certificate; the C2PA SDK ignores other formats silently.
 
+**Standalone manifests.** A separate `.c2pa` manifest file is linked to an
+asset only through the declared graph and is read on its own, so its content
+binding to that asset is not checked. Attestation strength still uses its
+trust status, so a trusted standalone manifest linked to the final artefact
+gives 1.0; `origin_authentication` reports such files as
+`linked_manifest_not_verified`. The scoring fix is item 20d in
+[`program/docs/NEXT_TASKS.md`](program/docs/NEXT_TASKS.md).
+
 **Findings.** Every assessment reports the final artefact's C2PA state in one
 `C2PA_FINAL_ATTESTATION` finding (`final_c2pa_state`: `not_checked`, `absent`,
 `unreadable`, `invalid`, `untrusted`, `trusted_c2pa`, `trusted_legacy_itl` or
@@ -385,7 +404,14 @@ Integrity shows that the files and claims have been checked against each other,
 but this does not guarantee who created the material, when it was recorded or
 that the recording session took place. See
 [C2PA provenance and trust](#c2pa-provenance-and-trust) for signed origin
-evidence.
+evidence. `assessment_checks.origin_authentication` reports origin separately
+for every submitted file: `signed_by_trusted_signer`,
+`signed_by_known_ai_signer`, `signed_untrusted`, `signature_not_verified`,
+`signature_invalid`, `linked_manifest_not_verified` (a separate manifest file
+linked only through the declared graph), `not_checked` (SDK missing or
+manifest unreadable) or `not_authenticated`. Only a manifest embedded in the
+file, and checked against its bytes, can identify who signed it; the section
+never changes a score.
 
 ### Evidence tiers
 
@@ -597,11 +623,16 @@ them that way, because they can hang inside the full suite on macOS Tk.
 Version 0.8.1 (22 October 2026): the same procedure found 332 tests; all 328
 non-GUI tests passed in one process (31 s) and the four GUI tests passed
 separately (`reports/test-results.txt`, `reports/release.json`).
+After the scoring review (24 October 2026) discovery found 356 tests. With the
+core requirements and `scipy` but without the optional audio backends, 334
+ran and passed and 13 were skipped (a test class that needs a missing backend
+counts once); the `REQUIRE_AUDIO_BACKENDS=1` run has not been repeated for
+these changes.
 `tests/test_builder.py` now also passes on its own: it imports `run` (and so
 c2pa) before its worker tests mock `subprocess.Popen`, because c2pa's import
 calls `platform.processor()`, which spawns a subprocess. The
-24 C2PA tests cover pinned-list hashes, trust status, asymmetric trust, known AI
-signers, the C2PA chunk precondition and every final state. The synthetic tests
+31 C2PA tests cover pinned-list hashes, trust status, asymmetric trust, known AI
+signers, the C2PA chunk precondition, every final state and per-file origin status. The synthetic tests
 are engineering checks, not real-session accuracy calibration. Run the full dependency-required suite with
 `REQUIRE_AUDIO_BACKENDS=1 python3 -B -m unittest discover -s tests -v`.
 Core tests include coverage for non-final
@@ -624,8 +655,9 @@ The locations below are relative to `program/`.
 | `music_target/wav_io.py` | Streaming RIFF/WAVE inspection and vectorised integer/float sample decoding |
 | `music_target/wav_parser.py` | Local copy of the supplied WAV parser |
 | `music_target/engine.py` | File binding, `WavMetadataPass`, `RelationshipIntegrityPass`, library pipeline, and assessment-stage orchestration |
-| `music_target/workflow_policy.py` | Safe policy loading, condition evaluation, and per-expectation workflow completeness |
-| `music_target/assessment_passes.py` | Cached file and relationship result aggregation, CrossEvidence, C2PA attestation with pinned trust and final-state findings, and AI disclosure assessment logic |
+| `music_target/workflow_policy.py` | Safe policy loading, condition evaluation, per-expectation workflow completeness, and the recording types each workflow requires |
+| `music_target/assessment_passes.py` | Cached file and relationship result aggregation, CrossEvidence, C2PA attestation with pinned trust and final-state findings, per-file origin authentication, support breadth, and AI disclosure assessment logic |
+| `music_target/evidence_audit.py` | Cross-evidence fact aggregation (with optional one vote per claim), declaration facts per file property, evidence-source and support-breadth summaries, and audit groups |
 | `music_target/audio_derivation.py` | Deprecated signal helpers and exact-reconstruction code retained for later cleanup; not executed by assessment |
 | `music_target/physical_audio_passes.py` | Deprecated physical-similarity implementation retained for later cleanup; not imported by assessment |
 | `music_target/midi_parser.py` | Size- and structure-bounded Standard MIDI File parser |
@@ -647,10 +679,10 @@ The locations below are relative to `program/`.
 | `requirements-audio.txt`, `requirements-audio-lock.txt` | Optional audio dependencies and the tested environment |
 | `make_audio_diagnostic_example.py`, `examples/audio-diagnostics/` | Reproducible repeated-excerpt example, request and core/audio reports |
 | `tests/test_audio_diagnostics.py` | 41 provider, protocol, score-isolation, insufficient-support and calibration-status tests |
-| `tests/test_c2pa_integrity.py` | 24 C2PA tests: runtime-signed fixtures, pinned lists, trust status, asymmetric trust, known AI signers, the C2PA chunk precondition and every final state |
+| `tests/test_c2pa_integrity.py` | 31 C2PA tests: runtime-signed fixtures, pinned lists, trust status, asymmetric trust, known AI signers, the C2PA chunk precondition, every final state and per-file origin status |
 | `reports/audio-diagnostics-verification.json` | Historical 19 October 2026 verification and real-provider example results |
 | `docs/AUDIO_DIAGNOSTICS.md` | Detailed audio setup, usage, output and interpretation |
-| `music_target/scoring_profile.py`, `policies/scoring_profile.json` | Validated three-layer Integrity weights, tier-aware withholding, confidence and severe-contradiction cap |
+| `music_target/scoring_profile.py`, `policies/scoring_profile.json` | Validated three-layer Integrity weights, tier-aware withholding (with optional `min_supported_asset_share`), confidence, `one_vote_per_claim` and severe-contradiction cap |
 | `run.py` | CSEC/local execution and explicit parent-side audio diagnostic orchestration |
 | `schemas/` | Original CSEC candidate schemas and local music schemas |
 | `schemas/ddex/` | Pinned RIN 2.1 and ERN 4.3 XSD files, source hashes, and licence reminder |
