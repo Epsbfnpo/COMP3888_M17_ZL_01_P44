@@ -1,17 +1,17 @@
 {
   "target_version": "0.8.1",
-  "date": "2026-10-24",
-  "source_revision": "sha256:b354426d2a75bbf3c48f551d15f6404677dea509dac1812d4fecd226ab7efe64",
+  "date": "2026-10-25",
+  "source_revision": "sha256:ac048707f1bc29f53bc8ffa2ca27d8e121f6da0008fd397dddfc3bea4b9cbf5c",
   "python": "3.13.7",
   "platform": "Darwin",
-  "tests_discovered": 425,
-  "tests_run": 425,
-  "non_gui_tests_one_process": 421,
+  "tests_discovered": 466,
+  "tests_run": 466,
+  "non_gui_tests_one_process": 462,
   "gui_tests_separate_processes": 4,
   "failures": 0,
   "errors": 0,
-  "skipped": 0,
-  "test_environment": "REQUIRE_AUDIO_BACKENDS=1; c2pa-python, audio libraries and mir_eval installed",
+  "skipped": 3,
+  "test_environment": "REQUIRE_AUDIO_BACKENDS=1; c2pa-python, audio libraries and mir_eval installed; the 3 skipped tests are the Suno real-sample tests, which need C2PA_SUNO_SAMPLE_DIR",
   "dependencies": {
     "jsonschema": "4.23.0",
     "attrs": "25.1.0",
@@ -53,5 +53,15 @@
     "Mixed-format evidence: report-only format_capabilities per audio file (recorder metadata present, not kept or not supported by the format; exact length; bit depth; BWF date; embedded C2PA) with advice; derived_from edges may declare transformation=format_conversion, whose sample rate, channel, bit-depth and length checks are scored in declaration consistency; lossless integer files are compared by a canonical sample SHA-256 (report-only, FORMAT_CONVERSION_SAMPLES_DIFFER); audio diagnostics add audio_format_conversion (alignment at 0 s and target bandwidth); the desktop builder shows format notes on import and a format-conversion option on derived_from",
     "WAV focus (decision of 24 October 2026): FORMAT_SCOPE in audio_observations states per check family whether FLAC and MP3 implement it; every FLAC or MP3 file lists the families not made in limited_checks (AUDIO_FORMAT_LIMITED_CHECKS, now also for FLAC), each unavailable with limitation program_scope, format or file; format_capabilities gains check_scope (full for WAV, limited for FLAC/MP3); audio diagnostics rows on FLAC/MP3 carry format_scope calibrated_on_wav_only; the builder notes the limited scope. No score change"
   ],
-  "revision_scope": "SHA-256 of runtime Python, requirements, policy JSON, JSON schemas, and bundled XSD files. Documentation, tests and reports excluded."
+  "revision_scope": "SHA-256 of runtime Python, requirements, policy JSON, JSON schemas, and bundled XSD files. Documentation, tests and reports excluded.",
+  "changes_after_0_8_1": [
+    "Client decisions on formats (24 October 2026) documented: FLAC and MP3 follow the WAV rules; recordings need not be WAV/BWF",
+    "AUDIO_DECLARED_RANGE_NOT_SUPPORTED: a declared window the audio does not support is named with the best-supported offset from a whole-source, fingerprint-only search (range_source declared_range_search); report-only",
+    "AUDIO_TAKE_CONTENT_BEYOND_FINAL and AUDIO_UNUSED_RANGE_FOUND_IN_FINAL: AAF-unused seconds of each take compared with the target, gated by a positive control (range_source aaf_unused_range); report-only",
+    "AUDIO_SOURCE_CONTENT_BEYOND_TARGET and audio_source_coverage: without an AAF, landmark-bearing source regions with no match in the target; audfprint adapter 1.3 reports source_content_windows_seconds; report-only",
+    "Scoring profile default-v7: forge_cost scales Integrity confidence only (factor 0.5 + 0.5 x strength / 5, per-subject strongest fact); costs measured by benchmarks/forge_cost.py on Project Rock Ep01 copies with a ranking check and a held-out case; tier order enforced by the loader; assessment_checks.evidence_strength",
+    "Start-timecode gap found and documented (NEXT_TASKS item 42): a 1 s shift in bext and the sound report raises no contradiction",
+    "Line and branch coverage report in reports/coverage/ (73.3% lines, 63.5% branches; 84% lines without the policy-disabled legacy modules)",
+    "Example responses regenerated: axis values unchanged; Integrity confidence now carries the forge-cost factor"
+  ]
 }

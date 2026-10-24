@@ -128,6 +128,24 @@ class AudioIntegrationTests(unittest.TestCase):
         self.assertEqual(len(response["assessment_checks"]["audio_fingerprint"]), 2)
         self.assertEqual(len(response["assessment_checks"]["audio_structure"]), 1)
 
+    def test_declared_window_adds_a_fingerprint_only_whole_source_search(self):
+        self.request["chain"]["artefacts"][1]["evidence"][0]["attributes"] = {
+            "source_start_seconds": 7.0, "source_end_seconds": 11.0,
+            "target_start_seconds": 0.0, "target_end_seconds": 4.0}
+        self.core = run.evaluate(copy.deepcopy(self.request), self.folder, "native")
+        calls = []
+        def fake(task, names, params, deadline):
+            calls.append((task["task_id"], task["range_source"], tuple(names)))
+            return [result(task, name) for name in names]
+        with mock.patch("music_target.audio_diagnostics.runner._run_task", side_effect=fake):
+            response = self.augment()
+        self.assert_core_unchanged(response)
+        searches = [call for call in calls if call[1] == "declared_range_search"]
+        self.assertEqual(len(searches), 1)
+        self.assertEqual(searches[0][2], ("audfprint", "spectromap"))
+        summary = response["assessment_checks"]["audio_diagnostic_summary"][0]
+        self.assertEqual((summary["task_count"], summary["declared_range_search_task_count"]), (1, 1))
+
     def test_expired_budget_is_only_diagnostic_unavailability(self):
         response = self.augment(deadline=time.monotonic() - 1)
         self.assert_core_unchanged(response)
@@ -570,6 +588,238 @@ class FingerprintAgreementTests(unittest.TestCase):
         self.assertEqual(expected_rows(["audfprint", "spectromap"])[-1], "fingerprint_agreement")
 
 
+def fingerprint_row(task_id, provider, range_source, matches, source=(7.0, 11.0), target=(0.0, 4.0),
+                    complete=True):
+    task = {"task_id": task_id, "relation_id": "edge", "relationship_type": "excerpted_from",
+            "source_hash": "1" * 64, "target_hash": "2" * 64, "range_source": range_source}
+    row = result(task, provider)
+    row.update(analysis_complete=complete, matches=matches,
+               analysed_ranges={"source": list(source), "target": list(target)} if complete else {})
+    return row
+
+
+def fingerprint_match(offset, supported, fraction=0.9):
+    return {"source_minus_target_offset_seconds": offset, "matched_token_pairs": 100,
+            "source_supported_fraction": fraction, "target_supported_fraction": fraction,
+            "support_assessment": {"status": "supported_within_profile" if supported else "candidate_only"}}
+
+
+class DeclaredRangeFindingTests(unittest.TestCase):
+    """A declared window the audio does not support is named; no score changes."""
+
+    def attach(self, declared, search, spectromap_search=()):
+        from music_target.audio_diagnostics.runner import _attach
+        rows = [fingerprint_row("edge:0", "audfprint", "declared", declared)]
+        if search is not None:
+            rows.append(fingerprint_row("edge:0:search", "audfprint", "declared_range_search", search,
+                                        source=(0.0, 16.0), complete=search != "failed"))
+            if search == "failed":
+                rows[-1]["matches"] = []
+            rows.append(fingerprint_row("edge:0:search", "spectromap", "declared_range_search",
+                                        list(spectromap_search), source=(0.0, 16.0)))
+        return _attach({"findings": [], "assessment_checks": {}}, rows,
+                       {"task_count": 1, "completed_provider_tasks": len(rows), "unavailable_provider_tasks": 0})
+
+    def findings(self, response):
+        return [row for row in response["findings"] if row["code"] == "AUDIO_DECLARED_RANGE_NOT_SUPPORTED"]
+
+    def test_range_search_companions_only_for_fully_declared_windows(self):
+        from music_target.audio_diagnostics.tasks import range_search_tasks
+        declared = {"source_start_seconds": 7.0, "source_end_seconds": 11.0,
+                    "target_start_seconds": 0.0, "target_end_seconds": 4.0}
+        base = {"task_id": "edge:0", "relation_id": "edge", "unavailable_reason": None}
+        tasks = [{**base, "range_source": "declared", "attributes": declared},
+                 {**base, "task_id": "aaf:0", "range_source": "aaf_source_range",
+                  "attributes": {**declared, "target_start_seconds": None, "target_end_seconds": None}},
+                 {**base, "task_id": "whole:0", "range_source": "whole_file",
+                  "attributes": {key: None for key in declared}},
+                 {**base, "task_id": "bad:0", "range_source": "declared", "unavailable_reason": "invalid_declaration",
+                  "attributes": declared}]
+        (search,) = range_search_tasks(tasks)
+        self.assertEqual(search["task_id"], "edge:0:search")
+        self.assertEqual(search["range_source"], "declared_range_search")
+        self.assertEqual(search["attributes"], {"source_start_seconds": None, "source_end_seconds": None,
+                                                "target_start_seconds": 0.0, "target_end_seconds": 4.0})
+
+    def test_supported_declared_window_gives_no_finding(self):
+        response = self.attach([fingerprint_match(7.0, True)], [fingerprint_match(7.0, True)])
+        self.assertEqual(self.findings(response), [])
+        (item,) = response["assessment_checks"]["audio_declared_range"]
+        self.assertEqual(item["outcome"], "declared_range_supported")
+        self.assertEqual(response["assessment_checks"]["audio_diagnostic_summary"][0]["declared_ranges_not_supported"], 0)
+
+    def test_content_found_elsewhere_names_the_best_supported_offset(self):
+        response = self.attach([fingerprint_match(9.9, False, 0.1)],
+                               [fingerprint_match(10.0, True, 0.6), fingerprint_match(2.0, True, 0.95)],
+                               spectromap_search=[fingerprint_match(10.0, False), fingerprint_match(2.05, False)])
+        (finding,) = self.findings(response)
+        self.assertEqual((finding["severity"], finding["outcome"]), ("low", "content_found_elsewhere"))
+        self.assertEqual(finding["best_offset_seconds"], 2.0)
+        self.assertEqual(finding["best_source_range_seconds"], [2.0, 6.0])
+        self.assertEqual(finding["declared_source_range_seconds"], [7.0, 11.0])
+        self.assertIn("found at source 2.00-6.00 s", finding["message"])
+        self.assertIn("SpectroMap agrees", finding["message"])
+        self.assertFalse(finding["scoring_eligible"])
+        self.assertIsNone(finding["integrity_contribution"])
+        (item,) = response["assessment_checks"]["audio_declared_range"]
+        self.assertEqual(item["search_supported_offsets_seconds"], [2.0, 10.0])
+        # Search rows serve this assessment only; they are not per-row findings.
+        self.assertEqual(len(response["assessment_checks"]["audio_fingerprint"]), 1)
+        self.assertEqual(len(response["assessment_checks"]["audio_declared_range_search"]), 2)
+
+    def test_content_not_located_is_info_and_not_a_contradiction(self):
+        response = self.attach([], [fingerprint_match(3.0, False, 0.05)])
+        (finding,) = self.findings(response)
+        self.assertEqual((finding["severity"], finding["outcome"]), ("info", "content_not_located"))
+        self.assertIn("not a contradiction", finding["message"])
+        self.assertIsNone(finding["best_offset_seconds"])
+
+    def test_failed_search_still_names_the_unsupported_window(self):
+        response = self.attach([], "failed")
+        (finding,) = self.findings(response)
+        self.assertEqual(finding["outcome"], "search_unavailable")
+
+    def test_whole_source_support_at_the_declared_offset_counts_as_supported(self):
+        response = self.attach([fingerprint_match(7.1, False, 0.3)], [fingerprint_match(7.1, True)])
+        self.assertEqual(self.findings(response), [])
+
+    def test_speed_change_windows_are_not_assessed(self):
+        from music_target.audio_diagnostics.runner import _attach
+        rows = [fingerprint_row("edge:0", "audfprint", "declared", [], source=(7.0, 11.0), target=(0.0, 5.0)),
+                fingerprint_row("edge:0:search", "audfprint", "declared_range_search", [], source=(0.0, 16.0),
+                                target=(0.0, 5.0))]
+        response = _attach({"findings": [], "assessment_checks": {}}, rows,
+                           {"task_count": 1, "completed_provider_tasks": 2, "unavailable_provider_tasks": 0})
+        self.assertEqual(self.findings(response), [])
+        self.assertEqual(response["assessment_checks"]["audio_declared_range"][0]["outcome"],
+                         "not_assessed_durations_differ")
+
+    def test_too_little_audio_is_not_reported_as_unsupported(self):
+        from music_target.audio_diagnostics.contracts import unavailable
+        from music_target.audio_diagnostics.runner import _attach
+        task = {"task_id": "edge:0", "relation_id": "edge", "relationship_type": "excerpted_from",
+                "source_hash": "1" * 64, "target_hash": "2" * 64, "range_source": "declared"}
+        rows = [unavailable(task, "audfprint", "insufficient_landmarks", "Too few landmarks."),
+                fingerprint_row("edge:0:search", "audfprint", "declared_range_search", [], source=(0.0, 16.0))]
+        rows[0]["range_source"] = "declared"
+        response = _attach({"findings": [], "assessment_checks": {}}, rows,
+                           {"task_count": 1, "completed_provider_tasks": 1, "unavailable_provider_tasks": 1})
+        self.assertEqual(self.findings(response), [])
+        self.assertEqual(response["assessment_checks"]["audio_declared_range"][0]["outcome"], "insufficient_support")
+
+
+class ContentBeyondFinalTests(unittest.TestCase):
+    """Take content the final lacks cannot come from a stem separated out of the final."""
+
+    TAKE, MIX = "1" * 64, "2" * 64
+
+    def row(self, task_id, provider, range_source, source, matches, complete=True):
+        task = {"task_id": task_id, "relation_id": "take", "relationship_type": "derived_from",
+                "source_hash": self.TAKE, "target_hash": self.MIX, "range_source": range_source,
+                "selection_id": task_id}
+        value = result(task, provider)
+        value.update(analysis_complete=complete, matches=matches,
+                     analysed_ranges={"source": list(source), "target": [0.0, 40.0]} if complete else {})
+        return value
+
+    @staticmethod
+    def match(windows, supported=True, pairs=40):
+        return {"source_minus_target_offset_seconds": 1.0, "matched_token_pairs": pairs,
+                "source_supported_windows_seconds": windows,
+                "source_supported_window_duration_seconds": sum(b - a for a, b in windows),
+                "source_supported_fraction": 0.5, "target_supported_fraction": 0.5,
+                "support_assessment": {"status": "supported_within_profile" if supported else "candidate_only"}}
+
+    def attach(self, rows):
+        from music_target.audio_diagnostics.runner import _attach
+        return _attach({"findings": [], "assessment_checks": {}}, rows,
+                       {"task_count": 1, "completed_provider_tasks": len(rows), "unavailable_provider_tasks": 0})
+
+    def codes(self, response, code):
+        return [row for row in response["findings"] if row["code"] == code]
+
+    def test_unused_pieces_leave_handles_and_drop_short_gaps(self):
+        from music_target.audio_diagnostics.tasks import _unused_pieces
+        self.assertEqual(_unused_pieces(60.0, [(10.0, 20.0), (21.0, 30.0)]), [(0.0, 9.5), (30.5, 60.0)])
+        self.assertEqual(_unused_pieces(10.0, [(0.0, 10.0)]), [])
+        self.assertEqual(_unused_pieces(12.0, [(2.0, 9.0)]), [])  # both remainders under 3 s
+
+    def test_unused_tasks_follow_aaf_range_tasks_only(self):
+        from music_target.audio_diagnostics import tasks as module
+        aaf = {"task_id": "take:0", "relation_id": "take", "source_hash": self.TAKE, "target_hash": self.MIX,
+               "range_source": "aaf_source_range", "attributes": {}, "selection_id": "aaf:mob:0"}
+        whole = {**aaf, "relation_id": "other", "range_source": "whole_file"}
+        takes = {self.TAKE: {"duration_seconds": 30.0, "ranges": [((10.0, 15.0), "mob")]}}
+        with mock.patch.object(module, "_aaf_takes", return_value=takes):
+            made = module.unused_range_tasks([aaf, {**aaf, "task_id": "take:1"}, whole], {"findings": []})
+        self.assertEqual([task["attributes"]["source_start_seconds"] for task in made], [0.0, 15.5])
+        self.assertEqual({task["range_source"] for task in made}, {"aaf_unused_range"})
+        self.assertEqual(made[1]["task_id"], "take:unused:1")
+
+    def aaf_rows(self, used_found, unused):
+        rows = [self.row("take:0:used", "audfprint", "aaf_source_range", (10.0, 15.0),
+                         [self.match([[10.0, 14.0]])] if used_found else [])]
+        for number, (span, matches) in enumerate(unused):
+            for provider in ("audfprint", "spectromap"):
+                rows.append(self.row(f"take:unused:{number}", provider, "aaf_unused_range", span,
+                                     matches if provider == "spectromap" else []))
+        return rows
+
+    def test_unused_take_content_not_in_final_is_reported_with_its_control(self):
+        response = self.attach(self.aaf_rows(True, [((0.0, 9.5), []),
+                                                    ((15.5, 30.0), [self.match([[20.0, 20.5]], False, 6)])]))
+        (beyond,) = self.codes(response, "AUDIO_TAKE_CONTENT_BEYOND_FINAL")
+        self.assertEqual((beyond["unused_seconds_not_found"], beyond["unused_seconds_found"]), (9.5, 14.5))
+        self.assertFalse(beyond["scoring_eligible"])
+        (found,) = self.codes(response, "AUDIO_UNUSED_RANGE_FOUND_IN_FINAL")
+        self.assertEqual(found["strongest_candidate"]["matched_token_pairs"], 6)
+        self.assertIn("not a contradiction", found["message"])
+        (take,) = response["assessment_checks"]["audio_take_beyond_final"]
+        self.assertTrue(take["positive_control"])
+        # Unused-range rows are not repeated as per-row fingerprint findings.
+        self.assertEqual(len(response["assessment_checks"]["audio_fingerprint"]), 1)
+
+    def test_without_a_positive_control_absence_is_not_interpreted(self):
+        response = self.attach(self.aaf_rows(False, [((0.0, 9.5), [])]))
+        self.assertEqual(self.codes(response, "AUDIO_TAKE_CONTENT_BEYOND_FINAL"), [])
+        self.assertEqual(response["assessment_checks"]["audio_take_beyond_final"][0]["outcome"],
+                         "no_positive_control")
+
+    def coverage_row(self, matches, content=((0.0, 30.0),), relationship="mixed_from"):
+        value = self.row("take:0", "audfprint", "whole_file", (0.0, 30.0), matches)
+        value["relationship_type"] = relationship
+        value["metrics"] = {"source_content_windows_seconds": [list(span) for span in content]}
+        return value
+
+    def test_source_content_with_no_match_in_the_target_is_reported(self):
+        response = self.attach([self.coverage_row([self.match([[10.0, 12.0], [13.0, 20.0]])])])
+        (finding,) = self.codes(response, "AUDIO_SOURCE_CONTENT_BEYOND_TARGET")
+        self.assertEqual(finding["beyond_target_windows_seconds"], [[0.0, 10.0], [20.0, 30.0]])
+        self.assertEqual(finding["beyond_target_seconds"], 20.0)
+
+    def test_scattered_matches_across_the_source_count_as_contained(self):
+        # Landmarks are picked differently in a short file, so a copy matches in patches.
+        windows = [[start, start + 1.0] for start in range(0, 30, 2)]
+        response = self.attach([self.coverage_row([self.match(windows)])])
+        self.assertEqual(self.codes(response, "AUDIO_SOURCE_CONTENT_BEYOND_TARGET"), [])
+        self.assertEqual(response["assessment_checks"]["audio_source_coverage"][0]["outcome"], "contained_in_target")
+
+    def test_silence_and_unsupported_matches_are_not_reported(self):
+        silent_tail = self.coverage_row([self.match([[0.0, 12.0]])], content=((0.0, 12.0),))
+        weak = self.coverage_row([self.match([[0.0, 5.0]], supported=False)])
+        excerpt = self.coverage_row([self.match([[0.0, 5.0]])], relationship="excerpted_from")
+        response = self.attach([silent_tail, weak, excerpt])
+        self.assertEqual(self.codes(response, "AUDIO_SOURCE_CONTENT_BEYOND_TARGET"), [])
+        self.assertEqual([item["outcome"] for item in response["assessment_checks"]["audio_source_coverage"]],
+                         ["contained_in_target", "no_positive_control"])
+
+    def test_interval_helpers(self):
+        from music_target.audio_diagnostics.providers.alignment import content_windows, subtract_intervals
+        self.assertEqual(subtract_intervals([[0, 10], [12, 20]], [[2, 4], [9, 13]]), [[0, 2], [4, 9], [13, 20]])
+        windows = content_windows([(0, 1), (10, 2), (100, 3)], 0.1, {"range": [5.0, 20.0]}, 1.0)
+        self.assertEqual(windows, [[5.0, 6.5], [14.5, 15.5]])
+
+
 class AudioPolicyTests(unittest.TestCase):
     def test_default_has_all_providers_and_no_development_caps(self):
         policy = load_policy()
@@ -698,6 +948,56 @@ class RealAudioBackendTests(unittest.TestCase):
                 share = best["matched_token_pairs"] / value["metrics"]["target_tokens"]
                 self.assertGreater(share, 0.3, share)
                 self.assertGreater(best["target_supported_window_duration_seconds"], 18)
+
+    def declared_excerpt(self, start):
+        request = copy.deepcopy(self.request)
+        request["chain"]["artefacts"][1]["evidence"][0]["attributes"] = {
+            "source_start_seconds": start, "source_end_seconds": start + 4.0,
+            "target_start_seconds": 0.0, "target_end_seconds": 4.0}
+        core = run.evaluate(copy.deepcopy(request), self.folder, "native")
+        response = augment_response(core, request, self.folder, "native", DEFAULT_PATH, time.monotonic() + 180)
+        validate(response, "scoring-response.schema.json")
+        self.assertEqual(response["axes"], core["axes"])
+        self.assertEqual([row for row in response["findings"] if not row["code"].startswith("AUDIO_")],
+                         core["findings"])
+        return response
+
+    def test_false_excerpt_interval_is_named_with_where_the_content_is(self):
+        response = self.declared_excerpt(7.0)
+        (finding,) = [row for row in response["findings"] if row["code"] == "AUDIO_DECLARED_RANGE_NOT_SUPPORTED"]
+        self.assertEqual(finding["outcome"], "content_found_elsewhere")
+        # The motif repeats, so the content is at source 2 s and 10 s; both are reported.
+        self.assertTrue(any(abs(finding["best_offset_seconds"] - offset) < 0.15 for offset in (2, 10)), finding)
+        (item,) = response["assessment_checks"]["audio_declared_range"]
+        offsets = item["search_supported_offsets_seconds"]
+        self.assertTrue(any(abs(offset - 2) < 0.15 for offset in offsets), offsets)
+        self.assertTrue(any(abs(offset - 10) < 0.15 for offset in offsets), offsets)
+        self.assertEqual(response["assessment_checks"]["audio_diagnostic_summary"][0]["declared_ranges_not_supported"], 1)
+
+    def test_true_excerpt_interval_gives_no_declared_range_finding(self):
+        for start in (2.0, 10.0):
+            response = self.declared_excerpt(start)
+            self.assertFalse([row for row in response["findings"]
+                              if row["code"] == "AUDIO_DECLARED_RANGE_NOT_SUPPORTED"], start)
+            (item,) = response["assessment_checks"]["audio_declared_range"]
+            self.assertEqual(item["outcome"], "declared_range_supported", item)
+
+    def test_real_take_has_content_beyond_the_mix_and_a_copy_of_the_mix_does_not(self):
+        from music_target.audio_diagnostics.runner import _source_coverage
+        rate = 22050
+        take = tone_sequence(30, seed=11)
+        mix = take[10 * rate:22 * rate] + 0.3 * tone_sequence(12, seed=12)
+        rows = []
+        for name, source in (("take", take), ("copy", mix[1 * rate:11 * rate])):
+            folder = self.folder / name
+            folder.mkdir()
+            task = write_task(folder, source, mix)
+            task["relationship_type"] = "mixed_from"
+            rows.append(execute(task, "audfprint", DEFAULTS["audfprint"]))
+        genuine, copy_of_mix = _source_coverage(rows)
+        self.assertEqual(genuine["outcome"], "content_beyond_target", genuine)
+        self.assertGreater(genuine["beyond_target_seconds"], 15)
+        self.assertEqual(copy_of_mix["outcome"], "contained_in_target", copy_of_mix)
 
     def test_actual_three_worker_processes_preserve_core_axes(self):
         response = augment_response(self.core, self.request, self.folder, "native", DEFAULT_PATH,

@@ -1,10 +1,10 @@
-COMP3888 music target v0.8.1
-Date: 2026-10-24
+COMP3888 music target v0.8.1 (scoring profile default-v7)
+Date: 2026-10-25
 Platform: CPython 3.13.7 on macOS (Darwin)
 
 Non-GUI tests, one process:
-  REQUIRE_AUDIO_BACKENDS=1 python -B <loader that discovers tests/ and excludes test_builder.GuiTests>
-  Ran 421 tests in 34 seconds. OK (0 failures, 0 errors, 0 skipped)
+  cd tests && REQUIRE_AUDIO_BACKENDS=1 python -B -m unittest <every test module except test_builder> test_builder.ManifestLimitTests test_builder.ExportTests test_builder.AssessmentTests
+  Ran 462 tests in 40 seconds. OK (skipped=3: the Suno real-sample tests need C2PA_SUNO_SAMPLE_DIR)
 
 GUI tests, one process each (they can hang inside the full suite on macOS Tk):
   cd tests && REQUIRE_AUDIO_BACKENDS=1 python -B -m unittest test_builder.GuiTests.<name>
@@ -13,4 +13,5 @@ GUI tests, one process each (they can hang inside the full suite on macOS Tk):
   test_result_shows_null_as_not_assessed_and_preserves_failure_status  OK
   test_load_export_assess_and_save_result_end_to_end                   OK
 
-Total: 425 tests, all passed.
+Total: 466 tests; 463 passed, 3 skipped, 0 failures, 0 errors.
+Coverage (same runs, coverage.py with branch measurement): 73.3% lines, 63.5% branches; reports/coverage/.

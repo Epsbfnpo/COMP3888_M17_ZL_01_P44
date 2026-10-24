@@ -1,7 +1,7 @@
 {
-  "profile_id": "default-v6",
-  "profile_version": 6,
-  "description": "Version 6 counts the same claim about one recording, repeated in several documents (sound report and AAF scene/take or track names), as one cross-evidence fact (one_vote_per_claim), because their independence is unknown. Version 5 moved submitted file technical claims (sample rate, channels, bit depth, duration) from file integrity to declaration consistency, so file integrity holds only checks with no submitter claim (hash binding, parser readability); declaration consistency scores one fact per declared file property, so the same claim made on a file and on its relationships counts once. As in version 4, it aggregates cross-evidence by rule and subject (one failed observation keeps the fact failed). Numeric release requires the configured layer count and qualifying assessed cross-evidence; an ordinary contradiction never releases a value. A severe contradiction is computed by the evaluator and needs no independent support, so it releases min(weighted mean, cap) even when the value would otherwise be withheld (version 3 withheld it). Recorder metadata remains eligible for consistency scoring and release, with a non-scoring origin-not-authenticated finding. Integrity is check consistency, not authenticated provenance. Layer weights, confidence formula and severe-contradiction ceiling are unchanged. Confidence reflects how many evidence layers were checked; check results are shown in the integrity value and layer results.",
+  "profile_id": "default-v7",
+  "profile_version": 7,
+  "description": "Version 7 grades how hard the checked cross-evidence would be to forge (forge_cost) and scales Integrity confidence by it: confidence = ceiling x checked layers / 3 x (strength_floor + (1 - strength_floor) x mean subject forge cost / scale_max), where each subject takes the cost of its strongest assessed fact. The Integrity value, the evidence tiers and the release gate are unchanged, and the costs must keep the tier order. As in version 6, it counts the same claim about one recording, repeated in several documents (sound report and AAF scene/take or track names), as one cross-evidence fact (one_vote_per_claim), because their independence is unknown. Version 5 moved submitted file technical claims (sample rate, channels, bit depth, duration) from file integrity to declaration consistency, so file integrity holds only checks with no submitter claim (hash binding, parser readability); declaration consistency scores one fact per declared file property, so the same claim made on a file and on its relationships counts once. As in version 4, it aggregates cross-evidence by rule and subject (one failed observation keeps the fact failed). Numeric release requires the configured layer count and qualifying assessed cross-evidence; an ordinary contradiction never releases a value. A severe contradiction is computed by the evaluator and needs no independent support, so it releases min(weighted mean, cap) even when the value would otherwise be withheld (version 3 withheld it). Recorder metadata remains eligible for consistency scoring and release, with a non-scoring origin-not-authenticated finding. Integrity is check consistency, not authenticated provenance. Layer weights and the severe-contradiction ceiling are unchanged; check results are shown in the integrity value and layer results.",
   "integrity": {
     "layer_weights": {
       "file_integrity": 1.0,
@@ -35,6 +35,21 @@
       "comp_sheet_selection_matches_comped_from_edge"
     ],
     "severe_contradiction_cap": 0.25,
-    "one_vote_per_claim": true
+    "one_vote_per_claim": true,
+    "forge_cost": {
+      "scale_max": 5,
+      "tier_costs": {
+        "signed_attestation": 5,
+        "recorder_metadata": 3
+      },
+      "submitter_document_costs": {
+        "project/aaf": 2,
+        "project/daw-session": 2
+      },
+      "submitter_document_default": 1,
+      "unbound_source_cost": 1,
+      "strength_floor": 0.5,
+      "derivation": "Measured on Project Rock Ep01 variants by benchmarks/forge_cost.py (benchmarks/results/forge_cost_project_rock_2026-10-25.json): smallest undetected forgeries and a ranking check, not calibrated probabilities."
+    }
   }
 }

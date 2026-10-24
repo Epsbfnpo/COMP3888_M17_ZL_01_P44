@@ -99,3 +99,14 @@ python -B benchmarks/music_benchmark.py musdb /data/musdb18hq/test --out /tmp/be
 The full datasets are large and the run is CPU-heavy. Run them on a cloud or
 lab machine rather than a laptop. The harness itself is covered by
 `tests/test_music_benchmark.py` on a generated two-track dataset.
+
+## Forge cost
+
+`python -B benchmarks/forge_cost.py /path/to/bundle --take 10T07.WAV --out results.json`
+derives the forge costs in scoring profile `default-v7` and checks that
+confidence orders stated evidence mixes. It needs a native recorder-take
+production (Project Rock Ep01 was used; it is client material and not in the
+repository). Forgery variants and evidence mixes are the development split;
+the unmodified submission is evaluated once at the end as the held-out case.
+The 25 October 2026 run is in `results/forge_cost_project_rock_2026-10-25.json`;
+method and results are described in [../docs/FORGE_COST.md](../docs/FORGE_COST.md).

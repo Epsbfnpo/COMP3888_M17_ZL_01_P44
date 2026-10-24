@@ -6,7 +6,7 @@
   "system": {
     "name": "COMP3888-music-baseline",
     "version": "0.8.1",
-    "source_revision": "sha256:b354426d2a75bbf3c48f551d15f6404677dea509dac1812d4fecd226ab7efe64"
+    "source_revision": "sha256:ac048707f1bc29f53bc8ffa2ca27d8e121f6da0008fd397dddfc3bea4b9cbf5c"
   },
   "execution_status": "succeeded",
   "axes": {
@@ -19,8 +19,8 @@
     "integrity": {
       "availability": "partial",
       "value": null,
-      "confidence": 0.533,
-      "reasoning": "Integrity has 2/3 score-eligible evidence layers; missing evidence reduces availability and confidence but is never treated as contradiction. Integrity confidence reflects how many of the three evidence layers were checked. To see how many checks passed, refer to the integrity value and the layer results. Numeric release requires at least 2 populated contributing layer(s) and an assessed qualifying cross-evidence fact (signed_attestation, recorder_metadata); the value is withheld (insufficient_qualifying_cross_evidence). An ordinary contradiction never releases a value. No qualifying cross-evidence was assessed for this submission. The files and claims have been checked against each other, but this does not guarantee who created the material, when it was recorded or that the recording session took place. Signed origin evidence, where available, is shown in attestation_strength. Structural validity and cryptographic attestation are reported separately and do not raise integrity. Legacy signal comparisons are disabled by policy and do not produce findings or affect integrity.",
+      "confidence": 0.32,
+      "reasoning": "Integrity has 2/3 score-eligible evidence layers; missing evidence reduces availability and confidence but is never treated as contradiction. Integrity confidence reflects how many of the three evidence layers were checked (2/3) and how hard the checked evidence would be to forge: no cross-evidence was assessed, so it rests on the submission's own claims (forge cost 1 of 5), a factor of 0.60. Forge cost changes confidence only, never the value. To see how many checks passed, refer to the integrity value and the layer results. Numeric release requires at least 2 populated contributing layer(s) and an assessed qualifying cross-evidence fact (signed_attestation, recorder_metadata); the value is withheld (insufficient_qualifying_cross_evidence). An ordinary contradiction never releases a value. No qualifying cross-evidence was assessed for this submission. The files and claims have been checked against each other, but this does not guarantee who created the material, when it was recorded or that the recording session took place. Signed origin evidence, where available, is shown in attestation_strength. Structural validity and cryptographic attestation are reported separately and do not raise integrity. Legacy signal comparisons are disabled by policy and do not produce findings or affect integrity.",
       "status": "insufficient_evidence"
     },
     "attestation_strength": {
@@ -803,9 +803,9 @@
       ]
     }
   ],
-  "processing_ms": 248.71504202019423,
+  "processing_ms": 247.7130419574678,
   "resource_usage": {
-    "cpu_ms": 6.3290000000000015,
+    "cpu_ms": 6.4230000000000125,
     "peak_rss_kib": null
   },
   "error": null,
@@ -992,8 +992,8 @@
   "assessment_checks": {
     "scoring_profile": [
       {
-        "profile_id": "default-v6",
-        "profile_version": 6
+        "profile_id": "default-v7",
+        "profile_version": 7
       }
     ],
     "bound_file_integrity": [
@@ -1668,6 +1668,20 @@
         ]
       }
     ],
+    "evidence_strength": [
+      {
+        "applies_to": "integrity_confidence_only",
+        "basis": "no_cross_evidence",
+        "subject_count": 0,
+        "mean_subject_forge_cost": 1,
+        "scale_max": 5,
+        "strength_floor": 0.5,
+        "confidence_factor": 0.6,
+        "subjects_by_basis": {},
+        "subjects": [],
+        "derivation": "Measured on Project Rock Ep01 variants by benchmarks/forge_cost.py (benchmarks/results/forge_cost_project_rock_2026-10-25.json): smallest undetected forgeries and a ranking check, not calibrated probabilities."
+      }
+    ],
     "ai_disclosure_coverage": [
       {
         "axis_key": "ai_disclosure",
@@ -2051,7 +2065,7 @@
         "axis": "integrity",
         "availability": "partial",
         "value": null,
-        "confidence": 0.533,
+        "confidence": 0.32,
         "layers": [
           {
             "layer": "file_integrity",

@@ -2,7 +2,9 @@
 
 Status (updated 23 October 2026): locally tested integration baseline for version 0.8.1, prepared for CSEC's
 adversarial testing. Not yet executed in CSEC's runner. The scoring update (profile default-v6) and FLAC/MP3
-support were merged on 24 October 2026; the target version is not pinned yet.
+support were merged on 24 October 2026; the target version is not pinned yet. On 25 October 2026 the default
+profile became default-v7 (forge cost scales Integrity confidence only; values, tiers and the release rule are
+unchanged), and three report-only audio findings were added. See "Changes on 25 October 2026" below.
 
 ## Contact and collaboration mode
 
@@ -172,7 +174,31 @@ the uploader as known common source, independence `unknown`) and
 qualifying evidence). The optional `withholding_rule.min_supported_asset_share`
 gate is off. A submission with declared technical values now usually has three
 populated layers, so its Integrity confidence is 0.8 instead of 0.533. G1 and
-G3 baselines must be measured against default-v6.
+G3 baselines must be measured against the pinned profile.
+
+## Changes on 25 October 2026
+
+- **Profile default-v7.** `integrity.forge_cost` multiplies Integrity confidence
+  by `0.5 + 0.5 x strength / 5`, where strength is the mean, over checked
+  recordings and documents, of the forge cost of the strongest assessed
+  cross-evidence fact (trusted signature 5, recorder metadata 3, AAF or DAW
+  not checked against recorder metadata 2, other documents and unbound files
+  1). The Integrity value, status, tiers and release rule are unchanged, so
+  value-based G1 and G3 baselines carry over; confidence baselines must be
+  re-measured. New field: `assessment_checks.evidence_strength`. Method and
+  measurements: `docs/FORGE_COST.md`.
+- **Report-only audio findings** (only with `--audio-analysis`):
+  `AUDIO_DECLARED_RANGE_NOT_SUPPORTED`, `AUDIO_TAKE_CONTENT_BEYOND_FINAL`,
+  `AUDIO_UNUSED_RANGE_FOUND_IN_FINAL` and `AUDIO_SOURCE_CONTENT_BEYOND_TARGET`,
+  with `assessment_checks.audio_declared_range`, `audio_declared_range_search`,
+  `audio_take_beyond_final`, `audio_aaf_unused_range` and
+  `audio_source_coverage`. None changes a score. The diagnostic schema accepts
+  the new `range_source` values `declared_range_search` and `aaf_unused_range`.
+- **Known gap.** A start timecode moved by one second in both the WAV (bext)
+  and the sound report raises no contradiction: the AAF only checks
+  containment, and bext and iXML timestamps are not yet compared
+  (`docs/NEXT_TASKS.md` item 42). Finding it again is not a new defect; its
+  cost is still worth recording.
 
 As in default-v4, cross-evidence scores one rule/subject
 fact once, with any failure retaining a contradiction; raw checks and source

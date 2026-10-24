@@ -6,7 +6,7 @@
   "system": {
     "name": "COMP3888-music-baseline",
     "version": "0.8.1",
-    "source_revision": "sha256:b354426d2a75bbf3c48f551d15f6404677dea509dac1812d4fecd226ab7efe64"
+    "source_revision": "sha256:ac048707f1bc29f53bc8ffa2ca27d8e121f6da0008fd397dddfc3bea4b9cbf5c"
   },
   "execution_status": "succeeded",
   "axes": {
@@ -19,8 +19,8 @@
     "integrity": {
       "availability": "partial",
       "value": null,
-      "confidence": 0.267,
-      "reasoning": "Integrity has 1/3 score-eligible evidence layers; missing evidence reduces availability and confidence but is never treated as contradiction. Integrity confidence reflects how many of the three evidence layers were checked. To see how many checks passed, refer to the integrity value and the layer results. Numeric release requires at least 2 populated contributing layer(s) and an assessed qualifying cross-evidence fact (signed_attestation, recorder_metadata); the value is withheld (insufficient_assessed_layers). An ordinary contradiction never releases a value. No qualifying cross-evidence was assessed for this submission. The files and claims have been checked against each other, but this does not guarantee who created the material, when it was recorded or that the recording session took place. Signed origin evidence, where available, is shown in attestation_strength. Structural validity and cryptographic attestation are reported separately and do not raise integrity. Legacy signal comparisons are disabled by policy and do not produce findings or affect integrity.",
+      "confidence": 0.16,
+      "reasoning": "Integrity has 1/3 score-eligible evidence layers; missing evidence reduces availability and confidence but is never treated as contradiction. Integrity confidence reflects how many of the three evidence layers were checked (1/3) and how hard the checked evidence would be to forge: no cross-evidence was assessed, so it rests on the submission's own claims (forge cost 1 of 5), a factor of 0.60. Forge cost changes confidence only, never the value. To see how many checks passed, refer to the integrity value and the layer results. Numeric release requires at least 2 populated contributing layer(s) and an assessed qualifying cross-evidence fact (signed_attestation, recorder_metadata); the value is withheld (insufficient_assessed_layers). An ordinary contradiction never releases a value. No qualifying cross-evidence was assessed for this submission. The files and claims have been checked against each other, but this does not guarantee who created the material, when it was recorded or that the recording session took place. Signed origin evidence, where available, is shown in attestation_strength. Structural validity and cryptographic attestation are reported separately and do not raise integrity. Legacy signal comparisons are disabled by policy and do not produce findings or affect integrity.",
       "status": "insufficient_evidence"
     },
     "attestation_strength": {
@@ -455,9 +455,9 @@
       "content_match_is_provenance": false
     }
   ],
-  "processing_ms": 2502.3143750149757,
+  "processing_ms": 2471.0692079970613,
   "resource_usage": {
-    "cpu_ms": 3.4780000000000086,
+    "cpu_ms": 3.4399999999999986,
     "peak_rss_kib": null
   },
   "error": null,
@@ -667,8 +667,8 @@
   "assessment_checks": {
     "scoring_profile": [
       {
-        "profile_id": "default-v6",
-        "profile_version": 6
+        "profile_id": "default-v7",
+        "profile_version": 7
       }
     ],
     "bound_file_integrity": [
@@ -819,6 +819,20 @@
             "contradicted": 0
           }
         ]
+      }
+    ],
+    "evidence_strength": [
+      {
+        "applies_to": "integrity_confidence_only",
+        "basis": "no_cross_evidence",
+        "subject_count": 0,
+        "mean_subject_forge_cost": 1,
+        "scale_max": 5,
+        "strength_floor": 0.5,
+        "confidence_factor": 0.6,
+        "subjects_by_basis": {},
+        "subjects": [],
+        "derivation": "Measured on Project Rock Ep01 variants by benchmarks/forge_cost.py (benchmarks/results/forge_cost_project_rock_2026-10-25.json): smallest undetected forgeries and a ranking check, not calibrated probabilities."
       }
     ],
     "ai_disclosure_coverage": [
@@ -1071,7 +1085,7 @@
         "axis": "integrity",
         "availability": "partial",
         "value": null,
-        "confidence": 0.267,
+        "confidence": 0.16,
         "layers": [
           {
             "layer": "file_integrity",
@@ -1214,7 +1228,7 @@
         "range_source": "whole_file",
         "provider": "audfprint",
         "provider_version": "cb03ba99feafd41b8874307f0f4e808a6ce34362",
-        "adapter_version": "1.2",
+        "adapter_version": "1.3",
         "status": "inconclusive",
         "reason_code": "bounded_fingerprint_observation",
         "message": "Landmark offset candidates with bounded support checks; no provenance verdict.",
@@ -1360,6 +1374,28 @@
           "candidate_offsets": 2,
           "mean_votes_per_offset_bin": 0.1596009975062344,
           "support_window_seconds": 0.25,
+          "source_content_windows_seconds": [
+            [
+              0.0,
+              4.2349319727891155
+            ],
+            [
+              4.263571428571429,
+              8.716383219954649
+            ],
+            [
+              8.745022675736962,
+              9.71484126984127
+            ],
+            [
+              9.743480725623582,
+              14.730351473922903
+            ],
+            [
+              14.73577097505669,
+              15.798469387755102
+            ]
+          ],
           "supported_offsets": 2,
           "calibration_profile_id": "bounded-audio-2026-10-20-v2"
         },
@@ -1379,7 +1415,7 @@
           "minimum_candidate_matches": 5,
           "support_window_seconds": 0.25
         },
-        "processing_ms": 455.2115829428658,
+        "processing_ms": 462.904957938008,
         "policy_id": "audio-observations-bounded-v2",
         "policy_version": 3,
         "policy_sha256": "802922f116cc4e5a96222efc6db0aa64b628351edf10f3b8126f5ee52d80bf54",
@@ -1782,6 +1818,12 @@
           "candidate_offsets": 2,
           "mean_votes_per_offset_bin": 0.4420225573438094,
           "support_window_seconds": 0.25,
+          "source_content_windows_seconds": [
+            [
+              0.0,
+              16.0
+            ]
+          ],
           "source_peaks": 1837,
           "target_peaks": 446,
           "peak_pair_frequency_bin_width": 1,
@@ -1809,7 +1851,7 @@
           "minimum_candidate_matches": 5,
           "support_window_seconds": 0.25
         },
-        "processing_ms": 20.274166949093342,
+        "processing_ms": 21.718000061810017,
         "policy_id": "audio-observations-bounded-v2",
         "policy_version": 3,
         "policy_sha256": "802922f116cc4e5a96222efc6db0aa64b628351edf10f3b8126f5ee52d80bf54",
@@ -1953,7 +1995,7 @@
           "aggregation_seconds": 1.0,
           "candidate_cosine_similarity": 0.9
         },
-        "processing_ms": 833.2654580008239,
+        "processing_ms": 822.3965419456363,
         "policy_id": "audio-observations-bounded-v2",
         "policy_version": 3,
         "policy_sha256": "802922f116cc4e5a96222efc6db0aa64b628351edf10f3b8126f5ee52d80bf54",
@@ -2037,7 +2079,7 @@
         "integrity_contribution": null,
         "content_match_is_provenance": false,
         "parameters": {},
-        "processing_ms": 0.03120803739875555,
+        "processing_ms": 0.03104202914983034,
         "policy_id": "audio-observations-bounded-v2",
         "policy_version": 3,
         "policy_sha256": "802922f116cc4e5a96222efc6db0aa64b628351edf10f3b8126f5ee52d80bf54",
@@ -2281,7 +2323,7 @@
           "section_minimum_seconds": 6.0,
           "section_prominence": 0.03
         },
-        "processing_ms": 533.0199589952826,
+        "processing_ms": 514.5461659412831,
         "policy_id": "audio-observations-bounded-v2",
         "policy_version": 3,
         "policy_sha256": "802922f116cc4e5a96222efc6db0aa64b628351edf10f3b8126f5ee52d80bf54",
@@ -2624,7 +2666,7 @@
           "flat_floor_spread_db": 3.0,
           "step_search_top_fraction": 0.9
         },
-        "processing_ms": 13.655000017024577,
+        "processing_ms": 13.518125051632524,
         "policy_id": "audio-observations-bounded-v2",
         "policy_version": 3,
         "policy_sha256": "802922f116cc4e5a96222efc6db0aa64b628351edf10f3b8126f5ee52d80bf54",
@@ -2774,7 +2816,7 @@
           "flat_floor_spread_db": 3.0,
           "step_search_top_fraction": 0.9
         },
-        "processing_ms": 10.35662495996803,
+        "processing_ms": 10.481833945959806,
         "policy_id": "audio-observations-bounded-v2",
         "policy_version": 3,
         "policy_sha256": "802922f116cc4e5a96222efc6db0aa64b628351edf10f3b8126f5ee52d80bf54",
@@ -2891,7 +2933,8 @@
         "policy_version": 3,
         "policy_sha256": "802922f116cc4e5a96222efc6db0aa64b628351edf10f3b8126f5ee52d80bf54",
         "file_task_count": 2,
-        "processing_ms": 2266.345000010915,
+        "declared_range_search_task_count": 0,
+        "processing_ms": 2235.3125419467688,
         "calibration_status_sha256": "d97705b6f4e3c3a6593b673733b6e4922ec0cbdc91dbbb5bfd64d52a883be7f4",
         "decoders": {
           "soundfile": "0.14.0",

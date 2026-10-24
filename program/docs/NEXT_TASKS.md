@@ -1,6 +1,6 @@
 # Future Work
 
-Updated: 2026-10-24 (after merging scoring profile default-v6 with FLAC/MP3 support)
+Updated: 2026-10-25 (declared ranges, content beyond the final, forge cost in scoring profile default-v7)
 
 This file is the current consolidated roadmap for `v3/program`. It replaces the
 shorter v0.4 task list and incorporates unresolved work from the legacy v3
@@ -76,10 +76,13 @@ fingerprinting or other non-scoring diagnostics.
    rules rather than rule weights, the Attestation confidence uses fixed
    levels (0.9, 0.6, 0.3) and the Disclosure confidence is a constant 0.8.
 
-6. Decide whether to restore the legacy prototype's `forge_cost` concept. If it
-   is retained, use it only as a separately reported confidence/fabrication-
-   effort estimate, never as evidence that a claim is true. Calibrate values
-   empirically rather than assigning them only by artefact type.
+6. Completed (25 October 2026): forge cost restored as scoring profile
+   `default-v7`. It scales Integrity confidence only, never the value, keeps
+   the tier order and was derived from forgery measurements on Project Rock
+   Ep01 copies with a ranking check and a held-out case
+   (`docs/FORGE_COST.md`, `benchmarks/forge_cost.py`). Still open: refine the
+   costs with the CSEC red-team cost records and more productions; the values
+   are measured costs, not calibrated probabilities.
 
 7. Add clearly licensed, XSD-valid real RIN and ERN fixtures. Cover valid,
    invalid, unsupported-version, namespace variation, missing field, incorrect
@@ -278,7 +281,10 @@ fingerprinting or other non-scoring diagnostics.
     missing material reported as insufficient evidence rather than a failure.
     A plain FLAC take is therefore withheld for lack of recorder evidence, and
     an MP3 mix now lists its edges as `not_comparable` (`format_has_no_bwf`)
-    in `declared_chronology`. Confirm this treatment with the client; FLAC and MP3 receive no further checks.
+    in `declared_chronology`. Decided (24 October 2026): the client confirmed
+    this treatment; FLAC and MP3 receive no further checks. The resulting
+    limitations are listed in the README ("Client decisions on formats") and
+    Sections 4 and 10 of the technical manual.
 
 34. Required-recording scope for `support_breadth` (client decision): which
     workflows require every take the AAF edit uses, which allow samples,
@@ -304,6 +310,50 @@ fingerprinting or other non-scoring diagnostics.
     `lossless: required`, giving Completeness `met`, `met_with_limits` or
     `not_met`. Default `preferred` everywhere until the client chooses. With
     the WAV focus this is mainly a way to require WAV/BWF recordings.
+    Decided (24 October 2026): the client confirmed that recordings do not
+    have to be WAV/BWF. WAV/BWF stays preferred, no `required` option is
+    added, and the format never makes Completeness fail; the limits are
+    reported in the findings and `format_capabilities`. Still open and
+    optional: a `met_with_limits` Completeness label, so that a package of
+    FLAC or MP3 recordings without recorder metadata is distinguishable in
+    Completeness itself (today only in the findings and Integrity status).
+
+## Open after the first-demo feedback work (25 October 2026)
+
+42. Start-timecode gap found by `benchmarks/forge_cost.py`: the AAF checks only
+    that each used range lies inside the recording, so a start timecode moved
+    by one second in both the WAV and the sound report raises no contradiction.
+    Fixes, cheapest first: (A) a scored check that bext `TimeReference` equals
+    iXML `TIMESTAMP_SAMPLES_SINCE_MIDNIGHT` (they agree on every Project Rock
+    take; the forgery changed only bext); (B) a consistent offset between
+    timecode and `OriginationTime` across the takes of one recorder and day
+    (reliable for shifts of 2 s or more, as `OriginationTime` has one-second
+    resolution); (C) compare the fingerprint offset of each AAF-used range in
+    the mix with the offset the AAF timeline and recorder start predict, using
+    the median over takes as reference so the unknown mix origin cancels;
+    report-only at first. C needs the episode composition positions from the
+    AAF, which the parser does not read yet. If C were scored, the timecode
+    claim would need the AAF changed too and recorder metadata would measure
+    cost 4.
+43. Decide when report-only audio findings may affect a score
+    (`AUDIO_DECLARED_RANGE_NOT_SUPPORTED`, `AUDIO_TAKE_CONTENT_BEYOND_FINAL`,
+    `AUDIO_SOURCE_CONTENT_BEYOND_TARGET`): the client's accuracy bar, then
+    calibration on labelled productions. Their thresholds (0.25 s offset
+    tolerance; 0.5 s handles, 3 s pieces and regions, 2 s content) are
+    heuristic.
+44. Positive control for dialogue: 7 of the 13 Project Rock takes cannot be
+    assessed for content beyond the final because no used range was found in
+    the mix (fingerprints find little in short dialogue). A better dialogue
+    matcher would let them be assessed.
+45. Machine-learning providers, report-only with calibration records: first a
+    Demucs source-separation comparison of submitted stems with the separated
+    final, calibrated on the MUSDB18-HQ test split and Cambridge-MT multitracks
+    (Demucs trains on the MUSDB18 training split); then Whisper dialogue
+    matching for post-production material such as Project Rock. Both need
+    pinned weights, an optional requirements file and licence checks.
+46. Remove or isolate the policy-disabled legacy signal modules
+    (`physical_audio_passes.py`, `audio_derivation.py`); they are most of the
+    gap between 73% overall and 84% active-code line coverage.
 
 ## Out of scope: FLAC and MP3 beyond the current checks (decided 24 October 2026)
 

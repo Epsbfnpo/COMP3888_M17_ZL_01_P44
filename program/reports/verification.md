@@ -1,5 +1,15 @@
 # Verification Record
 
+## First-demo feedback work: declared ranges, content beyond the final, forge cost (2026-10-25)
+
+- `REQUIRE_AUDIO_BACKENDS=1`, CPython 3.13.7 on macOS: **466 tests; 463 passed, 3 skipped**. 462 non-GUI tests ran in one process (40 s); the 3 skips are the Suno real-sample tests, which need `C2PA_SUNO_SAMPLE_DIR`. The four `test_builder.GuiTests` cases passed in separate processes.
+- Coverage of the same runs (coverage.py, branch measurement): 73.3% of lines and 63.5% of branches; 84% of lines without the policy-disabled `physical_audio_passes.py` and `audio_derivation.py`. Report: `reports/coverage/`.
+- Declared ranges: on the repeated-excerpt fixture, declared 2-6 s and 10-14 s windows give `declared_range_supported`; a declared 7-11 s window gives `AUDIO_DECLARED_RANGE_NOT_SUPPORTED` (`content_found_elsewhere`, best source range 2.0-6.0 s, SpectroMap agrees). Integrity and every non-audio finding are identical with analysis on or off.
+- Content beyond the final, Project Rock Ep01 (13 AAF-used takes, WIP mix): 26 unused pieces analysed; the 6 takes with a positive control report 10.1-32.8 s of unused material not found (119.9 s in total); 7 takes have no positive control; one unused piece has a 6-pair, 0.5 s SpectroMap candidate. Run time 35.5 s, 465 MB peak (previously about 19 s). No-AAF variant: a real take reports 15.1 s beyond the mix; an exact and a band-passed cut of the mix are both `contained_in_target`.
+- Forge cost (`benchmarks/results/forge_cost_project_rock_2026-10-25.json`): smallest undetected forgeries are WAV + sound report + AAF for a take number (cost 4), WAV + sound report for a 1 s start-timecode shift (cost 3) and the cue sheet alone for a cue range (cost 1). All five stated orderings held for strength floors 0-0.9 under the derived costs; default-v6 failed two. Held-out Ep01: value 1.0 (unchanged), confidence 0.427 (default-v6: 0.533).
+- Example responses regenerated: every axis value identical to the committed versions; Integrity confidence multiplied by the forge-cost factor (0.6 without cross-evidence, so 0.533 becomes 0.32 and 0.267 becomes 0.16).
+- `reports/public-results/` was not regenerated; the public CSEC bundles are not stored in the repository.
+
 ## Suno as a known AI signer (2026-10-24, branch feature/c2pa-ai-signer-expansion)
 
 - CPython 3.12.2 on macOS, c2pa-python 0.37.10 (`.venv312`): `tests.test_c2pa_integrity` **33 tests, OK (30 passed, 3 skipped without the Suno downloads)**; with `C2PA_SUNO_SAMPLE_DIR` set, the module plus `test_audio_formats.C2paInFlacAndMp3Tests` ran **35 tests, all passed, no skips**.

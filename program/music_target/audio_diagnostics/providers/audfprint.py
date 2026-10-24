@@ -39,7 +39,7 @@ def analyse(task, parameters, context=None):
                    "Landmark offset candidates with bounded support checks; no provenance verdict.")
     if context is not None:
         context["votes"]["audfprint"] = offset_profile
-    value.update(provider_version=UPSTREAM_COMMIT, adapter_version="1.2", analysis_complete=True,
+    value.update(provider_version=UPSTREAM_COMMIT, adapter_version="1.3", analysis_complete=True,
                  analysed_ranges=ranges(source, target), matches=matches, metrics=metrics)
     value["limitations"][1] = "Profile support is bounded to the documented mixture/excerpt experiment, not calibrated probability or provenance evidence."
     value["limitations"].append("Supported windows surround matched landmarks; they are not exact edit boundaries.")

@@ -20,6 +20,10 @@ def _norm(value):
 
 
 def _aaf_ranges(response):
+    return {digest: take["ranges"] for digest, take in _aaf_takes(response).items()}
+
+
+def _aaf_takes(response):
     """Source seconds each AAF-used recorder take contributes, keyed by the take's hash.
 
     AAF ranges are tape timecode; subtracting the take's recorder start gives
@@ -34,7 +38,7 @@ def _aaf_ranges(response):
                 and recorder.get("file_name")):
             recorders.setdefault((_norm(recorder.get("tape")), _norm(recorder["file_name"])), []).append(
                 (row["evidence_hash"], recorder))
-    ranges = {}
+    ranges, durations = {}, {}
     for row in response.get("findings", []):
         if not (row.get("code") == "PARSER_OBSERVATION" and row.get("parser") == "aaf"
                 and row.get("parser_status") in {"parsed", "partial"} and row.get("parser_result")):
@@ -54,7 +58,9 @@ def _aaf_ranges(response):
                     continue
                 key = (round(max(begin, 0.0), 6), round(min(end, duration), 6))
                 ranges.setdefault(digest, {}).setdefault(key, reference.get("master_mob"))
-    return {digest: sorted(items.items()) for digest, items in ranges.items()}
+                durations[digest] = float(duration)
+    return {digest: {"duration_seconds": durations[digest], "ranges": sorted(items.items())}
+            for digest, items in ranges.items()}
 
 
 def build_tasks(native, response):
@@ -149,6 +155,70 @@ def file_tasks(native, response):
 
 
 DERIVED = "derived_from_declared_source_duration"
+AAF_UNUSED = "aaf_unused_range"
+# Editors keep handles around each used clip; seconds this close to a used
+# range are not counted as unused.
+AAF_HANDLE_SECONDS = 0.5
+# Shorter unused pieces carry too few landmarks to fingerprint reliably.
+MINIMUM_UNUSED_SECONDS = 3.0
+RANGE_SEARCH = "declared_range_search"
+# Fingerprint providers that can locate a target window anywhere in the source.
+SEARCH_PROVIDERS = ("audfprint", "spectromap")
+
+
+def _unused_pieces(duration, used):
+    pieces, cursor = [], 0.0
+    for begin, end in sorted(used) + [(duration + AAF_HANDLE_SECONDS, duration + AAF_HANDLE_SECONDS)]:
+        stop = min(begin - AAF_HANDLE_SECONDS, duration)
+        if stop - cursor >= MINIMUM_UNUSED_SECONDS:
+            pieces.append((round(cursor, 6), round(stop, 6)))
+        cursor = max(cursor, end + AAF_HANDLE_SECONDS)
+    return pieces
+
+
+def unused_range_tasks(tasks, response):
+    """Seconds of each AAF-used take that the edit does not use, for comparison with the same target.
+
+    A recorder take normally holds more than the final keeps (other passes,
+    false starts, room tone). A stem separated from the final cannot, so
+    take content the final lacks is evidence the take is not derived from it.
+    """
+    takes, out, seen = _aaf_takes(response), [], set()
+    for task in tasks:
+        if task.get("range_source") != AAF_RANGE or task["relation_id"] in seen:
+            continue
+        seen.add(task["relation_id"])
+        take = takes.get(task["source_hash"])
+        if not take:
+            continue
+        for number, (begin, end) in enumerate(_unused_pieces(take["duration_seconds"],
+                                                             [span for span, _ in take["ranges"]])):
+            out.append({**task, "task_id": f"{task['relation_id']}:unused:{number}",
+                        "selection_id": f"aaf-unused:{number}", "range_source": AAF_UNUSED,
+                        "attributes": {"source_start_seconds": begin, "source_end_seconds": end,
+                                       "target_start_seconds": None, "target_end_seconds": None}})
+    return out
+
+
+def range_search_tasks(tasks):
+    """Whole-source companions for edges that declare both source and target seconds.
+
+    The declared task compares only the declared source window. Its companion
+    searches the whole source for the declared target window, so a false
+    interval can be told apart from audio that is simply hard to fingerprint.
+    It reads only the two files the edge already declares.
+    """
+    out = []
+    for task in tasks:
+        attrs = task["attributes"]
+        if (task.get("unavailable_reason") or task.get("range_source") not in ("declared", DERIVED)
+                or not all(type(attrs.get(key)) in (int, float) for key in RANGE_FIELDS)):
+            continue
+        out.append({**task, "task_id": task["task_id"] + ":search", "range_source": RANGE_SEARCH,
+                    "attributes": {"source_start_seconds": None, "source_end_seconds": None,
+                                   "target_start_seconds": attrs["target_start_seconds"],
+                                   "target_end_seconds": attrs["target_end_seconds"]}})
+    return out
 
 
 def _range_source(attrs):

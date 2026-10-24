@@ -11,3 +11,7 @@ certivina_audio_domain/
 *~
 \#*\#
 .\#*
+
+# Coverage data files (the HTML report in program/reports/coverage/ is kept)
+.coverage
+.coverage.*

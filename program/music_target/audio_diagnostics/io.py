@@ -141,9 +141,12 @@ def read_pair(task, sample_rate, cache=None):
     attrs = task["attributes"]
     values = [attrs.get(key) for key in RANGE_FIELDS]
     # An AAF range names only the source seconds used; the target is analysed whole.
-    aaf_source_only = (task.get("range_source") == "aaf_source_range" and values[2] is None
+    aaf_source_only = (task.get("range_source") in ("aaf_source_range", "aaf_unused_range") and values[2] is None
                        and values[3] is None and values[0] is not None and values[1] is not None)
-    if (not aaf_source_only and any(value is not None for value in values)
+    # A declared-range search reads the whole source against the declared target window.
+    range_search = (task.get("range_source") == "declared_range_search" and values[0] is None
+                    and values[1] is None and values[2] is not None and values[3] is not None)
+    if (not aaf_source_only and not range_search and any(value is not None for value in values)
             and not all(value is not None for value in values)):
         missing = ", ".join(key for key, value in zip(RANGE_FIELDS, values) if value is None)
         raise AnalysisUnavailable("incomplete_declared_ranges",

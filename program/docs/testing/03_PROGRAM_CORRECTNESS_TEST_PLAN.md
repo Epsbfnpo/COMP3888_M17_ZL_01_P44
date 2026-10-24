@@ -196,6 +196,6 @@ python3 -B check_public.py /path/to/public-bundles
 | PC-02 | audio-diagnostics, timeout 1 s | on | succeeded | `caller_timeout` rows | … | … | … | … | … | … | … | … |
 
 The PC-20 rows above were recorded at `588d7e5` under `default-v4`. Rows recorded from 24 October 2026
-use `default-v6`; record the profile in every row and do not compare rows across profiles.
+use `default-v7` (`default-v6` until 25 October 2026); record the profile in every row and do not compare rows across profiles.
 
 Every row should be reproducible from the recorded input, commit, and policy versions alone.
