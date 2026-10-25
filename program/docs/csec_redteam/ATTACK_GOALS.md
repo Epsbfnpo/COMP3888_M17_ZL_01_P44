@@ -1,11 +1,10 @@
 # Adversarial testing: attack goals and success criteria
 
-Status: **draft for CSEC review, updated 25 October 2026.** The scoring
-update (profile `default-v6`) has been merged into main together with FLAC
-and MP3 support. Profile `default-v7` (25 October 2026) changes Integrity
-confidence only: values and the release rule below are unchanged. Sections marked **[PENDING PIN]** still need the pinned
-version and the thresholds the team agrees for G1 and G3. Goals G4, G5 and G7
-do not depend on scoring and can be tested now.
+Status: **final for this round, 25 October 2026.** Pinned baseline: Git tag
+`csec-2026-10-25`, `system.version` 0.8.1, scoring profile `default-v7`,
+`system.source_revision` `sha256:ac048707f1bc29f53bc8ffa2ca27d8e121f6da0008fd397dddfc3bea4b9cbf5c`. Profile `default-v7` keeps the `default-v6`
+values and release rule and grades Integrity confidence by forge cost (G8).
+All goals, G1-G8, can be tested now.
 
 ## 1. What the evaluator claims, and what it does not
 
@@ -54,13 +53,15 @@ claimed history:
 - in `assessment_checks.integrity_decision`, `numeric_release` is not
   `withheld` and `contradiction_count` is 0, so `axes.integrity.value` is a
   number rather than `null`;
-- the release rule is the `default-v6` withholding rule (two populated
+- `axes.integrity.value` is at least **0.9**. The release rule is the
+  `default-v7` withholding rule, unchanged from `default-v6` (two populated
   layers and an assessed qualifying cross-evidence fact; the optional
-  `min_supported_asset_share` gate is off). The field names above are
-  unchanged. **[PENDING PIN]** the integrity value that counts as "high".
-- Note that in `default-v6` declared technical values form their own facts in
-  declaration consistency, so a package with declared values usually has three
-  populated layers (confidence 0.8).
+  `min_supported_asset_share` gate is off).
+- Record `axes.integrity.confidence` and `assessment_checks.evidence_strength`
+  as well: under `default-v7` confidence also shows how hard the accepted
+  evidence was to forge (see G8). Declared technical values form their own
+  facts in declaration consistency, so a package with declared values usually
+  has three populated layers.
 
 Partial success is worth recording: a package that passes some checks and is
 stopped by others shows which evidence raises the cost of forgery.
@@ -96,8 +97,10 @@ whose history is genuine. Under `default-v6` an ordinary contradiction
 neither releases nor withholds a value by itself: with qualifying support the
 value is still released, marked `contradicted`, and the contradiction only
 lowers its layer mean (on Project Rock Ep01 one forged timecode among 96
-facts gives 0.994); without support it stays withheld. **[PENDING PIN]** whether a single false contradiction
-counts as success regardless of the value.
+facts gives 0.994); without support it stays withheld. **A single
+contradiction that genuine material does not deserve counts as G3 success,
+whatever the Integrity value**, because the status and the contradiction
+count lead the reasoning a reader sees.
 
 The Project Rock dataset (see Section 5) is the main genuine material for G3.
 
@@ -149,6 +152,46 @@ Independent of scoring. Success: the same request and files give different
 `axes`, `findings` or `assessment_checks` on the same pinned version
 (timings, `processing_ms` and `resource_usage` excluded).
 
+### G8. Confidence is bought cheaply (forge cost)
+
+Profile `default-v7` grades every assessed cross-evidence fact by forge cost:
+trusted C2PA signature 5, recorder metadata (BWF/iXML) 3, an AAF or DAW
+session not checked against recorder metadata 2, any other submitter document
+1, and 1 whenever a document or the recording it is about is not hash-bound.
+Each subject (one recording or document collection) takes the cost of its
+strongest fact, and Integrity confidence is multiplied by
+`0.5 + 0.5 x mean subject cost / 5`. The value is never changed. Every
+response lists the subjects, costs and factor in
+`assessment_checks.evidence_strength`.
+
+The costs were measured on Project Rock Ep01 copies as the smallest set of
+files that must change together for a forged claim to raise no
+contradiction, plus one for a binary container (`docs/FORGE_COST.md`,
+`benchmarks/forge_cost.py`): a take number needed the WAV, the sound report
+and the AAF; a 1-second start-timecode shift needed the WAV and the sound
+report; a cue range needed only the cue sheet. One production is a small
+basis, so this goal tests the costs themselves.
+
+Success, any of:
+
+- a fabricated package reaches a confidence factor at or above that of
+  genuine recorder evidence (0.8) while its forgery took markedly less effort
+  than the measured costs imply (fewer files, no binary editing, or a
+  simpler tool than the cost assumes);
+- a fact is costed above its real basis: a document-only fact counted as
+  `recorder_metadata` or `signed_attestation`, or an unbound or substituted
+  file not reported as `unbound_source`;
+- adding a weaker document about the same recording lowers confidence, or
+  adding documents of any kind raises confidence above what the strongest
+  checked evidence justifies;
+- a forged claim backed by recorder metadata passes with fewer changed files
+  than the derivation measured.
+
+Always record the cost of each attempt (`fields_or_files_forged`,
+`skill_level`, `tools`, time) together with the resulting `evidence_strength`
+and confidence. A measured cost that disagrees with ours in either direction
+is the result we need, even when no goal above succeeds.
+
 ## 3. Known weaknesses
 
 These are documented limits. Testing them is still useful, because the brief
@@ -197,12 +240,17 @@ defect.
 - **Engineering fixtures** in `examples/`: synthetic, not genuine history.
 - **AI-labelled audio**: Lumina output with an embedded BytePlus C2PA
   manifest, as used in `docs/FALSE_MATCH_BENCHMARK_2026-10-21.md`.
+- **Forgery starting point for G1 and G8**: `benchmarks/forge_cost.py` forges a
+  take number, a start timecode and a cue range in copies of a Project Rock
+  bundle (`--take 10T07.WAV`) and records the contradictions each variant
+  raises; our results are in
+  `benchmarks/results/forge_cost_project_rock_2026-10-25.json`.
 
 ## 6. Rules of engagement
 
-- Test the pinned version only, and record `system.version` and
-  `system.source_revision` from each response. **[PENDING PIN]**
-  pinned version and Git tag.
+- Test the pinned version only (tag `csec-2026-10-25`), and record
+  `system.version` (0.8.1) and `system.source_revision` (`sha256:ac048707f1bc29f53bc8ffa2ca27d8e121f6da0008fd397dddfc3bea4b9cbf5c`)
+  from each response.
 - Run locally. The evaluator needs no network, credentials or online
   services.
 - Save every case as a reproducible bundle: the request JSON plus its
@@ -211,5 +259,5 @@ defect.
 - Report each defect with [ISSUE_REPORT_TEMPLATE.md](ISSUE_REPORT_TEMPLATE.md)
   and each attempt's cost with
   [COST_RECORD_TEMPLATE.md](COST_RECORD_TEMPLATE.md).
-- A G4 or G5 problem found on 0.8.1 can be reported at once. Report G1–G3
-  results only against the pinned post-update version.
+- Report every result against the pinned version. We would value your
+  feedback before our next client meeting, so that we can answer it there.

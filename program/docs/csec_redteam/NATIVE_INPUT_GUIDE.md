@@ -1,9 +1,9 @@
 # Native input guide for adversarial testing
 
-Status: draft for CSEC review, 23 October 2026, checked against version
-0.8.1 and updated 24 October 2026 for the merged scoring profile
-`default-v6` and FLAC/MP3 support. The input format did not change; the
-response gained the fields marked (v6) below.
+Status: final for this round, 25 October 2026, checked against the pinned
+baseline (tag `csec-2026-10-25`, version 0.8.1, scoring profile `default-v7`).
+The input format did not change since 23 October; the response gained the
+fields marked (v6) and (v7) below.
 
 ## Why native input
 
@@ -24,7 +24,10 @@ python3 -m venv .venv
 
 - `--root` is the case folder; every object must sit inside it.
 - Add `--audio-analysis` for the report-only audio diagnostics (needs
-  `requirements-audio.txt`).
+  `requirements-audio.txt`). To run the full test suite with
+  `REQUIRE_AUDIO_BACKENDS=1`, also install `requirements-audio.txt` and
+  `requirements-benchmark.txt` (`mir_eval`, used by 5 structure-benchmark
+  tests).
 - Exit code 0 means a response was produced; read `execution_status`
   (`succeeded`, `unsupported`, `timeout`, `error`). Exit code 2 means the
   input could not be read well enough to answer, with a message on stderr.
@@ -220,6 +223,10 @@ Schema: `schemas/scoring-response.schema.json`.
 | `assessment_checks.declared_chronology` | BWF origination order per audio edge; `status: not_comparable` with a reason when a file has no date; not scored |
 | `assessment_checks.format_capabilities` | Per audio file: `check_scope` (`full` for WAV, `limited` for FLAC/MP3), `limited_checks`, recorder metadata (`present`, `not_kept`, `not_supported_by_format`, `absent`), exact length, bit depth, BWF date, embedded C2PA, advice; not scored |
 | `assessment_checks.format_conversions` | Per declared format conversion: direction, the scored parameter checks and `sample_identity` (`identical`, `different`, `not_comparable`, `unavailable`) |
+| `assessment_checks.evidence_strength` (v7) | Forge cost of every checked subject (recording or document collection) with its basis, the mean cost and the confidence factor. Integrity confidence = 0.8 x populated layers / 3 x factor, factor = 0.5 + 0.5 x mean cost / 5; costs: trusted signature 5, recorder metadata 3, AAF or DAW not checked against recorder metadata 2, other documents and unbound files 1. Changes confidence only, never the value (goal G8) |
+| `assessment_checks.audio_declared_range`, `audio_declared_range_search` (v7, `--audio-analysis`) | For edges declaring all four range fields: whether audfprint supports the declared window and, if not, where the target's content is in the source; finding `AUDIO_DECLARED_RANGE_NOT_SUPPORTED`; report-only |
+| `assessment_checks.audio_take_beyond_final`, `audio_aaf_unused_range` (v7, `--audio-analysis`) | For AAF-used takes: unused seconds not found in the target (`AUDIO_TAKE_CONTENT_BEYOND_FINAL`) or with a candidate there (`AUDIO_UNUSED_RANGE_FOUND_IN_FINAL`), gated by the take's used ranges being found; report-only |
+| `assessment_checks.audio_source_coverage` (v7, `--audio-analysis`) | Without an AAF: source regions with landmarks but no match in the target (`AUDIO_SOURCE_CONTENT_BEYOND_TARGET`); report-only |
 | `workflow_assessment.rule_results` | Each workflow expectation: `satisfied`, `missing`, `not_applicable`, `not_assessed` |
 | `validation` | C2PA state of the final artefact (`validation_state`, signature and trust fields) |
 | `findings` | Coded findings with severity and evidence hash |

@@ -1,5 +1,10 @@
 # Verification Record
 
+## CSEC baseline pin and clean install (2026-10-25)
+
+- Pinned baseline for CSEC: tag `csec-2026-10-25`, version 0.8.1, scoring profile `default-v7`, `source_revision` `sha256:ac048707f1bc29f53bc8ffa2ca27d8e121f6da0008fd397dddfc3bea4b9cbf5c`. Only documentation changed after the forge-cost merge, and documentation is not part of `source_revision`.
+- Clean install: `git archive main program` into an empty folder, new virtual environment, `pip install -r requirements.txt -r requirements-audio.txt`. With `REQUIRE_AUDIO_BACKENDS=1`, 462 non-GUI tests ran: all passed except 3 of the 5 structure-benchmark tests, which need `mir_eval`; after `pip install -r requirements-benchmark.txt` those 5 passed. GUI tests passed in separate processes. The example response reported `source_revision` `sha256:ac048707…cbf5c`, matching the pin. The native input guide now lists all three requirement files.
+
 ## First-demo feedback work: declared ranges, content beyond the final, forge cost (2026-10-25)
 
 - `REQUIRE_AUDIO_BACKENDS=1`, CPython 3.13.7 on macOS: **466 tests; 463 passed, 3 skipped**. 462 non-GUI tests ran in one process (40 s); the 3 skips are the Suno real-sample tests, which need `C2PA_SUNO_SAMPLE_DIR`. The four `test_builder.GuiTests` cases passed in separate processes.
