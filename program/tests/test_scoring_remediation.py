@@ -284,7 +284,10 @@ class ProductionScoringRegressionTests(unittest.TestCase):
         response = self.score([self.report(True, "consistent synthetic BWF")])
         axis = response["axes"]["integrity"]
         self.assertAlmostEqual(axis["value"], 1.0)
-        self.assertEqual(axis["confidence"], 0.533)
+        # Two of three layers (0.8 x 2/3), scaled by recorder-metadata forge cost 3 of 5: 0.5 + 0.5 x 0.6.
+        self.assertEqual(axis["confidence"], 0.427)
+        strength = response["assessment_checks"]["evidence_strength"][0]
+        self.assertEqual((strength["subjects_by_basis"], strength["confidence_factor"]), ({"recorder_metadata": 1}, 0.8))
         warnings = [row for row in response["findings"] if row["code"] == "RECORDER_METADATA_ORIGIN_NOT_AUTHENTICATED"]
         self.assertTrue(warnings)
         self.assertTrue(any(row["evidence_hash"] == self.harness.take for row in warnings))

@@ -16,7 +16,9 @@ the music-domain evaluator. Not yet sent.
 Goals G4 (robustness), G5 (hidden input errors) and G7 (determinism) do not
 depend on scoring and can be tested on version 0.8.1. Goals G1–G3 should be
 reported against the pinned version. The scoring update (`default-v6`) is
-merged; only the version pin and the G1/G3 thresholds are outstanding.
+merged, and `default-v7` (25 October 2026) adds forge-cost-graded confidence
+without changing values; only the version pin and the G1/G3 thresholds are
+outstanding.
 
 ## Test data
 

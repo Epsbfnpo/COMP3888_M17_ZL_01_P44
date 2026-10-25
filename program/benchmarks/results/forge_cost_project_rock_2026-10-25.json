@@ -1,0 +1,571 @@
+{
+ "benchmark": "forge_cost",
+ "date": "2026-10-25",
+ "case_id": "PROJECT-ROCK-Ep01",
+ "take": "10T07.WAV",
+ "base_profile_id": "default-v7",
+ "derivation": {
+  "split": "development",
+  "claims": {
+   "take_number": {
+    "rows": [
+     {
+      "forged_in": [
+       "holder"
+      ],
+      "binary_edit": true,
+      "execution_status": "succeeded",
+      "contradictions": 1,
+      "failed_rules": [
+       "sound_report_scene_take_matches_recorder"
+      ],
+      "integrity": 0.9935897435897436,
+      "confidence": 0.427
+     },
+     {
+      "forged_in": [
+       "holder",
+       "sound_report"
+      ],
+      "binary_edit": true,
+      "execution_status": "succeeded",
+      "contradictions": 1,
+      "failed_rules": [
+       "aaf_scene_take_matches_recorder"
+      ],
+      "integrity": 0.9935897435897436,
+      "confidence": 0.427
+     },
+     {
+      "forged_in": [
+       "holder",
+       "aaf"
+      ],
+      "binary_edit": true,
+      "execution_status": "succeeded",
+      "contradictions": 1,
+      "failed_rules": [
+       "sound_report_scene_take_matches_recorder"
+      ],
+      "integrity": 0.9935897435897436,
+      "confidence": 0.427
+     },
+     {
+      "forged_in": [
+       "holder",
+       "sound_report",
+       "aaf"
+      ],
+      "binary_edit": true,
+      "execution_status": "succeeded",
+      "contradictions": 0,
+      "failed_rules": [],
+      "integrity": 1.0,
+      "confidence": 0.427
+     }
+    ],
+    "smallest_undetected_forgery": [
+     "holder",
+     "sound_report",
+     "aaf"
+    ],
+    "measured_cost": 4,
+    "edit": [
+     "07",
+     "08"
+    ]
+   },
+   "start_timecode_plus_1s": {
+    "rows": [
+     {
+      "forged_in": [
+       "holder"
+      ],
+      "binary_edit": true,
+      "execution_status": "succeeded",
+      "contradictions": 1,
+      "failed_rules": [
+       "sound_report_start_timecode_matches_recorder"
+      ],
+      "integrity": 0.9935897435897436,
+      "confidence": 0.427
+     },
+     {
+      "forged_in": [
+       "holder",
+       "sound_report"
+      ],
+      "binary_edit": true,
+      "execution_status": "succeeded",
+      "contradictions": 0,
+      "failed_rules": [],
+      "integrity": 1.0,
+      "confidence": 0.427
+     },
+     {
+      "forged_in": [
+       "holder",
+       "aaf"
+      ],
+      "binary_edit": true,
+      "execution_status": "succeeded",
+      "contradictions": 1,
+      "failed_rules": [
+       "sound_report_start_timecode_matches_recorder"
+      ],
+      "integrity": 0.9935897435897436,
+      "confidence": 0.427
+     },
+     {
+      "forged_in": [
+       "holder",
+       "sound_report",
+       "aaf"
+      ],
+      "binary_edit": true,
+      "execution_status": "succeeded",
+      "contradictions": 0,
+      "failed_rules": [],
+      "integrity": 1.0,
+      "confidence": 0.427
+     }
+    ],
+    "smallest_undetected_forgery": [
+     "holder",
+     "sound_report"
+    ],
+    "measured_cost": 3,
+    "edit": [
+     "08:36:09:00",
+     "08:36:10:00"
+    ]
+   },
+   "cue_range": {
+    "rows": [
+     {
+      "forged_in": [
+       "holder"
+      ],
+      "binary_edit": false,
+      "execution_status": "succeeded",
+      "contradictions": 0,
+      "failed_rules": [],
+      "integrity": 1.0,
+      "confidence": 0.427
+     }
+    ],
+    "smallest_undetected_forgery": [
+     "holder"
+    ],
+    "measured_cost": 1,
+    "baseline": {
+     "execution_status": "succeeded",
+     "contradictions": 0,
+     "failed_rules": [],
+     "integrity": 1.0,
+     "confidence": 0.427
+    },
+    "edit": [
+     "start 0.0 s",
+     "start 2.0 s"
+    ]
+   }
+  },
+  "derived_costs": {
+   "recorder_metadata": 3,
+   "plain_document": 1,
+   "binary_document": 2
+  },
+  "signed_attestation": "top of the scale: a trusted signature cannot be produced by editing files; an edited signed file becomes invalid"
+ },
+ "ranking": {
+  "split": "development",
+  "margin": 0.02,
+  "preregistered_floor": 0.5,
+  "orderings_stated_in_advance": [
+   [
+    "sound_report",
+    ">",
+    "cue_sheet",
+    "a sound report checked against recorder metadata beats a cue sheet checked only against file length"
+   ],
+   [
+    "aaf",
+    ">",
+    "cue_sheet",
+    "an AAF checked against recorder metadata beats a cue sheet checked only against file length"
+   ],
+   [
+    "cue_sheet",
+    ">",
+    "no_documents",
+    "checked cross-evidence beats none"
+   ],
+   [
+    "cue_sheet_and_sound_report",
+    ">=",
+    "sound_report",
+    "adding a weaker corroborating document never lowers confidence"
+   ],
+   [
+    "aaf_and_sound_report",
+    ">=",
+    "aaf",
+    "adding a corroborating document never lowers confidence"
+   ]
+  ],
+  "grid": [
+   {
+    "strength_floor": null,
+    "confidence": {
+     "aaf_and_sound_report": 0.533,
+     "aaf": 0.533,
+     "sound_report": 0.533,
+     "no_documents": 0.267,
+     "cue_sheet": 0.533,
+     "cue_sheet_and_sound_report": 0.533
+    },
+    "orderings": [
+     {
+      "higher": "sound_report",
+      "relation": ">",
+      "lower": "cue_sheet",
+      "reason": "a sound report checked against recorder metadata beats a cue sheet checked only against file length",
+      "difference": 0.0,
+      "held": false
+     },
+     {
+      "higher": "aaf",
+      "relation": ">",
+      "lower": "cue_sheet",
+      "reason": "an AAF checked against recorder metadata beats a cue sheet checked only against file length",
+      "difference": 0.0,
+      "held": false
+     },
+     {
+      "higher": "cue_sheet",
+      "relation": ">",
+      "lower": "no_documents",
+      "reason": "checked cross-evidence beats none",
+      "difference": 0.266,
+      "held": true
+     },
+     {
+      "higher": "cue_sheet_and_sound_report",
+      "relation": ">=",
+      "lower": "sound_report",
+      "reason": "adding a weaker corroborating document never lowers confidence",
+      "difference": 0.0,
+      "held": true
+     },
+     {
+      "higher": "aaf_and_sound_report",
+      "relation": ">=",
+      "lower": "aaf",
+      "reason": "adding a corroborating document never lowers confidence",
+      "difference": 0.0,
+      "held": true
+     }
+    ],
+    "all_held": false,
+    "label": "default-v6 (no forge cost)"
+   },
+   {
+    "strength_floor": 0.0,
+    "confidence": {
+     "aaf_and_sound_report": 0.32,
+     "aaf": 0.32,
+     "sound_report": 0.32,
+     "no_documents": 0.053,
+     "cue_sheet": 0.107,
+     "cue_sheet_and_sound_report": 0.32
+    },
+    "orderings": [
+     {
+      "higher": "sound_report",
+      "relation": ">",
+      "lower": "cue_sheet",
+      "reason": "a sound report checked against recorder metadata beats a cue sheet checked only against file length",
+      "difference": 0.213,
+      "held": true
+     },
+     {
+      "higher": "aaf",
+      "relation": ">",
+      "lower": "cue_sheet",
+      "reason": "an AAF checked against recorder metadata beats a cue sheet checked only against file length",
+      "difference": 0.213,
+      "held": true
+     },
+     {
+      "higher": "cue_sheet",
+      "relation": ">",
+      "lower": "no_documents",
+      "reason": "checked cross-evidence beats none",
+      "difference": 0.054,
+      "held": true
+     },
+     {
+      "higher": "cue_sheet_and_sound_report",
+      "relation": ">=",
+      "lower": "sound_report",
+      "reason": "adding a weaker corroborating document never lowers confidence",
+      "difference": 0.0,
+      "held": true
+     },
+     {
+      "higher": "aaf_and_sound_report",
+      "relation": ">=",
+      "lower": "aaf",
+      "reason": "adding a corroborating document never lowers confidence",
+      "difference": 0.0,
+      "held": true
+     }
+    ],
+    "all_held": true
+   },
+   {
+    "strength_floor": 0.25,
+    "confidence": {
+     "aaf_and_sound_report": 0.373,
+     "aaf": 0.373,
+     "sound_report": 0.373,
+     "no_documents": 0.107,
+     "cue_sheet": 0.213,
+     "cue_sheet_and_sound_report": 0.373
+    },
+    "orderings": [
+     {
+      "higher": "sound_report",
+      "relation": ">",
+      "lower": "cue_sheet",
+      "reason": "a sound report checked against recorder metadata beats a cue sheet checked only against file length",
+      "difference": 0.16,
+      "held": true
+     },
+     {
+      "higher": "aaf",
+      "relation": ">",
+      "lower": "cue_sheet",
+      "reason": "an AAF checked against recorder metadata beats a cue sheet checked only against file length",
+      "difference": 0.16,
+      "held": true
+     },
+     {
+      "higher": "cue_sheet",
+      "relation": ">",
+      "lower": "no_documents",
+      "reason": "checked cross-evidence beats none",
+      "difference": 0.106,
+      "held": true
+     },
+     {
+      "higher": "cue_sheet_and_sound_report",
+      "relation": ">=",
+      "lower": "sound_report",
+      "reason": "adding a weaker corroborating document never lowers confidence",
+      "difference": 0.0,
+      "held": true
+     },
+     {
+      "higher": "aaf_and_sound_report",
+      "relation": ">=",
+      "lower": "aaf",
+      "reason": "adding a corroborating document never lowers confidence",
+      "difference": 0.0,
+      "held": true
+     }
+    ],
+    "all_held": true
+   },
+   {
+    "strength_floor": 0.5,
+    "confidence": {
+     "aaf_and_sound_report": 0.427,
+     "aaf": 0.427,
+     "sound_report": 0.427,
+     "no_documents": 0.16,
+     "cue_sheet": 0.32,
+     "cue_sheet_and_sound_report": 0.427
+    },
+    "orderings": [
+     {
+      "higher": "sound_report",
+      "relation": ">",
+      "lower": "cue_sheet",
+      "reason": "a sound report checked against recorder metadata beats a cue sheet checked only against file length",
+      "difference": 0.107,
+      "held": true
+     },
+     {
+      "higher": "aaf",
+      "relation": ">",
+      "lower": "cue_sheet",
+      "reason": "an AAF checked against recorder metadata beats a cue sheet checked only against file length",
+      "difference": 0.107,
+      "held": true
+     },
+     {
+      "higher": "cue_sheet",
+      "relation": ">",
+      "lower": "no_documents",
+      "reason": "checked cross-evidence beats none",
+      "difference": 0.16,
+      "held": true
+     },
+     {
+      "higher": "cue_sheet_and_sound_report",
+      "relation": ">=",
+      "lower": "sound_report",
+      "reason": "adding a weaker corroborating document never lowers confidence",
+      "difference": 0.0,
+      "held": true
+     },
+     {
+      "higher": "aaf_and_sound_report",
+      "relation": ">=",
+      "lower": "aaf",
+      "reason": "adding a corroborating document never lowers confidence",
+      "difference": 0.0,
+      "held": true
+     }
+    ],
+    "all_held": true
+   },
+   {
+    "strength_floor": 0.75,
+    "confidence": {
+     "aaf_and_sound_report": 0.48,
+     "aaf": 0.48,
+     "sound_report": 0.48,
+     "no_documents": 0.213,
+     "cue_sheet": 0.427,
+     "cue_sheet_and_sound_report": 0.48
+    },
+    "orderings": [
+     {
+      "higher": "sound_report",
+      "relation": ">",
+      "lower": "cue_sheet",
+      "reason": "a sound report checked against recorder metadata beats a cue sheet checked only against file length",
+      "difference": 0.053,
+      "held": true
+     },
+     {
+      "higher": "aaf",
+      "relation": ">",
+      "lower": "cue_sheet",
+      "reason": "an AAF checked against recorder metadata beats a cue sheet checked only against file length",
+      "difference": 0.053,
+      "held": true
+     },
+     {
+      "higher": "cue_sheet",
+      "relation": ">",
+      "lower": "no_documents",
+      "reason": "checked cross-evidence beats none",
+      "difference": 0.214,
+      "held": true
+     },
+     {
+      "higher": "cue_sheet_and_sound_report",
+      "relation": ">=",
+      "lower": "sound_report",
+      "reason": "adding a weaker corroborating document never lowers confidence",
+      "difference": 0.0,
+      "held": true
+     },
+     {
+      "higher": "aaf_and_sound_report",
+      "relation": ">=",
+      "lower": "aaf",
+      "reason": "adding a corroborating document never lowers confidence",
+      "difference": 0.0,
+      "held": true
+     }
+    ],
+    "all_held": true
+   },
+   {
+    "strength_floor": 0.9,
+    "confidence": {
+     "aaf_and_sound_report": 0.512,
+     "aaf": 0.512,
+     "sound_report": 0.512,
+     "no_documents": 0.245,
+     "cue_sheet": 0.491,
+     "cue_sheet_and_sound_report": 0.512
+    },
+    "orderings": [
+     {
+      "higher": "sound_report",
+      "relation": ">",
+      "lower": "cue_sheet",
+      "reason": "a sound report checked against recorder metadata beats a cue sheet checked only against file length",
+      "difference": 0.021,
+      "held": true
+     },
+     {
+      "higher": "aaf",
+      "relation": ">",
+      "lower": "cue_sheet",
+      "reason": "an AAF checked against recorder metadata beats a cue sheet checked only against file length",
+      "difference": 0.021,
+      "held": true
+     },
+     {
+      "higher": "cue_sheet",
+      "relation": ">",
+      "lower": "no_documents",
+      "reason": "checked cross-evidence beats none",
+      "difference": 0.246,
+      "held": true
+     },
+     {
+      "higher": "cue_sheet_and_sound_report",
+      "relation": ">=",
+      "lower": "sound_report",
+      "reason": "adding a weaker corroborating document never lowers confidence",
+      "difference": 0.0,
+      "held": true
+     },
+     {
+      "higher": "aaf_and_sound_report",
+      "relation": ">=",
+      "lower": "aaf",
+      "reason": "adding a corroborating document never lowers confidence",
+      "difference": 0.0,
+      "held": true
+     }
+    ],
+    "all_held": true
+   }
+  ],
+  "passing_floors": [
+   0.0,
+   0.25,
+   0.5,
+   0.75,
+   0.9
+  ],
+  "chosen_floor": 0.5
+ },
+ "held_out": {
+  "split": "held_out",
+  "integrity": 1.0,
+  "confidence": 0.427,
+  "evidence_strength": {
+   "applies_to": "integrity_confidence_only",
+   "basis": "assessed_cross_evidence",
+   "subject_count": 13,
+   "mean_subject_forge_cost": 3.0,
+   "scale_max": 5,
+   "strength_floor": 0.5,
+   "confidence_factor": 0.8,
+   "subjects_by_basis": {
+    "recorder_metadata": 13
+   },
+   "derivation": "benchmarks/forge_cost.py on Project Rock Ep01 variants (development split), results in benchmarks/results/forge_cost_project_rock_2026-10-25.json. Smallest undetected forgery: a take number needs the WAV, the sound report and the AAF (cost 4); a start timecode moved by 1 s needs only the WAV and the sound report (cost 3); a cue range needs only the cue sheet (cost 1). Recorder metadata takes the cheaper recorder claim (3), plain documents 1, binary production documents 2 (one file plus the binary surcharge), trusted signatures the top of the scale. Every stated ranking held for strength floors 0 to 0.9; the pre-registered 0.5 is kept. These are measured forgery costs on one production and a ranking check, not calibrated probabilities."
+  }
+ }
+}

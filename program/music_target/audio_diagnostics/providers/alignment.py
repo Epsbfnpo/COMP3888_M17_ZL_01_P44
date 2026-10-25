@@ -17,6 +17,34 @@ def merge_intervals(intervals):
     return merged
 
 
+def subtract_intervals(intervals, removed):
+    """Parts of ``intervals`` not covered by ``removed``; both lists of [start, end]."""
+    out = []
+    removed = merge_intervals(removed)
+    for start, end in merge_intervals(intervals):
+        cursor = start
+        for cut_start, cut_end in removed:
+            if cut_end <= cursor or cut_start >= end:
+                continue
+            if cut_start > cursor:
+                out.append([cursor, cut_start])
+            cursor = max(cursor, cut_end)
+        if cursor < end:
+            out.append([cursor, end])
+    return out
+
+
+def content_windows(tokens, step, audio, window):
+    """Seconds of the source timeline that carry landmarks: where a match could be found at all.
+
+    Silence and near-silence give no landmarks, so they are not counted as
+    content that the target lacks.
+    """
+    start, end = audio["range"]
+    return merge_intervals((max(start, start + time * step - window / 2), min(end, start + time * step + window / 2))
+                           for time, _ in set(tokens))
+
+
 def align_tokens(source_tokens, target_tokens, step, source, target, parameters):
     from scipy.signal import find_peaks
     index = defaultdict(list)
@@ -38,9 +66,11 @@ def align_tokens(source_tokens, target_tokens, step, source, target, parameters)
     profile = {"votes": dict(votes), "bin_seconds": bin_seconds, "feasible_bins": feasible_bins,
                "range_offset_seconds": source["range"][0] - target["range"][0],
                "background": sum(votes.values()) / feasible_bins}
+    window = parameters["support_window_seconds"]
+    content = content_windows(source_tokens, step, source, window)
     if not votes:
         return [], {"source_tokens": len(source_tokens), "target_tokens": len(target_tokens),
-                    "raw_token_pair_matches": 0}, profile
+                    "raw_token_pair_matches": 0, "source_content_windows_seconds": content}, profile
     low, high = min(votes), max(votes)
     histogram = np.array([votes.get(key, 0) for key in range(low, high + 1)])
     peaks, _ = find_peaks(np.r_[0, histogram, 0],
@@ -48,7 +78,6 @@ def align_tokens(source_tokens, target_tokens, step, source, target, parameters)
     candidates = sorted((low + int(peak) - 1 for peak in peaks),
                         key=lambda key: (-votes[key], key))
     matches = []
-    window = parameters["support_window_seconds"]
     for bucket in candidates:
         entries = hits[bucket]
         offset = float(np.median([entry[1] for entry in entries]))
@@ -78,4 +107,6 @@ def align_tokens(source_tokens, target_tokens, step, source, target, parameters)
                      # over every feasible offset, not just the voted span, so a
                      # narrow histogram cannot inflate it.
                      "mean_votes_per_offset_bin": float(profile["background"]),
-                     "support_window_seconds": window}, profile
+                     "support_window_seconds": window,
+                     # Landmark-bearing source seconds, for content-coverage reports.
+                     "source_content_windows_seconds": content}, profile

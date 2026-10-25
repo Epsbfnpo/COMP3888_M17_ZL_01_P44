@@ -16,7 +16,9 @@ import time
 from .agreement import AGREEMENT, expected_rows
 from .contracts import FILE_PROVIDERS, NON_SCORING, unavailable, validate_result
 from .policy import load_policy
-from .tasks import build_tasks, file_tasks
+from .providers.alignment import merge_intervals, subtract_intervals
+from .tasks import (AAF_UNUSED, DERIVED, MINIMUM_UNUSED_SECONDS, RANGE_SEARCH, SEARCH_PROVIDERS, build_tasks,
+                    file_tasks, range_search_tasks, unused_range_tasks)
 
 STDERR_TAIL_CHARACTERS = 2000
 # Too little usable signal is a normal analytical outcome, not a failure to run.
@@ -257,6 +259,293 @@ def _conversion_corroboration(response, rows):
     return out
 
 
+# Declared seconds are often rounded; an offset this close is the declared alignment.
+DECLARED_OFFSET_TOLERANCE_SECONDS = 0.25
+# A window whose source and target lengths differ declares a speed change,
+# which fingerprints cannot align; such windows are not assessed.
+DURATION_TOLERANCE_SECONDS = 0.05
+NOT_SUPPORTED_OUTCOMES = {"content_found_elsewhere", "content_not_located", "search_unavailable"}
+
+
+def _supported(match):
+    # Only audfprint has a calibrated support profile; SpectroMap is context.
+    return (match.get("support_assessment") or {}).get("status") == "supported_within_profile"
+
+
+def _best_offset(row):
+    if not row or not row["analysis_complete"] or not row["matches"]:
+        return None
+    return round(row["matches"][0]["source_minus_target_offset_seconds"], 3)
+
+
+def _has_offset(row, offset):
+    # Repeated material gives several valid offsets; any candidate near ours counts.
+    return any(abs(match["source_minus_target_offset_seconds"] - offset) <= DECLARED_OFFSET_TOLERANCE_SECONDS
+               for match in row["matches"])
+
+
+def _declared_range_assessments(rows, search_rows):
+    """Does the audio support the declared source window, and if not, where is the content?
+
+    Compares the calibrated audfprint result inside the declared window with a
+    whole-source search for the declared target window. Report-only.
+    """
+    declared, searched = {}, {}
+    for row in rows:
+        if row["provider"] in SEARCH_PROVIDERS and row.get("range_source") in ("declared", DERIVED):
+            declared.setdefault(row["diagnostic_id"].rsplit(":", 1)[0], {})[row["provider"]] = row
+    for row in search_rows:
+        searched.setdefault(row["diagnostic_id"].rsplit(":", 2)[0], {})[row["provider"]] = row
+    out = []
+    for task_id, search in searched.items():
+        window = declared.get(task_id, {})
+        audfprint = window.get("audfprint")
+        if audfprint is None:
+            continue
+        item = {"source_hash": audfprint["source_hash"], "target_hash": audfprint["target_hash"],
+                "relationship_type": audfprint["relationship_type"], "selection_id": audfprint.get("selection_id"),
+                "range_source": audfprint.get("range_source"),
+                "diagnostic_ids": sorted(row["diagnostic_id"] for row in [*window.values(), *search.values()]),
+                "offset_tolerance_seconds": DECLARED_OFFSET_TOLERANCE_SECONDS, **NON_SCORING}
+        out.append(item)
+        if not audfprint["analysis_complete"]:
+            item["outcome"] = ("insufficient_support" if _insufficient_support(audfprint, rows) else "not_assessed")
+            continue
+        source, target = audfprint["analysed_ranges"]["source"], audfprint["analysed_ranges"]["target"]
+        expected = source[0] - target[0]
+        item.update(declared_source_range_seconds=source, declared_target_range_seconds=target,
+                    declared_offset_seconds=round(expected, 3))
+        if abs((source[1] - source[0]) - (target[1] - target[0])) > DURATION_TOLERANCE_SECONDS:
+            item["outcome"] = "not_assessed_durations_differ"
+            continue
+        fractions = [match["source_supported_fraction"] for match in audfprint["matches"]
+                     if abs(match["source_minus_target_offset_seconds"] - expected) <= DECLARED_OFFSET_TOLERANCE_SECONDS]
+        item["declared_window_supported_fraction"] = round(max(fractions, default=0.0), 3)
+        item["declared_window_support"] = ("supported_within_profile" if any(
+            _supported(match) and abs(match["source_minus_target_offset_seconds"] - expected)
+            <= DECLARED_OFFSET_TOLERANCE_SECONDS for match in audfprint["matches"]) else "not_supported")
+        item["spectromap_declared_best_offset_seconds"] = _best_offset(window.get("spectromap"))
+        if item["declared_window_support"] == "supported_within_profile":
+            item["outcome"] = "declared_range_supported"
+            continue
+        whole = search.get("audfprint")
+        if not whole or not whole["analysis_complete"]:
+            item["outcome"] = "search_unavailable"
+            continue
+        supported = sorted((match for match in whole["matches"] if _supported(match)),
+                           key=lambda match: (-match["target_supported_fraction"], -match["matched_token_pairs"]))
+        offsets = [round(match["source_minus_target_offset_seconds"], 3) for match in supported]
+        item["search_supported_offsets_seconds"] = offsets
+        spectromap = search.get("spectromap")
+        if not (spectromap and spectromap["analysis_complete"]):
+            spectromap = None
+        item["spectromap_search_best_offset_seconds"] = _best_offset(spectromap)
+        if any(abs(offset - expected) <= DECLARED_OFFSET_TOLERANCE_SECONDS for offset in offsets):
+            item["outcome"] = "declared_range_supported"
+        elif offsets:
+            best = supported[0]
+            item.update(outcome="content_found_elsewhere", best_offset_seconds=offsets[0],
+                        best_source_range_seconds=[round(offsets[0] + target[0], 3), round(offsets[0] + target[1], 3)],
+                        best_target_supported_fraction=round(best["target_supported_fraction"], 3),
+                        spectromap_agrees=None if spectromap is None else _has_offset(spectromap, offsets[0]))
+        else:
+            item["outcome"] = "content_not_located"
+    return out
+
+
+def _declared_range_finding(item):
+    source = item["declared_source_range_seconds"]
+    head =(f"The declared source range {source[0]:.2f}-{source[1]:.2f} s is not supported by the audio: audfprint "
+            f"supports {item['declared_window_supported_fraction']:.0%} of it at the declared offset. ")
+    if item["outcome"] == "content_found_elsewhere":
+        best = item["best_source_range_seconds"]
+        others = len(item["search_supported_offsets_seconds"]) - 1
+        body = (f"The target's content was found at source {best[0]:.2f}-{best[1]:.2f} s instead "
+                f"({item['best_target_supported_fraction']:.0%} of the target window supported" +
+                (f"; {others} other supported offset(s), as with repeated material" if others else "") +
+                ("; SpectroMap agrees" if item.get("spectromap_agrees") else "") + "). ")
+        severity = "low"
+    elif item["outcome"] == "content_not_located":
+        body = ("audfprint did not locate the target's content anywhere in the source. Processing such as "
+                "time-stretching or heavy effects can prevent a match, so this is not a contradiction. ")
+        severity = "info"
+    else:
+        body = "A whole-source search for the target's content could not be completed. "
+        severity = "info"
+    return {"code": "AUDIO_DECLARED_RANGE_NOT_SUPPORTED", "severity": severity,
+            "message": head + body + "This is a report-only content observation, not provenance; it does not "
+                                     "change any score.",
+            "outcome": item["outcome"], "source_hash": item["source_hash"], "target_hash": item["target_hash"],
+            "relationship_type": item["relationship_type"], "selection_id": item["selection_id"],
+            "declared_source_range_seconds": source, "best_offset_seconds": item.get("best_offset_seconds"),
+            "best_source_range_seconds": item.get("best_source_range_seconds"),
+            "diagnostic_ids": item["diagnostic_ids"], "detail_key": "audio_declared_range", **NON_SCORING}
+
+
+def _seconds(intervals):
+    return round(sum(end - start for start, end in intervals), 3)
+
+
+def _unused_range_assessments(unused_rows, controls):
+    """Per AAF-used take: is the take content the edit did not use absent from the target?
+
+    Absence only means something when the same comparison found this take's
+    used seconds in the target (the positive control); otherwise the take is
+    not assessed. Every candidate counts as found, so seconds 'beyond the
+    final' are counted conservatively.
+    """
+    pieces = {}
+    for row in unused_rows:
+        if row["provider"] in SEARCH_PROVIDERS:
+            pieces.setdefault(row["diagnostic_id"].rsplit(":", 1)[0], []).append(row)
+    takes = {}
+    for task_rows in pieces.values():
+        first = task_rows[0]
+        span = next((row["analysed_ranges"]["source"] for row in task_rows if row["analysis_complete"]), None)
+        candidates = [(row["provider"], match) for row in task_rows if row["analysis_complete"]
+                      for match in row["matches"]]
+        found = sorted({provider for provider, _ in candidates})
+        outcome = ("found_in_target" if found else
+                   "not_found" if span is not None else "not_analysable")
+        strongest = max(candidates, key=lambda item: item[1]["matched_token_pairs"], default=None)
+        takes.setdefault((first["source_hash"], first["target_hash"]), []).append(
+            {"selection_id": first.get("selection_id"), "source_range_seconds": span, "outcome": outcome,
+             "providers_found": found,
+             "strongest_candidate": None if strongest is None else {
+                 "provider": strongest[0], "matched_token_pairs": strongest[1]["matched_token_pairs"],
+                 "supported_seconds": round(strongest[1]["source_supported_window_duration_seconds"], 3),
+                 "source_minus_target_offset_seconds": round(strongest[1]["source_minus_target_offset_seconds"], 3)},
+             "diagnostic_ids": sorted(row["diagnostic_id"] for row in task_rows)})
+    out = []
+    for (source, target), items in sorted(takes.items()):
+        items.sort(key=lambda item: item["selection_id"] or "")
+        seconds = {outcome: _seconds([item["source_range_seconds"] for item in items if item["outcome"] == outcome])
+                   for outcome in ("found_in_target", "not_found")}
+        control = (source, target) in controls
+        if not control:
+            outcome = "no_positive_control"
+        elif seconds["not_found"] > 0:
+            outcome = "content_beyond_final"
+        elif seconds["found_in_target"] > 0:
+            outcome = "unused_content_found_in_final"
+        else:
+            outcome = "not_analysable"
+        out.append({"source_hash": source, "target_hash": target, "positive_control": control,
+                    "outcome": outcome, "unused_seconds_not_found": seconds["not_found"],
+                    "unused_seconds_found": seconds["found_in_target"], "pieces": items, **NON_SCORING})
+    return out
+
+
+def _beyond_final_finding(take):
+    return {"code": "AUDIO_TAKE_CONTENT_BEYOND_FINAL", "severity": "info",
+            "message": (f"{take['unused_seconds_not_found']:.1f} s of this take lie outside the AAF-used ranges and "
+                        f"were not found in the target ({take['unused_seconds_found']:.1f} s of unused material were "
+                        "found). The take's used ranges were found there, so the comparison could see this take's "
+                        "content in the target. A stem separated from the final cannot hold material the final "
+                        "lacks. This is a report-only content observation, not provenance; it does not change any "
+                        "score."),
+            "outcome": take["outcome"], "source_hash": take["source_hash"], "target_hash": take["target_hash"],
+            "unused_seconds_not_found": take["unused_seconds_not_found"],
+            "unused_seconds_found": take["unused_seconds_found"],
+            "detail_key": "audio_take_beyond_final", **NON_SCORING}
+
+
+def _unused_found_finding(take, piece):
+    span, best = piece["source_range_seconds"], piece["strongest_candidate"]
+    return {"code": "AUDIO_UNUSED_RANGE_FOUND_IN_FINAL", "severity": "info",
+            "message": (f"Take content at {span[0]:.2f}-{span[1]:.2f} s, which the AAF does not list as used, has a "
+                        f"candidate in the target ({best['provider']}: {best['matched_token_pairs']} matched pairs over "
+                        f"{best['supported_seconds']:.1f} s). A weak candidate can be chance; a strong one can be "
+                        "another clip, repeated material or an AAF that does not list every use. It is not a "
+                        "contradiction and does not change any score."),
+            "strongest_candidate": best,
+            "source_hash": take["source_hash"], "target_hash": take["target_hash"],
+            "selection_id": piece["selection_id"], "source_range_seconds": span,
+            "providers": piece["providers_found"], "diagnostic_ids": piece["diagnostic_ids"],
+            "detail_key": "audio_take_beyond_final", **NON_SCORING}
+
+
+def _coverage_finding(item):
+    return {"code": "AUDIO_SOURCE_CONTENT_BEYOND_TARGET", "severity": "info",
+            "message": (f"{item['beyond_target_seconds']:.1f} s of this source's content "
+                        f"({item['beyond_target_fraction']:.0%} of {item['source_content_seconds']:.1f} s with "
+                        "fingerprint landmarks) were not found in the target, while other parts were. Material the "
+                        "target lacks cannot have been separated from it. A stem rendered for this mix is expected "
+                        "to be fully contained, so containment is not evidence against a stem. Report-only; no "
+                        "score changes."),
+            "outcome": item["outcome"], "source_hash": item["source_hash"], "target_hash": item["target_hash"],
+            "relationship_type": item["relationship_type"], "beyond_target_seconds": item["beyond_target_seconds"],
+            "beyond_target_windows_seconds": item["beyond_target_windows_seconds"],
+            "diagnostic_ids": [item["diagnostic_id"]], "detail_key": "audio_source_coverage", **NON_SCORING}
+
+
+# Relationships where the source is a part the target was built from.
+COVERAGE_RELATIONSHIPS = {"mixed_from", "stemmed_from", "edited_from", "comped_from", "derived_from"}
+
+
+def _bridge(windows, gap):
+    """Join windows separated by less than ``gap`` seconds."""
+    out = []
+    for start, end in merge_intervals(windows):
+        if out and start - out[-1][1] < gap:
+            out[-1][1] = max(out[-1][1], end)
+        else:
+            out.append([start, end])
+    return out
+
+
+# Uncovered content shorter than this is too little to report.
+MINIMUM_BEYOND_CONTENT_SECONDS = 2.0
+
+
+def _source_coverage(rows):
+    """Without an AAF: which stretches of the source have content but no match in the target?
+
+    Uses whole-file audfprint rows. Landmarks are picked differently in a
+    short file and in a long one, so even an exact copy matches only part of
+    its landmarks; coverage is therefore judged by region. Matched windows of
+    one candidate closer than MINIMUM_UNUSED_SECONDS are joined, and only
+    uncovered stretches at least that long count. Silence carries no
+    landmarks and is never counted. Every candidate counts as found, so the
+    figure errs low.
+    """
+    out = []
+    for row in rows:
+        if not (row["provider"] == "audfprint" and row.get("range_source") == "whole_file"
+                and row["relationship_type"] in COVERAGE_RELATIONSHIPS and row["analysis_complete"]):
+            continue
+        content = row["metrics"].get("source_content_windows_seconds")
+        if content is None:
+            continue
+        found = merge_intervals(window for match in row["matches"]
+                                for window in _bridge(match["source_supported_windows_seconds"],
+                                                      MINIMUM_UNUSED_SECONDS))
+        uncovered = [piece for piece in subtract_intervals([row["analysed_ranges"]["source"]], found)
+                     if piece[1] - piece[0] >= MINIMUM_UNUSED_SECONDS]
+        beyond = subtract_intervals(content, subtract_intervals(content, uncovered))
+        regions = [[round(a, 3), round(b, 3)] for a, b in uncovered
+                   if any(start < b and end > a for start, end in beyond)]
+        control = any(_supported(match) for match in row["matches"])
+        total, beyond_seconds = _seconds(content), _seconds(beyond)
+        if not control:
+            outcome = "no_positive_control"
+        elif beyond_seconds >= MINIMUM_BEYOND_CONTENT_SECONDS:
+            outcome = "content_beyond_target"
+        else:
+            outcome = "contained_in_target"
+        out.append({"source_hash": row["source_hash"], "target_hash": row["target_hash"],
+                    "relationship_type": row["relationship_type"], "positive_control": control,
+                    "outcome": outcome, "source_content_seconds": total,
+                    "found_in_target_seconds": _seconds(subtract_intervals(content, subtract_intervals(content, found))),
+                    "beyond_target_seconds": beyond_seconds,
+                    "beyond_target_fraction": round(beyond_seconds / total, 3) if total else None,
+                    "beyond_target_windows_seconds": regions,
+                    "minimum_region_seconds": MINIMUM_UNUSED_SECONDS,
+                    "minimum_beyond_content_seconds": MINIMUM_BEYOND_CONTENT_SECONDS,
+                    "diagnostic_id": row["diagnostic_id"], **NON_SCORING})
+    return out
+
+
 def _attach(response, rows, summary):
     # Copy-on-append: do not feed any observations back through core assessors.
     combined = copy.deepcopy(response)
@@ -264,6 +553,11 @@ def _attach(response, rows, summary):
     # Every row states how far its provider has been calibrated, beside the result.
     rows = [{**row, "calibration": {**_calibration(row["provider"], status),
                                     **_format_scope(row, _formats(response))}} for row in rows]
+    # Whole-source searches only serve the declared-range assessment below.
+    search_rows = [row for row in rows if row.get("range_source") == RANGE_SEARCH]
+    # Unused-take comparisons likewise serve only the take assessment below.
+    unused_rows = [row for row in rows if row.get("range_source") == AAF_UNUSED]
+    rows = [row for row in rows if row.get("range_source") not in (RANGE_SEARCH, AAF_UNUSED)]
     summary = {**summary, "calibration_status_sha256": status_sha256, "decoders": _decoder_versions()}
     checks = combined.setdefault("assessment_checks", {})
     checks["audio_fingerprint"] = [row for row in rows if row["provider"] in ("audfprint", "spectromap")]
@@ -333,6 +627,36 @@ def _attach(response, rows, summary):
     summary["aaf_range_tasks"] = len({(row["source_hash"], row["target_hash"], row.get("selection_id"))
                                       for row in aaf_rows})
     summary["aaf_range_tasks_with_correspondence"] = len(corresponded)
+    if search_rows:
+        # A declared window the audio does not support is named; the core
+        # score is untouched until a client-agreed accuracy bar exists.
+        assessments = _declared_range_assessments(rows, search_rows)
+        checks["audio_declared_range_search"] = search_rows
+        checks["audio_declared_range"] = assessments
+        summary["declared_ranges_assessed"] = len(assessments)
+        summary["declared_ranges_not_supported"] = sum(item["outcome"] in NOT_SUPPORTED_OUTCOMES
+                                                       for item in assessments)
+        combined["findings"].extend(_declared_range_finding(item) for item in assessments
+                                    if item["outcome"] in NOT_SUPPORTED_OUTCOMES)
+    if unused_rows:
+        takes = _unused_range_assessments(unused_rows, {(source, target) for source, target, _ in corresponded})
+        checks["audio_aaf_unused_range"] = unused_rows
+        checks["audio_take_beyond_final"] = takes
+        summary["aaf_unused_range_tasks"] = len({row["diagnostic_id"].rsplit(":", 1)[0] for row in unused_rows})
+        summary["takes_with_content_beyond_final"] = sum(take["outcome"] == "content_beyond_final" for take in takes)
+        for take in takes:
+            if take["outcome"] == "content_beyond_final":
+                combined["findings"].append(_beyond_final_finding(take))
+            for piece in take["pieces"]:
+                if piece["outcome"] == "found_in_target":
+                    combined["findings"].append(_unused_found_finding(take, piece))
+    coverage = _source_coverage(rows)
+    if coverage:
+        checks["audio_source_coverage"] = coverage
+        summary["sources_with_content_beyond_target"] = sum(item["outcome"] == "content_beyond_target"
+                                                           for item in coverage)
+        combined["findings"].extend(_coverage_finding(item) for item in coverage
+                                    if item["outcome"] == "content_beyond_target")
     checks["audio_diagnostic_summary"] = [summary]
     for (source, target, selection), matched in corresponded.items():
         span = matched[0]["analysed_ranges"].get("source")
@@ -380,13 +704,19 @@ def augment_response(response, request, root, mode, policy_path, deadline):
             file_providers = [name for name in policy["providers"] if name in FILE_PROVIDERS]
             tasks = build_tasks(native, response) if pair_providers else []
             files = file_tasks(native, response) if file_providers else []
+            search_providers = [name for name in SEARCH_PROVIDERS if name in pair_providers]
+            searches = range_search_tasks(tasks) if "audfprint" in search_providers else []
+            searches += unused_range_tasks(tasks, response) if search_providers else []
             summary.update(task_count=len(tasks), relationship_count=len({row["relation_id"] for row in tasks}),
-                           file_task_count=len(files))
+                           file_task_count=len(files),
+                           declared_range_search_task_count=sum(item["range_source"] == RANGE_SEARCH
+                                                                for item in searches))
             root = Path(root).resolve(strict=True)
             snapshots = {}
             failures = {}
             with tempfile.TemporaryDirectory(prefix="music-audio-observations-") as directory:
                 for task, providers in ([(item, pair_providers) for item in tasks] +
+                                        [(item, search_providers) for item in searches] +
                                         [(item, file_providers) for item in files]):
                     task = dict(task)
                     problem = task.get("unavailable_reason")

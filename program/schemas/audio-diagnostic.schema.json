@@ -118,7 +118,9 @@
         "whole_file",
         "declared",
         "derived_from_declared_source_duration",
-        "aaf_source_range"
+        "aaf_source_range",
+        "aaf_unused_range",
+        "declared_range_search"
       ]
     }
   }

@@ -1596,7 +1596,7 @@ class TargetTests(unittest.TestCase):
         for name in ("structural_validity", "physical_similarity", "cryptographic_attestation"):
             self.assertIsNone(layers[name]["weight"])
         profile = result["assessment_checks"]["scoring_profile"][0]
-        self.assertEqual(profile, {"profile_id": "default-v6", "profile_version": 6})
+        self.assertEqual(profile, {"profile_id": "default-v7", "profile_version": 7})
         # No severe rule failed, so no cap record or cap sentence appears.
         self.assertNotIn("severe_contradiction_cap", result["assessment_checks"])
         self.assertNotIn("severe contradiction", result["axes"]["integrity"]["reasoning"])
@@ -2889,7 +2889,7 @@ class ScoringProfileTests(unittest.TestCase):
 
     def test_default_profile_loads_and_validates(self):
         profile = load_default_scoring_profile()
-        self.assertEqual(profile["profile_id"], "default-v6")
+        self.assertEqual(profile["profile_id"], "default-v7")
         self.assertEqual(profile["integrity"]["layer_weights"],
                          {"file_integrity": 1.0, "declaration_consistency": 1.0,
                           "cross_evidence_support": 1.0})

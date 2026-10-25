@@ -23,6 +23,13 @@ plain weighted mean.
 
 ``one_vote_per_claim`` (optional, default false) makes the same claim about
 one recording, repeated in several documents, a single cross-evidence fact.
+
+``forge_cost`` (optional) grades how hard the checked cross-evidence would be
+to forge and scales Integrity confidence by it, never the value (see
+``music_target.forge_cost``). Tiers keep their role as the release gate, so
+the costs must respect the tier order: signed attestation >= recorder
+metadata > every submitter document. A profile without it keeps the
+layer-count confidence formula.
 """
 
 from __future__ import annotations
@@ -47,11 +54,14 @@ DEFAULT_PROFILE_PATH = Path(__file__).resolve().parents[1] / "policies" / "scori
 
 _PROFILE_KEYS = {"profile_id", "profile_version", "description", "integrity"}
 _INTEGRITY_KEYS = {"layer_weights", "layer_weight_rationale", "withholding_rule", "confidence_formula",
-                   "severe_contradiction_rules", "severe_contradiction_cap", "one_vote_per_claim"}
+                   "severe_contradiction_rules", "severe_contradiction_cap", "one_vote_per_claim",
+                   "forge_cost"}
 _WITHHOLDING_RULE_KEYS = {"min_components_for_substantive_mean", "require_substantive_support_or_contradiction",
                           "substantive_support_tiers", "require_substantive_support",
                           "release_capped_value_on_severe_contradiction", "min_supported_asset_share"}
 _CONFIDENCE_FORMULA_KEYS = {"ceiling", "denominator_layers"}
+_FORGE_COST_KEYS = {"scale_max", "tier_costs", "submitter_document_costs", "submitter_document_default",
+                    "unbound_source_cost", "strength_floor", "derivation"}
 
 
 class ScoringProfileError(ValueError):
@@ -227,7 +237,52 @@ def load_scoring_profile(path):
     if not isinstance(integrity.get("one_vote_per_claim", False), bool):
         raise ScoringProfileError("integrity.one_vote_per_claim must be a boolean.")
 
+    if "forge_cost" in integrity:
+        _check_forge_cost(integrity["forge_cost"])
+
     return profile
+
+
+def _check_forge_cost(config):
+    if not isinstance(config, dict):
+        raise ScoringProfileError("integrity.forge_cost must be an object.")
+    unknown = set(config) - _FORGE_COST_KEYS
+    missing = _FORGE_COST_KEYS - {"derivation"} - set(config)
+    if unknown or missing:
+        raise ScoringProfileError("integrity.forge_cost has unexpected or missing key(s): "
+                                  + ", ".join(sorted(unknown | missing)))
+    scale = config["scale_max"]
+    if type(scale) is not int or scale < 1:
+        raise ScoringProfileError("integrity.forge_cost.scale_max must be a positive integer.")
+
+    def cost(value, where):
+        if type(value) is not int or not 1 <= value <= scale:
+            raise ScoringProfileError(f"integrity.forge_cost.{where} must be an integer from 1 to {scale}.")
+        return value
+
+    from music_target.evidence_tiers import RECORDER_METADATA, SIGNED_ATTESTATION
+    tiers = config["tier_costs"]
+    if not isinstance(tiers, dict) or set(tiers) != {SIGNED_ATTESTATION, RECORDER_METADATA}:
+        raise ScoringProfileError(
+            f"integrity.forge_cost.tier_costs must name exactly {SIGNED_ATTESTATION} and {RECORDER_METADATA}.")
+    documents = config["submitter_document_costs"]
+    if not isinstance(documents, dict) or any(not isinstance(name, str) or not name for name in documents):
+        raise ScoringProfileError("integrity.forge_cost.submitter_document_costs must map artefact types to costs.")
+    submitter = [cost(value, f"submitter_document_costs[{name!r}]") for name, value in documents.items()]
+    submitter.append(cost(config["submitter_document_default"], "submitter_document_default"))
+    signed = cost(tiers[SIGNED_ATTESTATION], "tier_costs.signed_attestation")
+    recorder = cost(tiers[RECORDER_METADATA], "tier_costs.recorder_metadata")
+    # Forge cost grades evidence within the tiers; it must not reorder them.
+    if not signed >= recorder > max(submitter):
+        raise ScoringProfileError("integrity.forge_cost must keep the tier order: signed_attestation >= "
+                                  "recorder_metadata > every submitter document cost.")
+    if cost(config["unbound_source_cost"], "unbound_source_cost") > config["submitter_document_default"]:
+        raise ScoringProfileError("integrity.forge_cost.unbound_source_cost must not exceed submitter_document_default.")
+    floor = config["strength_floor"]
+    if type(floor) not in (int, float) or isinstance(floor, bool) or not math.isfinite(floor) or not 0 <= floor < 1:
+        raise ScoringProfileError("integrity.forge_cost.strength_floor must be a number in [0, 1).")
+    if "derivation" in config and (not isinstance(config["derivation"], str) or not config["derivation"]):
+        raise ScoringProfileError("integrity.forge_cost.derivation must be a non-empty string.")
 
 
 def load_default_scoring_profile():

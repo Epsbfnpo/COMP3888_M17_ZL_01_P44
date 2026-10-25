@@ -32,10 +32,35 @@ nearly every WAV check, including recorder metadata kept by
 is lossy, so checks that need a bit depth, recorder metadata or an exact length
 are reported as unavailable rather than as contradictions. See
 [FLAC and MP3](#flac-and-mp3) below. Scoring follows the same rules as WAV
-under the `default-v6` profile: technical claims are scored in declaration
+under the default profile (rules of `default-v6`, unchanged in `default-v7`): technical claims are scored in declaration
 consistency, and the FLAC MD5 check in file integrity. **WAV is the assessed
 format**: FLAC and MP3 keep the checks implemented today, and every other
 check on them is reported as not assessed (see the scope limitation below).
+
+**After 0.8.1 (24-25 October 2026).** Four changes answer the client's
+first-demo feedback. Only the last changes a number, and it changes
+confidence, never the Integrity value.
+
+- A declared excerpt window the audio does not support is named
+  (`AUDIO_DECLARED_RANGE_NOT_SUPPORTED`), with the best-supported offset found
+  by a whole-source search. Report-only.
+- Recorder-take content the final lacks is reported: the seconds an AAF does
+  not use (`AUDIO_TAKE_CONTENT_BEYOND_FINAL`), or, without an AAF, source
+  content with no match in the target (`AUDIO_SOURCE_CONTENT_BEYOND_TARGET`).
+  A stem separated out of the final cannot hold such material. Report-only.
+- A line and branch coverage report of the full test suite
+  (`program/reports/coverage/`).
+- Scoring profile `default-v7` grades how hard the checked cross-evidence would
+  be to forge (`forge_cost`) and scales Integrity confidence by it. The costs
+  were measured by forging claims in Project Rock copies and checked against
+  stated rankings; the tiers, release gate, weights and value are unchanged.
+  See [`program/docs/FORGE_COST.md`](program/docs/FORGE_COST.md). On Project
+  Rock Ep01 the value stays 1.0 and confidence goes from 0.533 to 0.427.
+
+The forgery runs also found a gap: the AAF checks only that each used range
+lies inside the recording, so a start timecode moved by one second in both the
+WAV and the sound report is not caught. It is listed with possible fixes in
+[`program/docs/NEXT_TASKS.md`](program/docs/NEXT_TASKS.md).
 
 The [technical manual](Manual_layout_check.docx) describes the whole program;
 its Section 8 covers the C2PA work in detail and Section 10 lists the known
@@ -57,12 +82,13 @@ below are relative to that directory.
 2. [CSEC handoff](program/docs/03_CSEC_HANDOFF.md): integration instructions and supported boundaries.
 3. [C2PA trust lists](program/policies/c2pa_trust/README.md): pinned lists, known AI signers, the AI music generators checked (Suno, Stability AI, Google Lyria, ElevenLabs, Adobe Firefly) with their limitations, and the update procedure.
 4. [Physical diagnostic policy](program/docs/PHYSICAL_SIMILARITY.md): disabled legacy signal checks and the separate non-scoring boundary.
-5. [Audio diagnostics](program/docs/AUDIO_DIAGNOSTICS.md): optional dependencies, execution, providers and output fields.
-6. [False-match benchmark](program/docs/FALSE_MATCH_BENCHMARK_2026-10-21.md): unrelated-but-similar Lumina pairs and their results.
-7. [Sheet formats](program/docs/SHEET_FORMATS.md): supported CompSheet and CueSheet formats.
-8. [Future work](program/docs/NEXT_TASKS.md): consolidated P0-P3 roadmap and unresolved legacy items.
-9. [Verification results](program/reports/verification.md): historical core verification and remaining unverified areas.
-10. [Audio integration verification](program/reports/audio-diagnostics-verification.json): historical record of 189 passing tests (19 October 2026) and core-result invariance on the repeated-excerpt example.
+5. [Audio diagnostics](program/docs/AUDIO_DIAGNOSTICS.md): optional dependencies, execution, providers and output fields, including declared ranges and content beyond the final.
+6. [Forge cost](program/docs/FORGE_COST.md): how `default-v7` grades checked evidence, the forgery measurements behind the costs, the ranking check and the held-out result.
+7. [False-match benchmark](program/docs/FALSE_MATCH_BENCHMARK_2026-10-21.md): unrelated-but-similar Lumina pairs and their results.
+8. [Sheet formats](program/docs/SHEET_FORMATS.md): supported CompSheet and CueSheet formats.
+9. [Future work](program/docs/NEXT_TASKS.md): consolidated P0-P3 roadmap and unresolved legacy items.
+10. [Verification results](program/reports/verification.md): historical core verification and remaining unverified areas.
+11. [Audio integration verification](program/reports/audio-diagnostics-verification.json): historical record of 189 passing tests (19 October 2026) and core-result invariance on the repeated-excerpt example.
 
 ## Current implementation
 
@@ -154,7 +180,8 @@ parameters. It evaluates only graph edges and transformation parameters supplied
 in the submission. Missing evidence lowers assessment availability and
 confidence; it is not a contradiction and does not directly lower the integrity
 value. Integrity confidence reflects how many of the three evidence layers were
-checked. To see how many checks passed, refer to the integrity value, the layer
+checked and, under `default-v7`, how hard the checked evidence would be to forge
+(see [Integrity weighting and cap](#integrity-weighting-and-cap)). To see how many checks passed, refer to the integrity value, the layer
 results (`assessment_checks.integrity_layers`) and the findings. The legacy
 signal layer is disabled for every relationship because its narrow assumptions
 can produce misleading results for legitimate production material. No range, offset, gain, channel matrix, contribution, or content
@@ -233,8 +260,41 @@ AAF, not provenance), and `audio_diagnostic_summary` counts `aaf_range_tasks` an
 On Project Rock Ep01, 6 of 14 AAF ranges were found in the WIP mix and a
 whole-take false match disappeared.
 
+**Declared ranges (after 0.8.1).** An edge that declares source and target
+start and end gets a second, fingerprint-only task that searches the whole
+source for the declared target window (`range_source: declared_range_search`).
+When calibrated audfprint does not support the declared window at the declared
+offset (within 0.25 s), `AUDIO_DECLARED_RANGE_NOT_SUPPORTED` names it: severity
+`low` with the best-supported source range when the content is found elsewhere,
+`info` when it is not found anywhere or the search did not finish. Details are in
+`assessment_checks.audio_declared_range`. On the repeated-excerpt fixture a
+declared 7-11 s window is reported as found at 2-6 s, and 2-6 s or 10-14 s give
+no finding.
+
+**Content beyond the final (after 0.8.1).** A stem separated out of the final
+cannot hold material the final lacks; a recorder take usually does. For each
+AAF-used take, the seconds the edit does not use (less 0.5 s handles, in pieces
+of at least 3 s; `range_source: aaf_unused_range`) are compared with the same
+target. If the take's used ranges were found there (the positive control),
+unused seconds with no candidate are reported as
+`AUDIO_TAKE_CONTENT_BEYOND_FINAL`; any candidate in an unused piece is
+`AUDIO_UNUSED_RANGE_FOUND_IN_FINAL`, with the strongest candidate's size, and is
+not a contradiction. Without an AAF, whole-file `mixed_from`, `stemmed_from`,
+`edited_from`, `comped_from` and `derived_from` edges get
+`assessment_checks.audio_source_coverage`. It compares the source seconds that
+carry landmarks with the regions matched in the target and reports uncovered
+stretches as `AUDIO_SOURCE_CONTENT_BEYOND_TARGET`. Both are info, report-only
+and support a take; they never count against one. On Project Rock Ep01 the 6
+takes with a positive control each had 10.1-32.8 s of unused material not
+found in the mix, the other 7 were not assessed, and the run took 35.5 s
+(previously about 19 s) at a 465 MB peak. In a no-AAF variant a real take had
+15.1 s beyond the mix, while two "takes" cut from the mix (one exact, one
+band-passed) were contained in it.
+
 Detailed results are object arrays in `assessment_checks.audio_fingerprint`,
-`assessment_checks.audio_structure` and `assessment_checks.audio_diagnostic_summary`.
+`assessment_checks.audio_structure`, `assessment_checks.audio_declared_range`,
+`assessment_checks.audio_take_beyond_final`, `assessment_checks.audio_source_coverage`
+and `assessment_checks.audio_diagnostic_summary`.
 Findings use the `AUDIO_*` prefix and link to details by `diagnostic_id`. Each
 observation has `scoring_eligible: false`, `integrity_contribution: null` and
 `content_match_is_provenance: false`.
@@ -417,7 +477,7 @@ FLAC, the MD5 of the decoded audio).
 measured property: a file's own technical claims and a relationship's declared
 ranges and input/output sample rate and bit depth. A property claimed for the
 same file in more than one place is one fact, and it fails if any claim fails
-(`declaration_scored_facts`). With `one_vote_per_claim` (on in `default-v6`),
+(`declaration_scored_facts`). With `one_vote_per_claim` (on since `default-v6`),
 the same claim about one recording repeated in several documents (sound report
 and AAF scene/take or track names) is one cross-evidence fact, since all
 documents were uploaded by the same user and their independence is unknown.
@@ -443,7 +503,7 @@ not 0/0. It is report-only by default; an optional
 `withholding_rule.min_supported_asset_share` withholds the value
 (`insufficient_support_breadth`) when `support_coverage` is below it, counting
 contradicted recordings as checked. On Project Rock Ep01 with one AAF-used take
-removed it reads 12 of 13. The default withholding rule (`default-v6`)
+removed it reads 12 of 13. The default withholding rule (`default-v7`, unchanged since `default-v6`)
 requires at least two populated layers and an assessed
 cross-evidence fact from an allowed tier (`signed_attestation` or
 `recorder_metadata`). An ordinary contradiction never releases a number; it is
@@ -452,8 +512,17 @@ reported and sets `axes.integrity.status` and `integrity_decision.status` to
 contradiction is computed by the evaluator and needs no independent support, so
 it releases `min(weighted mean, 0.25)` with `release_reason`
 `severe_contradiction_cap`.
-Confidence is `0.8 * populated_layers / 3`; it is not a probability of authorship,
-and material or support coverage is reported beside it, never folded into it.
+Confidence is `0.8 * populated_layers / 3 * factor`, where under `default-v7`
+`factor = 0.5 + 0.5 * strength / 5` and `strength` is the mean, over the
+recordings and documents checked, of the forge cost of the strongest assessed
+cross-evidence fact about each: trusted signature 5, recorder metadata 3, an
+AAF or DAW session not checked against recorder metadata 2, any other
+submitter document or an unbound file 1. The tiers keep their role as the
+release gate, and the profile loader rejects costs that would rank a document
+above recorder metadata. `assessment_checks.evidence_strength` lists each
+subject's cost. A profile without `forge_cost` keeps factor 1. Confidence is
+not a probability of authorship, and material or support coverage is reported
+beside it, never folded into it.
 Consistency does not authenticate origin: recorder metadata (BWF, iXML) can be
 rewritten together with the audio and the file rehashed, and a FLAC's stored
 MD5 can be rewritten with its audio, so matching checks show agreement between
@@ -688,6 +757,50 @@ the recorder evidence, so Integrity was withheld; an MP3 final mix (320 or
 128 kbps) changed nothing except the chronology comparison
 ([findings](program/docs/PROJECT_ROCK_FINDINGS_2026-10-22.md)).
 
+### Client decisions on formats (24 October 2026)
+
+**FLAC and MP3 follow the WAV rules (confirmed).** The client confirmed the
+current treatment: FLAC and MP3 use the same analysis and scoring rules as
+WAV, read in the way each format allows. The FLAC MD5 is an internal check
+that never adds origin confidence, and a check a file cannot support is
+reported as not assessed (insufficient evidence), never as a failure or a
+contradiction.
+
+**Recordings do not have to be WAV/BWF (confirmed).** Raw takes and raw tracks
+may be submitted as WAV/BWF, FLAC or MP3. WAV/BWF is preferred, not required:
+the format never makes Completeness fail and never lowers a score, and no
+workflow can require it. What a file lacks is reported instead, in
+`limited_checks`, `AUDIO_FORMAT_LIMITED_CHECKS`, `FLAC_RECORDER_METADATA_ABSENT`
+and `format_capabilities` (with advice for recordings that lost their recorder
+evidence).
+
+Limitations that follow from these decisions:
+
+- **Fewer checks, sometimes no Integrity value.** A plain FLAC or an MP3
+  recording carries no recorder metadata, so the recorder, sound-report, AAF
+  and chronology checks cannot run. If no other qualifying evidence exists,
+  Integrity is withheld (`null`). That means "not enough evidence to assess",
+  not "suspicious"; it must be presented that way to end users.
+- **Completeness does not show the limit.** Completeness counts a FLAC or MP3
+  recording as present, so a package of MP3 takes can reach the same
+  Completeness as one of WAV/BWF takes. The difference is visible only in the
+  findings, `format_capabilities` and the Integrity status. A separate
+  Completeness label for "present with limits" is not implemented.
+- **Evidence a submitter could have kept is lost.** Converting to MP3 or to
+  FLAC without `--keep-foreign-metadata` removes recorder evidence, and a
+  fabricated package converted that way shows fewer contradictions than its
+  WAV version would. This is reported, not counted as a contradiction.
+- **Thresholds are WAV-only.** Audio diagnostics on FLAC and MP3 use thresholds
+  calibrated on WAV (`format_scope: calibrated_on_wav_only`), and dates in ID3
+  or Vorbis tags are not read.
+
+**Submission guidance.** For the most complete assessment, submit recordings
+as WAV/BWF, or as FLAC encoded with `flac --keep-foreign-metadata`, which keeps
+the recorder chunks and gives the same result as WAV. Use MP3 for release or
+reference copies rather than recordings. When a FLAC or MP3 is delivered and
+the WAV original exists, submit both and declare the delivered file
+`derived_from` the original with `transformation: format_conversion`.
+
 ### Mixing formats in one submission
 
 Every role accepts WAV, FLAC and MP3. The format never lowers a score; it
@@ -823,7 +936,15 @@ versions) it found 409 tests; all 405 non-GUI tests passed in one process
 422 tests; all 418 non-GUI tests passed in one process (35 s) and the four GUI
 tests passed separately. After the WAV-focus scope change it found 425 tests;
 all 421 non-GUI tests passed in one process (34 s) and the four GUI tests passed
-separately (`reports/test-results.txt`, `reports/release.json`).
+separately. After the declared-range, content-beyond-final and forge-cost
+changes (25 October 2026) it found 466 tests; 459 of the 462 non-GUI tests
+passed in one process (40 s) with 3 skipped (the Suno real-sample tests need
+`C2PA_SUNO_SAMPLE_DIR`), and the four GUI tests passed separately
+(`reports/test-results.txt`, `reports/release.json`).
+
+A line and branch coverage report of the same runs is in
+`reports/coverage/` (`index.html` and `coverage-summary.txt`); see
+[Coverage report](#coverage-report).
 `tests/test_builder.py` now also passes on its own: it imports `run` (and so
 c2pa) before its worker tests mock `subprocess.Popen`, because c2pa's import
 calls `platform.processor()`, which spawns a subprocess. The
@@ -839,6 +960,35 @@ sample rejection, RIFF warnings, field-level unavailability, final-scoped C2PA,
 standalone C2PA ingredient checks, hash caching, ndarray PCM decoding, 24-bit
 sign extension, legacy signal-helper isolation, and an explicit assertion that
 the policy-disabled `PhysicalSimilarityPass` is never invoked by assessment.
+
+## Coverage report
+
+`reports/coverage/` holds the line and branch coverage of the full suite
+(`index.html`, and `coverage-summary.txt` per file). To reproduce it from
+`program/`, install `coverage` and run the suite in the same split as the
+tests, because the GUI tests can hang inside one process on macOS Tk:
+
+```bash
+python3 -m pip install coverage
+```
+
+```bash
+cd tests && REQUIRE_AUDIO_BACKENDS=1 python3 -m coverage run --branch --parallel-mode --data-file=../.coverage --source=music_target,builder_operations,builder_results,builder_gui,manifest_logic,relationship_modes,run,check_public,wav_probe --omit='*/vendor/*' -m unittest $(ls test_*.py | grep -v test_builder.py | sed 's/\.py$//') test_builder.ManifestLimitTests test_builder.ExportTests test_builder.AssessmentTests
+```
+
+Then run each `test_builder.GuiTests.<name>` the same way in its own process,
+and combine:
+
+```bash
+python3 -m coverage combine && python3 -m coverage html -d reports/coverage && python3 -m coverage report
+```
+
+On 25 October 2026 (466 tests) line coverage was 73.3% and branch coverage
+63.5%. The policy-disabled legacy signal modules (`physical_audio_passes.py`,
+`audio_derivation.py`, 20%) account for most of the gap: active code is at 84%.
+The core evaluator and scoring are at 92%, the audio diagnostics at 93%, the
+parsers at 82% and the desktop builder at 66%, because its Tk widgets are
+tested end to end. Code run in builder worker subprocesses is not counted.
 
 ## Directory overview
 
@@ -878,13 +1028,18 @@ The locations below are relative to `program/`.
 | `schemas/audio-diagnostic.schema.json` | Diagnostic result validation and fixed non-scoring fields |
 | `requirements-audio.txt`, `requirements-audio-lock.txt` | Optional audio dependencies and the tested environment |
 | `make_audio_diagnostic_example.py`, `examples/audio-diagnostics/` | Reproducible repeated-excerpt example, request and core/audio reports |
-| `tests/test_audio_diagnostics.py` | 41 provider, protocol, score-isolation, insufficient-support and calibration-status tests |
+| `tests/test_audio_diagnostics.py` | 61 provider, protocol, score-isolation, insufficient-support, calibration-status, declared-range and content-beyond-final tests |
 | `tests/test_case_intervals.py` | 10 tests: interval values and bounds, stored intervals matching their counts, and the benchmark summaries |
 | `tests/test_audio_formats.py` | 29 FLAC and MP3 tests: detection by content, ID3v2, FLAC blocks, kept WAV chunks and MD5, MP3 exact and estimated length, sync loss and tags, evaluator results, C2PA in FLAC and MP3, diagnostics decoding, the public profile and the builder probe |
 | `tests/test_c2pa_integrity.py` | 33 C2PA tests: runtime-signed fixtures, pinned lists, trust status, asymmetric trust, known AI signers (including Suno by fingerprint only; the three real-sample tests run when `C2PA_SUNO_SAMPLE_DIR` is set), the C2PA chunk precondition and every final state |
 | `reports/audio-diagnostics-verification.json` | Historical 19 October 2026 verification and real-provider example results |
 | `docs/AUDIO_DIAGNOSTICS.md` | Detailed audio setup, usage, output and interpretation |
-| `music_target/scoring_profile.py`, `policies/scoring_profile.json` | Validated three-layer Integrity weights, tier-aware withholding, confidence and severe-contradiction cap |
+| `music_target/scoring_profile.py`, `policies/scoring_profile.json` | Validated three-layer Integrity weights, tier-aware withholding, confidence, forge cost (`default-v7`) and severe-contradiction cap |
+| `music_target/forge_cost.py` | Per-fact forge cost, per-subject evidence strength and the confidence factor; never changes the Integrity value |
+| `benchmarks/forge_cost.py`, `benchmarks/results/forge_cost_project_rock_2026-10-25.json` | Forgery measurements behind the `default-v7` costs, the ranking check and the held-out result |
+| `docs/FORGE_COST.md` | Forge cost method, costs, ranking check, held-out result and limits |
+| `tests/test_forge_cost.py` | 12 tests: profile validation and tier order, fact and subject costs, value invariance and reasoning |
+| `reports/coverage/` | Line and branch coverage of the full test suite (HTML and text summary) |
 | `run.py` | CSEC/local execution and explicit parent-side audio diagnostic orchestration |
 | `schemas/` | Original CSEC candidate schemas and local music schemas |
 | `schemas/ddex/` | Pinned RIN 2.1 and ERN 4.3 XSD files, source hashes, and licence reminder |
@@ -901,5 +1056,8 @@ The locations below are relative to `program/`.
 5. Agree with CSEC whether the new optional C2PA `validation` fields (`trust_status`, `trust_source`, `revocation_status`, `signer`) need a new response `schema_version`; it currently stays `0.2-candidate`.
 6. Confirm the BytePlus Lumina and Suno signing certificates with the vendors, decide which other AI generators to add to the known AI signer list (Stability AI and Google Lyria need no entry because their certificates are already trusted; ElevenLabs needs a signed MP3 from its opt-in API workflow before a certificate can be verified; Adobe Firefly needs remote manifest support rather than an entry), decide whether an optional online mode may fetch remote manifests, and agree how often the pinned C2PA trust lists are reviewed.
 7. Decide with the client which recordings a workflow requires (every take the AAF edit uses, or a sample), what substitutes are acceptable, and whether `min_supported_asset_share` should gate release. Chronology warnings stay report-only until relationship-specific time rules, time sources and tolerances are agreed. See `program/docs/NEXT_TASKS.md` items 34–37.
+
+8. Set the accuracy a report-only audio diagnostic must reach before it may affect a score (declared ranges, content beyond the final), and review the `default-v7` forge costs, which come from forgery measurements on one production, not calibrated probabilities.
+9. Choose fixes for the start-timecode gap (`program/docs/NEXT_TASKS.md`) and confirm the next ML step: Demucs source-separation comparison for submitted stems, with Whisper dialogue matching on the roadmap.
 
 These decisions do not block the local executable baseline, but the directory must not yet be described as a complete music-authenticity assessment system.

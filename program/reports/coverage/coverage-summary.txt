@@ -1,0 +1,56 @@
+Name                                                            Stmts   Miss Branch BrPart  Cover
+-------------------------------------------------------------------------------------------------
+builder_gui.py                                                    776    375    240     30    46%
+builder_operations.py                                             203     29     68     16    83%
+builder_results.py                                                369     48    210     31    84%
+manifest_logic.py                                                 370    128    210     49    59%
+music_target/__init__.py                                            1      0      0      0   100%
+music_target/assessment_passes.py                                 895     89    444     50    87%
+music_target/audio_derivation.py                                  855    617    308     18    24%
+music_target/audio_diagnostics/agreement.py                        49      2     18      3    93%
+music_target/audio_diagnostics/contracts.py                        33      4     14      4    83%
+music_target/audio_diagnostics/io.py                              116      5     32      3    95%
+music_target/audio_diagnostics/policy.py                           58     15     42     15    70%
+music_target/audio_diagnostics/providers/alignment.py              64      3     28      3    93%
+music_target/audio_diagnostics/providers/audfprint.py              38      3     12      4    86%
+music_target/audio_diagnostics/providers/bandwidth.py             106     17     40      5    85%
+music_target/audio_diagnostics/providers/calibration.py            77      9     44      9    85%
+music_target/audio_diagnostics/providers/librosa_structure.py      57      3      6      3    90%
+music_target/audio_diagnostics/providers/music_semantics.py       258      4     52      2    98%
+music_target/audio_diagnostics/providers/spectromap.py             60      4     20      5    89%
+music_target/audio_diagnostics/providers/structure.py              48      2     10      2    93%
+music_target/audio_diagnostics/runner.py                          440     25    162     11    94%
+music_target/audio_diagnostics/tasks.py                           144      6     76      8    94%
+music_target/audio_diagnostics/worker.py                           55      9      6      2    82%
+music_target/audio_formats.py                                     285     53    124     30    76%
+music_target/audio_observations.py                                 40      0     10      0   100%
+music_target/case_intervals.py                                     24      1      8      1    94%
+music_target/contract.py                                          318     32    152     16    89%
+music_target/daw_session.py                                        97      7     36      6    90%
+music_target/domain.py                                             30      0      6      0   100%
+music_target/engine.py                                            357     13    126      7    96%
+music_target/evidence_audit.py                                    134      2     54      2    98%
+music_target/evidence_tiers.py                                     29      0     10      1    97%
+music_target/flac_io.py                                           225     40     96     26    76%
+music_target/forge_cost.py                                         52      0     28      0   100%
+music_target/format_conversion.py                                  63      5     28      6    88%
+music_target/midi_parser.py                                       161     46     96     34    64%
+music_target/mp3_io.py                                            165     15     64     18    86%
+music_target/physical_audio_passes.py                             719    646    270      0     7%
+music_target/production_documents.py                              238     25     88     18    87%
+music_target/recorder_metadata.py                                  56      5     18      2    91%
+music_target/sample_identity.py                                    44     10     20      4    72%
+music_target/score_explanations.py                                 94      4     46      5    94%
+music_target/scoring_profile.py                                   161     24     96     22    82%
+music_target/sheet_parsers.py                                     231     49     98     34    75%
+music_target/time_ranges.py                                        19      0      8      0   100%
+music_target/wav_io.py                                            291     40    124     33    82%
+music_target/wav_parser.py                                        210     82     48      7    55%
+music_target/workflow_policy.py                                   274     20    156     20    91%
+relationship_modes.py                                              99     29     58     16    69%
+run.py                                                            166     49     62      6    71%
+wav_probe.py                                                      113     14     50     12    83%
+-------------------------------------------------------------------------------------------------
+TOTAL                                                            9767   2608   4022    599    70%
+
+2 empty files skipped.

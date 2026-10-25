@@ -1,8 +1,9 @@
 # Adversarial testing: attack goals and success criteria
 
-Status: **draft for CSEC review, updated 24 October 2026.** The scoring
+Status: **draft for CSEC review, updated 25 October 2026.** The scoring
 update (profile `default-v6`) has been merged into main together with FLAC
-and MP3 support. Sections marked **[PENDING PIN]** still need the pinned
+and MP3 support. Profile `default-v7` (25 October 2026) changes Integrity
+confidence only: values and the release rule below are unchanged. Sections marked **[PENDING PIN]** still need the pinned
 version and the thresholds the team agrees for G1 and G3. Goals G4, G5 and G7
 do not depend on scoring and can be tested now.
 
@@ -159,6 +160,7 @@ defect.
 | Recorder metadata (BWF `bext`, iXML) is written by the recorder but not authenticated: it can be rewritten together with the audio and the file rehashed, and a FLAC's stored MD5 can be rewritten with its audio. The response says so with `RECORDER_METADATA_ORIGIN_NOT_AUTHENTICATED`. | Time and skill needed to write convincing recorder metadata plus a matching sound report and AAF. |
 | Sound reports and AAF files come from the submitter; their value is agreement with the recorder metadata, which a forger controls too. | Whether any cross-check catches a consistent forgery (expected: few or none). |
 | BWF origination dates can be reset; a source newer than its target gives `DECLARED_SOURCE_NEWER_THAN_TARGET` (low, not scored). | Cost of making dates consistent. |
+| A take's start timecode moved by one second in the WAV's bext `TimeReference` and in the sound report raises no contradiction: the AAF only checks that used ranges lie inside the recording, and bext and iXML timestamps are not compared yet (found 25 October 2026 by `benchmarks/forge_cost.py`; fixes in `docs/NEXT_TASKS.md` item 42). | Size of shift that first produces a contradiction; time to make it consistent. |
 | Stripping a C2PA manifest gives `absent`, not a negative result. | Effort to strip or re-encode without leaving traces. |
 | C2PA certificate revocation is not checked (`revocation_status: not_checked`, offline by design), and there is no time-stamp authority check. | Whether a revoked or expired signer is accepted. |
 | Only two known AI signers are listed (BytePlus Lumina and Suno, matched by exact certificate fingerprint; neither confirmed by the vendor). Stability AI and Google Lyria output is signed by trusted certificates and needs no entry. | AI audio from other generators that is not recognised as AI-labelled; whether a certificate copying a listed signer's name or serial number is recognised (expected: no). |

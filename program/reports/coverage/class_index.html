@@ -1,0 +1,1454 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+    <title>COMP3888 P44 music evaluator - test coverage (25 Oct 2026)</title>
+    <link rel="icon" sizes="32x32" href="favicon_32_cb_c827f16f.png">
+    <link rel="stylesheet" href="style_cb_4667309f.css" type="text/css">
+    <script src="coverage_html_cb_54cfdca1.js" defer></script>
+</head>
+<body class="indexfile">
+<header>
+    <div class="content">
+        <h1>COMP3888 P44 music evaluator - test coverage (25 Oct 2026):
+            <span class="pc_cov">70%</span>
+        </h1>
+        <aside id="help_panel_wrapper">
+            <input id="help_panel_state" type="checkbox">
+            <label for="help_panel_state">
+                <img id="keyboard_icon" src="keybd_closed_cb_900cfef5.png" alt="Show/hide keyboard shortcuts">
+            </label>
+            <div id="help_panel">
+                <p class="legend">Shortcuts on this page</p>
+                <div class="keyhelp">
+                    <p>
+                        <kbd>f</kbd>
+                        <kbd>n</kbd>
+                        <kbd>s</kbd>
+                        <kbd>m</kbd>
+                        <kbd>x</kbd>
+                        <kbd>b</kbd>
+                        <kbd>p</kbd>
+                        <kbd>c</kbd>
+                        &nbsp; change column sorting
+                    </p>
+                    <p>
+                        <kbd>[</kbd>
+                        <kbd>]</kbd>
+                        &nbsp; prev/next file
+                    </p>
+                    <p>
+                        <kbd>?</kbd> &nbsp; show/hide this help
+                    </p>
+                </div>
+            </div>
+        </aside>
+        <form id="filter_container">
+            <input id="filter" type="text" value="" placeholder="filter...">
+            <div>
+                <input id="hide100" type="checkbox" >
+                <label for="hide100">hide covered</label>
+            </div>
+        </form>
+        <h2>
+                <a class="button" href="index.html">Files</a>
+                <a class="button" href="function_index.html">Functions</a>
+                <a class="button current">Classes</a>
+        </h2>
+        <p class="text">
+            <a class="nav" href="https://coverage.readthedocs.io/en/7.17.0">coverage.py v7.17.0</a>,
+            created at 2026-10-25 10:46 +1100
+        </p>
+    </div>
+</header>
+<main id="index">
+    <table class="index" data-sortable>
+        <thead>
+            <tr class="tablehead grouphead">
+                <th class="spacer">&nbsp;</th>
+                <th class="spacer">&nbsp;</th>
+                <th class="spacer">&nbsp;</th>
+                <th class="left" colspan="4">Statements</th>
+                <th class="spacer">&nbsp;</th>
+                <th class="left" colspan="3">Branches</th>
+                <th class="spacer">&nbsp;</th>
+                <th>Total</th>
+            </tr>
+            <tr class="tablehead" title="Click to sort">
+                <th id="file" class="name" aria-sort="none" data-shortcut="f">File<span class="arrows"></span></th>
+                <th id="region" class="name" aria-sort="none" data-default-sort-order="ascending" data-shortcut="n">class<span class="arrows"></span></th>
+                <th class="spacer">&nbsp;</th>
+                <th id="statements_coverage" aria-sort="none" data-default-sort-order="descending">coverage<span class="arrows"></span></th>
+                <th id="statements" aria-sort="none" data-default-sort-order="descending" data-shortcut="s">statements<span class="arrows"></span></th>
+                <th id="missing" aria-sort="none" data-default-sort-order="descending" data-shortcut="m">missing<span class="arrows"></span></th>
+                <th id="excluded" aria-sort="none" data-default-sort-order="descending" data-shortcut="x">excluded<span class="arrows"></span></th>
+                <th class="spacer">&nbsp;</th>
+                <th id="branches_coverage" aria-sort="none" data-default-sort-order="descending">coverage<span class="arrows"></span></th>
+                <th id="branches" aria-sort="none" data-default-sort-order="descending" data-shortcut="b">branches<span class="arrows"></span></th>
+                <th id="partial" aria-sort="none" data-default-sort-order="descending" data-shortcut="p">partial<span class="arrows"></span></th>
+                <th class="spacer">&nbsp;</th>
+                <th id="coverage" aria-sort="none" data-shortcut="c">coverage<span class="arrows"></span></th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr class="region">
+                <td class="name"><a href="builder_gui_py.html#t65">builder_gui.py</a></td>
+                <td class="name"><a href="builder_gui_py.html#t65"><data value='Dialog'>Dialog</data></a></td>
+                <td class="spacer">&nbsp;</td>
+                <td data-ratio="0 18">0%</td>
+                <td>18</td>
+                <td>18</td>
+                <td>0</td>
+                <td class="spacer">&nbsp;</td>
+                <td data-ratio="0 0">100%</td>
+                <td>0</td>
+                <td>0</td>
+                <td class="spacer">&nbsp;</td>
+                <td data-ratio="0 18">0%</td>
+            </tr>
+            <tr class="region">
+                <td class="name"><a href="builder_gui_py.html#t95">builder_gui.py</a></td>
+                <td class="name"><a href="builder_gui_py.html#t95"><data value='FileDialog'>FileDialog</data></a></td>
+                <td class="spacer">&nbsp;</td>
+                <td data-ratio="0 47">0%</td>
+                <td>47</td>
+                <td>47</td>
+                <td>0</td>
+                <td class="spacer">&nbsp;</td>
+                <td data-ratio="0 10">0%</td>
+                <td>10</td>
+                <td>0</td>
+                <td class="spacer">&nbsp;</td>
+                <td data-ratio="0 57">0%</td>
+            </tr>
+            <tr class="region">
+                <td class="name"><a href="builder_gui_py.html#t161">builder_gui.py</a></td>
+                <td class="name"><a href="builder_gui_py.html#t161"><data value='RelDialog'>RelDialog</data></a></td>
+                <td class="spacer">&nbsp;</td>
+                <td data-ratio="0 101">0%</td>
+                <td>101</td>
+                <td>101</td>
+                <td>0</td>
+                <td class="spacer">&nbsp;</td>
+                <td data-ratio="0 52">0%</td>
+                <td>52</td>
+                <td>0</td>
+                <td class="spacer">&nbsp;</td>
+                <td data-ratio="0 153">0%</td>
+            </tr>
+            <tr class="region">
+                <td class="name"><a href="builder_gui_py.html#t332">builder_gui.py</a></td>
+                <td class="name"><a href="builder_gui_py.html#t332"><data value='App'>App</data></a></td>
+                <td class="spacer">&nbsp;</td>
+                <td data-ratio="324 516">63%</td>
+                <td>516</td>
+                <td>192</td>
+                <td>0</td>
+                <td class="spacer">&nbsp;</td>
+                <td data-ratio="69 168">41%</td>
+                <td>168</td>
+                <td>29</td>
+                <td class="spacer">&nbsp;</td>
+                <td data-ratio="393 684">57%</td>
+            </tr>
+            <tr class="region">
+                <td class="name"><a href="builder_gui_py.html">builder_gui.py</a></td>
+                <td class="name"><a href="builder_gui_py.html"><data value=''><span class='no-noun'>(no class)</span></data></a></td>
+                <td class="spacer">&nbsp;</td>
+                <td data-ratio="77 94">82%</td>
+                <td>94</td>
+                <td>17</td>
+                <td>0</td>
+                <td class="spacer">&nbsp;</td>
+                <td data-ratio="1 10">10%</td>
+                <td>10</td>
+                <td>1</td>
+                <td class="spacer">&nbsp;</td>
+                <td data-ratio="78 104">75%</td>
+            </tr>
+            <tr class="region">
+                <td class="name"><a href="builder_operations_py.html">builder_operations.py</a></td>
+                <td class="name"><a href="builder_operations_py.html"><data value=''><span class='no-noun'>(no class)</span></data></a></td>
+                <td class="spacer">&nbsp;</td>
+                <td data-ratio="174 203">86%</td>
+                <td>203</td>
+                <td>29</td>
+                <td>0</td>
+                <td class="spacer">&nbsp;</td>
+                <td data-ratio="50 68">74%</td>
+                <td>68</td>
+                <td>16</td>
+                <td class="spacer">&nbsp;</td>
+                <td data-ratio="224 271">83%</td>
+            </tr>
+            <tr class="region">
+                <td class="name"><a href="builder_results_py.html">builder_results.py</a></td>
+                <td class="name"><a href="builder_results_py.html"><data value=''><span class='no-noun'>(no class)</span></data></a></td>
+                <td class="spacer">&nbsp;</td>
+                <td data-ratio="321 369">87%</td>
+                <td>369</td>
+                <td>48</td>
+                <td>0</td>
+                <td class="spacer">&nbsp;</td>
+                <td data-ratio="163 210">78%</td>
+                <td>210</td>
+                <td>31</td>
+                <td class="spacer">&nbsp;</td>
+                <td data-ratio="484 579">84%</td>
+            </tr>
+            <tr class="region">
+                <td class="name"><a href="manifest_logic_py.html">manifest_logic.py</a></td>
+                <td class="name"><a href="manifest_logic_py.html"><data value=''><span class='no-noun'>(no class)</span></data></a></td>
+                <td class="spacer">&nbsp;</td>
+                <td data-ratio="242 370">65%</td>
+                <td>370</td>
+                <td>128</td>
+                <td>0</td>
+                <td class="spacer">&nbsp;</td>
+                <td data-ratio="101 210">48%</td>
+                <td>210</td>
+                <td>49</td>
+                <td class="spacer">&nbsp;</td>
+                <td data-ratio="343 580">59%</td>
+            </tr>
+            <tr class="region">
+                <td class="name"><a href="z_ce08308d25a90d86___init___py.html">music_target<span class="sep">/</span>__init__.py</a></td>
+                <td class="name"><a href="z_ce08308d25a90d86___init___py.html"><data value=''><span class='no-noun'>(no class)</span></data></a></td>
+                <td class="spacer">&nbsp;</td>
+                <td data-ratio="1 1">100%</td>
+                <td>1</td>
+                <td>0</td>
+                <td>0</td>
+                <td class="spacer">&nbsp;</td>
+                <td data-ratio="0 0">100%</td>
+                <td>0</td>
+                <td>0</td>
+                <td class="spacer">&nbsp;</td>
+                <td data-ratio="1 1">100%</td>
+            </tr>
+            <tr class="region">
+                <td class="name"><a href="z_ce08308d25a90d86_assessment_passes_py.html#t162">music_target<span class="sep">/</span>assessment_passes.py</a></td>
+                <td class="name"><a href="z_ce08308d25a90d86_assessment_passes_py.html#t162"><data value='BoundFileIntegrityPass'>BoundFileIntegrityPass</data></a></td>
+                <td class="spacer">&nbsp;</td>
+                <td data-ratio="19 19">100%</td>
+                <td>19</td>
+                <td>0</td>
+                <td>0</td>
+                <td class="spacer">&nbsp;</td>
+                <td data-ratio="12 12">100%</td>
+                <td>12</td>
+                <td>0</td>
+                <td class="spacer">&nbsp;</td>
+                <td data-ratio="31 31">100%</td>
+            </tr>
+            <tr class="region">
+                <td class="name"><a href="z_ce08308d25a90d86_assessment_passes_py.html#t202">music_target<span class="sep">/</span>assessment_passes.py</a></td>
+                <td class="name"><a href="z_ce08308d25a90d86_assessment_passes_py.html#t202"><data value='StructuralValidityPass'>StructuralValidityPass</data></a></td>
+                <td class="spacer">&nbsp;</td>
+                <td data-ratio="5 5">100%</td>
+                <td>5</td>
+                <td>0</td>
+                <td>0</td>
+                <td class="spacer">&nbsp;</td>
+                <td data-ratio="4 4">100%</td>
+                <td>4</td>
+                <td>0</td>
+                <td class="spacer">&nbsp;</td>
+                <td data-ratio="9 9">100%</td>
+            </tr>
+            <tr class="region">
+                <td class="name"><a href="z_ce08308d25a90d86_assessment_passes_py.html#t238">music_target<span class="sep">/</span>assessment_passes.py</a></td>
+                <td class="name"><a href="z_ce08308d25a90d86_assessment_passes_py.html#t238"><data value='CrossEvidencePass'>CrossEvidencePass</data></a></td>
+                <td class="spacer">&nbsp;</td>
+                <td data-ratio="0 34">0%</td>
+                <td>34</td>
+                <td>34</td>
+                <td>0</td>
+                <td class="spacer">&nbsp;</td>
+                <td data-ratio="0 26">0%</td>
+                <td>26</td>
+                <td>0</td>
+                <td class="spacer">&nbsp;</td>
+                <td data-ratio="0 60">0%</td>
+            </tr>
+            <tr class="region">
+                <td class="name"><a href="z_ce08308d25a90d86_assessment_passes_py.html#t468">music_target<span class="sep">/</span>assessment_passes.py</a></td>
+                <td class="name"><a href="z_ce08308d25a90d86_assessment_passes_py.html#t468"><data value='ExpandedCrossEvidencePass'>ExpandedCrossEvidencePass</data></a></td>
+                <td class="spacer">&nbsp;</td>
+                <td data-ratio="129 146">88%</td>
+                <td>146</td>
+                <td>17</td>
+                <td>0</td>
+                <td class="spacer">&nbsp;</td>
+                <td data-ratio="75 102">74%</td>
+                <td>102</td>
+                <td>21</td>
+                <td class="spacer">&nbsp;</td>
+                <td data-ratio="204 248">82%</td>
+            </tr>
+            <tr class="region">
+                <td class="name"><a href="z_ce08308d25a90d86_assessment_passes_py.html#t759">music_target<span class="sep">/</span>assessment_passes.py</a></td>
+                <td class="name"><a href="z_ce08308d25a90d86_assessment_passes_py.html#t759"><data value='C2PAAttestationPass'>C2PAAttestationPass</data></a></td>
+                <td class="spacer">&nbsp;</td>
+                <td data-ratio="153 166">92%</td>
+                <td>166</td>
+                <td>13</td>
+                <td>0</td>
+                <td class="spacer">&nbsp;</td>
+                <td data-ratio="72 82">88%</td>
+                <td>82</td>
+                <td>10</td>
+                <td class="spacer">&nbsp;</td>
+                <td data-ratio="225 248">91%</td>
+            </tr>
+            <tr class="region">
+                <td class="name"><a href="z_ce08308d25a90d86_assessment_passes_py.html#t1044">music_target<span class="sep">/</span>assessment_passes.py</a></td>
+                <td class="name"><a href="z_ce08308d25a90d86_assessment_passes_py.html#t1044"><data value='AIDisclosurePass'>AIDisclosurePass</data></a></td>
+                <td class="spacer">&nbsp;</td>
+                <td data-ratio="15 16">94%</td>
+                <td>16</td>
+                <td>1</td>
+                <td>0</td>
+                <td class="spacer">&nbsp;</td>
+                <td data-ratio="3 4">75%</td>
+                <td>4</td>
+                <td>1</td>
+                <td class="spacer">&nbsp;</td>
+                <td data-ratio="18 20">90%</td>
+            </tr>
+            <tr class="region">
+                <td class="name"><a href="z_ce08308d25a90d86_assessment_passes_py.html">music_target<span class="sep">/</span>assessment_passes.py</a></td>
+                <td class="name"><a href="z_ce08308d25a90d86_assessment_passes_py.html"><data value=''><span class='no-noun'>(no class)</span></data></a></td>
+                <td class="spacer">&nbsp;</td>
+                <td data-ratio="485 509">95%</td>
+                <td>509</td>
+                <td>24</td>
+                <td>0</td>
+                <td class="spacer">&nbsp;</td>
+                <td data-ratio="190 214">89%</td>
+                <td>214</td>
+                <td>18</td>
+                <td class="spacer">&nbsp;</td>
+                <td data-ratio="675 723">93%</td>
+            </tr>
+            <tr class="region">
+                <td class="name"><a href="z_ce08308d25a90d86_audio_derivation_py.html#t959">music_target<span class="sep">/</span>audio_derivation.py</a></td>
+                <td class="name"><a href="z_ce08308d25a90d86_audio_derivation_py.html#t959"><data value='AudioDerivationPass'>AudioDerivationPass</data></a></td>
+                <td class="spacer">&nbsp;</td>
+                <td data-ratio="0 1">0%</td>
+                <td>1</td>
+                <td>1</td>
+                <td>0</td>
+                <td class="spacer">&nbsp;</td>
+                <td data-ratio="0 0">100%</td>
+                <td>0</td>
+                <td>0</td>
+                <td class="spacer">&nbsp;</td>
+                <td data-ratio="0 1">0%</td>
+            </tr>
+            <tr class="region">
+                <td class="name"><a href="z_ce08308d25a90d86_audio_derivation_py.html#t971">music_target<span class="sep">/</span>audio_derivation.py</a></td>
+                <td class="name"><a href="z_ce08308d25a90d86_audio_derivation_py.html#t971"><data value='EditDerivationPass'>EditDerivationPass</data></a></td>
+                <td class="spacer">&nbsp;</td>
+                <td data-ratio="0 1">0%</td>
+                <td>1</td>
+                <td>1</td>
+                <td>0</td>
+                <td class="spacer">&nbsp;</td>
+                <td data-ratio="0 0">100%</td>
+                <td>0</td>
+                <td>0</td>
+                <td class="spacer">&nbsp;</td>
+                <td data-ratio="0 1">0%</td>
+            </tr>
+            <tr class="region">
+                <td class="name"><a href="z_ce08308d25a90d86_audio_derivation_py.html#t983">music_target<span class="sep">/</span>audio_derivation.py</a></td>
+                <td class="name"><a href="z_ce08308d25a90d86_audio_derivation_py.html#t983"><data value='StemDerivationPass'>StemDerivationPass</data></a></td>
+                <td class="spacer">&nbsp;</td>
+                <td data-ratio="0 1">0%</td>
+                <td>1</td>
+                <td>1</td>
+                <td>0</td>
+                <td class="spacer">&nbsp;</td>
+                <td data-ratio="0 0">100%</td>
+                <td>0</td>
+                <td>0</td>
+                <td class="spacer">&nbsp;</td>
+                <td data-ratio="0 1">0%</td>
+            </tr>
+            <tr class="region">
+                <td class="name"><a href="z_ce08308d25a90d86_audio_derivation_py.html#t995">music_target<span class="sep">/</span>audio_derivation.py</a></td>
+                <td class="name"><a href="z_ce08308d25a90d86_audio_derivation_py.html#t995"><data value='CompDerivationPass'>CompDerivationPass</data></a></td>
+                <td class="spacer">&nbsp;</td>
+                <td data-ratio="0 77">0%</td>
+                <td>77</td>
+                <td>77</td>
+                <td>0</td>
+                <td class="spacer">&nbsp;</td>
+                <td data-ratio="0 46">0%</td>
+                <td>46</td>
+                <td>0</td>
+                <td class="spacer">&nbsp;</td>
+                <td data-ratio="0 123">0%</td>
+            </tr>
+            <tr class="region">
+                <td class="name"><a href="z_ce08308d25a90d86_audio_derivation_py.html#t1384">music_target<span class="sep">/</span>audio_derivation.py</a></td>
+                <td class="name"><a href="z_ce08308d25a90d86_audio_derivation_py.html#t1384"><data value='MasterDerivationPass'>MasterDerivationPass</data></a></td>
+                <td class="spacer">&nbsp;</td>
+                <td data-ratio="0 66">0%</td>
+                <td>66</td>
+                <td>66</td>
+                <td>0</td>
+                <td class="spacer">&nbsp;</td>
+                <td data-ratio="0 22">0%</td>
+                <td>22</td>
+                <td>0</td>
+                <td class="spacer">&nbsp;</td>
+                <td data-ratio="0 88">0%</td>
+            </tr>
+            <tr class="region">
+                <td class="name"><a href="z_ce08308d25a90d86_audio_derivation_py.html">music_target<span class="sep">/</span>audio_derivation.py</a></td>
+                <td class="name"><a href="z_ce08308d25a90d86_audio_derivation_py.html"><data value=''><span class='no-noun'>(no class)</span></data></a></td>
+                <td class="spacer">&nbsp;</td>
+                <td data-ratio="238 709">34%</td>
+                <td>709</td>
+                <td>471</td>
+                <td>0</td>
+                <td class="spacer">&nbsp;</td>
+                <td data-ratio="46 240">19%</td>
+                <td>240</td>
+                <td>18</td>
+                <td class="spacer">&nbsp;</td>
+                <td data-ratio="284 949">30%</td>
+            </tr>
+            <tr class="region">
+                <td class="name"><a href="z_73a108d1408af25d_agreement_py.html">music_target<span class="sep">/</span>audio_diagnostics<span class="sep">/</span>agreement.py</a></td>
+                <td class="name"><a href="z_73a108d1408af25d_agreement_py.html"><data value=''><span class='no-noun'>(no class)</span></data></a></td>
+                <td class="spacer">&nbsp;</td>
+                <td data-ratio="47 49">96%</td>
+                <td>49</td>
+                <td>2</td>
+                <td>0</td>
+                <td class="spacer">&nbsp;</td>
+                <td data-ratio="15 18">83%</td>
+                <td>18</td>
+                <td>3</td>
+                <td class="spacer">&nbsp;</td>
+                <td data-ratio="62 67">93%</td>
+            </tr>
+            <tr class="region">
+                <td class="name"><a href="z_73a108d1408af25d_contracts_py.html">music_target<span class="sep">/</span>audio_diagnostics<span class="sep">/</span>contracts.py</a></td>
+                <td class="name"><a href="z_73a108d1408af25d_contracts_py.html"><data value=''><span class='no-noun'>(no class)</span></data></a></td>
+                <td class="spacer">&nbsp;</td>
+                <td data-ratio="29 33">88%</td>
+                <td>33</td>
+                <td>4</td>
+                <td>0</td>
+                <td class="spacer">&nbsp;</td>
+                <td data-ratio="10 14">71%</td>
+                <td>14</td>
+                <td>4</td>
+                <td class="spacer">&nbsp;</td>
+                <td data-ratio="39 47">83%</td>
+            </tr>
+            <tr class="region">
+                <td class="name"><a href="z_73a108d1408af25d_io_py.html#t19">music_target<span class="sep">/</span>audio_diagnostics<span class="sep">/</span>io.py</a></td>
+                <td class="name"><a href="z_73a108d1408af25d_io_py.html#t19"><data value='AnalysisUnavailable'>AnalysisUnavailable</data></a></td>
+                <td class="spacer">&nbsp;</td>
+                <td data-ratio="2 2">100%</td>
+                <td>2</td>
+                <td>0</td>
+                <td>0</td>
+                <td class="spacer">&nbsp;</td>
+                <td data-ratio="0 0">100%</td>
+                <td>0</td>
+                <td>0</td>
+                <td class="spacer">&nbsp;</td>
+                <td data-ratio="2 2">100%</td>
+            </tr>
+            <tr class="region">
+                <td class="name"><a href="z_73a108d1408af25d_io_py.html">music_target<span class="sep">/</span>audio_diagnostics<span class="sep">/</span>io.py</a></td>
+                <td class="name"><a href="z_73a108d1408af25d_io_py.html"><data value=''><span class='no-noun'>(no class)</span></data></a></td>
+                <td class="spacer">&nbsp;</td>
+                <td data-ratio="109 114">96%</td>
+                <td>114</td>
+                <td>5</td>
+                <td>0</td>
+                <td class="spacer">&nbsp;</td>
+                <td data-ratio="29 32">91%</td>
+                <td>32</td>
+                <td>3</td>
+                <td class="spacer">&nbsp;</td>
+                <td data-ratio="138 146">95%</td>
+            </tr>
+            <tr class="region">
+                <td class="name"><a href="z_73a108d1408af25d_policy_py.html">music_target<span class="sep">/</span>audio_diagnostics<span class="sep">/</span>policy.py</a></td>
+                <td class="name"><a href="z_73a108d1408af25d_policy_py.html"><data value=''><span class='no-noun'>(no class)</span></data></a></td>
+                <td class="spacer">&nbsp;</td>
+                <td data-ratio="43 58">74%</td>
+                <td>58</td>
+                <td>15</td>
+                <td>0</td>
+                <td class="spacer">&nbsp;</td>
+                <td data-ratio="27 42">64%</td>
+                <td>42</td>
+                <td>15</td>
+                <td class="spacer">&nbsp;</td>
+                <td data-ratio="70 100">70%</td>
+            </tr>
+            <tr class="region">
+                <td class="name"><a href="z_2bb11c1c397c0d34_alignment_py.html">music_target<span class="sep">/</span>audio_diagnostics<span class="sep">/</span>providers<span class="sep">/</span>alignment.py</a></td>
+                <td class="name"><a href="z_2bb11c1c397c0d34_alignment_py.html"><data value=''><span class='no-noun'>(no class)</span></data></a></td>
+                <td class="spacer">&nbsp;</td>
+                <td data-ratio="61 64">95%</td>
+                <td>64</td>
+                <td>3</td>
+                <td>0</td>
+                <td class="spacer">&nbsp;</td>
+                <td data-ratio="25 28">89%</td>
+                <td>28</td>
+                <td>3</td>
+                <td class="spacer">&nbsp;</td>
+                <td data-ratio="86 92">93%</td>
+            </tr>
+            <tr class="region">
+                <td class="name"><a href="z_2bb11c1c397c0d34_audfprint_py.html">music_target<span class="sep">/</span>audio_diagnostics<span class="sep">/</span>providers<span class="sep">/</span>audfprint.py</a></td>
+                <td class="name"><a href="z_2bb11c1c397c0d34_audfprint_py.html"><data value=''><span class='no-noun'>(no class)</span></data></a></td>
+                <td class="spacer">&nbsp;</td>
+                <td data-ratio="35 38">92%</td>
+                <td>38</td>
+                <td>3</td>
+                <td>0</td>
+                <td class="spacer">&nbsp;</td>
+                <td data-ratio="8 12">67%</td>
+                <td>12</td>
+                <td>4</td>
+                <td class="spacer">&nbsp;</td>
+                <td data-ratio="43 50">86%</td>
+            </tr>
+            <tr class="region">
+                <td class="name"><a href="z_2bb11c1c397c0d34_bandwidth_py.html">music_target<span class="sep">/</span>audio_diagnostics<span class="sep">/</span>providers<span class="sep">/</span>bandwidth.py</a></td>
+                <td class="name"><a href="z_2bb11c1c397c0d34_bandwidth_py.html"><data value=''><span class='no-noun'>(no class)</span></data></a></td>
+                <td class="spacer">&nbsp;</td>
+                <td data-ratio="89 106">84%</td>
+                <td>106</td>
+                <td>17</td>
+                <td>0</td>
+                <td class="spacer">&nbsp;</td>
+                <td data-ratio="35 40">88%</td>
+                <td>40</td>
+                <td>5</td>
+                <td class="spacer">&nbsp;</td>
+                <td data-ratio="124 146">85%</td>
+            </tr>
+            <tr class="region">
+                <td class="name"><a href="z_2bb11c1c397c0d34_calibration_py.html">music_target<span class="sep">/</span>audio_diagnostics<span class="sep">/</span>providers<span class="sep">/</span>calibration.py</a></td>
+                <td class="name"><a href="z_2bb11c1c397c0d34_calibration_py.html"><data value=''><span class='no-noun'>(no class)</span></data></a></td>
+                <td class="spacer">&nbsp;</td>
+                <td data-ratio="68 77">88%</td>
+                <td>77</td>
+                <td>9</td>
+                <td>0</td>
+                <td class="spacer">&nbsp;</td>
+                <td data-ratio="35 44">80%</td>
+                <td>44</td>
+                <td>9</td>
+                <td class="spacer">&nbsp;</td>
+                <td data-ratio="103 121">85%</td>
+            </tr>
+            <tr class="region">
+                <td class="name"><a href="z_2bb11c1c397c0d34_librosa_structure_py.html">music_target<span class="sep">/</span>audio_diagnostics<span class="sep">/</span>providers<span class="sep">/</span>librosa_structure.py</a></td>
+                <td class="name"><a href="z_2bb11c1c397c0d34_librosa_structure_py.html"><data value=''><span class='no-noun'>(no class)</span></data></a></td>
+                <td class="spacer">&nbsp;</td>
+                <td data-ratio="54 57">95%</td>
+                <td>57</td>
+                <td>3</td>
+                <td>0</td>
+                <td class="spacer">&nbsp;</td>
+                <td data-ratio="3 6">50%</td>
+                <td>6</td>
+                <td>3</td>
+                <td class="spacer">&nbsp;</td>
+                <td data-ratio="57 63">90%</td>
+            </tr>
+            <tr class="region">
+                <td class="name"><a href="z_2bb11c1c397c0d34_music_semantics_py.html">music_target<span class="sep">/</span>audio_diagnostics<span class="sep">/</span>providers<span class="sep">/</span>music_semantics.py</a></td>
+                <td class="name"><a href="z_2bb11c1c397c0d34_music_semantics_py.html"><data value=''><span class='no-noun'>(no class)</span></data></a></td>
+                <td class="spacer">&nbsp;</td>
+                <td data-ratio="254 258">98%</td>
+                <td>258</td>
+                <td>4</td>
+                <td>0</td>
+                <td class="spacer">&nbsp;</td>
+                <td data-ratio="50 52">96%</td>
+                <td>52</td>
+                <td>2</td>
+                <td class="spacer">&nbsp;</td>
+                <td data-ratio="304 310">98%</td>
+            </tr>
+            <tr class="region">
+                <td class="name"><a href="z_2bb11c1c397c0d34_spectromap_py.html">music_target<span class="sep">/</span>audio_diagnostics<span class="sep">/</span>providers<span class="sep">/</span>spectromap.py</a></td>
+                <td class="name"><a href="z_2bb11c1c397c0d34_spectromap_py.html"><data value=''><span class='no-noun'>(no class)</span></data></a></td>
+                <td class="spacer">&nbsp;</td>
+                <td data-ratio="56 60">93%</td>
+                <td>60</td>
+                <td>4</td>
+                <td>0</td>
+                <td class="spacer">&nbsp;</td>
+                <td data-ratio="15 20">75%</td>
+                <td>20</td>
+                <td>5</td>
+                <td class="spacer">&nbsp;</td>
+                <td data-ratio="71 80">89%</td>
+            </tr>
+            <tr class="region">
+                <td class="name"><a href="z_2bb11c1c397c0d34_structure_py.html">music_target<span class="sep">/</span>audio_diagnostics<span class="sep">/</span>providers<span class="sep">/</span>structure.py</a></td>
+                <td class="name"><a href="z_2bb11c1c397c0d34_structure_py.html"><data value=''><span class='no-noun'>(no class)</span></data></a></td>
+                <td class="spacer">&nbsp;</td>
+                <td data-ratio="46 48">96%</td>
+                <td>48</td>
+                <td>2</td>
+                <td>0</td>
+                <td class="spacer">&nbsp;</td>
+                <td data-ratio="8 10">80%</td>
+                <td>10</td>
+                <td>2</td>
+                <td class="spacer">&nbsp;</td>
+                <td data-ratio="54 58">93%</td>
+            </tr>
+            <tr class="region">
+                <td class="name"><a href="z_73a108d1408af25d_runner_py.html">music_target<span class="sep">/</span>audio_diagnostics<span class="sep">/</span>runner.py</a></td>
+                <td class="name"><a href="z_73a108d1408af25d_runner_py.html"><data value=''><span class='no-noun'>(no class)</span></data></a></td>
+                <td class="spacer">&nbsp;</td>
+                <td data-ratio="415 440">94%</td>
+                <td>440</td>
+                <td>25</td>
+                <td>0</td>
+                <td class="spacer">&nbsp;</td>
+                <td data-ratio="149 162">92%</td>
+                <td>162</td>
+                <td>11</td>
+                <td class="spacer">&nbsp;</td>
+                <td data-ratio="564 602">94%</td>
+            </tr>
+            <tr class="region">
+                <td class="name"><a href="z_73a108d1408af25d_tasks_py.html">music_target<span class="sep">/</span>audio_diagnostics<span class="sep">/</span>tasks.py</a></td>
+                <td class="name"><a href="z_73a108d1408af25d_tasks_py.html"><data value=''><span class='no-noun'>(no class)</span></data></a></td>
+                <td class="spacer">&nbsp;</td>
+                <td data-ratio="138 144">96%</td>
+                <td>144</td>
+                <td>6</td>
+                <td>0</td>
+                <td class="spacer">&nbsp;</td>
+                <td data-ratio="68 76">89%</td>
+                <td>76</td>
+                <td>8</td>
+                <td class="spacer">&nbsp;</td>
+                <td data-ratio="206 220">94%</td>
+            </tr>
+            <tr class="region">
+                <td class="name"><a href="z_73a108d1408af25d_worker_py.html">music_target<span class="sep">/</span>audio_diagnostics<span class="sep">/</span>worker.py</a></td>
+                <td class="name"><a href="z_73a108d1408af25d_worker_py.html"><data value=''><span class='no-noun'>(no class)</span></data></a></td>
+                <td class="spacer">&nbsp;</td>
+                <td data-ratio="46 55">84%</td>
+                <td>55</td>
+                <td>9</td>
+                <td>0</td>
+                <td class="spacer">&nbsp;</td>
+                <td data-ratio="4 6">67%</td>
+                <td>6</td>
+                <td>2</td>
+                <td class="spacer">&nbsp;</td>
+                <td data-ratio="50 61">82%</td>
+            </tr>
+            <tr class="region">
+                <td class="name"><a href="z_ce08308d25a90d86_audio_formats_py.html#t46">music_target<span class="sep">/</span>audio_formats.py</a></td>
+                <td class="name"><a href="z_ce08308d25a90d86_audio_formats_py.html#t46"><data value='MpegHeader'>MpegHeader</data></a></td>
+                <td class="spacer">&nbsp;</td>
+                <td data-ratio="3 4">75%</td>
+                <td>4</td>
+                <td>1</td>
+                <td>0</td>
+                <td class="spacer">&nbsp;</td>
+                <td data-ratio="1 2">50%</td>
+                <td>2</td>
+                <td>1</td>
+                <td class="spacer">&nbsp;</td>
+                <td data-ratio="4 6">67%</td>
+            </tr>
+            <tr class="region">
+                <td class="name"><a href="z_ce08308d25a90d86_audio_formats_py.html#t107">music_target<span class="sep">/</span>audio_formats.py</a></td>
+                <td class="name"><a href="z_ce08308d25a90d86_audio_formats_py.html#t107"><data value='Id3Header'>Id3Header</data></a></td>
+                <td class="spacer">&nbsp;</td>
+                <td data-ratio="1 1">100%</td>
+                <td>1</td>
+                <td>0</td>
+                <td>0</td>
+                <td class="spacer">&nbsp;</td>
+                <td data-ratio="0 0">100%</td>
+                <td>0</td>
+                <td>0</td>
+                <td class="spacer">&nbsp;</td>
+                <td data-ratio="1 1">100%</td>
+            </tr>
+            <tr class="region">
+                <td class="name"><a href="z_ce08308d25a90d86_audio_formats_py.html">music_target<span class="sep">/</span>audio_formats.py</a></td>
+                <td class="name"><a href="z_ce08308d25a90d86_audio_formats_py.html"><data value=''><span class='no-noun'>(no class)</span></data></a></td>
+                <td class="spacer">&nbsp;</td>
+                <td data-ratio="228 280">81%</td>
+                <td>280</td>
+                <td>52</td>
+                <td>0</td>
+                <td class="spacer">&nbsp;</td>
+                <td data-ratio="77 122">63%</td>
+                <td>122</td>
+                <td>29</td>
+                <td class="spacer">&nbsp;</td>
+                <td data-ratio="305 402">76%</td>
+            </tr>
+            <tr class="region">
+                <td class="name"><a href="z_ce08308d25a90d86_audio_observations_py.html">music_target<span class="sep">/</span>audio_observations.py</a></td>
+                <td class="name"><a href="z_ce08308d25a90d86_audio_observations_py.html"><data value=''><span class='no-noun'>(no class)</span></data></a></td>
+                <td class="spacer">&nbsp;</td>
+                <td data-ratio="40 40">100%</td>
+                <td>40</td>
+                <td>0</td>
+                <td>0</td>
+                <td class="spacer">&nbsp;</td>
+                <td data-ratio="10 10">100%</td>
+                <td>10</td>
+                <td>0</td>
+                <td class="spacer">&nbsp;</td>
+                <td data-ratio="50 50">100%</td>
+            </tr>
+            <tr class="region">
+                <td class="name"><a href="z_ce08308d25a90d86_case_intervals_py.html">music_target<span class="sep">/</span>case_intervals.py</a></td>
+                <td class="name"><a href="z_ce08308d25a90d86_case_intervals_py.html"><data value=''><span class='no-noun'>(no class)</span></data></a></td>
+                <td class="spacer">&nbsp;</td>
+                <td data-ratio="23 24">96%</td>
+                <td>24</td>
+                <td>1</td>
+                <td>0</td>
+                <td class="spacer">&nbsp;</td>
+                <td data-ratio="7 8">88%</td>
+                <td>8</td>
+                <td>1</td>
+                <td class="spacer">&nbsp;</td>
+                <td data-ratio="30 32">94%</td>
+            </tr>
+            <tr class="region">
+                <td class="name"><a href="z_ce08308d25a90d86_contract_py.html">music_target<span class="sep">/</span>contract.py</a></td>
+                <td class="name"><a href="z_ce08308d25a90d86_contract_py.html"><data value=''><span class='no-noun'>(no class)</span></data></a></td>
+                <td class="spacer">&nbsp;</td>
+                <td data-ratio="286 318">90%</td>
+                <td>318</td>
+                <td>32</td>
+                <td>0</td>
+                <td class="spacer">&nbsp;</td>
+                <td data-ratio="130 152">86%</td>
+                <td>152</td>
+                <td>16</td>
+                <td class="spacer">&nbsp;</td>
+                <td data-ratio="416 470">89%</td>
+            </tr>
+            <tr class="region">
+                <td class="name"><a href="z_ce08308d25a90d86_daw_session_py.html">music_target<span class="sep">/</span>daw_session.py</a></td>
+                <td class="name"><a href="z_ce08308d25a90d86_daw_session_py.html"><data value=''><span class='no-noun'>(no class)</span></data></a></td>
+                <td class="spacer">&nbsp;</td>
+                <td data-ratio="90 97">93%</td>
+                <td>97</td>
+                <td>7</td>
+                <td>0</td>
+                <td class="spacer">&nbsp;</td>
+                <td data-ratio="30 36">83%</td>
+                <td>36</td>
+                <td>6</td>
+                <td class="spacer">&nbsp;</td>
+                <td data-ratio="120 133">90%</td>
+            </tr>
+            <tr class="region">
+                <td class="name"><a href="z_ce08308d25a90d86_domain_py.html#t23">music_target<span class="sep">/</span>domain.py</a></td>
+                <td class="name"><a href="z_ce08308d25a90d86_domain_py.html#t23"><data value='MusicAudioType'>MusicAudioType</data></a></td>
+                <td class="spacer">&nbsp;</td>
+                <td data-ratio="1 1">100%</td>
+                <td>1</td>
+                <td>0</td>
+                <td>0</td>
+                <td class="spacer">&nbsp;</td>
+                <td data-ratio="0 0">100%</td>
+                <td>0</td>
+                <td>0</td>
+                <td class="spacer">&nbsp;</td>
+                <td data-ratio="1 1">100%</td>
+            </tr>
+            <tr class="region">
+                <td class="name"><a href="z_ce08308d25a90d86_domain_py.html#t39">music_target<span class="sep">/</span>domain.py</a></td>
+                <td class="name"><a href="z_ce08308d25a90d86_domain_py.html#t39"><data value='MusicDocumentType'>MusicDocumentType</data></a></td>
+                <td class="spacer">&nbsp;</td>
+                <td data-ratio="1 1">100%</td>
+                <td>1</td>
+                <td>0</td>
+                <td>0</td>
+                <td class="spacer">&nbsp;</td>
+                <td data-ratio="0 0">100%</td>
+                <td>0</td>
+                <td>0</td>
+                <td class="spacer">&nbsp;</td>
+                <td data-ratio="1 1">100%</td>
+            </tr>
+            <tr class="region">
+                <td class="name"><a href="z_ce08308d25a90d86_domain_py.html#t102">music_target<span class="sep">/</span>domain.py</a></td>
+                <td class="name"><a href="z_ce08308d25a90d86_domain_py.html#t102"><data value='MusicRelationship'>_relationship_class.MusicRelationship</data></a></td>
+                <td class="spacer">&nbsp;</td>
+                <td data-ratio="2 2">100%</td>
+                <td>2</td>
+                <td>0</td>
+                <td>0</td>
+                <td class="spacer">&nbsp;</td>
+                <td data-ratio="0 0">100%</td>
+                <td>0</td>
+                <td>0</td>
+                <td class="spacer">&nbsp;</td>
+                <td data-ratio="2 2">100%</td>
+            </tr>
+            <tr class="region">
+                <td class="name"><a href="z_ce08308d25a90d86_domain_py.html">music_target<span class="sep">/</span>domain.py</a></td>
+                <td class="name"><a href="z_ce08308d25a90d86_domain_py.html"><data value=''><span class='no-noun'>(no class)</span></data></a></td>
+                <td class="spacer">&nbsp;</td>
+                <td data-ratio="26 26">100%</td>
+                <td>26</td>
+                <td>0</td>
+                <td>0</td>
+                <td class="spacer">&nbsp;</td>
+                <td data-ratio="6 6">100%</td>
+                <td>6</td>
+                <td>0</td>
+                <td class="spacer">&nbsp;</td>
+                <td data-ratio="32 32">100%</td>
+            </tr>
+            <tr class="region">
+                <td class="name"><a href="z_ce08308d25a90d86_engine_py.html#t30">music_target<span class="sep">/</span>engine.py</a></td>
+                <td class="name"><a href="z_ce08308d25a90d86_engine_py.html#t30"><data value='InputError'>InputError</data></a></td>
+                <td class="spacer">&nbsp;</td>
+                <td data-ratio="2 2">100%</td>
+                <td>2</td>
+                <td>0</td>
+                <td>0</td>
+                <td class="spacer">&nbsp;</td>
+                <td data-ratio="0 0">100%</td>
+                <td>0</td>
+                <td>0</td>
+                <td class="spacer">&nbsp;</td>
+                <td data-ratio="2 2">100%</td>
+            </tr>
+            <tr class="region">
+                <td class="name"><a href="z_ce08308d25a90d86_engine_py.html#t42">music_target<span class="sep">/</span>engine.py</a></td>
+                <td class="name"><a href="z_ce08308d25a90d86_engine_py.html#t42"><data value='ObjectsChangedDuringEvaluation'>ObjectsChangedDuringEvaluation</data></a></td>
+                <td class="spacer">&nbsp;</td>
+                <td data-ratio="2 2">100%</td>
+                <td>2</td>
+                <td>0</td>
+                <td>0</td>
+                <td class="spacer">&nbsp;</td>
+                <td data-ratio="0 0">100%</td>
+                <td>0</td>
+                <td>0</td>
+                <td class="spacer">&nbsp;</td>
+                <td data-ratio="2 2">100%</td>
+            </tr>
+            <tr class="region">
+                <td class="name"><a href="z_ce08308d25a90d86_engine_py.html#t215">music_target<span class="sep">/</span>engine.py</a></td>
+                <td class="name"><a href="z_ce08308d25a90d86_engine_py.html#t215"><data value='WavMetadataPass'>WavMetadataPass</data></a></td>
+                <td class="spacer">&nbsp;</td>
+                <td data-ratio="38 40">95%</td>
+                <td>40</td>
+                <td>2</td>
+                <td>0</td>
+                <td class="spacer">&nbsp;</td>
+                <td data-ratio="10 10">100%</td>
+                <td>10</td>
+                <td>0</td>
+                <td class="spacer">&nbsp;</td>
+                <td data-ratio="48 50">96%</td>
+            </tr>
+            <tr class="region">
+                <td class="name"><a href="z_ce08308d25a90d86_engine_py.html#t286">music_target<span class="sep">/</span>engine.py</a></td>
+                <td class="name"><a href="z_ce08308d25a90d86_engine_py.html#t286"><data value='RelationshipIntegrityPass'>RelationshipIntegrityPass</data></a></td>
+                <td class="spacer">&nbsp;</td>
+                <td data-ratio="36 36">100%</td>
+                <td>36</td>
+                <td>0</td>
+                <td>0</td>
+                <td class="spacer">&nbsp;</td>
+                <td data-ratio="21 22">95%</td>
+                <td>22</td>
+                <td>1</td>
+                <td class="spacer">&nbsp;</td>
+                <td data-ratio="57 58">98%</td>
+            </tr>
+            <tr class="region">
+                <td class="name"><a href="z_ce08308d25a90d86_engine_py.html">music_target<span class="sep">/</span>engine.py</a></td>
+                <td class="name"><a href="z_ce08308d25a90d86_engine_py.html"><data value=''><span class='no-noun'>(no class)</span></data></a></td>
+                <td class="spacer">&nbsp;</td>
+                <td data-ratio="266 277">96%</td>
+                <td>277</td>
+                <td>11</td>
+                <td>0</td>
+                <td class="spacer">&nbsp;</td>
+                <td data-ratio="88 94">94%</td>
+                <td>94</td>
+                <td>6</td>
+                <td class="spacer">&nbsp;</td>
+                <td data-ratio="354 371">95%</td>
+            </tr>
+            <tr class="region">
+                <td class="name"><a href="z_ce08308d25a90d86_evidence_audit_py.html">music_target<span class="sep">/</span>evidence_audit.py</a></td>
+                <td class="name"><a href="z_ce08308d25a90d86_evidence_audit_py.html"><data value=''><span class='no-noun'>(no class)</span></data></a></td>
+                <td class="spacer">&nbsp;</td>
+                <td data-ratio="132 134">99%</td>
+                <td>134</td>
+                <td>2</td>
+                <td>0</td>
+                <td class="spacer">&nbsp;</td>
+                <td data-ratio="52 54">96%</td>
+                <td>54</td>
+                <td>2</td>
+                <td class="spacer">&nbsp;</td>
+                <td data-ratio="184 188">98%</td>
+            </tr>
+            <tr class="region">
+                <td class="name"><a href="z_ce08308d25a90d86_evidence_tiers_py.html">music_target<span class="sep">/</span>evidence_tiers.py</a></td>
+                <td class="name"><a href="z_ce08308d25a90d86_evidence_tiers_py.html"><data value=''><span class='no-noun'>(no class)</span></data></a></td>
+                <td class="spacer">&nbsp;</td>
+                <td data-ratio="29 29">100%</td>
+                <td>29</td>
+                <td>0</td>
+                <td>0</td>
+                <td class="spacer">&nbsp;</td>
+                <td data-ratio="9 10">90%</td>
+                <td>10</td>
+                <td>1</td>
+                <td class="spacer">&nbsp;</td>
+                <td data-ratio="38 39">97%</td>
+            </tr>
+            <tr class="region">
+                <td class="name"><a href="z_ce08308d25a90d86_flac_io_py.html#t33">music_target<span class="sep">/</span>flac_io.py</a></td>
+                <td class="name"><a href="z_ce08308d25a90d86_flac_io_py.html#t33"><data value='FlacError'>FlacError</data></a></td>
+                <td class="spacer">&nbsp;</td>
+                <td data-ratio="3 3">100%</td>
+                <td>3</td>
+                <td>0</td>
+                <td>0</td>
+                <td class="spacer">&nbsp;</td>
+                <td data-ratio="1 2">50%</td>
+                <td>2</td>
+                <td>1</td>
+                <td class="spacer">&nbsp;</td>
+                <td data-ratio="4 5">80%</td>
+            </tr>
+            <tr class="region">
+                <td class="name"><a href="z_ce08308d25a90d86_flac_io_py.html">music_target<span class="sep">/</span>flac_io.py</a></td>
+                <td class="name"><a href="z_ce08308d25a90d86_flac_io_py.html"><data value=''><span class='no-noun'>(no class)</span></data></a></td>
+                <td class="spacer">&nbsp;</td>
+                <td data-ratio="182 222">82%</td>
+                <td>222</td>
+                <td>40</td>
+                <td>0</td>
+                <td class="spacer">&nbsp;</td>
+                <td data-ratio="59 94">63%</td>
+                <td>94</td>
+                <td>25</td>
+                <td class="spacer">&nbsp;</td>
+                <td data-ratio="241 316">76%</td>
+            </tr>
+            <tr class="region">
+                <td class="name"><a href="z_ce08308d25a90d86_forge_cost_py.html">music_target<span class="sep">/</span>forge_cost.py</a></td>
+                <td class="name"><a href="z_ce08308d25a90d86_forge_cost_py.html"><data value=''><span class='no-noun'>(no class)</span></data></a></td>
+                <td class="spacer">&nbsp;</td>
+                <td data-ratio="52 52">100%</td>
+                <td>52</td>
+                <td>0</td>
+                <td>0</td>
+                <td class="spacer">&nbsp;</td>
+                <td data-ratio="28 28">100%</td>
+                <td>28</td>
+                <td>0</td>
+                <td class="spacer">&nbsp;</td>
+                <td data-ratio="80 80">100%</td>
+            </tr>
+            <tr class="region">
+                <td class="name"><a href="z_ce08308d25a90d86_format_conversion_py.html">music_target<span class="sep">/</span>format_conversion.py</a></td>
+                <td class="name"><a href="z_ce08308d25a90d86_format_conversion_py.html"><data value=''><span class='no-noun'>(no class)</span></data></a></td>
+                <td class="spacer">&nbsp;</td>
+                <td data-ratio="58 63">92%</td>
+                <td>63</td>
+                <td>5</td>
+                <td>0</td>
+                <td class="spacer">&nbsp;</td>
+                <td data-ratio="22 28">79%</td>
+                <td>28</td>
+                <td>6</td>
+                <td class="spacer">&nbsp;</td>
+                <td data-ratio="80 91">88%</td>
+            </tr>
+            <tr class="region">
+                <td class="name"><a href="z_ce08308d25a90d86_midi_parser_py.html">music_target<span class="sep">/</span>midi_parser.py</a></td>
+                <td class="name"><a href="z_ce08308d25a90d86_midi_parser_py.html"><data value=''><span class='no-noun'>(no class)</span></data></a></td>
+                <td class="spacer">&nbsp;</td>
+                <td data-ratio="115 161">71%</td>
+                <td>161</td>
+                <td>46</td>
+                <td>0</td>
+                <td class="spacer">&nbsp;</td>
+                <td data-ratio="50 96">52%</td>
+                <td>96</td>
+                <td>34</td>
+                <td class="spacer">&nbsp;</td>
+                <td data-ratio="165 257">64%</td>
+            </tr>
+            <tr class="region">
+                <td class="name"><a href="z_ce08308d25a90d86_mp3_io_py.html#t32">music_target<span class="sep">/</span>mp3_io.py</a></td>
+                <td class="name"><a href="z_ce08308d25a90d86_mp3_io_py.html#t32"><data value='Mp3Error'>Mp3Error</data></a></td>
+                <td class="spacer">&nbsp;</td>
+                <td data-ratio="3 3">100%</td>
+                <td>3</td>
+                <td>0</td>
+                <td>0</td>
+                <td class="spacer">&nbsp;</td>
+                <td data-ratio="1 2">50%</td>
+                <td>2</td>
+                <td>1</td>
+                <td class="spacer">&nbsp;</td>
+                <td data-ratio="4 5">80%</td>
+            </tr>
+            <tr class="region">
+                <td class="name"><a href="z_ce08308d25a90d86_mp3_io_py.html">music_target<span class="sep">/</span>mp3_io.py</a></td>
+                <td class="name"><a href="z_ce08308d25a90d86_mp3_io_py.html"><data value=''><span class='no-noun'>(no class)</span></data></a></td>
+                <td class="spacer">&nbsp;</td>
+                <td data-ratio="147 162">91%</td>
+                <td>162</td>
+                <td>15</td>
+                <td>0</td>
+                <td class="spacer">&nbsp;</td>
+                <td data-ratio="45 62">73%</td>
+                <td>62</td>
+                <td>17</td>
+                <td class="spacer">&nbsp;</td>
+                <td data-ratio="192 224">86%</td>
+            </tr>
+            <tr class="region">
+                <td class="name"><a href="z_ce08308d25a90d86_physical_audio_passes_py.html#t382">music_target<span class="sep">/</span>physical_audio_passes.py</a></td>
+                <td class="name"><a href="z_ce08308d25a90d86_physical_audio_passes_py.html#t382"><data value='AudioAlignmentPass'>AudioAlignmentPass</data></a></td>
+                <td class="spacer">&nbsp;</td>
+                <td data-ratio="0 20">0%</td>
+                <td>20</td>
+                <td>20</td>
+                <td>0</td>
+                <td class="spacer">&nbsp;</td>
+                <td data-ratio="0 10">0%</td>
+                <td>10</td>
+                <td>0</td>
+                <td class="spacer">&nbsp;</td>
+                <td data-ratio="0 30">0%</td>
+            </tr>
+            <tr class="region">
+                <td class="name"><a href="z_ce08308d25a90d86_physical_audio_passes_py.html#t419">music_target<span class="sep">/</span>physical_audio_passes.py</a></td>
+                <td class="name"><a href="z_ce08308d25a90d86_physical_audio_passes_py.html#t419"><data value='SourceContributionPass'>SourceContributionPass</data></a></td>
+                <td class="spacer">&nbsp;</td>
+                <td data-ratio="0 52">0%</td>
+                <td>52</td>
+                <td>52</td>
+                <td>0</td>
+                <td class="spacer">&nbsp;</td>
+                <td data-ratio="0 20">0%</td>
+                <td>20</td>
+                <td>0</td>
+                <td class="spacer">&nbsp;</td>
+                <td data-ratio="0 72">0%</td>
+            </tr>
+            <tr class="region">
+                <td class="name"><a href="z_ce08308d25a90d86_physical_audio_passes_py.html#t522">music_target<span class="sep">/</span>physical_audio_passes.py</a></td>
+                <td class="name"><a href="z_ce08308d25a90d86_physical_audio_passes_py.html#t522"><data value='DecoySourcePass'>DecoySourcePass</data></a></td>
+                <td class="spacer">&nbsp;</td>
+                <td data-ratio="0 15">0%</td>
+                <td>15</td>
+                <td>15</td>
+                <td>0</td>
+                <td class="spacer">&nbsp;</td>
+                <td data-ratio="0 8">0%</td>
+                <td>8</td>
+                <td>0</td>
+                <td class="spacer">&nbsp;</td>
+                <td data-ratio="0 23">0%</td>
+            </tr>
+            <tr class="region">
+                <td class="name"><a href="z_ce08308d25a90d86_physical_audio_passes_py.html#t554">music_target<span class="sep">/</span>physical_audio_passes.py</a></td>
+                <td class="name"><a href="z_ce08308d25a90d86_physical_audio_passes_py.html#t554"><data value='CompVerificationPass'>CompVerificationPass</data></a></td>
+                <td class="spacer">&nbsp;</td>
+                <td data-ratio="0 34">0%</td>
+                <td>34</td>
+                <td>34</td>
+                <td>0</td>
+                <td class="spacer">&nbsp;</td>
+                <td data-ratio="0 12">0%</td>
+                <td>12</td>
+                <td>0</td>
+                <td class="spacer">&nbsp;</td>
+                <td data-ratio="0 46">0%</td>
+            </tr>
+            <tr class="region">
+                <td class="name"><a href="z_ce08308d25a90d86_physical_audio_passes_py.html#t617">music_target<span class="sep">/</span>physical_audio_passes.py</a></td>
+                <td class="name"><a href="z_ce08308d25a90d86_physical_audio_passes_py.html#t617"><data value='ProcessedAudioMatchPass'>ProcessedAudioMatchPass</data></a></td>
+                <td class="spacer">&nbsp;</td>
+                <td data-ratio="0 32">0%</td>
+                <td>32</td>
+                <td>32</td>
+                <td>0</td>
+                <td class="spacer">&nbsp;</td>
+                <td data-ratio="0 8">0%</td>
+                <td>8</td>
+                <td>0</td>
+                <td class="spacer">&nbsp;</td>
+                <td data-ratio="0 40">0%</td>
+            </tr>
+            <tr class="region">
+                <td class="name"><a href="z_ce08308d25a90d86_physical_audio_passes_py.html#t710">music_target<span class="sep">/</span>physical_audio_passes.py</a></td>
+                <td class="name"><a href="z_ce08308d25a90d86_physical_audio_passes_py.html#t710"><data value='StemMixResidualPass'>StemMixResidualPass</data></a></td>
+                <td class="spacer">&nbsp;</td>
+                <td data-ratio="0 74">0%</td>
+                <td>74</td>
+                <td>74</td>
+                <td>0</td>
+                <td class="spacer">&nbsp;</td>
+                <td data-ratio="0 38">0%</td>
+                <td>38</td>
+                <td>0</td>
+                <td class="spacer">&nbsp;</td>
+                <td data-ratio="0 112">0%</td>
+            </tr>
+            <tr class="region">
+                <td class="name"><a href="z_ce08308d25a90d86_physical_audio_passes_py.html#t838">music_target<span class="sep">/</span>physical_audio_passes.py</a></td>
+                <td class="name"><a href="z_ce08308d25a90d86_physical_audio_passes_py.html#t838"><data value='MasteringDerivationPass'>MasteringDerivationPass</data></a></td>
+                <td class="spacer">&nbsp;</td>
+                <td data-ratio="0 1">0%</td>
+                <td>1</td>
+                <td>1</td>
+                <td>0</td>
+                <td class="spacer">&nbsp;</td>
+                <td data-ratio="0 0">100%</td>
+                <td>0</td>
+                <td>0</td>
+                <td class="spacer">&nbsp;</td>
+                <td data-ratio="0 1">0%</td>
+            </tr>
+            <tr class="region">
+                <td class="name"><a href="z_ce08308d25a90d86_physical_audio_passes_py.html#t848">music_target<span class="sep">/</span>physical_audio_passes.py</a></td>
+                <td class="name"><a href="z_ce08308d25a90d86_physical_audio_passes_py.html#t848"><data value='ExcerptedFromPass'>ExcerptedFromPass</data></a></td>
+                <td class="spacer">&nbsp;</td>
+                <td data-ratio="0 29">0%</td>
+                <td>29</td>
+                <td>29</td>
+                <td>0</td>
+                <td class="spacer">&nbsp;</td>
+                <td data-ratio="0 12">0%</td>
+                <td>12</td>
+                <td>0</td>
+                <td class="spacer">&nbsp;</td>
+                <td data-ratio="0 41">0%</td>
+            </tr>
+            <tr class="region">
+                <td class="name"><a href="z_ce08308d25a90d86_physical_audio_passes_py.html#t1049">music_target<span class="sep">/</span>physical_audio_passes.py</a></td>
+                <td class="name"><a href="z_ce08308d25a90d86_physical_audio_passes_py.html#t1049"><data value='PhysicalSimilarityPass'>PhysicalSimilarityPass</data></a></td>
+                <td class="spacer">&nbsp;</td>
+                <td data-ratio="0 105">0%</td>
+                <td>105</td>
+                <td>105</td>
+                <td>0</td>
+                <td class="spacer">&nbsp;</td>
+                <td data-ratio="0 52">0%</td>
+                <td>52</td>
+                <td>0</td>
+                <td class="spacer">&nbsp;</td>
+                <td data-ratio="0 157">0%</td>
+            </tr>
+            <tr class="region">
+                <td class="name"><a href="z_ce08308d25a90d86_physical_audio_passes_py.html">music_target<span class="sep">/</span>physical_audio_passes.py</a></td>
+                <td class="name"><a href="z_ce08308d25a90d86_physical_audio_passes_py.html"><data value=''><span class='no-noun'>(no class)</span></data></a></td>
+                <td class="spacer">&nbsp;</td>
+                <td data-ratio="73 357">20%</td>
+                <td>357</td>
+                <td>284</td>
+                <td>0</td>
+                <td class="spacer">&nbsp;</td>
+                <td data-ratio="0 110">0%</td>
+                <td>110</td>
+                <td>0</td>
+                <td class="spacer">&nbsp;</td>
+                <td data-ratio="73 467">16%</td>
+            </tr>
+            <tr class="region">
+                <td class="name"><a href="z_ce08308d25a90d86_production_documents_py.html">music_target<span class="sep">/</span>production_documents.py</a></td>
+                <td class="name"><a href="z_ce08308d25a90d86_production_documents_py.html"><data value=''><span class='no-noun'>(no class)</span></data></a></td>
+                <td class="spacer">&nbsp;</td>
+                <td data-ratio="213 238">89%</td>
+                <td>238</td>
+                <td>25</td>
+                <td>0</td>
+                <td class="spacer">&nbsp;</td>
+                <td data-ratio="70 88">80%</td>
+                <td>88</td>
+                <td>18</td>
+                <td class="spacer">&nbsp;</td>
+                <td data-ratio="283 326">87%</td>
+            </tr>
+            <tr class="region">
+                <td class="name"><a href="z_ce08308d25a90d86_recorder_metadata_py.html">music_target<span class="sep">/</span>recorder_metadata.py</a></td>
+                <td class="name"><a href="z_ce08308d25a90d86_recorder_metadata_py.html"><data value=''><span class='no-noun'>(no class)</span></data></a></td>
+                <td class="spacer">&nbsp;</td>
+                <td data-ratio="51 56">91%</td>
+                <td>56</td>
+                <td>5</td>
+                <td>0</td>
+                <td class="spacer">&nbsp;</td>
+                <td data-ratio="16 18">89%</td>
+                <td>18</td>
+                <td>2</td>
+                <td class="spacer">&nbsp;</td>
+                <td data-ratio="67 74">91%</td>
+            </tr>
+            <tr class="region">
+                <td class="name"><a href="z_ce08308d25a90d86_sample_identity_py.html">music_target<span class="sep">/</span>sample_identity.py</a></td>
+                <td class="name"><a href="z_ce08308d25a90d86_sample_identity_py.html"><data value=''><span class='no-noun'>(no class)</span></data></a></td>
+                <td class="spacer">&nbsp;</td>
+                <td data-ratio="34 44">77%</td>
+                <td>44</td>
+                <td>10</td>
+                <td>0</td>
+                <td class="spacer">&nbsp;</td>
+                <td data-ratio="12 20">60%</td>
+                <td>20</td>
+                <td>4</td>
+                <td class="spacer">&nbsp;</td>
+                <td data-ratio="46 64">72%</td>
+            </tr>
+            <tr class="region">
+                <td class="name"><a href="z_ce08308d25a90d86_score_explanations_py.html">music_target<span class="sep">/</span>score_explanations.py</a></td>
+                <td class="name"><a href="z_ce08308d25a90d86_score_explanations_py.html"><data value=''><span class='no-noun'>(no class)</span></data></a></td>
+                <td class="spacer">&nbsp;</td>
+                <td data-ratio="90 94">96%</td>
+                <td>94</td>
+                <td>4</td>
+                <td>0</td>
+                <td class="spacer">&nbsp;</td>
+                <td data-ratio="41 46">89%</td>
+                <td>46</td>
+                <td>5</td>
+                <td class="spacer">&nbsp;</td>
+                <td data-ratio="131 140">94%</td>
+            </tr>
+            <tr class="region">
+                <td class="name"><a href="z_ce08308d25a90d86_scoring_profile_py.html">music_target<span class="sep">/</span>scoring_profile.py</a></td>
+                <td class="name"><a href="z_ce08308d25a90d86_scoring_profile_py.html"><data value=''><span class='no-noun'>(no class)</span></data></a></td>
+                <td class="spacer">&nbsp;</td>
+                <td data-ratio="137 161">85%</td>
+                <td>161</td>
+                <td>24</td>
+                <td>0</td>
+                <td class="spacer">&nbsp;</td>
+                <td data-ratio="74 96">77%</td>
+                <td>96</td>
+                <td>22</td>
+                <td class="spacer">&nbsp;</td>
+                <td data-ratio="211 257">82%</td>
+            </tr>
+            <tr class="region">
+                <td class="name"><a href="z_ce08308d25a90d86_sheet_parsers_py.html">music_target<span class="sep">/</span>sheet_parsers.py</a></td>
+                <td class="name"><a href="z_ce08308d25a90d86_sheet_parsers_py.html"><data value=''><span class='no-noun'>(no class)</span></data></a></td>
+                <td class="spacer">&nbsp;</td>
+                <td data-ratio="182 231">79%</td>
+                <td>231</td>
+                <td>49</td>
+                <td>0</td>
+                <td class="spacer">&nbsp;</td>
+                <td data-ratio="64 98">65%</td>
+                <td>98</td>
+                <td>34</td>
+                <td class="spacer">&nbsp;</td>
+                <td data-ratio="246 329">75%</td>
+            </tr>
+            <tr class="region">
+                <td class="name"><a href="z_ce08308d25a90d86_time_ranges_py.html">music_target<span class="sep">/</span>time_ranges.py</a></td>
+                <td class="name"><a href="z_ce08308d25a90d86_time_ranges_py.html"><data value=''><span class='no-noun'>(no class)</span></data></a></td>
+                <td class="spacer">&nbsp;</td>
+                <td data-ratio="19 19">100%</td>
+                <td>19</td>
+                <td>0</td>
+                <td>0</td>
+                <td class="spacer">&nbsp;</td>
+                <td data-ratio="8 8">100%</td>
+                <td>8</td>
+                <td>0</td>
+                <td class="spacer">&nbsp;</td>
+                <td data-ratio="27 27">100%</td>
+            </tr>
+            <tr class="region">
+                <td class="name"><a href="z_ce08308d25a90d86_wav_io_py.html#t48">music_target<span class="sep">/</span>wav_io.py</a></td>
+                <td class="name"><a href="z_ce08308d25a90d86_wav_io_py.html#t48"><data value='WavError'>WavError</data></a></td>
+                <td class="spacer">&nbsp;</td>
+                <td data-ratio="3 3">100%</td>
+                <td>3</td>
+                <td>0</td>
+                <td>0</td>
+                <td class="spacer">&nbsp;</td>
+                <td data-ratio="2 2">100%</td>
+                <td>2</td>
+                <td>0</td>
+                <td class="spacer">&nbsp;</td>
+                <td data-ratio="5 5">100%</td>
+            </tr>
+            <tr class="region">
+                <td class="name"><a href="z_ce08308d25a90d86_wav_io_py.html">music_target<span class="sep">/</span>wav_io.py</a></td>
+                <td class="name"><a href="z_ce08308d25a90d86_wav_io_py.html"><data value=''><span class='no-noun'>(no class)</span></data></a></td>
+                <td class="spacer">&nbsp;</td>
+                <td data-ratio="248 288">86%</td>
+                <td>288</td>
+                <td>40</td>
+                <td>0</td>
+                <td class="spacer">&nbsp;</td>
+                <td data-ratio="87 122">71%</td>
+                <td>122</td>
+                <td>33</td>
+                <td class="spacer">&nbsp;</td>
+                <td data-ratio="335 410">82%</td>
+            </tr>
+            <tr class="region">
+                <td class="name"><a href="z_ce08308d25a90d86_wav_parser_py.html">music_target<span class="sep">/</span>wav_parser.py</a></td>
+                <td class="name"><a href="z_ce08308d25a90d86_wav_parser_py.html"><data value=''><span class='no-noun'>(no class)</span></data></a></td>
+                <td class="spacer">&nbsp;</td>
+                <td data-ratio="128 210">61%</td>
+                <td>210</td>
+                <td>82</td>
+                <td>0</td>
+                <td class="spacer">&nbsp;</td>
+                <td data-ratio="13 48">27%</td>
+                <td>48</td>
+                <td>7</td>
+                <td class="spacer">&nbsp;</td>
+                <td data-ratio="141 258">55%</td>
+            </tr>
+            <tr class="region">
+                <td class="name"><a href="z_ce08308d25a90d86_workflow_policy_py.html#t140">music_target<span class="sep">/</span>workflow_policy.py</a></td>
+                <td class="name"><a href="z_ce08308d25a90d86_workflow_policy_py.html#t140"><data value='WorkflowCompletenessPass'>WorkflowCompletenessPass</data></a></td>
+                <td class="spacer">&nbsp;</td>
+                <td data-ratio="155 163">95%</td>
+                <td>163</td>
+                <td>8</td>
+                <td>0</td>
+                <td class="spacer">&nbsp;</td>
+                <td data-ratio="82 90">91%</td>
+                <td>90</td>
+                <td>8</td>
+                <td class="spacer">&nbsp;</td>
+                <td data-ratio="237 253">94%</td>
+            </tr>
+            <tr class="region">
+                <td class="name"><a href="z_ce08308d25a90d86_workflow_policy_py.html">music_target<span class="sep">/</span>workflow_policy.py</a></td>
+                <td class="name"><a href="z_ce08308d25a90d86_workflow_policy_py.html"><data value=''><span class='no-noun'>(no class)</span></data></a></td>
+                <td class="spacer">&nbsp;</td>
+                <td data-ratio="99 111">89%</td>
+                <td>111</td>
+                <td>12</td>
+                <td>0</td>
+                <td class="spacer">&nbsp;</td>
+                <td data-ratio="54 66">82%</td>
+                <td>66</td>
+                <td>12</td>
+                <td class="spacer">&nbsp;</td>
+                <td data-ratio="153 177">86%</td>
+            </tr>
+            <tr class="region">
+                <td class="name"><a href="relationship_modes_py.html">relationship_modes.py</a></td>
+                <td class="name"><a href="relationship_modes_py.html"><data value=''><span class='no-noun'>(no class)</span></data></a></td>
+                <td class="spacer">&nbsp;</td>
+                <td data-ratio="70 99">71%</td>
+                <td>99</td>
+                <td>29</td>
+                <td>0</td>
+                <td class="spacer">&nbsp;</td>
+                <td data-ratio="38 58">66%</td>
+                <td>58</td>
+                <td>16</td>
+                <td class="spacer">&nbsp;</td>
+                <td data-ratio="108 157">69%</td>
+            </tr>
+            <tr class="region">
+                <td class="name"><a href="run_py.html">run.py</a></td>
+                <td class="name"><a href="run_py.html"><data value=''><span class='no-noun'>(no class)</span></data></a></td>
+                <td class="spacer">&nbsp;</td>
+                <td data-ratio="117 166">70%</td>
+                <td>166</td>
+                <td>49</td>
+                <td>0</td>
+                <td class="spacer">&nbsp;</td>
+                <td data-ratio="44 62">71%</td>
+                <td>62</td>
+                <td>6</td>
+                <td class="spacer">&nbsp;</td>
+                <td data-ratio="161 228">71%</td>
+            </tr>
+            <tr class="region">
+                <td class="name"><a href="wav_probe_py.html">wav_probe.py</a></td>
+                <td class="name"><a href="wav_probe_py.html"><data value=''><span class='no-noun'>(no class)</span></data></a></td>
+                <td class="spacer">&nbsp;</td>
+                <td data-ratio="99 113">88%</td>
+                <td>113</td>
+                <td>14</td>
+                <td>0</td>
+                <td class="spacer">&nbsp;</td>
+                <td data-ratio="36 50">72%</td>
+                <td>50</td>
+                <td>12</td>
+                <td class="spacer">&nbsp;</td>
+                <td data-ratio="135 163">83%</td>
+            </tr>
+        </tbody>
+        <tfoot>
+            <tr class="total">
+                <td class="name">Total</td>
+                <td class="name">&nbsp;</td>
+                <td class="spacer">&nbsp;</td>
+                <td data-ratio="7159 9767">73%</td>
+                <td>9767</td>
+                <td>2608</td>
+                <td>0</td>
+                <td class="spacer">&nbsp;</td>
+                <td data-ratio="2555 4022">64%</td>
+                <td>4022</td>
+                <td>599</td>
+                <td class="spacer">&nbsp;</td>
+                <td data-ratio="9714 13789">70%</td>
+            </tr>
+        </tfoot>
+    </table>
+    <p id="no_rows">
+        No items found using the specified filter.
+    </p>
+        <p>27 empty classes skipped.</p>
+</main>
+<footer>
+    <div class="content">
+        <p>
+            <a class="nav" href="https://coverage.readthedocs.io/en/7.17.0">coverage.py v7.17.0</a>,
+            created at 2026-10-25 10:46 +1100
+        </p>
+    </div>
+    <aside class="hidden">
+        <a id="prevFileLink" class="nav" href=""></a>
+        <a id="nextFileLink" class="nav" href=""></a>
+        <button type="button" class="button_prev_file" data-shortcut="["></button>
+        <button type="button" class="button_next_file" data-shortcut="]"></button>
+        <button type="button" class="button_show_hide_help" data-shortcut="?"></button>
+    </aside>
+</footer>
+</body>
+</html>

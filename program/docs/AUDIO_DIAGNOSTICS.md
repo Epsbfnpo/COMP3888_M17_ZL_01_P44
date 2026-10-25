@@ -66,9 +66,21 @@ It appends only `AUDIO_*` findings and the following object arrays:
   declared as a format conversion, whether audfprint supports whole-file
   alignment within 0.1 s of 0 and the target's bandwidth assessment, beside
   the core `format_conversions` checks;
+- `assessment_checks.audio_declared_range`: for each edge that declares all
+  four range fields, whether the declared source window is supported and, if
+  not, where the target's content is in the source (see "Declared ranges"
+  below); `assessment_checks.audio_declared_range_search` holds the
+  whole-source fingerprint rows behind it;
+- `assessment_checks.audio_take_beyond_final`: for each AAF-used take, whether
+  the seconds the edit did not use are absent from the target, with the
+  fingerprint rows in `assessment_checks.audio_aaf_unused_range`; and
+  `assessment_checks.audio_source_coverage`: without an AAF, which stretches of
+  a source's content have no match in the target (see "Content beyond the
+  final" below);
 - `assessment_checks.audio_diagnostic_summary`: policy/version, task counts
-  (pair tasks and `file_task_count`), decoder versions, diagnostic runtime,
-  and the explicit non-scoring boundary.
+  (pair tasks, `file_task_count` and `declared_range_search_task_count`),
+  `declared_ranges_assessed` and `declared_ranges_not_supported`, decoder
+  versions, diagnostic runtime, and the explicit non-scoring boundary.
 
 When the graph has no retained audio-to-audio relationships, one
 `AUDIO_DIAGNOSTIC_NOT_APPLICABLE` info finding says so, instead of the report
@@ -126,6 +138,100 @@ Every row carries `range_source` (`whole_file`, `declared` or derived). Other
 partial ranges are not completed: `incomplete_declared_ranges` names the
 missing fields. Time measurements are converted back to the original file's
 timeline.
+
+### Declared ranges
+
+A declared window is compared only inside the declared seconds, so on its own
+it cannot tell a false interval from audio that is hard to fingerprint. For
+each edge that declares source and target start and end, the runner therefore
+adds one companion task (`range_source: "declared_range_search"`). It runs only
+audfprint and SpectroMap, reads the whole source and the declared target
+window, and uses no file outside the declared edge.
+
+The decision uses audfprint, the provider with a calibrated support profile.
+The declared offset is `source_start - target_start`; offsets within 0.25 s
+count as that alignment. `audio_declared_range[].outcome` is one of:
+
+| Outcome | Meaning | Finding |
+|---|---|---|
+| `declared_range_supported` | audfprint supports the declared window at the declared offset | none |
+| `content_found_elsewhere` | the window is not supported, but the target's content is supported at another source offset | `AUDIO_DECLARED_RANGE_NOT_SUPPORTED`, severity `low`, with `best_offset_seconds` and `best_source_range_seconds` |
+| `content_not_located` | neither the window nor the whole source supports the target's content | the same code, severity `info`: processing such as time-stretching can prevent a match, so this is not a contradiction |
+| `search_unavailable` | the window is not supported and the whole-source search did not complete | the same code, severity `info` |
+| `insufficient_support`, `not_assessed` | the declared-window analysis itself could not conclude | none |
+| `not_assessed_durations_differ` | the source and target windows differ by more than 0.05 s, which declares a speed change fingerprints cannot align | none |
+
+Every supported offset is listed (`search_supported_offsets_seconds`), so
+repeated material shows each place it occurs, and `spectromap_agrees` says
+whether any SpectroMap candidate lies near the best offset. Like every other
+diagnostic the finding is report-only: Integrity, confidence and caps are
+unchanged. On the repeated-excerpt fixture a declared 7-11 s window (the
+content is at 2-6 s and 10-14 s) gives `content_found_elsewhere` at 2.0 s,
+and declared 2-6 s or 10-14 s windows give `declared_range_supported`.
+
+### Content beyond the final
+
+A stem separated out of the final mix matches that mix, so a match alone says
+little about where a part came from. What a separated stem cannot hold is
+material the final lacks. A recorder take normally does: other passes, false
+starts, room tone. These reports look for it. Like every diagnostic they are
+report-only and never change a score.
+
+**With an AAF.** The AAF names the seconds of each recorder take that the edit
+used. The unused seconds, less a 0.5 s handle on each side of every used range,
+are split into pieces of at least 3 s (`range_source: "aaf_unused_range"`).
+audfprint and SpectroMap compare each piece with the same target as the
+used-range comparison. Absence only means something if that comparison can see
+the take in the target at all. So the take's used ranges act as a positive
+control, and a take whose used ranges were not found is reported
+`no_positive_control` with no finding.
+
+| `audio_take_beyond_final[].outcome` | Finding |
+|---|---|
+| `content_beyond_final`: control found; some unused seconds have no candidate in the target | `AUDIO_TAKE_CONTENT_BEYOND_FINAL` (info), with `unused_seconds_not_found` and `unused_seconds_found` |
+| `unused_content_found_in_final`: control found; every analysed unused piece has a candidate | none for the take |
+| `no_positive_control`, `not_analysable` | none |
+
+Any unused piece with a candidate also gets `AUDIO_UNUSED_RANGE_FOUND_IN_FINAL`
+(info), naming the strongest candidate (provider, matched pairs, supported
+seconds). A weak candidate can be chance; a strong one can be another clip,
+repeated material or an AAF that does not list every use. It is never a
+contradiction. Every candidate counts as found, so seconds beyond the final
+err low.
+
+**Without an AAF.** For whole-file `mixed_from`, `stemmed_from`, `edited_from`,
+`comped_from` and `derived_from` edges, `audio_source_coverage` uses the
+audfprint row. Its metrics now include `source_content_windows_seconds`: the
+source seconds that carry landmarks, so silence is never counted as missing
+content. audfprint picks landmarks differently in a short file and a long one,
+so even an exact copy of part of the mix matches only part of its landmarks.
+Coverage is therefore judged by region. Windows of one candidate closer than
+3 s are joined, and only uncovered stretches of at least 3 s that still hold at
+least 2 s of landmark content count. A supported audfprint candidate is the
+positive control.
+
+| `audio_source_coverage[].outcome` | Finding |
+|---|---|
+| `content_beyond_target` | `AUDIO_SOURCE_CONTENT_BEYOND_TARGET` (info), with the uncovered regions |
+| `contained_in_target` | none: a stem rendered for the mix is expected to be fully contained, so this is not evidence against it |
+| `no_positive_control` | none |
+
+These thresholds (0.5 s handles, 3 s pieces and regions, 2 s content) are
+heuristic and uncalibrated. Missing a quiet or heavily processed part also
+looks like "not found", so the reports support a take; they never count
+against one.
+
+Project Rock Ep01 (13 AAF-used takes, the WIP mix): 26 unused pieces were
+analysed. The 6 takes whose used ranges were found all report
+`content_beyond_final`, with 10.1-32.8 s of unused material not found in the
+mix (119.9 s in total). The other 7 have no positive control and are not
+assessed. One unused piece has a SpectroMap candidate of 6 matched pairs over
+0.5 s, reported as `AUDIO_UNUSED_RANGE_FOUND_IN_FINAL`. With audio analysis the
+run took 35.5 s at a 465 MB peak (previously about 19 s), and the core result
+was identical with analysis on or off. In a no-AAF variant built from the same
+files, a real take reports `content_beyond_target` with 15.1 s not found. Two
+"takes" cut from the mix itself, one exact and one band-passed to 200-4000 Hz
+at gain 0.8, both report `contained_in_target`.
 
 The formats the core accepts are analysed: supported WAV encodings are read
 directly, and FLAC and MP3 are decoded with soundfile (libsndfile). FLAC decodes

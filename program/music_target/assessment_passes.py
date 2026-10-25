@@ -20,6 +20,7 @@ from music_target.production_documents import (aaf_checks, aaf_non_recorder_medi
                                                parse_aaf_file, parse_sound_report_file, sound_report_checks)
 from music_target.evidence_tiers import TIERS, assign_default_tiers, c2pa_signer_trusted, c2pa_tier, tier_counts
 from music_target.score_explanations import contradiction_summary, describe_check, fact_counts
+from music_target.forge_cost import describe as describe_strength, evidence_strength
 from music_target.scoring_profile import load_default_scoring_profile
 from music_target.sheet_parsers import parse_comp_sheet_file, parse_cue_sheet_file
 
@@ -1558,6 +1559,12 @@ def assess_axes(native, chain, bound_hashes, missing_hashes, wav_observations,
                         for item in cross_facts if isinstance(item.get("passed"), bool)
                         and set(item["assessed_evidence_tiers"]) & set(support_tiers)]
     cap_record = None
+    # Optional: how hard the checked evidence is to forge scales confidence,
+    # never the value. Profiles without forge_cost keep the layer-count formula.
+    forge_config = integrity_profile.get("forge_cost")
+    strength = (evidence_strength(cross_facts, {node["artefact_hash"]: node["artefact_type"]
+                                                for node in native["artefacts"]}, bound_hashes, forge_config)
+                if forge_config else None)
     if not components:
         integrity_availability, integrity_value, integrity_confidence = "unavailable", None, None
     else:
@@ -1581,7 +1588,8 @@ def assess_axes(native, chain, bound_hashes, missing_hashes, wav_observations,
         else:
             integrity_value = None
         integrity_confidence = round(
-            confidence_formula["ceiling"] * len(components) / denominator_layers, 3)
+            confidence_formula["ceiling"] * len(components) / denominator_layers
+            * (strength["confidence_factor"] if strength else 1.0), 3)
     # An ordinary contradiction is a finding and a status, never permission to
     # release an otherwise withheld numeric score.
     tiers_restricted = set(support_tiers) != set(TIERS)
@@ -1692,11 +1700,14 @@ def assess_axes(native, chain, bound_hashes, missing_hashes, wav_observations,
     # leads the reasoning: a reader of the number alone would miss it.
     summary = contradiction_summary(decision)
     count_clause = f"{summary}; the numeric value alone understates this. " if summary else ""
+    confidence_clause = (describe_strength(strength, len(components), denominator_layers)
+                         if strength and components else
+                         "Integrity confidence reflects how many of the three evidence layers were checked. ")
     integrity = _axis(
         integrity_availability, integrity_value, integrity_confidence,
         (f"{count_clause}"
          f"Integrity has {len(components)}/{denominator_layers} score-eligible evidence layers; missing evidence reduces availability and confidence but is never treated as contradiction. "
-         "Integrity confidence reflects how many of the three evidence layers were checked. "
+         f"{confidence_clause}"
          "To see how many checks passed, refer to the integrity value and the layer results. "
          f"{withholding_clause}"
          f"{cap_clause}"
@@ -1757,6 +1768,8 @@ def assess_axes(native, chain, bound_hashes, missing_hashes, wav_observations,
                                            for check in observation.get("range_validation_details", [])],
         "integrity_layers": layers,
         "integrity_decision": [decision],
+        # Present only when the profile grades evidence by forge cost.
+        **({"evidence_strength": [strength]} if strength else {}),
         "ai_disclosure_coverage": [AIDisclosurePass.summary(native)],
         "assessment_status_semantics": ASSESSMENT_STATUS_SEMANTICS,
         "cross_evidence": cross_checks,

@@ -14,7 +14,11 @@
 
 ## 0. Pin the policy version first
 
-Every expected value in this plan assumes **`default-v6`**. Under v6:
+Every expected value in this plan assumes **`default-v6`**. `default-v7`
+(25 October 2026) keeps every Integrity value, status and release expectation
+here and changes only confidence: multiply the v6 confidence by
+`0.5 + 0.5 x strength / 5` from `assessment_checks.evidence_strength`
+(`docs/FORGE_COST.md`; tests in `tests/test_forge_cost.py`). Under v6:
 
 - Integrity is the weighted mean of three layers: `file_integrity`, `declaration_consistency`,
   `cross_evidence_support`, all weight **1.0**.
