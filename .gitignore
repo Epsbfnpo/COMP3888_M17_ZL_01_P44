@@ -15,3 +15,6 @@ certivina_audio_domain/
 # Coverage data files (the HTML report in program/reports/coverage/ is kept)
 .coverage
 .coverage.*
+
+# Optional environment for the ML source-separation research (program/requirements-separation.txt)
+.venv-separation/

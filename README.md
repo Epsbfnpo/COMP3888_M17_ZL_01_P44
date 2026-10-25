@@ -89,6 +89,7 @@ below are relative to that directory.
 9. [Future work](program/docs/NEXT_TASKS.md): consolidated P0-P3 roadmap and unresolved legacy items.
 10. [Verification results](program/reports/verification.md): historical core verification and remaining unverified areas.
 11. [Audio integration verification](program/reports/audio-diagnostics-verification.json): historical record of 189 passing tests (19 October 2026) and core-result invariance on the repeated-excerpt example.
+12. [ML source-separation research](program/docs/SOURCE_SEPARATION_POC.md): exploratory, uncalibrated research, not a production feature. Tests whether Demucs separation can show that a submitted stem was extracted from the final mix. The evaluator does not use it; the only discriminating signal reflected audio encoding, so nothing was integrated.
 
 ## Current implementation
 
@@ -1058,6 +1059,6 @@ The locations below are relative to `program/`.
 7. Decide with the client which recordings a workflow requires (every take the AAF edit uses, or a sample), what substitutes are acceptable, and whether `min_supported_asset_share` should gate release. Chronology warnings stay report-only until relationship-specific time rules, time sources and tolerances are agreed. See `program/docs/NEXT_TASKS.md` items 34–37.
 
 8. Set the accuracy a report-only audio diagnostic must reach before it may affect a score (declared ranges, content beyond the final), and review the `default-v7` forge costs, which come from forgery measurements on one production, not calibrated probabilities.
-9. Choose fixes for the start-timecode gap (`program/docs/NEXT_TASKS.md`) and confirm the next ML step: Demucs source-separation comparison for submitted stems, with Whisper dialogue matching on the roadmap.
+9. Choose fixes for the start-timecode gap (`program/docs/NEXT_TASKS.md`) and decide whether to pursue Whisper dialogue matching as a future ML task. The Demucs source-separation investigation is complete and will not be integrated: realistic encoding controls produced unacceptable false positives (see [`program/docs/SOURCE_SEPARATION_POC.md`](program/docs/SOURCE_SEPARATION_POC.md)).
 
 These decisions do not block the local executable baseline, but the directory must not yet be described as a complete music-authenticity assessment system.

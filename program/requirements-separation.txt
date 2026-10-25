@@ -1,0 +1,12 @@
+# Optional: Phase 1 source-separation probe only (benchmarks/separation_probe.py,
+# docs/SOURCE_SEPARATION_POC.md). The evaluator never imports torch or demucs.
+# Installing these packages downloads no model weights; the probe needs
+# --model-repo (local weights) or an explicit --allow-download.
+numpy==2.2.6
+soundfile==0.14.0
+# Resampling when the mix, stem and model (44.1 kHz) rates differ.
+scipy==1.16.3
+# Pulls in a compatible torch. Torch is left to the resolver because its wheels
+# differ per platform; record the installed version (`pip freeze`) with any
+# result, and the probe writes it into every report.
+demucs==4.1.0
