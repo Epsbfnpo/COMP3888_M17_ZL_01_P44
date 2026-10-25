@@ -1,10 +1,11 @@
 # Music target: local integration handoff v0.8.1
 
-Status (updated 23 October 2026): locally tested integration baseline for version 0.8.1, prepared for CSEC's
-adversarial testing. Not yet executed in CSEC's runner. The scoring update (profile default-v6) and FLAC/MP3
-support were merged on 24 October 2026; the target version is not pinned yet. On 25 October 2026 the default
-profile became default-v7 (forge cost scales Integrity confidence only; values, tiers and the release rule are
-unchanged), and three report-only audio findings were added. See "Changes on 25 October 2026" below.
+Status (updated 25 October 2026): pinned baseline for CSEC's adversarial testing. Git tag `csec-2026-10-25`,
+`system.version` 0.8.1, scoring profile default-v7, `system.source_revision`
+`sha256:ac048707f1bc29f53bc8ffa2ca27d8e121f6da0008fd397dddfc3bea4b9cbf5c`. Not yet executed in CSEC's runner. The scoring update (profile default-v6) and FLAC/MP3 support were
+merged on 24 October 2026; on 25 October 2026 the default profile became default-v7 (forge cost scales Integrity
+confidence only; values, tiers and the release rule are unchanged), and four report-only audio findings were added.
+See "Changes on 25 October 2026" below and the red-team package in `docs/csec_redteam/`.
 
 ## Contact and collaboration mode
 

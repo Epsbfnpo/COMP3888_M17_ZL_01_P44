@@ -49,6 +49,8 @@ JSON blocks into one `.jsonl` file).
     "axes": {"completeness": null, "integrity": null, "attestation_strength": null, "ai_disclosure": null},
     "integrity_status": "",
     "contradiction_count": null,
+    "integrity_confidence": null,
+    "evidence_strength": {"mean_subject_forge_cost": null, "confidence_factor": null, "subjects_by_basis": {}},
     "checks_that_held": ["finding codes or cross_evidence rules that caught the attack"],
     "checks_that_did_not_hold": ["checks that should have caught it but passed"]
   },
@@ -76,5 +78,10 @@ JSON blocks into one `.jsonl` file).
   `C2PA_SIGNATURE_INVALID`) or `assessment_checks.cross_evidence` rules (for
   example `c2pa_ai_source_type_matches_creation_method`) that exposed the
   attack, so the cost of defeating each check can be compared.
+- **Evidence strength.** Copy `axes.integrity.confidence` and, from
+  `assessment_checks.evidence_strength`, `mean_subject_forge_cost`,
+  `confidence_factor` and `subjects_by_basis`. Together with
+  `fields_or_files_forged`, `skill_level` and the time spent, this lets each
+  attempt be compared with the forge costs in `default-v7` (goal G8).
 - **Personal data.** Refer to Project Rock files by name or SHA-256. Do not
   copy contact details from the sound reports.
