@@ -337,7 +337,7 @@ def attention_items(response, file_names=None, policy_rules=None):
                 disposition = ("unassessed" if item.get("status") == "unavailable"
                                else mapping.get(item.get("passed"), "unknown"))
                 if (collection == "bound_file_integrity"
-                        and item.get("rule") == "declared_type_parser_succeeds"
+                        and item.get("rule") in ("declared_type_parser_succeeds", "audio_file_readable")
                         and item.get("passed") is False):
                     continue
             else:

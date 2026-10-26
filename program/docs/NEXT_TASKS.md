@@ -323,9 +323,11 @@ fingerprinting or other non-scoring diagnostics.
 42. Start-timecode gap found by `benchmarks/forge_cost.py`: the AAF checks only
     that each used range lies inside the recording, so a start timecode moved
     by one second in both the WAV and the sound report raises no contradiction.
-    Fixes, cheapest first: (A) a scored check that bext `TimeReference` equals
-    iXML `TIMESTAMP_SAMPLES_SINCE_MIDNIGHT` (they agree on every Project Rock
-    take; the forgery changed only bext); (B) a consistent offset between
+    Fixes, cheapest first: (A, done 27 October as
+    `recorder_bext_time_reference_matches_ixml_timestamp`) a scored check
+    that bext `TimeReference` equals iXML `TIMESTAMP_SAMPLES_SINCE_MIDNIGHT`
+    (they agree on every Project Rock take; the forgery changed only bext;
+    iXML can still be edited too, so B and C remain); (B) a consistent offset between
     timecode and `OriginationTime` across the takes of one recorder and day
     (reliable for shifts of 2 s or more, as `OriginationTime` has one-second
     resolution); (C) compare the fingerprint offset of each AAF-used range in

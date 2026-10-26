@@ -110,9 +110,13 @@ class FileDialog(Dialog):
         self.type_var = tk.StringVar(value=entry["type"])
         self.add_row("Artefact type", ttk.Combobox(
             self.body, textvariable=self.type_var, values=L.ALL_TYPES))
-        self.method_var = tk.StringVar(value=entry["creation_method"])
+        self.method_var = tk.StringVar(value=L.creation_method_text(entry["creation_method"]))
         self.add_row("Creation method", ttk.Combobox(
             self.body, textvariable=self.method_var, values=L.CREATION_METHODS))
+        ttk.Label(self.body, foreground="gray",
+                  text='Multiple methods: ["recorded", "ai-generated"]').grid(
+            row=self._row, column=1, sticky="w")
+        self._row += 1
         self.role_var = tk.StringVar(value=entry["role"])
         self.add_row("Role (production.role)", ttk.Combobox(
             self.body, textvariable=self.role_var, values=[""] + roles))
@@ -140,6 +144,7 @@ class FileDialog(Dialog):
                 raise ValueError(f"ID '{new_id}' is already used")
             if self.type_var.get().strip() not in L.SUPPORTED:
                 raise ValueError("choose a registered artefact type")
+            creation_method = L.parse_creation_method(self.method_var.get())
             production = parse_json_object(self.prod_text.get("1.0", "end"), "production")
             extra = parse_json_object(self.extra_text.get("1.0", "end"), "other attributes")
             clash = {"creation_method", "production", "technical"} & set(extra)
@@ -151,7 +156,7 @@ class FileDialog(Dialog):
             messagebox.showerror("Invalid", str(exc), parent=self)
             return
         self.result = {"id": new_id, "type": self.type_var.get().strip(),
-                       "creation_method": self.method_var.get().strip(),
+                       "creation_method": creation_method,
                        "role": self.role_var.get().strip(),
                        "final": self.final_var.get(),
                        "production": production, "extra": extra}

@@ -199,7 +199,32 @@ G3 baselines must be measured against the pinned profile.
   and the sound report raises no contradiction: the AAF only checks
   containment, and bext and iXML timestamps are not yet compared
   (`docs/NEXT_TASKS.md` item 42). Finding it again is not a new defect; its
-  cost is still worth recording.
+  cost is still worth recording. Partly closed on 27 October (below).
+
+## Changes on 27 October 2026 (after the CSEC feedback)
+
+- **Damaged audio fails the file check.** A non-final audio file that is
+  malformed or is not audio at all (truncated RIFF, broken FLAC metadata, no
+  MP3 frames) now adds `audio_file_readable` with `passed: false` to
+  `bound_file_integrity`, beside the existing unavailable
+  `wav_parser_available`/`audio_parser_available` row. A parsed file whose
+  audio had to be skipped adds `audio_stream_complete` with `passed: false`
+  and a `damage` list (WAV `partial_final_frame_ignored`, MP3 `sync_lost`,
+  `truncated_final_frame`, `too_many_sync_losses`). Both are
+  `FILE_INTEGRITY_CONTRADICTION`s. Unsupported but valid formats (AIFF, RF64,
+  A-law, MPEG Layer II), read errors and the caller's time limit add no check;
+  intact files add none either, so their responses are unchanged. Before, an
+  unreadable stem left `file_integrity` at 1.0.
+- **bext against iXML timestamp.** A recorder WAV or FLAC with both bext
+  `TimeReference` and iXML `TIMESTAMP_SAMPLES_SINCE_MIDNIGHT_HI/LO` adds
+  `recorder_bext_time_reference_matches_ixml_timestamp` to
+  `bound_file_integrity` (exact samples at the same rate, one sample at
+  different rates). All 233 Project Rock takes agree; the forge-cost forgery
+  of 10T07 (+1 s in bext) now fails by 1.000 s. `recorder_metadata` gains
+  `time_reference_samples`, `ixml_timestamp_samples` and
+  `ixml_timestamp_sample_rate`. Limit: iXML is plain XML inside the same WAV,
+  so a forger who edits both still passes and the measured file cost (3) is
+  unchanged; this catches tools that edit bext alone.
 
 As in default-v4, cross-evidence scores one rule/subject
 fact once, with any failure retaining a contradiction; raw checks and source

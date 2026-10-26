@@ -50,13 +50,21 @@ def _parse_ixml(raw):
     def text(tag):
         node = root.find(".//" + tag)
         return node.text.strip() if node is not None and node.text and node.text.strip() else None
+    def number(tag):
+        value = text(tag)
+        return int(value) if value is not None and value.isdigit() else None
     tracks = {}
     for track in root.iter("TRACK"):
         index, name = track.findtext("CHANNEL_INDEX"), track.findtext("NAME")
         if index and index.strip().isdigit() and name and name.strip():
             tracks[int(index)] = name.strip()
+    # The recorder's start time, written alongside bext TimeReference (iXML
+    # SPEED block, 64 bits split into HI and LO).
+    high, low = number("TIMESTAMP_SAMPLES_SINCE_MIDNIGHT_HI"), number("TIMESTAMP_SAMPLES_SINCE_MIDNIGHT_LO")
     return {"scene": text("SCENE"), "take": text("TAKE"), "tape": text("TAPE"),
             "timecode_rate": text("TIMECODE_RATE"), "timecode_flag": text("TIMECODE_FLAG"),
+            "timestamp_samples": (high << 32) | low if high is not None and low is not None else None,
+            "timestamp_sample_rate": number("TIMESTAMP_SAMPLE_RATE"),
             "tracks": tracks}, None
 
 
@@ -113,9 +121,36 @@ def _recorder_fields(bext, ixml, warning, rate, duration_seconds):
         "tracks": {str(key): value for key, value in sorted((ixml.get("tracks") or bext_tracks).items())},
         "origination_date": bext.get("origination_date") or None,
         "start_timecode_seconds": reference_seconds,
+        "time_reference_samples": time_reference if isinstance(time_reference, int) else None,
+        "ixml_timestamp_samples": ixml.get("timestamp_samples"),
+        "ixml_timestamp_sample_rate": ixml.get("timestamp_sample_rate"),
         "duration_seconds": duration_seconds,
         "timecode_rate": ixml.get("timecode_rate"),
         "timecode_flag": ixml.get("timecode_flag"),
         "sources": sources,
         "warnings": warnings,
     }
+
+
+def timestamp_checks(digest, recorder, sample_rate):
+    """bext TimeReference against the iXML timestamp of the same recorder file.
+
+    The recorder writes both at record time and they agree to the sample (all
+    233 Project Rock takes), so a start timecode edited in only one of them is
+    a contradiction. Nothing is checked unless both are present.
+    """
+    recorder = recorder or {}
+    bext, ixml = recorder.get("time_reference_samples"), recorder.get("ixml_timestamp_samples")
+    if recorder.get("bwf_kind") != "recorder" or bext is None or ixml is None or not sample_rate:
+        return []
+    ixml_rate = recorder.get("ixml_timestamp_sample_rate") or sample_rate
+    bext_seconds, ixml_seconds = bext / sample_rate, ixml / ixml_rate
+    # Same rate: exact samples. Otherwise allow one sample at the lower rate.
+    passed = (bext == ixml if ixml_rate == sample_rate
+              else abs(bext_seconds - ixml_seconds) <= 1 / min(ixml_rate, sample_rate) + 1e-9)
+    return [{"rule": "recorder_bext_time_reference_matches_ixml_timestamp", "passed": passed,
+             "evidence_hash": digest, "source_pass": "WavMetadataPass",
+             "bext_time_reference_samples": bext, "ixml_timestamp_samples": ixml,
+             "sample_rate_hz": sample_rate, "ixml_timestamp_sample_rate": ixml_rate,
+             "bext_seconds": bext_seconds, "ixml_seconds": ixml_seconds,
+             "difference_seconds": bext_seconds - ixml_seconds}]

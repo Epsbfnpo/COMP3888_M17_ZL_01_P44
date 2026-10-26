@@ -494,6 +494,37 @@ class EvaluatorTests(unittest.TestCase):
         failed = next(row for row in response["findings"] if row["code"] == "AUDIO_PARSER_FAILED")
         self.assertEqual(failed["evidence_hash"], broken)
         self.assertEqual(failed["checks"][0]["rule"], "audio_parser_available")
+        unreadable = next(item for item in response["assessment_checks"]["bound_file_integrity"]
+                          if item["rule"] == "audio_file_readable")
+        self.assertEqual((unreadable["passed"], unreadable["format"]), (False, "FLAC"))
+        self.assertTrue(response["assessment_checks"]["integrity_decision"][0]["contradiction_present"])
+
+    def test_mp3_with_lost_sync_fails_the_file_check_but_trailing_junk_does_not(self):
+        data = write_mp3(self.folder / "source.mp3").read_bytes()
+        middle = len(data) // 2
+        for payload, damaged in ((data[:middle] + b"\x00" * 50 + data[middle:], True),
+                                 (data + b"\x00" * 50, False)):
+            with self.subTest(damaged=damaged):
+                final = store(self.folder, payload, "mp3")
+                response = self.evaluate(self.request([(final, "audio/master", "mp3", {}, [])], final,
+                                                      workflow="mastering_service_only"))
+                rows = [item for item in response["assessment_checks"]["bound_file_integrity"]
+                        if item["rule"] == "audio_stream_complete"]
+                if damaged:
+                    self.assertIs(rows[0]["passed"], False)
+                    self.assertTrue(rows[0]["damage"][0].startswith("sync_lost:"))
+                else:
+                    self.assertEqual(rows, [])
+
+    def test_time_limit_and_unsupported_formats_are_not_file_damage(self):
+        from music_target.engine import _readability_checks
+        timeout = Mp3Error("The caller's time limit was reached.", "caller_deadline")
+        self.assertEqual(_readability_checks("d" * 64, "MP3", "invalid", timeout, "timeout"), [])
+        self.assertEqual(_readability_checks("d" * 64, "MP3", "unsupported",
+                                             UnsupportedMp3("Layer II", "unsupported_mpeg_layer"), "x"), [])
+        self.assertEqual(_readability_checks("d" * 64, "WAV", "invalid", OSError("read error"), "x"), [])
+        [check] = _readability_checks("d" * 64, "MP3", "invalid", Mp3Error("No frame.", "no_mpeg_frames"), "x")
+        self.assertIs(check["passed"], False)
 
     def test_unknown_mp3_duration_skips_range_checks_without_crashing(self):
         stripped, _ = Mp3ParserTests.without_info_frame(self, "cue.mp3")

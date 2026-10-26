@@ -372,6 +372,45 @@ class TargetTests(unittest.TestCase):
         self.assertEqual(failed[0]["failure_type"], "unsupported")
         self.assertTrue(any(item["status"] == "unavailable"
                             for item in result["assessment_checks"]["physical_similarity"]))
+        # A valid format the reader does not support is not damage.
+        self.assertFalse(any(item["rule"] == "audio_file_readable"
+                             for item in result["assessment_checks"]["bound_file_integrity"]))
+
+    def _file_integrity(self, stem_data):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            request = self._workflow_request(root, "multitrack_recording_mix_master", [
+                {"type": "audio/stem", "data": stem_data},
+                {"type": "audio/mix", "data": self._pcm16([0] * 800),
+                 "parents": [(0, "mixed_from")]},
+            ])
+            result = self.score(request, root)
+        self.assertEqual(result["execution_status"], "succeeded", result["error"])
+        checks = result["assessment_checks"]
+        layer = next(item for item in checks["integrity_layers"] if item["layer"] == "file_integrity")
+        return checks, layer
+
+    def test_nonfinal_truncated_wav_fails_the_file_check(self):
+        whole = self._pcm16([int(2000 * math.sin(index / 10)) for index in range(800)])
+        checks, layer = self._file_integrity(whole[:len(whole) // 2])  # RIFF size still claims all of it
+        failed = next(item for item in checks["bound_file_integrity"] if item["rule"] == "audio_file_readable")
+        self.assertIs(failed["passed"], False)
+        self.assertEqual((failed["format"], failed["reason_code"]), ("WAV", "riff_truncated"))
+        self.assertEqual(layer["status"], "contradicted")
+        self.assertLess(layer["value"], 1.0)
+        self.assertTrue(checks["integrity_decision"][0]["contradiction_present"])
+
+    def test_nonfinal_wav_with_a_partial_final_frame_fails_the_file_check(self):
+        checks, layer = self._file_integrity(self._wav_container(1, bytes(1601), bits=16))
+        failed = next(item for item in checks["bound_file_integrity"] if item["rule"] == "audio_stream_complete")
+        self.assertIs(failed["passed"], False)
+        self.assertEqual(failed["damage"], ["partial_final_frame_ignored:1"])
+        self.assertEqual(layer["status"], "contradicted")
+
+    def test_intact_wav_adds_no_damage_check(self):
+        checks, layer = self._file_integrity(self._pcm16([100] * 800))
+        self.assertEqual({item["rule"] for item in checks["bound_file_integrity"]}, {"object_hash_bound"})
+        self.assertEqual(layer["value"], 1.0)
 
     def test_unsupported_final_wav_still_returns_unsupported(self):
         with tempfile.TemporaryDirectory() as directory:
