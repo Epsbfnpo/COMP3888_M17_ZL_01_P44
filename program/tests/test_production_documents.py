@@ -33,8 +33,12 @@ def _fixed(text, size):
 
 
 def recorder_wav(folder, file_name, tape, scene, take, tracks, start_seconds, date, seconds=2.0,
-                 ixml_prefix=b"", seed=0):
-    """A poly BWF like a field recorder writes: bext + iXML + 24-bit PCM."""
+                 ixml_prefix=b"", seed=0, ixml_timestamp=None):
+    """A poly BWF like a field recorder writes: bext + iXML + 24-bit PCM.
+
+    ``ixml_timestamp`` is (samples since midnight, sample rate) for the iXML
+    SPEED block; real recorders write it equal to bext TimeReference.
+    """
     description = "\r\n".join([f"sTAKE={take}", f"sSCENE={scene}", f"sFILENAME={file_name}", f"sTAPE={tape}"] +
                               [f"sTRK{index}={name}" for index, name in tracks.items()])
     reference = round(start_seconds * RATE)
@@ -43,9 +47,16 @@ def recorder_wav(folder, file_name, tape, scene, take, tracks, start_seconds, da
             b"\0" * 64 + b"\0" * 10 + b"\0" * 180 + b"A=PCM,F=48000,W=24\r\n")
     track_xml = "".join(f"<TRACK><CHANNEL_INDEX>{index}</CHANNEL_INDEX><NAME>{name}</NAME></TRACK>"
                         for index, name in tracks.items())
+    stamp = ""
+    if ixml_timestamp is not None:
+        samples, stamp_rate = ixml_timestamp
+        stamp = (f"<TIMESTAMP_SAMPLE_RATE>{stamp_rate}</TIMESTAMP_SAMPLE_RATE>"
+                 f"<TIMESTAMP_SAMPLES_SINCE_MIDNIGHT_HI>{samples >> 32:010d}</TIMESTAMP_SAMPLES_SINCE_MIDNIGHT_HI>"
+                 f"<TIMESTAMP_SAMPLES_SINCE_MIDNIGHT_LO>{samples & 0xFFFFFFFF:010d}"
+                 "</TIMESTAMP_SAMPLES_SINCE_MIDNIGHT_LO>")
     ixml = ixml_prefix + (f"<?xml version=\"1.0\"?><BWFXML><SCENE>{scene}</SCENE><TAKE>{take}</TAKE>"
                           f"<TAPE>{tape}</TAPE><SPEED><TIMECODE_RATE>25/1</TIMECODE_RATE>"
-                          f"<TIMECODE_FLAG>NDF</TIMECODE_FLAG></SPEED><TRACK_LIST>{track_xml}</TRACK_LIST>"
+                          f"<TIMECODE_FLAG>NDF</TIMECODE_FLAG>{stamp}</SPEED><TRACK_LIST>{track_xml}</TRACK_LIST>"
                           "</BWFXML>").encode()
     channels = len(tracks)
     rng = np.random.default_rng(seed)
@@ -530,6 +541,81 @@ class ProductionDocumentTests(unittest.TestCase):
         response = run.evaluate(self.request([(report, "text/sound-report", "csv")]), self.folder, "native")
         self.assertEqual(response["execution_status"], "succeeded", response.get("error"))
         self.assertIsNone(response["axes"]["integrity"]["value"])
+
+
+class RecorderTimestampTests(unittest.TestCase):
+    """bext TimeReference against the iXML timestamp the recorder wrote with it."""
+
+    setUp = RecorderMetadataTests.setUp
+    fields = RecorderMetadataTests.fields
+    request = ProductionDocumentTests.request
+
+    def check(self, digest):
+        from music_target.recorder_metadata import timestamp_checks
+        return timestamp_checks(digest, self.fields(digest), RATE)
+
+    def recorder_take(self, bext_seconds, ixml_samples, ixml_rate=RATE):
+        return recorder_wav(self.folder, "2T01.WAV", "24Y12M18", "2", "01", TRACKS, bext_seconds, "2024-12-18",
+                            ixml_timestamp=(ixml_samples, ixml_rate))
+
+    def test_matching_timestamps_pass(self):
+        [check] = self.check(self.recorder_take(31783.0, 31783 * RATE))
+        self.assertEqual(check["rule"], "recorder_bext_time_reference_matches_ixml_timestamp")
+        self.assertIs(check["passed"], True)
+        self.assertEqual(check["difference_seconds"], 0.0)
+
+    def test_bext_shifted_by_one_second_fails(self):
+        [check] = self.check(self.recorder_take(31784.0, 31783 * RATE))
+        self.assertIs(check["passed"], False)
+        self.assertAlmostEqual(check["difference_seconds"], 1.0)
+
+    def test_one_sample_apart_at_the_same_rate_fails(self):
+        [check] = self.check(self.recorder_take(31783.0, 31783 * RATE + 1))
+        self.assertIs(check["passed"], False)
+
+    def test_timestamp_at_another_rate_is_compared_in_seconds(self):
+        [check] = self.check(self.recorder_take(31783.0, 31783 * 96000, ixml_rate=96000))
+        self.assertIs(check["passed"], True)
+        [check] = self.check(self.recorder_take(31783.0, 31784 * 96000, ixml_rate=96000))
+        self.assertIs(check["passed"], False)
+
+    def test_without_an_ixml_timestamp_nothing_is_checked(self):
+        self.assertEqual(self.check(recorder_wav(self.folder, *TAKE)), [])
+
+    def test_daw_or_library_bwf_is_not_checked(self):
+        from music_target.recorder_metadata import timestamp_checks
+        recorder = {"bwf_kind": "daw_or_library", "time_reference_samples": 1, "ixml_timestamp_samples": 2}
+        self.assertEqual(timestamp_checks("d" * 64, recorder, RATE), [])
+
+    def test_timestamp_shift_matched_in_the_sound_report_is_a_contradiction(self):
+        # The CSEC forgery: bext and the sound report both moved by one
+        # second, so the report check passes; the iXML timestamp still says
+        # 08:49:43:00.
+        self.take = self.recorder_take(31784.0, 31783 * RATE)
+        report = store(self.folder, sound_report("18/12/24", [
+            ["2T01.WAV", "2", "01", "00:00:02", "08:49:44:00", '"MixL"', '"MixR"', '"Boom"', '""']]), "csv")
+        response = run.evaluate(self.request([(report, "text/sound-report", "csv")]), self.folder, "native")
+        self.assertEqual(response["execution_status"], "succeeded", response.get("error"))
+        checks = response["assessment_checks"]
+        report_check = next(item for item in checks["cross_evidence"]
+                            if item["rule"] == "sound_report_start_timecode_matches_recorder")
+        self.assertIs(report_check["passed"], True)
+        stamp = next(item for item in checks["bound_file_integrity"]
+                     if item["rule"] == "recorder_bext_time_reference_matches_ixml_timestamp")
+        self.assertIs(stamp["passed"], False)
+        layer = next(item for item in checks["integrity_layers"] if item["layer"] == "file_integrity")
+        self.assertEqual(layer["status"], "contradicted")
+        self.assertTrue(checks["integrity_decision"][0]["contradiction_present"])
+        explanation = next(row for row in checks["score_explanations"] if row["axis"] == "integrity")
+        self.assertIn("differs from its iXML timestamp (31783.000 s) by 1.000 s", " ".join(explanation["statements"]))
+
+    def test_honest_take_with_timestamp_still_releases_integrity(self):
+        self.take = self.recorder_take(31783.0, 31783 * RATE)
+        report = store(self.folder, sound_report("18/12/24", [
+            ["2T01.WAV", "2", "01", "00:00:02", "08:49:43:00", '"MixL"', '"MixR"', '"Boom"', '""']]), "csv")
+        response = run.evaluate(self.request([(report, "text/sound-report", "csv")]), self.folder, "native")
+        self.assertEqual(response["assessment_checks"]["integrity_decision"][0]["contradiction_count"], 0)
+        self.assertIsNotNone(response["axes"]["integrity"]["value"])
 
 
 if __name__ == "__main__":

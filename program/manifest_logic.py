@@ -35,6 +35,7 @@ DOCUMENT_TYPES = (
     "metadata/ddex-rin", "metadata/ddex-ern", "provenance/c2pa",
     "text/cue-sheet", "text/comp-sheet", "text/session-log",
     "text/license-clearance", "text/generation-record",
+    "text/sound-report", "project/aaf",
 )
 ALL_TYPES = AUDIO_TYPES + DOCUMENT_TYPES
 SUPPORTED = {"audio", *ALL_TYPES}
@@ -73,8 +74,35 @@ LINEAR_FIELDS = TIME_FIELDS + ("gain",)
 LINEAR_TYPES = ("mixed_from", "stemmed_from", "edited_from")
 COMPLEX_WORDS = ("compress", "limiter", "master", "time stretch", "pitch shift",
                  "distortion", "saturat", "reverb", "nonlinear")
-CREATION_METHODS = ["", "recorded", "synthesised", "generated", "sampled",
-                    "ai-generated"]
+CREATION_METHODS = ["", "recorded", "synthesised", "ai-generated"]
+
+
+def validate_creation_method(value):
+    """Accept the schema's scalar or list values; a blank UI field omits the claim."""
+    if isinstance(value, str) and value in CREATION_METHODS:
+        return value
+    if isinstance(value, list) and all(
+            isinstance(item, str) and item in CREATION_METHODS[1:] for item in value):
+        return list(value)
+    raise ValueError(
+        "Creation method must be recorded, synthesised or ai-generated, "
+        "or a JSON list of these values. Leave the field blank to omit the declaration.")
+
+
+def creation_method_text(value) -> str:
+    """Display imported lists as JSON so editing preserves their structure."""
+    return value if isinstance(value, str) else json.dumps(value, ensure_ascii=True)
+
+
+def parse_creation_method(text: str):
+    """Read a single menu value or an explicitly entered JSON list."""
+    value = text.strip()
+    if value.startswith("["):
+        try:
+            value = json.loads(value)
+        except json.JSONDecodeError:
+            raise ValueError("Creation method list must be valid JSON.") from None
+    return validate_creation_method(value)
 
 
 # --------------------------------------------------------------------------
@@ -278,10 +306,16 @@ def build_chain(files, rels) -> dict:
     if len(finals) != 1:
         raise ValueError(f"exactly one file must be final; found {len(finals)}")
 
-    seen, total = {}, 0
+    seen, total, methods = {}, 0, {}
     for f in files:
         if f["type"] not in SUPPORTED:
             raise ValueError(f"'{f['id']}' has an unregistered artefact type: {f['type']!r}")
+        try:
+            methods[f["id"]] = validate_creation_method(f["creation_method"])
+        except ValueError as exc:
+            raise ValueError(f"'{f['id']}': {exc}") from None
+        if "creation_method" in f["extra"]:
+            raise ValueError(f"'{f['id']}': set creation_method via its own field, not other attributes")
         if f["hash"] in seen:
             raise ValueError(f"'{f['id']}' and '{seen[f['hash']]}' have identical content")
         seen[f["hash"]] = f["id"]
@@ -345,8 +379,8 @@ def build_chain(files, rels) -> dict:
     for fid in order:
         f = by_id[fid]
         attributes = {}
-        if f["creation_method"]:
-            attributes["creation_method"] = f["creation_method"]
+        if methods[fid] != "":
+            attributes["creation_method"] = methods[fid]
         production = dict(f["production"])
         if f.get("role"):
             production["role"] = f["role"]

@@ -49,6 +49,16 @@ def describe_check(check):
                     f"({check.get('decoded_frames')} samples decoded; STREAMINFO declares "
                     f"{check.get('declared_total_samples')}), so the audio was altered or damaged after encoding.")
         return f"FLAC {name} could not be decoded to verify its MD5: {check.get('reason', 'decoding failed')}"
+    if rule == "audio_file_readable":
+        return (f"{check.get('format', 'Audio')} {name} could not be read as audio "
+                f"({check.get('reason', 'unreadable')}): it is damaged or is not the declared audio type.")
+    if rule == "audio_stream_complete":
+        return (f"{check.get('format', 'Audio')} {name} has damaged audio data "
+                f"({', '.join(check.get('damage', []))}): samples are missing or the stream is interrupted.")
+    if rule == "recorder_bext_time_reference_matches_ixml_timestamp":
+        return (f"The recorder start time in the bext chunk of {name} ({check['bext_seconds']:.3f} s after "
+                f"midnight) differs from its iXML timestamp ({check['ixml_seconds']:.3f} s) by "
+                f"{abs(check['difference_seconds']):.3f} s, so one was edited after recording.")
     if rule.endswith("_scene_take_matches_recorder"):
         return (f"{rule}: {name} is declared as scene/take {'/'.join(map(str, check.get('declared', [])))} "
                 f"but the recorder wrote {'/'.join(map(str, check.get('recorded', [])))}.")

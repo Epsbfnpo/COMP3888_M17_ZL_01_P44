@@ -18,7 +18,7 @@ from music_target.flac_io import FlacError, UnsupportedFlac, inspect_flac, verif
 from music_target.format_conversion import FORMAT_CONVERSION, conversion_checks
 from music_target.mp3_io import Mp3Error, UnsupportedMp3, inspect_mp3
 from music_target.wav_io import UnsupportedWav, WavError, inspect_wav
-from music_target.recorder_metadata import recorder_fields
+from music_target.recorder_metadata import recorder_fields, timestamp_checks
 from music_target.wav_parser import parse_wav_file
 from music_target.workflow_policy import DEFAULT_POLICY_PATH, WorkflowCompletenessPass, load_workflow_policy
 from music_target.time_ranges import content_range_checks
@@ -160,6 +160,40 @@ def _technical_checks(artefact, observed, unmeasurable=None):
     return checks, mismatches, skipped_claims
 
 
+# Parser warnings that mean audio samples are missing or the stream is broken.
+# Damaged metadata after complete audio, unfinalised sizes (streaming writers
+# leave them) and junk before the first MP3 frame are only warnings.
+_STREAM_DAMAGE = {"WAV": ("partial_final_frame_ignored:",),
+                  "MP3": ("sync_lost:", "truncated_final_frame:", "too_many_sync_losses")}
+
+# Parse failures that say nothing about the file itself.
+_NOT_FILE_DAMAGE = {"caller_deadline"}
+
+
+def _stream_checks(digest, container, warnings):
+    """A failed ``audio_stream_complete`` check when the parser had to skip audio; else none."""
+    damage = [item for item in warnings if item.startswith(_STREAM_DAMAGE.get(container, ()))]
+    if not damage:
+        return []
+    return [{"rule": "audio_stream_complete", "passed": False, "evidence_hash": digest,
+             "source_pass": "WavMetadataPass", "format": container, "damage": damage}]
+
+
+def _readability_checks(digest, label, failure_type, cause, error):
+    """A failed ``audio_file_readable`` check when a file is malformed or not audio at all.
+
+    An unsupported but valid format (AIFF, RF64, A-law), a read error and a
+    time limit are not evidence about the file, so they add no check.
+    """
+    reason_code = getattr(cause, "reason_code", None)
+    if (failure_type != "invalid" or not isinstance(cause, (WavError, FlacError, Mp3Error))
+            or reason_code in _NOT_FILE_DAMAGE):
+        return []
+    return [{"rule": "audio_file_readable", "passed": False, "evidence_hash": digest,
+             "source_pass": "WavMetadataPass", "format": label, "reason_code": reason_code,
+             "reason": error}]
+
+
 def _md5_check(digest, md5):
     passed = {"matched": True, "mismatched": False, "failed": False}.get(md5["status"])
     check = {"rule": "flac_md5_matches_decoded_audio", "passed": passed, "evidence_hash": digest,
@@ -191,6 +225,8 @@ def _evaluate_other(artefact, path, detected):
     else:
         observed, embedded, recorder = mp3_observed(descriptor), mp3_embedded(descriptor), dict(MP3_RECORDER)
     checks, mismatches, skipped_claims = _technical_checks(artefact, observed, _UNMEASURABLE[container])
+    checks += _stream_checks(artefact.artefact_hash, container, descriptor.warnings)
+    checks += timestamp_checks(artefact.artefact_hash, recorder, descriptor.sample_rate)
     result = {"status": "parsed", "audio_format": container, "observed": observed,
               "embedded_metadata": embedded, "recorder_metadata": recorder,
               "checks": checks, "claim_mismatches": mismatches}
@@ -256,7 +292,7 @@ class WavMetadataPass(ArtefactPass):
                     "evidence_hash": artefact.artefact_hash,
                     "source_pass": "WavMetadataPass",
                     "reason": str(exc),
-                }],
+                }] + _readability_checks(artefact.artefact_hash, label, failure_type, cause, str(exc)),
                 "claim_mismatches": [],
             }
             if other:
@@ -268,10 +304,12 @@ class WavMetadataPass(ArtefactPass):
         artefact._wav_parser_failure_reason_code = None
         artefact._wav_descriptor = descriptor
         checks, mismatches, skipped_claims = _technical_checks(artefact, observed)
+        checks += _stream_checks(artefact.artefact_hash, "WAV", descriptor.warnings)
         try:
             recorder = recorder_fields(path, descriptor, parsed)
         except Exception as exc:  # metadata never decides whether audio is usable
             recorder = {"present": False, "warnings": ["Recorder metadata could not be read: " + str(exc)]}
+        checks += timestamp_checks(artefact.artefact_hash, recorder, descriptor.sample_rate)
         result = {"status": "parsed", "observed": observed,
                   "embedded_metadata": parsed, "recorder_metadata": recorder,
                   "checks": checks, "claim_mismatches": mismatches}

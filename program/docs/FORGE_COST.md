@@ -72,7 +72,10 @@ The timecode result is a finding in its own right. The AAF only checks that
 each used range lies inside the recording, so a start timecode moved by one
 second in both the WAV and the sound report passes. Comparing the AAF-used
 seconds with the audio of the mix (the report-only `AUDIO_AAF_RANGE_CORRESPONDENCE`
-diagnostic) is the natural way to close it.
+diagnostic) is the natural way to close it. Since 27 October the bext
+`TimeReference` is also compared with the iXML timestamp in the same WAV, which
+catches this forgery as made here (bext edited alone); a forger who edits the
+iXML as well still passes, and that is one file, so the measured cost stays 3.
 
 ## Ranking check
 
