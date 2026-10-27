@@ -4,7 +4,9 @@ This directory contains an implemented baseline for assessing evidence from musi
 
 The main approach is to reuse Ben's evidence graph and execution framework, connect the music parsers and checks, and expose a runnable interface for CSEC.
 
-The current version is **0.8.1** (22 October 2026). It builds on 0.8.0, which
+The current version is **0.8.2** (27 October 2026); see
+[Version 0.8.2](#version-082-27-october-2026) below. It follows 0.8.1
+(22 October 2026), which builds on 0.8.0, which
 focused on C2PA provenance: pinned trust lists, asymmetric trust and a
 plain-language finding for every state of the final artefact's C2PA manifest
 (see [C2PA provenance and trust](#c2pa-provenance-and-trust)). Optional
@@ -59,8 +61,48 @@ confidence, never the Integrity value.
 
 The forgery runs also found a gap: the AAF checks only that each used range
 lies inside the recording, so a start timecode moved by one second in both the
-WAV and the sound report is not caught. It is listed with possible fixes in
+WAV and the sound report was not caught. Version 0.8.2 closes the cheapest form
+of it (see below); the remaining fixes are listed in
 [`program/docs/NEXT_TASKS.md`](program/docs/NEXT_TASKS.md).
+
+### Version 0.8.2 (27 October 2026)
+
+These changes answer CSEC's feedback on the 25 October package. Scoring
+weights, evidence tiers and the release rule are unchanged; a file check can
+now fail or be incomplete where it used to pass.
+
+- **Damaged audio fails the file check.** A non-final audio file that is
+  malformed or is not audio (truncated RIFF, broken FLAC metadata, no MP3
+  frames) fails `audio_file_readable`; audio the parser had to skip (a WAV's
+  partial last frame, MP3 sync loss or truncation) fails
+  `audio_stream_complete`. Before, an unreadable stem left file integrity at
+  1.0. Valid formats the reader does not support (AIFF, RF64, A-law) are not
+  counted as damage.
+- **Every sample is read.** `audio_samples_valid` reads each bound WAV, FLAC
+  and MP3 in full in every evaluation, the final included. A NaN or Infinity
+  fails it, with the first one's time and channel. WAV float samples are
+  checked as stored, before any conversion. On 236 Project Rock WAVs
+  (3.37 GiB) this took 1.2 s; results are not cached across runs.
+- **Unfinished is never a pass.** A scan stopped by the time limit, a file
+  change or a missing decoder is `not_completed`. The file-integrity layer
+  then has no value, Integrity is withheld and `axes.integrity.status` is the
+  new value `incomplete` (`release_reason: file_checks_not_completed`). The
+  builder shows "Incomplete" and one "Check incomplete" row per file.
+- **bext against iXML.** A recorder file's bext `TimeReference` must equal
+  its iXML `TIMESTAMP_SAMPLES_SINCE_MIDNIGHT` (they agree on all 233 Project
+  Rock takes). A start timecode shifted in bext alone now fails; a shift
+  written into both still passes, so the gap is narrowed, not closed.
+- **Builder.** Audio diagnostics are on by default in the desktop builder
+  (untick to skip); `run.py` and the CSEC path keep `--audio-analysis`
+  opt-in. Creation method accepts `recorded`, `synthesised`, `ai-generated`
+  or a JSON list of these, and sound reports and AAF edits can be added.
+- **Packaging.** The 25 October archive sent to CSEC lacked the two DDEX
+  `allowed-value-sets.xsd` files, which changed its `source_revision` and
+  failed the DDEX tests. The 27 October archive is built from the files Git
+  tracks and carries a SHA-256 manifest.
+
+The physical-similarity comparison stays disabled; the sample check reads
+each file on its own and compares nothing between files.
 
 The [technical manual](Manual_layout_check.docx) describes the whole program;
 its Section 8 covers the C2PA work in detail and Section 10 lists the known
@@ -99,14 +141,14 @@ below are relative to that directory.
 - The MIDI parser extracts channel and meta events, notes, tempo, time signatures, controllers, and duration in seconds when it can be calculated.
 - CompSheet and CueSheet parsers support strict JSON, CSV, delimited text, and PDF text extraction. See [`program/docs/SHEET_FORMATS.md`](program/docs/SHEET_FORMATS.md).
 - Runs file, relationship, and cross-evidence analysis through the actual `EvidenceChain` and `Pipeline` implementations.
-- `WavMetadataPass` emits standardised technical checks once per audio artefact. The checks that compare submitted technical claims with the file (`technical.*_matches_observed`) are scored in declaration consistency (`declared_file_properties`); `BoundFileIntegrityPass` keeps only hash binding and parser readability.
-- A non-final WAV parser failure is isolated to that node: the program emits `WAV_PARSER_FAILED`, marks only dependent checks unavailable, and continues with independent evidence. An unsupported final WAV still returns `unsupported`.
+- `WavMetadataPass` emits standardised technical checks once per audio artefact. The checks that compare submitted technical claims with the file (`technical.*_matches_observed`) are scored in declaration consistency (`declared_file_properties`); `BoundFileIntegrityPass` keeps the checks with no submitter claim: hash binding, readability (`audio_file_readable`, `audio_stream_complete`), the full-length sample check (`audio_samples_valid`), the FLAC MD5 and the bext/iXML timestamp agreement.
+- A non-final WAV parser failure is isolated to that node: the program emits `WAV_PARSER_FAILED`, marks only dependent checks unavailable, and continues with independent evidence. When the file is malformed rather than unsupported, `audio_file_readable` also fails in file integrity. An unsupported final WAV still returns `unsupported`.
 - `RelationshipIntegrityPass` is a registered libevchain `EvidencePass`. It compares only submitter-declared edge parameters with cached source and target observations and replaces the former diagnostic-only `MusicRelationshipPass`.
 - The core assessment does not execute the legacy `PhysicalSimilarityPass`, exact reconstruction, waveform comparison, landmark/DTW matching, source-contribution analysis, residual modelling, master continuity, or excerpt search.
 - Keeps one compatibility placeholder per retained relationship. Every placeholder has `comparison_mode: disabled`, `status: unavailable`, `reason_code: disabled_by_policy`, `scoring_eligible: false`, and `integrity_contribution: null`.
 - The disabled legacy layer emits no physical-similarity findings. The separate optional diagnostic runner appends `AUDIO_*` findings without affecting integrity; deprecated signal code remains isolated.
 - With `--audio-analysis`, audfprint and SpectroMap report candidate content offsets and supported windows, while librosa reports feature correspondences, candidate boundaries and repetition. Their outputs are observations, not independent votes or proof of historical provenance.
-- Deprecated sample and proxy helpers remain directly testable. The core assessment does not decode signal content for comparison; optional diagnostic workers read independently verified WAV snapshots.
+- Deprecated sample and proxy helpers remain directly testable. The core assessment decodes each file only to check that its samples are readable and finite (`music_target/sample_validation.py`), never to compare files; optional diagnostic workers read independently verified WAV snapshots.
 - Objects remain limited to 512 MiB each and 1 GiB per request, and the caller's wall-clock timeout has no evaluator-side 60-second cap.
 - Separates submitter-declared technical properties from measured file properties and reports inconsistencies.
 - Requires `workflow_id`, `modifiers`, and submitter declarations in `submission.json`, and loads policies for 16 workflow types.
@@ -480,8 +522,11 @@ in the [trust-list README](program/policies/c2pa_trust/README.md#ai-music-genera
 The active profile is `policies/scoring_profile.json`. Integrity combines three
 available score-eligible layers: `file_integrity`, `declaration_consistency` and
 `cross_evidence_support`, each with default weight 1.0. `file_integrity` holds
-only checks with no submitter claim (hash binding, parser readability and, for
-FLAC, the MD5 of the decoded audio).
+only checks with no submitter claim: hash binding, readability, the
+full-length sample check, the bext/iXML timestamp agreement and, for FLAC, the
+MD5 of the decoded audio. A file check that did not finish (`not_completed`)
+leaves this layer without a value and withholds Integrity, whose status is
+then `incomplete`.
 `declaration_consistency` holds every comparison of a submitted claim with a
 measured property: a file's own technical claims and a relationship's declared
 ranges and input/output sample rate and bit depth. A property claimed for the
@@ -892,7 +937,13 @@ python3 builder_gui.py
 The builder imports and hashes files in the background, provides workflow
 preflight and full assessment, and can save the full machine-readable result.
 Full assessment uses a verified temporary snapshot and the same production
-worker as the command-line evaluator. Its preflight
+worker as the command-line evaluator. The "Include audio diagnostics" box
+starts ticked (untick it to skip them); without the audio packages the result
+is the core assessment plus a note. Creation method takes `recorded`,
+`synthesised`, `ai-generated` or a JSON list such as
+`["recorded", "ai-generated"]`; leave it blank to omit the claim. Sound
+reports (`text/sound-report`) and AAF edits (`project/aaf`) are available as
+document types. Its preflight
 uses the evaluator's limits (128 artefacts, 512 MiB per object, 1 GiB per
 request), so it refuses exactly what the evaluator would refuse.
 
@@ -949,7 +1000,11 @@ separately. After the declared-range, content-beyond-final and forge-cost
 changes (25 October 2026) it found 466 tests; 459 of the 462 non-GUI tests
 passed in one process (40 s) with 3 skipped (the Suno real-sample tests need
 `C2PA_SUNO_SAMPLE_DIR`), and the four GUI tests passed separately
-(`reports/test-results.txt`, `reports/release.json`).
+(`reports/test-results.txt`, `reports/release.json`). Version 0.8.2 (27 October 2026) was checked on
+a fresh export in a new virtual environment with all three requirement files:
+501 tests, all passed. The 496 non-GUI tests passed in one process (59 s) with
+no skips (`C2PA_SUNO_SAMPLE_DIR` set to the verified Suno downloads), and the
+five GUI tests passed separately.
 
 A line and branch coverage report of the same runs is in
 `reports/coverage/` (`index.html` and `coverage-summary.txt`); see
@@ -1020,7 +1075,8 @@ The locations below are relative to `program/`.
 | `music_target/physical_audio_passes.py` | Deprecated physical-similarity implementation retained for later cleanup; not imported by assessment |
 | `music_target/midi_parser.py` | Size- and structure-bounded Standard MIDI File parser |
 | `music_target/sheet_parsers.py` | CompSheet/CueSheet JSON, CSV, TXT, and PDF parsers plus field normalisation |
-| `music_target/recorder_metadata.py` | Recorder-written BWF `bext`/iXML fields (tape, file name, scene/take, tracks, start timecode) from a bound WAV; other BWF is reported as `daw_or_library` |
+| `music_target/recorder_metadata.py` | Recorder-written BWF `bext`/iXML fields (tape, file name, scene/take, tracks, start timecode, iXML timestamp) from a bound WAV and the bext/iXML timestamp check; other BWF is reported as `daw_or_library` |
+| `music_target/sample_validation.py` | Full-length sample check of every bound WAV, FLAC and MP3: NaN/Infinity fails, an unfinished scan is `not_completed` |
 | `music_target/production_documents.py` | Sound report CSV and AAF (pyaaf2) parsers, their checks against recorder metadata, AAF take coverage and the AAF's non-recorder media |
 | `music_target/evidence_tiers.py` | Evidence tiers for cross-evidence checks and their counts, including the asymmetric C2PA tier |
 | `music_target/score_explanations.py` | Per-axis score explanations, contradiction and assessed-fact counts, and plain-language statements of failed checks |
@@ -1067,6 +1123,6 @@ The locations below are relative to `program/`.
 7. Decide with the client which recordings a workflow requires (every take the AAF edit uses, or a sample), what substitutes are acceptable, and whether `min_supported_asset_share` should gate release. Chronology warnings stay report-only until relationship-specific time rules, time sources and tolerances are agreed. See `program/docs/NEXT_TASKS.md` items 34–37.
 
 8. Set the accuracy a report-only audio diagnostic must reach before it may affect a score (declared ranges, content beyond the final), and review the `default-v7` forge costs, which come from forgery measurements on one production, not calibrated probabilities.
-9. Choose fixes for the start-timecode gap (`program/docs/NEXT_TASKS.md`) and confirm the next ML step: Demucs source-separation comparison for submitted stems, with Whisper dialogue matching on the roadmap.
+9. Choose the remaining fixes for the start-timecode gap (0.8.2 catches a bext-only shift; see `program/docs/NEXT_TASKS.md` item 42) and confirm the next ML step: Demucs source-separation comparison for submitted stems, with Whisper dialogue matching on the roadmap.
 
 These decisions do not block the local executable baseline, but the directory must not yet be described as a complete music-authenticity assessment system.

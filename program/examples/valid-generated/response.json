@@ -5,8 +5,8 @@
   "asset_sha256": "746c90b6d8f6306ce93c347477103c16027d71a4072cf12d10a9f7246ce93d18",
   "system": {
     "name": "COMP3888-music-baseline",
-    "version": "0.8.1",
-    "source_revision": "sha256:ac048707f1bc29f53bc8ffa2ca27d8e121f6da0008fd397dddfc3bea4b9cbf5c"
+    "version": "0.8.2",
+    "source_revision": "sha256:90716ba4d277b654807a335106b054e2de7829c3fa3656f822fad0cad278b021"
   },
   "execution_status": "succeeded",
   "axes": {
@@ -20,7 +20,7 @@
       "availability": "partial",
       "value": null,
       "confidence": 0.32,
-      "reasoning": "Integrity has 2/3 score-eligible evidence layers; missing evidence reduces availability and confidence but is never treated as contradiction. Integrity confidence reflects how many of the three evidence layers were checked (2/3) and how hard the checked evidence would be to forge: no cross-evidence was assessed, so it rests on the submission's own claims (forge cost 1 of 5), a factor of 0.60. Forge cost changes confidence only, never the value. To see how many checks passed, refer to the integrity value and the layer results. Numeric release requires at least 2 populated contributing layer(s) and an assessed qualifying cross-evidence fact (signed_attestation, recorder_metadata); the value is withheld (insufficient_qualifying_cross_evidence). An ordinary contradiction never releases a value. No qualifying cross-evidence was assessed for this submission. The files and claims have been checked against each other, but this does not guarantee who created the material, when it was recorded or that the recording session took place. Signed origin evidence, where available, is shown in attestation_strength. Structural validity and cryptographic attestation are reported separately and do not raise integrity. Legacy signal comparisons are disabled by policy and do not produce findings or affect integrity.",
+      "reasoning": "Integrity has 2/3 score-eligible evidence layers; missing evidence reduces availability and confidence but is never treated as contradiction. Integrity confidence reflects how many of the three evidence layers were checked (2/3) and how hard the checked evidence would be to forge: no cross-evidence was assessed, so it rests on the submission's own claims (forge cost 1 of 5), a factor of 0.60. Forge cost changes confidence only, never the value. To see how many checks passed, refer to the integrity value and the layer results. Numeric release requires at least 2 populated contributing layer(s) and an assessed qualifying cross-evidence fact (signed_attestation, recorder_metadata) and every file check completed; the value is withheld (insufficient_qualifying_cross_evidence). An ordinary contradiction never releases a value. No qualifying cross-evidence was assessed for this submission. The files and claims have been checked against each other, but this does not guarantee who created the material, when it was recorded or that the recording session took place. Signed origin evidence, where available, is shown in attestation_strength. Structural validity and cryptographic attestation are reported separately and do not raise integrity. Legacy signal comparisons are disabled by policy and do not produce findings or affect integrity.",
       "status": "insufficient_evidence"
     },
     "attestation_strength": {
@@ -127,6 +127,20 @@
           "declared": 16,
           "observed": 16,
           "source_pass": "WavMetadataPass"
+        },
+        {
+          "rule": "audio_samples_valid",
+          "evidence_hash": "7580f3a09b8a02bdfc6520235e92f6c8318dd3b52002b7eb8a430abc2c007dea",
+          "source_pass": "WavMetadataPass",
+          "format": "WAV",
+          "check_version": "audio-sample-validation-v1",
+          "decoder": "wav_io",
+          "values_checked": "integer_pcm",
+          "frame_count": 4000,
+          "frames_checked": 4000,
+          "non_finite_samples": 0,
+          "first_non_finite": null,
+          "passed": true
         }
       ],
       "claim_mismatches": []
@@ -210,6 +224,20 @@
           "declared": 16,
           "observed": 16,
           "source_pass": "WavMetadataPass"
+        },
+        {
+          "rule": "audio_samples_valid",
+          "evidence_hash": "6aacc6b93785fbbefb186285e5f9c9ce49a6ccc7c2af664fc2f2a21416001ea0",
+          "source_pass": "WavMetadataPass",
+          "format": "WAV",
+          "check_version": "audio-sample-validation-v1",
+          "decoder": "wav_io",
+          "values_checked": "integer_pcm",
+          "frame_count": 4000,
+          "frames_checked": 4000,
+          "non_finite_samples": 0,
+          "first_non_finite": null,
+          "passed": true
         }
       ],
       "claim_mismatches": []
@@ -293,6 +321,20 @@
           "declared": 16,
           "observed": 16,
           "source_pass": "WavMetadataPass"
+        },
+        {
+          "rule": "audio_samples_valid",
+          "evidence_hash": "bc1dd3c26ef5f4d97fbb41e653e93a09c940b53c75229594d82c928727134ca0",
+          "source_pass": "WavMetadataPass",
+          "format": "WAV",
+          "check_version": "audio-sample-validation-v1",
+          "decoder": "wav_io",
+          "values_checked": "integer_pcm",
+          "frame_count": 4000,
+          "frames_checked": 4000,
+          "non_finite_samples": 0,
+          "first_non_finite": null,
+          "passed": true
         }
       ],
       "claim_mismatches": []
@@ -376,6 +418,20 @@
           "declared": 16,
           "observed": 16,
           "source_pass": "WavMetadataPass"
+        },
+        {
+          "rule": "audio_samples_valid",
+          "evidence_hash": "746c90b6d8f6306ce93c347477103c16027d71a4072cf12d10a9f7246ce93d18",
+          "source_pass": "WavMetadataPass",
+          "format": "WAV",
+          "check_version": "audio-sample-validation-v1",
+          "decoder": "wav_io",
+          "values_checked": "integer_pcm",
+          "frame_count": 4000,
+          "frames_checked": 4000,
+          "non_finite_samples": 0,
+          "first_non_finite": null,
+          "passed": true
         }
       ],
       "claim_mismatches": []
@@ -506,6 +562,20 @@
             "declared": 16,
             "observed": 16,
             "source_pass": "WavMetadataPass"
+          },
+          {
+            "rule": "audio_samples_valid",
+            "evidence_hash": "7580f3a09b8a02bdfc6520235e92f6c8318dd3b52002b7eb8a430abc2c007dea",
+            "source_pass": "WavMetadataPass",
+            "format": "WAV",
+            "check_version": "audio-sample-validation-v1",
+            "decoder": "wav_io",
+            "values_checked": "integer_pcm",
+            "frame_count": 4000,
+            "frames_checked": 4000,
+            "non_finite_samples": 0,
+            "first_non_finite": null,
+            "passed": true
           }
         ],
         "claim_mismatches": []
@@ -593,6 +663,20 @@
             "declared": 16,
             "observed": 16,
             "source_pass": "WavMetadataPass"
+          },
+          {
+            "rule": "audio_samples_valid",
+            "evidence_hash": "6aacc6b93785fbbefb186285e5f9c9ce49a6ccc7c2af664fc2f2a21416001ea0",
+            "source_pass": "WavMetadataPass",
+            "format": "WAV",
+            "check_version": "audio-sample-validation-v1",
+            "decoder": "wav_io",
+            "values_checked": "integer_pcm",
+            "frame_count": 4000,
+            "frames_checked": 4000,
+            "non_finite_samples": 0,
+            "first_non_finite": null,
+            "passed": true
           }
         ],
         "claim_mismatches": []
@@ -680,6 +764,20 @@
             "declared": 16,
             "observed": 16,
             "source_pass": "WavMetadataPass"
+          },
+          {
+            "rule": "audio_samples_valid",
+            "evidence_hash": "bc1dd3c26ef5f4d97fbb41e653e93a09c940b53c75229594d82c928727134ca0",
+            "source_pass": "WavMetadataPass",
+            "format": "WAV",
+            "check_version": "audio-sample-validation-v1",
+            "decoder": "wav_io",
+            "values_checked": "integer_pcm",
+            "frame_count": 4000,
+            "frames_checked": 4000,
+            "non_finite_samples": 0,
+            "first_non_finite": null,
+            "passed": true
           }
         ],
         "claim_mismatches": []
@@ -767,6 +865,20 @@
             "declared": 16,
             "observed": 16,
             "source_pass": "WavMetadataPass"
+          },
+          {
+            "rule": "audio_samples_valid",
+            "evidence_hash": "746c90b6d8f6306ce93c347477103c16027d71a4072cf12d10a9f7246ce93d18",
+            "source_pass": "WavMetadataPass",
+            "format": "WAV",
+            "check_version": "audio-sample-validation-v1",
+            "decoder": "wav_io",
+            "values_checked": "integer_pcm",
+            "frame_count": 4000,
+            "frames_checked": 4000,
+            "non_finite_samples": 0,
+            "first_non_finite": null,
+            "passed": true
           }
         ],
         "claim_mismatches": []
@@ -803,9 +915,9 @@
       ]
     }
   ],
-  "processing_ms": 247.7130419574678,
+  "processing_ms": 260.45145897660404,
   "resource_usage": {
-    "cpu_ms": 6.4230000000000125,
+    "cpu_ms": 5.149999999999988,
     "peak_rss_kib": null
   },
   "error": null,
@@ -1003,9 +1115,37 @@
         "evidence_hash": "7580f3a09b8a02bdfc6520235e92f6c8318dd3b52002b7eb8a430abc2c007dea"
       },
       {
+        "rule": "audio_samples_valid",
+        "evidence_hash": "7580f3a09b8a02bdfc6520235e92f6c8318dd3b52002b7eb8a430abc2c007dea",
+        "source_pass": "WavMetadataPass",
+        "format": "WAV",
+        "check_version": "audio-sample-validation-v1",
+        "decoder": "wav_io",
+        "values_checked": "integer_pcm",
+        "frame_count": 4000,
+        "frames_checked": 4000,
+        "non_finite_samples": 0,
+        "first_non_finite": null,
+        "passed": true
+      },
+      {
         "rule": "object_hash_bound",
         "passed": true,
         "evidence_hash": "6aacc6b93785fbbefb186285e5f9c9ce49a6ccc7c2af664fc2f2a21416001ea0"
+      },
+      {
+        "rule": "audio_samples_valid",
+        "evidence_hash": "6aacc6b93785fbbefb186285e5f9c9ce49a6ccc7c2af664fc2f2a21416001ea0",
+        "source_pass": "WavMetadataPass",
+        "format": "WAV",
+        "check_version": "audio-sample-validation-v1",
+        "decoder": "wav_io",
+        "values_checked": "integer_pcm",
+        "frame_count": 4000,
+        "frames_checked": 4000,
+        "non_finite_samples": 0,
+        "first_non_finite": null,
+        "passed": true
       },
       {
         "rule": "object_hash_bound",
@@ -1013,9 +1153,37 @@
         "evidence_hash": "bc1dd3c26ef5f4d97fbb41e653e93a09c940b53c75229594d82c928727134ca0"
       },
       {
+        "rule": "audio_samples_valid",
+        "evidence_hash": "bc1dd3c26ef5f4d97fbb41e653e93a09c940b53c75229594d82c928727134ca0",
+        "source_pass": "WavMetadataPass",
+        "format": "WAV",
+        "check_version": "audio-sample-validation-v1",
+        "decoder": "wav_io",
+        "values_checked": "integer_pcm",
+        "frame_count": 4000,
+        "frames_checked": 4000,
+        "non_finite_samples": 0,
+        "first_non_finite": null,
+        "passed": true
+      },
+      {
         "rule": "object_hash_bound",
         "passed": true,
         "evidence_hash": "746c90b6d8f6306ce93c347477103c16027d71a4072cf12d10a9f7246ce93d18"
+      },
+      {
+        "rule": "audio_samples_valid",
+        "evidence_hash": "746c90b6d8f6306ce93c347477103c16027d71a4072cf12d10a9f7246ce93d18",
+        "source_pass": "WavMetadataPass",
+        "format": "WAV",
+        "check_version": "audio-sample-validation-v1",
+        "decoder": "wav_io",
+        "values_checked": "integer_pcm",
+        "frame_count": 4000,
+        "frames_checked": 4000,
+        "non_finite_samples": 0,
+        "first_non_finite": null,
+        "passed": true
       }
     ],
     "structural_validity": [
@@ -1561,8 +1729,8 @@
         "status": "corroborated",
         "value": 1.0,
         "contributes_to_integrity": true,
-        "check_count": 4,
-        "reason": "SHA-256 binding and parser readability of submitted files; no submitter claims are compared here.",
+        "check_count": 8,
+        "reason": "SHA-256 binding, parser readability and a full-length sample check of submitted files; no submitter claims are compared here.",
         "manual_review_reasons": [],
         "weight": 1.0
       },
@@ -1639,6 +1807,8 @@
       {
         "status": "insufficient_evidence",
         "contradiction_present": false,
+        "not_completed_count": 0,
+        "not_completed_checks": [],
         "severe_contradiction_present": false,
         "numeric_release": "withheld",
         "release_reason": "insufficient_qualifying_cross_evidence",
@@ -1648,11 +1818,11 @@
         "severe_contradiction_release": "capped_value",
         "score_semantics": "assessed_check_consistency_not_provenance_authentication",
         "contradiction_count": 0,
-        "assessed_fact_count": 20,
+        "assessed_fact_count": 24,
         "fact_counts_by_layer": [
           {
             "layer": "file_integrity",
-            "assessed": 4,
+            "assessed": 8,
             "contradicted": 0
           },
           {
@@ -1716,6 +1886,11 @@
         "status": "unavailable",
         "meaning": "The check could not run, for example because a file, parameter, budget, or analysable signal was unavailable.",
         "numeric_treatment": "Excluded from the denominator and never treated as zero."
+      },
+      {
+        "status": "not_completed",
+        "meaning": "A file check that must run on every file started but did not finish (time limit, file changed, no decoder). It is never a pass.",
+        "numeric_treatment": "Excluded from the denominator; the file_integrity layer shows not_completed with no value, and the Integrity value is withheld unless a severe contradiction caps it."
       }
     ],
     "cross_evidence": [],
@@ -2072,7 +2247,7 @@
             "status": "corroborated",
             "value": 1.0,
             "weight": 1.0,
-            "check_count": 4
+            "check_count": 8
           },
           {
             "layer": "declaration_consistency",
@@ -2109,11 +2284,11 @@
         },
         "contradictions": [],
         "contradiction_count": 0,
-        "assessed_fact_count": 20,
+        "assessed_fact_count": 24,
         "fact_counts_by_layer": [
           {
             "layer": "file_integrity",
-            "assessed": 4,
+            "assessed": 8,
             "contradicted": 0
           },
           {
@@ -2134,6 +2309,8 @@
         "decision": {
           "status": "insufficient_evidence",
           "contradiction_present": false,
+          "not_completed_count": 0,
+          "not_completed_checks": [],
           "severe_contradiction_present": false,
           "numeric_release": "withheld",
           "release_reason": "insufficient_qualifying_cross_evidence",
@@ -2143,11 +2320,11 @@
           "severe_contradiction_release": "capped_value",
           "score_semantics": "assessed_check_consistency_not_provenance_authentication",
           "contradiction_count": 0,
-          "assessed_fact_count": 20,
+          "assessed_fact_count": 24,
           "fact_counts_by_layer": [
             {
               "layer": "file_integrity",
-              "assessed": 4,
+              "assessed": 8,
               "contradicted": 0
             },
             {

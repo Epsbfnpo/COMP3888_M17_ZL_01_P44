@@ -1,5 +1,15 @@
 # Verification Record
 
+## Version 0.8.2 and the new CSEC pin (2026-10-27)
+
+- Pin: tag `csec-2026-10-27` (proposed), version 0.8.2, scoring profile `default-v7`, `source_revision` `sha256:90716ba4d277b654807a335106b054e2de7829c3fa3656f822fad0cad278b021`.
+- Fresh environment: the files Git tracks were exported into an empty folder, a new virtual environment was created (CPython 3.13.7, macOS) and `requirements.txt`, `requirements-audio.txt` and `requirements-benchmark.txt` were installed. The exported code reported the pinned `source_revision`, and the valid-generated example returned `succeeded` with version 0.8.2.
+- With `REQUIRE_AUDIO_BACKENDS=1` and `C2PA_SUNO_SAMPLE_DIR` set to the verified Suno downloads, **496 non-GUI tests passed in one process (59 s) with no skips**; the five `test_builder.GuiTests` cases passed in separate processes. Total: 501 tests, all passed.
+- Example responses regenerated: every axis value, confidence and status is identical to 0.8.1; each audio file now carries a passing `audio_samples_valid` row.
+- Real data: all 236 Project Rock WAVs (3.37 GiB) pass `audio_samples_valid` (1.2 s in total); all 233 recorder takes pass the bext/iXML timestamp check, and the forge-cost forgery of 10T07 (+1 s in bext only) fails it by 1.000 s.
+- The 25 October archive received by CSEC lacked both `schemas/ddex/*/allowed-value-sets.xsd` files. Hashing the 25 October export without them gives `sha256:a3c0a5ed…`, the value CSEC reported; with them it gives the pinned `sha256:ac048707…`.
+- Coverage was not re-measured for 0.8.2; `reports/coverage/` is from 25 October.
+
 ## CSEC baseline pin and clean install (2026-10-25)
 
 - Pinned baseline for CSEC: tag `csec-2026-10-25`, version 0.8.1, scoring profile `default-v7`, `source_revision` `sha256:ac048707f1bc29f53bc8ffa2ca27d8e121f6da0008fd397dddfc3bea4b9cbf5c`. Only documentation changed after the forge-cost merge, and documentation is not part of `source_revision`.

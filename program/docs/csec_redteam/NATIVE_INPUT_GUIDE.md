@@ -1,7 +1,7 @@
 # Native input guide for adversarial testing
 
-Status: final for this round, 25 October 2026, checked against the pinned
-baseline (tag `csec-2026-10-25`, version 0.8.1, scoring profile `default-v7`).
+Status: final for this round, 27 October 2026, checked against the pinned
+baseline (tag `csec-2026-10-27`, version 0.8.2, scoring profile `default-v7`).
 The input format did not change since 23 October; the response gained the
 fields marked (v6) and (v7) below.
 
@@ -186,12 +186,13 @@ scene 2, take 01, start 08:49:43:00), a sound report listing the same take
 and an AAF using one second of it, starting 0.5 s in. The helpers `recorder_wav`, `sound_report` and
 `aaf_bytes` in `tests/test_production_documents.py` generate such files.
 
-Result on 0.8.1: `succeeded`; Integrity 1.0, status `consistent`, released on
+Result on 0.8.2: `succeeded`; Integrity 1.0, status `consistent`, released on
 qualifying recorder-metadata cross-evidence, 0 of 12 assessed facts
 contradicted; `RECORDER_METADATA_ORIGIN_NOT_AUTHENTICATED` reported. Writing
 a take start timecode half a second away from the sound report's instead gave
 one contradiction ("Sound report start timecode for 2T01.WAV is 08:49:43:00,
-but the recorder wrote 08:49:43:13") and Integrity 0.9375 (`contradicted`). The example is
+but the recorder wrote 08:49:43:13") and Integrity 0.917 (`contradicted`; 0.9375 on 0.8.1, before
+each audio file added a passing `audio_samples_valid` check to file integrity). The example is
 itself a fabricated package. It shows the known G1 weakness in
 [ATTACK_GOALS.md](ATTACK_GOALS.md): consistent fabricated recorder metadata
 is not detected, while inconsistent fabrication is.
@@ -214,7 +215,7 @@ Schema: `schemas/scoring-response.schema.json`.
 |---|---|
 | `execution_status` | `succeeded`, `unsupported`, `timeout` or `error` |
 | `axes.<axis>.value`, `.availability`, `.confidence`, `.reasoning` | The four axes; `null` means not assessed |
-| `axes.integrity.status` | For example `consistent`, `contradicted`, `insufficient_evidence` |
+| `axes.integrity.status` | `consistent`, `contradicted`, `insufficient_evidence`, or (v0.8.2) `incomplete` when a file check did not finish; `incomplete` is never a pass and the value is withheld |
 | `assessment_checks.integrity_decision` | `numeric_release`, `release_reason`, `contradiction_count`, `assessed_fact_count`, per-layer counts |
 | `assessment_checks.cross_evidence` | Every cross-check with its `evidence_tier` and `passed` |
 | `assessment_checks.declared_file_properties`, `declaration_scored_facts` (v6) | Declared technical values compared with the file, and the facts they form (one per declared property) |

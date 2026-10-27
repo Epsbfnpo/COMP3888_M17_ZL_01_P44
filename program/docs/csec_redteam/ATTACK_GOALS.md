@@ -1,8 +1,8 @@
 # Adversarial testing: attack goals and success criteria
 
-Status: **final for this round, 25 October 2026.** Pinned baseline: Git tag
-`csec-2026-10-25`, `system.version` 0.8.1, scoring profile `default-v7`,
-`system.source_revision` `sha256:ac048707f1bc29f53bc8ffa2ca27d8e121f6da0008fd397dddfc3bea4b9cbf5c`. Profile `default-v7` keeps the `default-v6`
+Status: **final for this round, 27 October 2026.** Pinned baseline: Git tag
+`csec-2026-10-27`, `system.version` 0.8.2, scoring profile `default-v7`,
+`system.source_revision` `sha256:90716ba4d277b654807a335106b054e2de7829c3fa3656f822fad0cad278b021`. Profile `default-v7` keeps the `default-v6`
 values and release rule and grades Integrity confidence by forge cost (G8).
 All goals, G1-G8, can be tested now.
 
@@ -203,7 +203,7 @@ defect.
 | Recorder metadata (BWF `bext`, iXML) is written by the recorder but not authenticated: it can be rewritten together with the audio and the file rehashed, and a FLAC's stored MD5 can be rewritten with its audio. The response says so with `RECORDER_METADATA_ORIGIN_NOT_AUTHENTICATED`. | Time and skill needed to write convincing recorder metadata plus a matching sound report and AAF. |
 | Sound reports and AAF files come from the submitter; their value is agreement with the recorder metadata, which a forger controls too. | Whether any cross-check catches a consistent forgery (expected: few or none). |
 | BWF origination dates can be reset; a source newer than its target gives `DECLARED_SOURCE_NEWER_THAN_TARGET` (low, not scored). | Cost of making dates consistent. |
-| A take's start timecode moved by one second in the WAV's bext `TimeReference` and in the sound report raises no contradiction: the AAF only checks that used ranges lie inside the recording, and bext and iXML timestamps are not compared yet (found 25 October 2026 by `benchmarks/forge_cost.py`; fixes in `docs/NEXT_TASKS.md` item 42). | Size of shift that first produces a contradiction; time to make it consistent. |
+| A take's start timecode moved by one second in the WAV and in the sound report: since 0.8.2 an edit of bext `TimeReference` alone fails `recorder_bext_time_reference_matches_ixml_timestamp`, but a shift written into both bext and the iXML timestamp (plain XML in the same file) still raises no contradiction, because the AAF only checks that used ranges lie inside the recording (found 25 October 2026 by `benchmarks/forge_cost.py`; further fixes in `docs/NEXT_TASKS.md` item 42). | Size of shift that first produces a contradiction; time to make bext and iXML consistent. |
 | Stripping a C2PA manifest gives `absent`, not a negative result. | Effort to strip or re-encode without leaving traces. |
 | C2PA certificate revocation is not checked (`revocation_status: not_checked`, offline by design), and there is no time-stamp authority check. | Whether a revoked or expired signer is accepted. |
 | Only two known AI signers are listed (BytePlus Lumina and Suno, matched by exact certificate fingerprint; neither confirmed by the vendor). Stability AI and Google Lyria output is signed by trusted certificates and needs no entry. | AI audio from other generators that is not recognised as AI-labelled; whether a certificate copying a listed signer's name or serial number is recognised (expected: no). |
@@ -248,8 +248,8 @@ defect.
 
 ## 6. Rules of engagement
 
-- Test the pinned version only (tag `csec-2026-10-25`), and record
-  `system.version` (0.8.1) and `system.source_revision` (`sha256:ac048707f1bc29f53bc8ffa2ca27d8e121f6da0008fd397dddfc3bea4b9cbf5c`)
+- Test the pinned version only (tag `csec-2026-10-27`), and record
+  `system.version` (0.8.2) and `system.source_revision` (`sha256:90716ba4d277b654807a335106b054e2de7829c3fa3656f822fad0cad278b021`)
   from each response.
 - Run locally. The evaluator needs no network, credentials or online
   services.
