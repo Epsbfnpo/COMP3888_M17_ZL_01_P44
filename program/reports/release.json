@@ -1,17 +1,17 @@
 {
-  "target_version": "0.8.1",
-  "date": "2026-10-25",
-  "source_revision": "sha256:ac048707f1bc29f53bc8ffa2ca27d8e121f6da0008fd397dddfc3bea4b9cbf5c",
+  "target_version": "0.8.2",
+  "date": "2026-10-27",
+  "source_revision": "sha256:90716ba4d277b654807a335106b054e2de7829c3fa3656f822fad0cad278b021",
   "python": "3.13.7",
   "platform": "Darwin",
-  "tests_discovered": 466,
-  "tests_run": 466,
-  "non_gui_tests_one_process": 462,
-  "gui_tests_separate_processes": 4,
+  "tests_discovered": 501,
+  "tests_run": 501,
+  "non_gui_tests_one_process": 496,
+  "gui_tests_separate_processes": 5,
   "failures": 0,
   "errors": 0,
-  "skipped": 3,
-  "test_environment": "REQUIRE_AUDIO_BACKENDS=1; c2pa-python, audio libraries and mir_eval installed; the 3 skipped tests are the Suno real-sample tests, which need C2PA_SUNO_SAMPLE_DIR",
+  "skipped": 0,
+  "test_environment": "Fresh export of the working tree into an empty folder, new virtual environment, pip install -r requirements.txt -r requirements-audio.txt -r requirements-benchmark.txt; REQUIRE_AUDIO_BACKENDS=1 and C2PA_SUNO_SAMPLE_DIR set to the verified Suno downloads, so no test is skipped",
   "dependencies": {
     "jsonschema": "4.23.0",
     "attrs": "25.1.0",
@@ -63,5 +63,21 @@
     "Start-timecode gap found and documented (NEXT_TASKS item 42): a 1 s shift in bext and the sound report raises no contradiction",
     "Line and branch coverage report in reports/coverage/ (73.3% lines, 63.5% branches; 84% lines without the policy-disabled legacy modules)",
     "Example responses regenerated: axis values unchanged; Integrity confidence now carries the forge-cost factor"
+  ],
+  "previous_pin": {
+    "tag": "csec-2026-10-25",
+    "version": "0.8.1",
+    "source_revision": "sha256:ac048707f1bc29f53bc8ffa2ca27d8e121f6da0008fd397dddfc3bea4b9cbf5c"
+  },
+  "changes_in_0_8_2": [
+    "audio_file_readable: a malformed or non-audio non-final file fails file integrity (before: unavailable, layer stayed 1.0); unsupported valid formats, read errors and time limits add no check",
+    "audio_stream_complete: a WAV partial last frame, MP3 sync loss or MP3 truncation fails file integrity",
+    "audio_samples_valid (sample_validation.py, audio-sample-validation-v1): every bound WAV, FLAC and MP3 is read in full; NaN/Infinity fails with count, first kind, time and channel; WAV float checked as stored",
+    "not_completed: an unfinished file check leaves the file_integrity layer without a value, withholds Integrity (release_reason file_checks_not_completed) and sets axes.integrity.status to the new schema value incomplete; FILE_CHECK_NOT_COMPLETED finding; integrity_decision.not_completed_count and not_completed_checks",
+    "recorder_bext_time_reference_matches_ixml_timestamp: bext TimeReference must equal the iXML TIMESTAMP_SAMPLES_SINCE_MIDNIGHT (233 of 233 Project Rock takes agree); catches a bext-only start-timecode shift",
+    "MP3 decoded_sample_integrity scope changed from not_implemented_for_format to format_cannot_carry: every frame is decoded, but MP3 stores no checksum",
+    "Desktop builder: audio diagnostics on by default (untick to skip); creation_method accepts recorded, synthesised, ai-generated or a JSON list; text/sound-report and project/aaf document types; run.py and the CSEC path unchanged",
+    "Example responses regenerated: every axis value, confidence and status identical to 0.8.1",
+    "Packaging: the 25 October archive lacked schemas/ddex/*/allowed-value-sets.xsd (source_revision sha256:a3c0a5ed... instead of the pinned ac048707...); the 27 October archive is built from Git-tracked files with MANIFEST.sha256"
   ]
 }

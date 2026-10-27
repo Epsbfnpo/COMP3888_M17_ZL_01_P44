@@ -1,11 +1,11 @@
 # CSEC adversarial testing package
 
-Status: **ready to send, 25 October 2026.** Prepared for CSEC's adversarial
-testing of the music-domain evaluator.
+Status: **ready to send, 27 October 2026** (replaces the 25 October package).
+Prepared for CSEC's adversarial testing of the music-domain evaluator.
 
-**Pinned baseline:** Git tag `csec-2026-10-25`; `system.version` 0.8.1;
+**Pinned baseline:** Git tag `csec-2026-10-27`; `system.version` 0.8.2;
 scoring profile `default-v7`; `system.source_revision`
-`sha256:ac048707f1bc29f53bc8ffa2ca27d8e121f6da0008fd397dddfc3bea4b9cbf5c`. Every response carries the last two in `system`; please record them
+`sha256:90716ba4d277b654807a335106b054e2de7829c3fa3656f822fad0cad278b021`. Every response carries the last two in `system`; please record them
 in each report.
 
 | Document | Content |
@@ -32,13 +32,30 @@ CSEC already holds the client's Project Rock dataset; it is not
 redistributed with this package. Its sound reports contain crew contact
 details, which must stay out of reports.
 
+## Changes since the 25 October package
+
+- The two DDEX schema dependencies (`schemas/ddex/ern-4.3/allowed-value-sets.xsd`
+  and `schemas/ddex/rin-2.1/allowed-value-sets.xsd`) are in the archive. They
+  were in the tag but were lost when the earlier archive was made. Without
+  them `source_revision` is `sha256:a3c0a5ed…` instead of the pinned value,
+  and the DDEX tests fail; that explains both differences you reported.
+- Version 0.8.2: damaged or unreadable audio fails the file check; every
+  audio file is read in full and NaN/Infinity fails (`audio_samples_valid`);
+  a scan that does not finish is `not_completed` and Integrity becomes
+  `incomplete` instead of passing; bext `TimeReference` is compared with the
+  iXML timestamp. Scoring weights, tiers and the release rule are unchanged.
+  Details: `docs/03_CSEC_HANDOFF.md`, "Changes on 27 October 2026".
+- The Suno real-sample tests can run: set `C2PA_SUNO_SAMPLE_DIR` to the
+  `suno_samples/` folder shipped beside `evaluator/`.
+
 ## Install check
 
-On 25 October 2026 a clean export of the pinned code was installed into a new
+On 27 October 2026 a clean export of the pinned code was installed into a new
 virtual environment (CPython 3.13.7, macOS) with `requirements.txt`,
 `requirements-audio.txt` and `requirements-benchmark.txt`, as described in
 [NATIVE_INPUT_GUIDE.md](NATIVE_INPUT_GUIDE.md) ("Running the target"). Its
-responses carry the pinned `source_revision`, and the test suite passed
-(without `requirements-benchmark.txt`, 3 of the 5 structure-benchmark tests
-fail under `REQUIRE_AUDIO_BACKENDS=1`, as they need `mir_eval`). See
+responses carry the pinned `source_revision`, and all 501 tests passed with
+no skips (`C2PA_SUNO_SAMPLE_DIR` set to the shipped Suno samples; the five GUI
+tests run one per process). `requirements-benchmark.txt` is needed: under
+`REQUIRE_AUDIO_BACKENDS=1` the structure-benchmark tests need `mir_eval`. See
 `reports/verification.md`.

@@ -1,11 +1,16 @@
-# Music target: local integration handoff v0.8.1
+# Music target: local integration handoff v0.8.2
 
-Status (updated 25 October 2026): pinned baseline for CSEC's adversarial testing. Git tag `csec-2026-10-25`,
-`system.version` 0.8.1, scoring profile default-v7, `system.source_revision`
-`sha256:ac048707f1bc29f53bc8ffa2ca27d8e121f6da0008fd397dddfc3bea4b9cbf5c`. Not yet executed in CSEC's runner. The scoring update (profile default-v6) and FLAC/MP3 support were
+Status (updated 27 October 2026): pinned baseline for CSEC's adversarial testing. Git tag `csec-2026-10-27`,
+`system.version` 0.8.2, scoring profile default-v7, `system.source_revision`
+`sha256:90716ba4d277b654807a335106b054e2de7829c3fa3656f822fad0cad278b021`. It replaces the 25 October pin
+(`csec-2026-10-25`, 0.8.1, `sha256:ac048707…`). CSEC ran that package on three Lumina excerpt cases; the
+archive they received lacked the two DDEX `allowed-value-sets.xsd` files, which is why their responses showed
+`sha256:a3c0a5ed…` and the DDEX tests failed. The scoring update (profile default-v6) and FLAC/MP3 support were
 merged on 24 October 2026; on 25 October 2026 the default profile became default-v7 (forge cost scales Integrity
 confidence only; values, tiers and the release rule are unchanged), and four report-only audio findings were added.
-See "Changes on 25 October 2026" below and the red-team package in `docs/csec_redteam/`.
+Version 0.8.2 (27 October 2026) makes the file check fail on damaged or non-finite audio and report unfinished
+checks as `incomplete`. See "Changes on 25 October 2026" and "Changes on 27 October 2026" below and the
+red-team package in `docs/csec_redteam/`.
 
 ## Contact and collaboration mode
 
@@ -17,7 +22,7 @@ See "Changes on 25 October 2026" below and the red-team package in `docs/csec_re
 ## Pinned target
 
 - Target name: `COMP3888-music-baseline`.
-- Target version: `0.8.1`. Version 0.8.1 adds optional `assessment_checks` entries (`aaf_reference_coverage`, `aaf_non_recorder_media`, `declared_chronology`) and counts in `integrity_decision`; the response `schema_version` stays `0.2-candidate`.
+- Target version: `0.8.2`. Version 0.8.2 adds the file-check rules of 27 October (below) and the Integrity status `incomplete`. Version 0.8.1 adds optional `assessment_checks` entries (`aaf_reference_coverage`, `aaf_non_recorder_media`, `declared_chronology`) and counts in `integrity_decision`; the response `schema_version` stays `0.2-candidate`.
 - Runtime code revision: see `reports/release.json` and `system.source_revision` in each response.
   This is an explicit SHA-256 content identifier, not a claimed Git commit.
 - The supplied Ben library snapshot has no Git metadata; its original files are identified in `reports/source_inventory.json`.
@@ -248,6 +253,34 @@ G3 baselines must be measured against the pinned profile.
   "Include audio diagnostics" box now starts ticked. `run.py` and the CSEC
   scoring-request path are unchanged: diagnostics still run only with
   `--audio-analysis`, so CSEC responses do not change.
+- **Builder: creation methods and document types.** The builder accepts
+  `creation_method` as `recorded`, `synthesised` or `ai-generated`, or a JSON
+  list of these (for example `["recorded", "ai-generated"]`); a blank field
+  omits the claim, and any other value is refused before the manifest is
+  built. The legacy values `generated` and `sampled` are no longer offered.
+  Sound reports (`text/sound-report`) and AAF edits (`project/aaf`) can be
+  added as documents. Native and CSEC requests are unaffected.
+- **Incomplete declared intervals (answer to CSEC).** A declared excerpt
+  window missing `target_end_seconds` (for example `[6,?)`) is not completed
+  from the source span or searched for. The audio diagnostic reports
+  `AUDIO_DIAGNOSTIC_UNAVAILABLE` with reason `incomplete_declared_ranges`, and
+  no `audio_declared_range` row is produced for that relationship: the
+  declaration is incomplete and the interval is not assessed. It is neither
+  supported nor contradicted, and it does not fail the submission.
+- **Version and pin.** `system.version` is 0.8.2 and the pin is tag
+  `csec-2026-10-27` with `source_revision`
+  `sha256:90716ba4d277b654807a335106b054e2de7829c3fa3656f822fad0cad278b021`.
+  The example responses under `examples/` were regenerated: every axis value,
+  confidence and status is identical to 0.8.1, and each audio file now has a
+  passing `audio_samples_valid` row.
+- **Archive check.** The 25 October archive CSEC received lacked
+  `schemas/ddex/ern-4.3/allowed-value-sets.xsd` and
+  `schemas/ddex/rin-2.1/allowed-value-sets.xsd`, although both are in the tag.
+  Recomputing `source_revision` without them gives exactly the
+  `sha256:a3c0a5ed…` CSEC reported, so `sha256:ac048707…` was the
+  authoritative 0.8.1 revision. The 27 October archive is built from the
+  files Git tracks and checked against that list before it is sent; it
+  includes `MANIFEST.sha256` so any missing or changed file can be found.
 
 As in default-v4, cross-evidence scores one rule/subject
 fact once, with any failure retaining a contradiction; raw checks and source

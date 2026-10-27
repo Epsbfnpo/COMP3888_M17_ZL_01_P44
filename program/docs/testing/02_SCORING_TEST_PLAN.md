@@ -183,6 +183,7 @@ check, or put evidence in the wrong tier.*
 | SI-08 | Creation-method disclosure | Complete "recorded" and complete "ai-generated" declarations both give 1.0; `content_ai_detection_performed: false` |
 | SI-09 | FLAC and MP3 layers (v6) | MP3 master declaring bit depth, duration, sample rate and channels; FLAC master with a corrupted `STREAMINFO` MD5 | MP3: bit depth and duration are `unavailable` facts that are not counted, sample rate passes in `declaration_consistency`; FLAC: `flac_md5_matches_decoded_audio` fails in `file_integrity` (`FILE_INTEGRITY_CONTRADICTION`) |
 | SI-10 | Breadth on Project Rock Ep01 (v6) | Ep01 chain; the same with one AAF-used take removed; takes as plain FLAC | 13/13 supported; 12 of 13 with 1 `not_submitted` and a sentence in the reasoning; 0/13 supported, 13 `unmatched_references`, `coverage_scope: provisional`. Integrity values unchanged in all three |
+| SI-11 | A file check does not finish (time limit reached before the full sample scan) (0.8.2) | A float WAV stem and a mix, evaluated with the deadline already passed | `audio_samples_valid` is `not_completed`; file-integrity layer `not_completed` with no value; Integrity status `incomplete`, value withheld (`file_checks_not_completed`); `tests/test_sample_validation.py` |
 
 ### 3.2 Worked example — SI-03 "change one fact, watch the score move"
 
