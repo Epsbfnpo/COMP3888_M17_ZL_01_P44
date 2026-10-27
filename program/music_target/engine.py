@@ -19,6 +19,7 @@ from music_target.format_conversion import FORMAT_CONVERSION, conversion_checks
 from music_target.mp3_io import Mp3Error, UnsupportedMp3, inspect_mp3
 from music_target.wav_io import UnsupportedWav, WavError, inspect_wav
 from music_target.recorder_metadata import recorder_fields, timestamp_checks
+from music_target.sample_validation import from_flac_md5, sample_check, scan_decoded, scan_wav
 from music_target.wav_parser import parse_wav_file
 from music_target.workflow_policy import DEFAULT_POLICY_PATH, WorkflowCompletenessPass, load_workflow_policy
 from music_target.time_ranges import content_range_checks
@@ -232,6 +233,7 @@ def _evaluate_other(artefact, path, detected):
               "checks": checks, "claim_mismatches": mismatches}
     notes = [f"{container} structure was checked; submission claims were compared with measured file properties.",
              "Embedded dates, credits and software tags are unauthenticated metadata."]
+    md5 = {}
     if container == "FLAC":
         md5 = verify_md5(path, descriptor, deadline)
         result["checks"] = checks + [_md5_check(artefact.artefact_hash, md5)]
@@ -241,6 +243,14 @@ def _evaluate_other(artefact, path, detected):
             recorder_kept=recorder.get("foreign_metadata_kept") is not False)
     else:
         result["limited_checks"] = limited_checks("MP3", exact_duration=descriptor.duration_seconds is not None)
+    # Every sample is read once: FLAC through its MD5 pass (or a plain decode
+    # when no MD5 is stored), MP3 through the decoder.
+    if container == "FLAC" and md5.get("reason_code") != "md5_not_stored":
+        samples = from_flac_md5(md5)
+    else:
+        samples = scan_decoded(path, deadline)
+    if samples is not None:
+        result["checks"].append(sample_check(artefact.artefact_hash, container, samples))
     notes.append("The evaluator is designed for WAV; checks not made on this file are listed in "
                  "limited_checks and reported as unavailable.")
     if skipped_claims:
@@ -310,6 +320,9 @@ class WavMetadataPass(ArtefactPass):
         except Exception as exc:  # metadata never decides whether audio is usable
             recorder = {"present": False, "warnings": ["Recorder metadata could not be read: " + str(exc)]}
         checks += timestamp_checks(artefact.artefact_hash, recorder, descriptor.sample_rate)
+        chain = getattr(artefact, "_evaluation_chain", None)
+        checks.append(sample_check(artefact.artefact_hash, "WAV",
+                                   scan_wav(path, descriptor, getattr(chain, "_deadline", None))))
         result = {"status": "parsed", "observed": observed,
                   "embedded_metadata": parsed, "recorder_metadata": recorder,
                   "checks": checks, "claim_mismatches": mismatches}

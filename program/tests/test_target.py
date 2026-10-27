@@ -409,7 +409,9 @@ class TargetTests(unittest.TestCase):
 
     def test_intact_wav_adds_no_damage_check(self):
         checks, layer = self._file_integrity(self._pcm16([100] * 800))
-        self.assertEqual({item["rule"] for item in checks["bound_file_integrity"]}, {"object_hash_bound"})
+        self.assertEqual({item["rule"] for item in checks["bound_file_integrity"]},
+                         {"object_hash_bound", "audio_samples_valid"})
+        self.assertTrue(all(item["passed"] is True for item in checks["bound_file_integrity"]))
         self.assertEqual(layer["value"], 1.0)
 
     def test_unsupported_final_wav_still_returns_unsupported(self):
@@ -1493,7 +1495,8 @@ class TargetTests(unittest.TestCase):
                             for item in checks["physical_similarity"]))
         semantics = {item["status"] for item in
                      checks["assessment_status_semantics"]}
-        self.assertEqual(semantics, allowed)
+        # not_completed is a file-check status, never a signal-comparison status.
+        self.assertEqual(semantics, allowed | {"not_completed"})
 
     def test_pairwise_continuity_is_not_run(self):
         source = self._deterministic_samples(12000, 121)

@@ -379,9 +379,9 @@ README and the technical manual.
 40. `supported_via_conversion` in `support_breadth`: a converted FLAC/MP3 is
     not counted through its declared WAV original.
 
-41. Decoded-sample integrity for MP3 (`decoded_sample_integrity`,
-    `not_implemented_for_format`): frame headers are walked, samples are not
-    verified.
+41. Decoded-sample integrity for MP3: done 27 October in part. Every frame is
+    decoded and checked by `audio_samples_valid`; MP3 stores no checksum, so
+    the family is now `format_cannot_carry`.
 
 ## External inputs and decisions still required
 

@@ -55,6 +55,9 @@ def describe_check(check):
     if rule == "audio_stream_complete":
         return (f"{check.get('format', 'Audio')} {name} has damaged audio data "
                 f"({', '.join(check.get('damage', []))}): samples are missing or the stream is interrupted.")
+    if rule == "audio_samples_valid":
+        return (f"{check.get('format', 'Audio')} {name} failed the full sample check: "
+                f"{check.get('reason', 'the samples could not all be read')}")
     if rule == "recorder_bext_time_reference_matches_ixml_timestamp":
         return (f"The recorder start time in the bext chunk of {name} ({check['bext_seconds']:.3f} s after "
                 f"midnight) differs from its iXML timestamp ({check['ixml_seconds']:.3f} s) by "

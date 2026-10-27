@@ -223,6 +223,15 @@ python3 -B run.py --native examples/audio-diagnostics/request.json \
   --output examples/audio-diagnostics/response.json
 ```
 
+In the builder GUI the diagnostics are on by default: the "Include audio
+diagnostics" box on the Full assessment tab starts ticked and can be unticked
+for a run. If the audio packages are not installed, the builder returns the
+core result with a note instead. The command line and the CSEC path are
+unchanged: `run.py` adds diagnostics only with `--audio-analysis` (or
+`--audio-analysis-policy`). Either way the diagnostics are report-only and the
+core result is identical with or without them. On Project Rock Ep01 they add
+about 20-30 s and up to about 815 MB of memory to a 0.9 s core run.
+
 Use the existing virtual environment where available. `requirements-audio-lock.txt`
 records the tested environment. The vendored audfprint extractor consumes decoded
 arrays, so this integration does not require FFmpeg. Dependency origins and

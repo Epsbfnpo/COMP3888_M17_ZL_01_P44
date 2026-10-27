@@ -195,6 +195,12 @@ class BoundFileIntegrityPass:
             if item.get("passed") is False:
                 findings.append(_finding("FILE_INTEGRITY_CONTRADICTION", item["rule"],
                                          item["evidence_hash"], "medium"))
+            elif item.get("status") == "not_completed":
+                findings.append(_finding(
+                    "FILE_CHECK_NOT_COMPLETED",
+                    f"{item['rule']} did not complete ({item.get('reason_code')}); the file is not counted "
+                    "as checked and Integrity is withheld until it is.",
+                    item["evidence_hash"], "medium", reason_code=item.get("reason_code")))
         value = passed / len(eligible) if eligible else None
         return value, checks, findings
 
@@ -1098,6 +1104,11 @@ ASSESSMENT_STATUS_SEMANTICS = [
     {"status": "unavailable",
      "meaning": "The check could not run, for example because a file, parameter, budget, or analysable signal was unavailable.",
      "numeric_treatment": "Excluded from the denominator and never treated as zero."},
+    {"status": "not_completed",
+     "meaning": "A file check that must run on every file started but did not finish (time limit, file changed, "
+                "no decoder). It is never a pass.",
+     "numeric_treatment": "Excluded from the denominator; the file_integrity layer shows not_completed with no "
+                          "value, and the Integrity value is withheld unless a severe contradiction caps it."},
 ]
 
 
@@ -1431,6 +1442,11 @@ def assess_axes(native, chain, bound_hashes, missing_hashes, wav_observations,
     ai, ai_findings = AIDisclosurePass.evaluate(native)
 
     file_status, file_layer_value = _boolean_status(file_checks)
+    # A file check that did not finish is never a pass: unless a check already
+    # failed, the layer has no value, and the Integrity value is withheld.
+    not_completed = [item for item in file_checks if item.get("status") == "not_completed"]
+    if not_completed and file_status != "contradicted":
+        file_status, file_layer_value = "not_completed", None
     declaration_facts = aggregate_declarations(declared_checks + rel_checks)
     declaration_status, declaration_layer_value = _boolean_status(declaration_facts)
     cross_facts = aggregate_cross_evidence(
@@ -1452,7 +1468,8 @@ def assess_axes(native, chain, bound_hashes, missing_hashes, wav_observations,
 
     layers = [
         _layer("file_integrity", file_status, file_layer_value, True,
-               "SHA-256 binding and parser readability of submitted files; no submitter claims are compared here.",
+               "SHA-256 binding, parser readability and a full-length sample check of submitted files; "
+               "no submitter claims are compared here.",
                len(file_checks), weight=layer_weights["file_integrity"]),
         _layer("structural_validity", "corroborated", 1.0, False,
                "Graph, references, cycles, connectivity, and endpoint roles passed before assessment; this is not content proof.",
@@ -1553,7 +1570,7 @@ def assess_axes(native, chain, bound_hashes, missing_hashes, wav_observations,
         "scoring_effect": "none_report_only" if min_share is None else "numeric_release_gate"})
     threshold_met = (len(components) >= min_components and
                      (substantive_support or not require_support) and not final_attestation_unreadable
-                     and breadth_met)
+                     and breadth_met and not not_completed)
     qualifying_facts = [{"rule": item["rule"], "identity": item["identity"],
                          "evidence_tiers": sorted(set(item["assessed_evidence_tiers"]) & set(support_tiers))}
                         for item in cross_facts if isinstance(item.get("passed"), bool)
@@ -1600,12 +1617,15 @@ def assess_axes(native, chain, bound_hashes, missing_hashes, wav_observations,
             rule_description += f" ({', '.join(support_tiers)})"
     if min_share is not None:
         rule_description += f" and qualifying evidence checked for at least {min_share:.0%} of the workflow's recordings"
-    if not components:
+    rule_description += " and every file check completed"
+    if not components and not not_completed:
         release_reason = "no_assessed_layers"
     elif threshold_met:
         release_reason = "qualifying_cross_evidence" if require_support else "configured_layer_coverage"
     elif triggered and severe_release:
         release_reason = "severe_contradiction_cap"
+    elif not_completed:
+        release_reason = "file_checks_not_completed"
     elif final_attestation_unreadable:
         release_reason = "final_attestation_unreadable"
     elif len(components) < min_components:
@@ -1615,8 +1635,12 @@ def assess_axes(native, chain, bound_hashes, missing_hashes, wav_observations,
     else:
         release_reason = "insufficient_qualifying_cross_evidence"
     decision = {"status": ("contradicted" if contradiction_present else
+                           "incomplete" if not_completed else
                            "consistent" if integrity_value is not None else "insufficient_evidence"),
                 "contradiction_present": contradiction_present,
+                "not_completed_count": len(not_completed),
+                "not_completed_checks": [{"rule": item["rule"], "evidence_hash": item.get("evidence_hash"),
+                                          "reason_code": item.get("reason_code")} for item in not_completed],
                 "severe_contradiction_present": bool(triggered),
                 "numeric_release": "released" if integrity_value is not None else "withheld",
                 "release_reason": release_reason,
@@ -1700,6 +1724,9 @@ def assess_axes(native, chain, bound_hashes, missing_hashes, wav_observations,
     # leads the reasoning: a reader of the number alone would miss it.
     summary = contradiction_summary(decision)
     count_clause = f"{summary}; the numeric value alone understates this. " if summary else ""
+    if not_completed:
+        count_clause = (f"{len(not_completed)} file {'check' if len(not_completed) == 1 else 'checks'} did not "
+                        "complete, so the files are not fully checked and this is not a pass. " + count_clause)
     confidence_clause = (describe_strength(strength, len(components), denominator_layers)
                          if strength and components else
                          "Integrity confidence reflects how many of the three evidence layers were checked. ")

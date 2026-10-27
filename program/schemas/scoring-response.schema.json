@@ -225,8 +225,8 @@
         "value": { "type": ["number", "null"], "minimum": 0, "maximum": 1 },
         "confidence": { "type": ["number", "null"], "minimum": 0, "maximum": 1 },
         "reasoning": { "type": ["string", "null"] },
-        "status": { "enum": ["consistent", "contradicted", "insufficient_evidence"],
-          "description": "Integrity only: separates a contradicted submission from one lacking evidence, including when value is null." }
+        "status": { "enum": ["consistent", "contradicted", "incomplete", "insufficient_evidence"],
+          "description": "Integrity only: separates a contradicted submission from one lacking evidence, including when value is null; incomplete means a required file check did not finish, which is never a pass." }
       },
       "allOf": [
         {

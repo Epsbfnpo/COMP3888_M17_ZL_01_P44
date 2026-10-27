@@ -225,6 +225,29 @@ G3 baselines must be measured against the pinned profile.
   `ixml_timestamp_sample_rate`. Limit: iXML is plain XML inside the same WAV,
   so a forger who edits both still passes and the measured file cost (3) is
   unchanged; this catches tools that edit bext alone.
+- **Full-length sample check (`audio_samples_valid`).** Every bound WAV, FLAC
+  and MP3, the final included, is read in full in every evaluation
+  (`music_target/sample_validation.py`, version `audio-sample-validation-v1`).
+  WAV float samples are checked as stored (float32 or float64) before any
+  conversion; FLAC reuses its MD5 decode (or decodes when no MD5 is stored);
+  MP3 is decoded with libsndfile. A NaN or Infinity fails the check with the
+  count and the first one's kind, time and channel. A scan stopped by the
+  caller's time limit, a file change or a missing decoder is
+  `status: not_completed` with `passed: null`, never a pass, and adds a
+  `FILE_CHECK_NOT_COMPLETED` finding. Unless a file check failed, the
+  `file_integrity` layer is then `not_completed` with no value, Integrity is
+  withheld (`release_reason: file_checks_not_completed`) and
+  `axes.integrity.status` is the new value **`incomplete`** (schema enum
+  extended). `integrity_decision` gains `not_completed_count` and
+  `not_completed_checks`. Before this, physical similarity was the only
+  sample reader; with it disabled since 14 October (0d82520), a NaN stem
+  scored `file_integrity` 1.0. Cost measured on 236 Project Rock WAVs
+  (3.37 GiB): 1.2 s; a 3-minute MP3 decodes in under 0.1 s. Results are not
+  cached across runs.
+- **Builder only: audio diagnostics on by default.** The desktop builder's
+  "Include audio diagnostics" box now starts ticked. `run.py` and the CSEC
+  scoring-request path are unchanged: diagnostics still run only with
+  `--audio-analysis`, so CSEC responses do not change.
 
 As in default-v4, cross-evidence scores one rule/subject
 fact once, with any failure retaining a contradiction; raw checks and source
