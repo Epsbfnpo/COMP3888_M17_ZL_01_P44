@@ -11,7 +11,9 @@ Install the optional dependencies in the program's virtual environment:
 python -m pip install -r requirements-audio.txt
 ```
 
-Run the normal input with audio observations explicitly enabled:
+In the builder GUI they are on by default (the "Include audio diagnostics"
+box starts ticked; untick it to skip them). The command line and the CSEC path
+stay opt-in. Run the normal input with audio observations explicitly enabled:
 
 ```sh
 python -B run.py --native examples/valid-generated/request.json \

@@ -280,6 +280,21 @@ class GuiTests(unittest.TestCase):
         self.assertEqual(completed, [(42, main_thread)])
         self.assertEqual(str(self.app.cancel_button.cget("state")), "disabled")
 
+    def test_audio_diagnostics_are_on_by_default_and_can_be_unticked(self):
+        requested = []
+        jobs = []
+        self.app.build_manifest = lambda *args: {"manifest": True}
+        self.app._start_job = lambda work, done: jobs.append(work)
+        with patch("builder_gui.operations.assess_manifest",
+                   side_effect=lambda manifest, files, progress, cancel, audio: requested.append(audio)):
+            self.assertTrue(self.app.audio_var.get())
+            self.app.run_assessment()
+            self.app.audio_var.set(False)
+            self.app.run_assessment()
+            for work in jobs:
+                work(lambda *_: None, threading.Event())
+        self.assertEqual(requested, [True, False])
+
     def test_worker_error_is_visible_and_job_resets(self):
         def work(progress, cancel):
             raise OSError("copy failure")

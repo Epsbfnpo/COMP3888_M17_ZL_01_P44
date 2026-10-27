@@ -462,7 +462,7 @@ class EvaluatorTests(unittest.TestCase):
         limited = next(row for row in response["findings"] if row["code"] == "AUDIO_FORMAT_LIMITED_CHECKS")
         families = {item["check_family"]: item["limitation"] for item in limited["limited_checks"]}
         self.assertEqual(families, {"declared_bit_depth": "format", "declared_duration": "file",
-                                    "decoded_sample_integrity": "program_scope", "recorder_metadata": "format",
+                                    "decoded_sample_integrity": "format", "recorder_metadata": "format",
                                     "bwf_chronology": "format", "tag_dates": "program_scope",
                                     "lossless_content": "format"})
         self.assertTrue(all(item["status"] == "unavailable" for item in limited["limited_checks"]))

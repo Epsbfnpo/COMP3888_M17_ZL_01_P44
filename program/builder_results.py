@@ -28,6 +28,8 @@ LAYER_STATUSES = {
     "matched": "success",
     "corroborated": "supportive",
     "contradicted": "issue",
+    # The per-file "Check incomplete" row says which file and why; the axis shows "Incomplete".
+    "not_completed": "hide",
     "inconclusive": "unassessed",
     "unavailable": "unassessed",
     "not_applicable": "hide",
@@ -125,10 +127,14 @@ ATTENTION_FINDINGS = {
 def axis_value_label(name, axis, response):
     """Value text for the axis table; a contradicted Integrity shows its count beside the number."""
     text = "Not assessed" if axis["value"] is None else f"{axis['value']:.3f}"
-    if name != "integrity" or axis.get("status") != "contradicted":
-        return text
     # integrity_decision is present even when include_reasoning=false omits the explanations.
     decision = ((response.get("assessment_checks") or {}).get("integrity_decision") or [{}])[0] or {}
+    if name == "integrity" and axis.get("status") == "incomplete":
+        # A file check that did not finish is never shown as a value or a pass.
+        count = decision.get("not_completed_count")
+        return f"Incomplete ({count} file check{'' if count == 1 else 's'} not completed)" if count else "Incomplete"
+    if name != "integrity" or axis.get("status") != "contradicted":
+        return text
     count = decision.get("contradiction_count")
     return f"{text} (contradicted: {count})" if count else f"{text} (contradicted)"
 
@@ -161,6 +167,9 @@ def _affected(item, names):
 
 def _suggestion_for_check(collection, item, status):
     rule = item.get("rule", "")
+    if status == "incomplete":
+        return ("Run the assessment again with a longer time limit (or install the audio decoder if one "
+                "is missing). Until the check finishes, this file is not counted as checked.")
     if collection == "bound_file_integrity":
         return ("Relocate or replace the original file and confirm its SHA-256 matches "
                 "the declared hash." if item.get("rule") == "object_hash_bound"
@@ -335,6 +344,7 @@ def attention_items(response, file_names=None, policy_rules=None):
             elif collection in ("bound_file_integrity", "structural_validity", "declared_file_properties",
                                 "relationship_integrity", "cross_evidence"):
                 disposition = ("unassessed" if item.get("status") == "unavailable"
+                               else "incomplete" if item.get("status") == "not_completed"
                                else mapping.get(item.get("passed"), "unknown"))
                 if (collection == "bound_file_integrity"
                         and item.get("rule") in ("declared_type_parser_succeeds", "audio_file_readable")
@@ -352,6 +362,8 @@ def attention_items(response, file_names=None, policy_rules=None):
             elif item.get("status") == "unavailable" and item.get(
                     "comparison_mode") == "unsupported_relationship":
                 continue  # nothing to act on: no comparison exists for this type
+            elif disposition == "incomplete":
+                title = "Check incomplete"
             elif disposition == "unassessed":
                 title = "Check not assessed"
             else:
@@ -374,6 +386,7 @@ def attention_items(response, file_names=None, policy_rules=None):
         "DECLARED_SOURCE_NOT_SUPPORTED",
         "DECOY_SOURCE_SUSPECTED",
         "CROSS_EVIDENCE_CHECK_UNAVAILABLE",
+        "FILE_CHECK_NOT_COMPLETED",  # shown once, as its "Check incomplete" row
     }
     findings = response.get("findings", [])
     failed_parser_hashes = {

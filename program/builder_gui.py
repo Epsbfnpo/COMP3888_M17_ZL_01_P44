@@ -556,9 +556,11 @@ class App(tk.Tk):
         self.report_button = ttk.Button(bar, text="Save result JSON…", command=self.save_response,
                                         state="disabled")
         self.report_button.pack(side="left", padx=6)
-        self.audio_var = tk.BooleanVar(value=False)
+        # On by default here (the CLI and CSEC path keep --audio-analysis opt-in);
+        # untick to skip it. Missing audio packages only add a note to the result.
+        self.audio_var = tk.BooleanVar(value=True)
         ttk.Checkbutton(
-            bar, text="Include optional audio diagnostics (report-only, slower)",
+            bar, text="Include audio diagnostics (report-only, slower; untick to skip)",
             variable=self.audio_var).pack(side="left", padx=6)
         self.assessment_label = ttk.Label(tab, text="No assessment run. Results describe a submission snapshot.")
         self.assessment_label.pack(fill="x", pady=4)
