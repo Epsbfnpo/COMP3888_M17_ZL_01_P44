@@ -1,8 +1,10 @@
 Name                                                            Stmts   Miss Branch BrPart  Cover
 -------------------------------------------------------------------------------------------------
-builder_gui.py                                                    779    313    240     34    54%
+builder_gui.py                                                    849    314    244     35    57%
 builder_operations.py                                             203     19     68     15    87%
-builder_results.py                                                376     36    216     26    88%
+builder_report.py                                                  21      0      8      0   100%
+builder_results.py                                                376     30    216     25    89%
+builder_review.py                                                 191     12     96     11    91%
 manifest_logic.py                                                 392    128    218     46    62%
 music_target/__init__.py                                            1      0      0      0   100%
 music_target/assessment_passes.py                                 905     88    452     49    87%
@@ -54,4 +56,4 @@ relationship_modes.py                                              99     29    
 run.py                                                            166     49     62      6    71%
 wav_probe.py                                                      113     14     50     12    83%
 -------------------------------------------------------------------------------------------------
-TOTAL                                                            9935   2516   4090    591    72%
+TOTAL                                                           10217   2523   4198    602    73%

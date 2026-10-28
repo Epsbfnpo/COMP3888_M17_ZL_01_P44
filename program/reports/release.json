@@ -1,17 +1,17 @@
 {
-  "target_version": "0.8.2",
-  "date": "2026-10-27",
-  "source_revision": "sha256:90716ba4d277b654807a335106b054e2de7829c3fa3656f822fad0cad278b021",
+  "target_version": "0.8.3",
+  "date": "2026-10-28",
+  "source_revision": "sha256:db9f07a3a2eb8a977a19ec3bf9f43bbfbd6698608cc2b760e1a526c458451172",
   "python": "3.13.7",
   "platform": "Darwin",
-  "tests_discovered": 501,
-  "tests_run": 501,
-  "non_gui_tests_one_process": 496,
-  "gui_tests_separate_processes": 5,
+  "tests_discovered": 538,
+  "tests_run": 538,
+  "non_gui_tests_one_process": 530,
+  "gui_tests_separate_processes": 8,
   "failures": 0,
   "errors": 0,
   "skipped": 0,
-  "test_environment": "Fresh export of the working tree into an empty folder, new virtual environment, pip install -r requirements.txt -r requirements-audio.txt -r requirements-benchmark.txt; REQUIRE_AUDIO_BACKENDS=1 and C2PA_SUNO_SAMPLE_DIR set to the verified Suno downloads, so no test is skipped",
+  "test_environment": "Actual Desktop/V3 working tree; existing CPython 3.13.7 virtual environment with core, audio and benchmark dependencies; REQUIRE_AUDIO_BACKENDS=1 and C2PA_SUNO_SAMPLE_DIR set to verified Suno downloads. GUI cases isolated in separate processes.",
   "dependencies": {
     "jsonschema": "4.23.0",
     "attrs": "25.1.0",
@@ -79,5 +79,15 @@
     "Desktop builder: audio diagnostics on by default (untick to skip); creation_method accepts recorded, synthesised, ai-generated or a JSON list; text/sound-report and project/aaf document types; run.py and the CSEC path unchanged",
     "Example responses regenerated: every axis value, confidence and status identical to 0.8.1",
     "Packaging: the 25 October archive lacked schemas/ddex/*/allowed-value-sets.xsd (source_revision sha256:a3c0a5ed... instead of the pinned ac048707...); the 27 October archive is built from Git-tracked files with MANIFEST.sha256"
+  ],
+  "changes_in_0_8_3": [
+    "GUI and human presentation only; Core Evidence Consistency display label maps to unchanged integrity API key",
+    "Detached summary-first review model; no new fields in the evaluator response JSON",
+    "Structured non-scoring audio review, inconclusive and gap states; conservative deduplication and candidate ambiguity",
+    "Qualified recording cross-check coverage separate from material and provider-task coverage",
+    "Offline escaped HTML and text from the same presentation; original result JSON export retained",
+    "Snapshot labels, updated manual with actual GUI screenshot, README and local wiki",
+    "Original 501 plus 37 new tests: 538 passed, 0 skipped; unchanged core axes/findings/checks on four replay cases",
+    "Current coverage: 75.3% lines, 65.7% branches; includes new display modules"
   ]
 }

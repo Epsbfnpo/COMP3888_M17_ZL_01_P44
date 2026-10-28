@@ -1,0 +1,32 @@
+{
+  "baseline": "0.8.2 local V3 before installation",
+  "target": "0.8.3",
+  "only_backend_file_changed": [
+    "program/music_target/__init__.py"
+  ],
+  "backend_difference": "VERSION metadata only",
+  "schemas_policies_unchanged": true,
+  "comparisons": [
+    {
+      "case": "valid-generated",
+      "axes_findings_checks_unchanged": true,
+      "execution_status": "succeeded"
+    },
+    {
+      "case": "csec-wav",
+      "axes_findings_checks_unchanged": true,
+      "execution_status": "succeeded"
+    },
+    {
+      "case": "invalid-hash",
+      "axes_findings_checks_unchanged": true,
+      "execution_status": "error"
+    },
+    {
+      "case": "unsupported-png",
+      "axes_findings_checks_unchanged": true,
+      "execution_status": "unsupported"
+    }
+  ],
+  "new_source_revision": "sha256:db9f07a3a2eb8a977a19ec3bf9f43bbfbd6698608cc2b760e1a526c458451172"
+}

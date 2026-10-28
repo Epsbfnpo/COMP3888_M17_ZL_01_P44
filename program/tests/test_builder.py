@@ -345,6 +345,61 @@ class GuiTests(unittest.TestCase):
                 self.app.save_response()
             self.assertEqual(json.loads(report.read_text()), self.app._response)
 
+    def test_review_summary_first_and_exports_preserve_worker_json(self):
+        from test_builder_review import response, SOURCE, TARGET
+        payload = response()
+        payload["_builder_notes"] = ["Transport note."]
+        before = copy.deepcopy(payload)
+        self.app.files = [{"hash": SOURCE, "path": "source.wav"}, {"hash": TARGET, "path": "mix.wav"}]
+        self.app.show_response(payload)
+        self.assertEqual(payload, before)
+        self.assertIn("1 content finding(s) require review", self.app.summary_label.cget("text"))
+        self.assertIn("7.00–11.00 s", self.app.first_finding.cget("text"))
+        self.assertIn("Core Evidence Consistency", self.app.axis_tree.item(self.app.axis_tree.get_children()[0], "values"))
+        self.app.view_findings()
+        self.assertEqual(self.app.detail_notebook.index("current"), 0)
+        self.app.copy_review_text()
+        self.assertIn("1 content finding(s) require review", self.app.clipboard_get())
+        with tempfile.TemporaryDirectory() as folder:
+            report = Path(folder) / "result.json"
+            with patch("builder_gui.filedialog.asksaveasfilename", return_value=str(report)):
+                self.app.save_response()
+            self.assertEqual(json.loads(report.read_text()), {k: v for k, v in before.items() if k != "_builder_notes"})
+            self.assertNotIn("summary", json.loads(report.read_text()))
+            report = Path(folder) / "review.html"
+            with patch("builder_gui.filedialog.asksaveasfilename", return_value=str(report)):
+                self.app.save_review_report()
+            self.assertIn("1 content finding(s) require review", report.read_text())
+
+    def test_report_snapshot_keeps_original_names_when_submission_changes(self):
+        from test_builder_review import response, SOURCE
+        self.app.files = [{"hash": SOURCE, "path": "original.wav"}]
+        self.app.show_response(response())
+        self.app.files[0]["path"] = "replacement.wav"
+        self.app._check_snapshot()
+        self.assertIn("Showing previous assessment", self.app.assessment_label.cget("text"))
+        self.assertEqual(self.app._review["file_names"][SOURCE], "original.wav")
+        self.assertIn("original.wav", self.app.first_finding.cget("text"))
+        self.app.show_response(response())
+        self.app.v["case_id"].set("CHANGED")
+        self.assertIn("Showing previous assessment", self.app.assessment_label.cget("text"))
+
+    def test_review_layout_keeps_summary_and_finding_above_scores_at_small_size(self):
+        from test_builder_review import response
+        self.app.deiconify()
+        self.app.geometry("800x600")
+        self.app.tk.call("tk", "scaling", 1.5)
+        self.app.show_response(response())
+        notebook = self.app.axis_tree.master.master
+        notebook.select(self.app.axis_tree.master)
+        self.app.update()
+        self.assertLess(self.app.summary_label.winfo_rooty(), self.app.first_finding.winfo_rooty())
+        self.assertLess(self.app.first_finding.winfo_rooty(), self.app.axis_tree.winfo_rooty())
+        self.assertLess(self.app.axis_tree.winfo_rooty() + self.app.axis_tree.winfo_height(),
+                        self.app.winfo_rooty() + self.app.winfo_height())
+        self.assertTrue(self.app.finding_button.winfo_viewable())
+        self.assertLessEqual(int(self.app.summary_label.cget("wraplength")), 800)
+
 
 if __name__ == "__main__":
     unittest.main()
