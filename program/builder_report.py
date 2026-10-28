@@ -17,9 +17,13 @@ def render_review_html(model):
              'background:#f3f5f7;border:1px solid #cbd3dc;border-radius:6px}.audio_review{border-left:6px solid #ad6500}'
              '.core{border-left:6px solid #a32b26}pre{white-space:pre-wrap;overflow-wrap:anywhere;font-size:13px}'
              '@media print{body{margin:0;max-width:none}article,tr{break-inside:avoid}details>*{display:block!important}'
-             'summary{display:none}h2,h3{break-after:avoid}.summary,.scope{break-inside:avoid}}</style>',
+             'summary{display:none}h2,h3{break-after:avoid}.summary>section,.scope{break-inside:avoid}}</style>',
              '<h1>Music evidence assessment report</h1><section class="summary"><h2>Assessment summary</h2>']
-    parts += ['<p>' + e(line) + '</p>' for line in model['summary']]
+    for section in model['summary_sections']:
+        parts += ['<section><h3>' + e(section['title']) + '</h3><p>' + e(section['text']) + '</p>']
+        if section.get('scope'):
+            parts.append('<p class="scope"><strong>Scope:</strong> ' + e(section['scope']) + '</p>')
+        parts.append('</section>')
     parts += ['<p class="scope">' + e(model['scope_note']) + '</p></section>', '<h2>Items requiring attention</h2>']
     for group, label in GROUP_LABELS.items():
         rows = [item for item in model['items'] if item['group'] == group]

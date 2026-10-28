@@ -1,5 +1,16 @@
 # Verification Record
 
+## Assessment Summary refinement without a version change (2026-10-29)
+
+- Version stays **0.8.3**. The backend source digest stays `sha256:db9f07a3a2eb8a977a19ec3bf9f43bbfbd6698608cc2b760e1a526c458451172`; scoring, policies, schemas and response JSON are unchanged.
+- The one Assessment Summary layer now contains five blocks: Evaluation Status, Core Evidence Consistency, Review Required, Coverage & Limitations, and Other Key Results. Core scope names file identity/readability, technical properties/relationships and cross-evidence consistency, and explicitly excludes optional audio analysis from that score.
+- Provider completion counts are separate from interval-level review items. Missing evidence and withheld scores are explained without treating execution success as a pass. Workflow requirements, final-file C2PA and creation-method declaration coverage use their structured records; missing records remain unknown.
+- GUI, HTML and copied text use the same summary sections. The Full assessment page scrolls in small windows and View findings reveals the detailed panel; bottom controls remain visible. The guide and current screenshot were updated.
+- **555 tests passed, no failures, errors or skips:** 547 non-GUI tests and eight GUI cases in separate processes. Includes 17 new summary tests. Existing CPython 3.13.7 environment, all optional audio backends required, verified Suno samples enabled. Log: `reports/assessment-summary-2026-10-29-tests.txt`.
+- Response immutability, unchanged axes/non-scoring flags, five-section ordering, all C2PA states, declaration counts, unknown data, provider failures, score withholding, HTML escaping, JSON export and small-window scroll access are covered.
+- Coverage was not remeasured for this wording refinement; the dated coverage figures below belong to the previous 28 October snapshot.
+
+
 ## Version 0.8.3 presentation release (2026-10-28)
 
 - Summary-first GUI, human text and offline HTML presentation; API `integrity` displayed as Core Evidence Consistency. No summary is inserted into response JSON.
