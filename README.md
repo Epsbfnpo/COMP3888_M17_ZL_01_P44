@@ -1047,12 +1047,19 @@ and combine:
 python3 -m coverage combine && python3 -m coverage html -d reports/coverage && python3 -m coverage report
 ```
 
-On 25 October 2026 (466 tests) line coverage was 73.3% and branch coverage
-63.5%. The policy-disabled legacy signal modules (`physical_audio_passes.py`,
-`audio_derivation.py`, 20%) account for most of the gap: active code is at 84%.
-The core evaluator and scoring are at 92%, the audio diagnostics at 93%, the
-parsers at 82% and the desktop builder at 66%, because its Tk widgets are
-tested end to end. Code run in builder worker subprocesses is not counted.
+On 28 October 2026 (version 0.8.2, 501 tests, all passed with no skips) line
+coverage was 74.7% and branch coverage 65.0%. The policy-disabled legacy
+signal modules (`physical_audio_passes.py`, `audio_derivation.py`, 20%)
+account for most of the gap: active code is at 85%. The core evaluator and
+scoring are at 91%, the audio diagnostics at 93%, the parsers at 82% and the
+desktop builder at 72%, because its Tk widgets are tested end to end. Code run
+in builder worker subprocesses is not counted. On 25 October (466 tests) the
+figures were 73.3% and 63.5%.
+
+[`program/docs/testing/04_TEST_TRACEABILITY.md`](program/docs/testing/04_TEST_TRACEABILITY.md)
+maps each numbered case in the three test plans (AU, AI, SU, SI, PC) to the
+tests that check it, and lists the cases that are only partly automated or
+not automated: 77 of 86 are fully automated.
 
 ## Directory overview
 
