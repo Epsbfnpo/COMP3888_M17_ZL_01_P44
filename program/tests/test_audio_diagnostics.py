@@ -973,6 +973,16 @@ class RealAudioBackendTests(unittest.TestCase):
         self.assertTrue(any(abs(offset - 2) < 0.15 for offset in offsets), offsets)
         self.assertTrue(any(abs(offset - 10) < 0.15 for offset in offsets), offsets)
         self.assertEqual(response["assessment_checks"]["audio_diagnostic_summary"][0]["declared_ranges_not_supported"], 1)
+        # Exercise the real emitted observations through both human presentation paths.
+        from builder_review import build_review_presentation
+        from builder_report import render_review_html
+        before = copy.deepcopy(response)
+        model = build_review_presentation(response)
+        self.assertEqual(model["counts"]["audio_review"], 1)
+        self.assertIn("Declared interval needs review", render_review_html(model))
+        self.assertEqual(response, before)
+        self.assertFalse(item["scoring_eligible"])
+        self.assertIsNone(item["integrity_contribution"])
 
     def test_true_excerpt_interval_gives_no_declared_range_finding(self):
         for start in (2.0, 10.0):

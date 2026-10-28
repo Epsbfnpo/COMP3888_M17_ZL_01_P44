@@ -318,6 +318,7 @@ def attention_items(response, file_names=None, policy_rules=None):
     for result in attention_workflow_results(
             workflow.get("rule_results", []), policy_rules):
         issues.append({
+            "collection": "workflow_assessment", "reference": result.get("rule_id"),
             "status": result["display_status"],
             "affected": result["affected"],
             "explanation": result.get("reason", ""),
@@ -369,6 +370,10 @@ def attention_items(response, file_names=None, policy_rules=None):
             else:
                 title = f"Needs review ({item.get('status', item.get('passed', 'unknown'))})"
             issues.append({
+                "collection": collection, "reference": item.get("fact_id") or item.get("rule"),
+                "raw_status": item.get("status"), "passed": item.get("passed"),
+                "scoring_eligible": item.get("scoring_eligible"),
+                "severity": item.get("severity"),
                 "status": title,
                 "affected": _affected(item, names),
                 "explanation": _check_explanation(item),
@@ -432,6 +437,9 @@ def attention_items(response, file_names=None, policy_rules=None):
         else:
             continue
         issues.append({
+            "collection": "findings", "reference": code,
+            "severity": finding.get("severity"),
+            "scoring_eligible": finding.get("scoring_eligible"),
             "status": title,
             "affected": _affected(finding, names),
             "explanation": finding.get("message", code),
@@ -517,7 +525,7 @@ def _agreement_line(row, group):
 def audio_diagnostic_lines(response, file_names=None):
     """Plain-language fingerprint and structure lines for the report-only audio diagnostics.
 
-    These rows never affect scores and are not attention items. A shared offset is a
+    These rows never affect scores; review items are derived separately. A shared offset is a
     content match; it is not provenance.
     """
     names = file_names or {}

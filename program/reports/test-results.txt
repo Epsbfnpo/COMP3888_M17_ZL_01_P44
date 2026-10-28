@@ -20,3 +20,34 @@ GUI tests, one process each (they can hang inside the full suite on macOS Tk):
 Total: 501 tests; 501 passed, 0 skipped, 0 failures, 0 errors.
 Coverage was re-measured on 28 October 2026 with the same split (501 tests, all passed, no skips):
   74.7% lines, 65.0% branches; 85% of lines without the policy-disabled legacy modules; reports/coverage/.
+
+COMP3888 music target v0.8.3 (scoring profile default-v7; GUI and human-report presentation release)
+Date: 2026-10-28
+Platform: CPython 3.13.7 on macOS (Darwin)
+Environment: the Desktop/V3 working tree, existing virtual environment with
+  requirements.txt, requirements-audio.txt and requirements-benchmark.txt installed
+source_revision: sha256:db9f07a3a2eb8a977a19ec3bf9f43bbfbd6698608cc2b760e1a526c458451172
+  (only music_target/__init__.py differs from 0.8.2: VERSION 0.8.2 -> 0.8.3)
+
+Non-GUI tests, one process:
+  cd tests && C2PA_SUNO_SAMPLE_DIR=<folder with the verified Suno downloads> REQUIRE_AUDIO_BACKENDS=1 python -B -m unittest <every test module except test_builder> test_builder.ManifestLimitTests test_builder.ExportTests test_builder.AssessmentTests
+  Ran 530 tests in 49 seconds. OK (no skips)
+
+GUI tests, one process each:
+  cd tests && REQUIRE_AUDIO_BACKENDS=1 python -B -m unittest test_builder.GuiTests.<name>
+  test_audio_diagnostics_are_on_by_default_and_can_be_unticked                       OK
+  test_background_operation_keeps_ui_responsive_and_restores_controls                OK
+  test_load_export_assess_and_save_result_end_to_end                                 OK
+  test_report_snapshot_keeps_original_names_when_submission_changes          (new)   OK
+  test_result_shows_null_as_not_assessed_and_preserves_failure_status                OK
+  test_review_layout_keeps_summary_and_finding_above_scores_at_small_size    (new)   OK
+  test_review_summary_first_and_exports_preserve_worker_json                 (new)   OK
+  test_worker_error_is_visible_and_job_resets                                        OK
+
+Total: 538 tests (the original 501 plus 37 new: 34 in test_builder_review, 3 GUI cases);
+  538 passed, 0 skipped, 0 failures, 0 errors.
+Coverage, same split: 75.3% lines, 65.7% branches, including builder_review.py (93.7%)
+  and builder_report.py (100%); reports/coverage/ and reports/coverage-0.8.3.json.
+Contract check: four example replays keep axes, findings and assessment_checks unchanged;
+  reports/ui-boundary-0.8.3.json.
+Full per-test log: reports/test-results-0.8.3.txt.

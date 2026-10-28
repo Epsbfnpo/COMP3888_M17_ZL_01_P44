@@ -17,6 +17,7 @@ import copy
 import queue
 import threading
 import uuid
+from datetime import datetime
 from pathlib import Path
 import tkinter as tk
 from tkinter import filedialog, messagebox, ttk
@@ -37,9 +38,10 @@ def technical_summary(tech):
     if tech.get("bit_depth") is not None:
         parts.append(f"{tech['bit_depth']}-bit")
     return ", ".join(parts)
-from builder_results import (
-    INSUFFICIENT_SUPPORT_LABEL, attention_items, attention_workflow_results, audio_diagnostic_lines,
-    axis_value_label, music_semantics_lines)
+from builder_results import INSUFFICIENT_SUPPORT_LABEL, attention_workflow_results
+from builder_review import build_review_presentation, review_text, SCOPE_NOTE
+from builder_report import render_review_html
+from music_target import VERSION
 
 
 def parse_json_object(text: str, label: str) -> dict:
@@ -337,7 +339,7 @@ class RelDialog(Dialog):
 class App(tk.Tk):
     def __init__(self):
         super().__init__()
-        self.title("Evidence manifest builder")
+        self.title(f"Evidence manifest builder — {VERSION}")
         self.geometry("1000x700")
         self.files, self.rels, self._counter = [], [], 0
         self.policy, self._forced = None, set()
@@ -345,6 +347,9 @@ class App(tk.Tk):
         self._job = None
         self._closing = False
         self._response = None
+        self._review = None
+        self._snapshot_signature = None
+        self._pending_snapshot = None
         self.protocol("WM_DELETE_WINDOW", self.close)
 
         notebook = ttk.Notebook(self)
@@ -360,9 +365,8 @@ class App(tk.Tk):
         self.copy_var = tk.BooleanVar(value=False)
         ttk.Checkbutton(bar, text="Copy files into a portable submission folder",
                         variable=self.copy_var).pack(side="left")
-        self.storage_hint = ttk.Label(
-            bar, text="References originals; keep them available at their current paths.")
-        self.storage_hint.pack(side="left", padx=8)
+        self.storage_hint = ttk.Label(self, text="References originals; keep them available at their current paths.")
+        self.storage_hint.pack(fill="x", padx=12, pady=(0, 4))
         self.copy_var.trace_add("write", self._update_storage_hint)
         ttk.Button(bar, text="Save manifest…", command=self.save).pack(side="right")
         ttk.Button(bar, text="Preview JSON", command=self.preview).pack(side="right", padx=6)
@@ -383,6 +387,10 @@ class App(tk.Tk):
             self.set_policy(found)
         else:
             self.after(300, self.ask_policy)
+
+        for var in [*self.v.values(), self.audio_var]:
+            var.trace_add("write", self._check_snapshot)
+        self.desc.bind("<<Modified>>", self._description_modified)
 
     # ---- policy ----------------------------------------------------------
     def ask_policy(self):
@@ -408,6 +416,7 @@ class App(tk.Tk):
             btn = ttk.Checkbutton(self.mod_frame, text=name, variable=var)
             btn.grid(row=i // 2, column=i % 2, sticky="w", padx=6)
             self.mod_vars[name], self.mod_buttons[name] = var, btn
+            var.trace_add("write", self._check_snapshot)
         self.on_workflow_change()
 
     def workflow(self):
@@ -438,11 +447,13 @@ class App(tk.Tk):
             ttk.Checkbutton(self.flag_frame, text=name, variable=var).grid(
                 row=i, column=0, sticky="w", padx=6)
             self.flag_vars[name] = var
+            var.trace_add("write", self._check_snapshot)
         if wf:
             self.hint.configure(text=f"{wf['when_applicable']}\nAllowed final types: "
                                      + ", ".join(wf["allowed_final_types"]))
         else:
             self.hint.configure(text="")
+        self._check_snapshot()
 
     # ---- tabs ------------------------------------------------------------
     def _case_tab(self, notebook):
@@ -556,28 +567,83 @@ class App(tk.Tk):
         self.report_button = ttk.Button(bar, text="Save result JSON…", command=self.save_response,
                                         state="disabled")
         self.report_button.pack(side="left", padx=6)
-        # On by default here (the CLI and CSEC path keep --audio-analysis opt-in);
-        # untick to skip it. Missing audio packages only add a note to the result.
+        self.html_button = ttk.Button(bar, text="Save review report…", command=self.save_review_report,
+                                      state="disabled")
+        self.html_button.pack(side="left", padx=6)
+        self.copy_report_button = ttk.Button(bar, text="Copy report text", command=self.copy_review_text,
+                                             state="disabled")
+        self.copy_report_button.pack(side="left", padx=6)
         self.audio_var = tk.BooleanVar(value=True)
-        ttk.Checkbutton(
-            bar, text="Include audio diagnostics (report-only, slower; untick to skip)",
-            variable=self.audio_var).pack(side="left", padx=6)
-        self.assessment_label = ttk.Label(tab, text="No assessment run. Results describe a submission snapshot.")
+        ttk.Checkbutton(tab, text="Include audio diagnostics (report-only, slower; untick to skip)",
+                        variable=self.audio_var).pack(anchor="w")
+        self.assessment_label = ttk.Label(tab, text="No assessment run. Results describe a submission snapshot.",
+                                          wraplength=950)
         self.assessment_label.pack(fill="x", pady=4)
-        self.axis_tree = ttk.Treeview(
-            tab, columns=("dimension", "availability", "value", "confidence"),
-            show="headings", height=4)
-        for name in ("dimension", "availability", "value", "confidence"):
-            self.axis_tree.heading(
-                name, text="confidence (layers checked)" if name == "confidence" else name)
-        self.axis_tree.pack(fill="x")
-        details = ttk.Frame(tab)
-        details.pack(fill="both", expand=True, pady=6)
-        self.assessment_text = tk.Text(details, wrap="word", state="disabled")
-        scroll = ttk.Scrollbar(details, command=self.assessment_text.yview)
-        self.assessment_text.configure(yscrollcommand=scroll.set)
-        scroll.pack(side="right", fill="y")
-        self.assessment_text.pack(fill="both", expand=True)
+        summary_frame = ttk.LabelFrame(tab, text="Assessment summary", padding=6)
+        summary_frame.pack(fill="x")
+        self.summary_label = ttk.Label(summary_frame, text="Run an assessment to see execution, core and audio states.",
+                                       wraplength=930, justify="left")
+        self.summary_label.pack(fill="x")
+        self.scope_label = ttk.Label(summary_frame, text=SCOPE_NOTE, wraplength=930, justify="left")
+        self.scope_label.pack(fill="x", pady=(4, 0))
+        self.first_finding = ttk.Label(tab, text="", wraplength=950, justify="left")
+        self.first_finding.pack(fill="x", pady=4)
+        self.finding_button = ttk.Button(tab, text="View findings", command=self.view_findings, state="disabled")
+        self.finding_button.pack(anchor="w")
+        self.axis_tree = ttk.Treeview(tab, columns=("dimension", "availability", "value", "confidence", "status"),
+                                      show="headings", height=4)
+        for name, width in (("dimension", 210), ("availability", 95), ("value", 160),
+                            ("confidence", 120), ("status", 325)):
+            self.axis_tree.heading(name, text="Assessment confidence" if name == "confidence" else name.title())
+            self.axis_tree.column(name, width=width, minwidth=65, stretch=True)
+        self.axis_tree.pack(fill="x", pady=4)
+        self.detail_notebook = ttk.Notebook(tab)
+        self.detail_notebook.pack(fill="both", expand=True)
+        def text_page(title):
+            frame = ttk.Frame(self.detail_notebook)
+            self.detail_notebook.add(frame, text=title)
+            widget = tk.Text(frame, wrap="word", state="disabled", height=5)
+            scroll = ttk.Scrollbar(frame, command=widget.yview)
+            widget.configure(yscrollcommand=scroll.set)
+            scroll.pack(side="right", fill="y")
+            widget.pack(fill="both", expand=True)
+            return widget
+        self.assessment_text = text_page("Findings and explanations")
+        self.raw_text = text_page("All checks and raw evidence")
+        tab.bind("<Configure>", self._resize_report)
+
+    def _resize_report(self, event):
+        width = max(250, event.width - 35)
+        for label in (self.assessment_label, self.summary_label, self.scope_label, self.first_finding):
+            label.configure(wraplength=width)
+
+    def _submission_signature(self):
+        return json.dumps({"files": self.files, "relationships": self.rels,
+                           "case": {key: var.get() for key, var in self.v.items()},
+                           "modifiers": {key: var.get() for key, var in self.mod_vars.items()},
+                           "flags": {key: var.get() for key, var in self.flag_vars.items()},
+                           "description": self.desc.get("1.0", "end").strip(),
+                           "audio": self.audio_var.get(), "policy": self.policy}, sort_keys=True)
+
+    def _description_modified(self, _event=None):
+        if self.desc.edit_modified():
+            self.desc.edit_modified(False)
+            self._check_snapshot()
+
+    def _check_snapshot(self, *_args):
+        if self._review is None:
+            return
+        metadata = self._review["metadata"]
+        stale = self._snapshot_signature != self._submission_signature()
+        self.assessment_label.configure(text=("Showing previous assessment — submission or analysis options changed. "
+            "Run again. " if stale else "Assessment snapshot. ") +
+            f"case {metadata['case_id']} | run {metadata['run_id']} | status: {self._response.get('execution_status', 'unknown')} | "
+            f"{metadata['snapshot_time']}")
+
+    def view_findings(self):
+        self.detail_notebook.select(0)
+        self.assessment_text.see("first_review_item")
+        self.assessment_text.focus_set()
 
     def _start_job(self, work, done):
         if self._job is not None:
@@ -657,59 +723,48 @@ class App(tk.Tk):
             return
         files = copy.deepcopy(self.files)
         audio = self.audio_var.get()
+        self._pending_snapshot = {"signature": self._submission_signature(),
+                                  "names": {item["hash"]: Path(item["path"]).name for item in files if item.get("path")},
+                                  "audio_requested": audio}
         self._start_job(
             lambda progress, cancel: operations.assess_manifest(
                 manifest, files, progress, cancel, audio),
             self.show_response)
 
     def show_response(self, response):
-        notes = response.pop("_builder_notes", [])
-        self._response = response
-        self.report_button.configure(state="normal")
-        self.assessment_label.configure(
-            text=f"Snapshot case {response['case_id']} | run {response['run_id']} | "
-                 f"status: {response['execution_status']}")
+        # Builder transport notes are private, pre-existing metadata; never mutate the worker response.
+        notes = response.get("_builder_notes", [])
+        self._response = copy.deepcopy({key: value for key, value in response.items() if key != "_builder_notes"})
+        snapshot = self._pending_snapshot or {
+            "signature": self._submission_signature(), "audio_requested": None,
+            "names": {item["hash"]: Path(item["path"]).name for item in self.files if item.get("path")}}
+        self._pending_snapshot = None
+        self._snapshot_signature = snapshot["signature"]
+        self._review = build_review_presentation(self._response, snapshot["names"], self.policy,
+            audio_requested=snapshot["audio_requested"], snapshot_time=datetime.now().astimezone().isoformat(timespec="seconds"),
+            notes=notes)
+        for button in (self.report_button, self.html_button, self.copy_report_button, self.finding_button):
+            button.configure(state="normal")
+        self._check_snapshot()
+        self.summary_label.configure(text="\n".join(self._review["summary"]))
+        visible = [item for item in self._review["items"] if item["group"] != "support"]
+        first = visible[0] if visible else None
+        self.first_finding.configure(text=(first["title"] + " — " + (first["affected"] if len(first["affected"]) < 130 else first["affected"][:127] + "…") + "\n" +
+                                          "\n".join(first["explanation"].splitlines()[:3]) if first else
+            "Read the execution, audio state and coverage above. Unassessed checks are not passes."),
+            foreground="#985800" if first and first["group"] == "audio_review" else
+                       "#a02a24" if first and first["group"] == "core" else "#263442")
         self.axis_tree.delete(*self.axis_tree.get_children())
-        explanation = [
-            "Content consistency does not prove authorship. AI disclosure is not AI detection.\n"]
-        if response.get("error"):
-            explanation.append(f"ERROR: {response['error']}\n")
-        for name, axis in response["axes"].items():
-            self.axis_tree.insert("", "end", values=(
-                name, axis["availability"],
-                axis_value_label(name, axis, response),
-                "Not assessed" if axis["confidence"] is None else f"{axis['confidence']:.3f}"))
-            explanation.append(f"{name}: {axis.get('reasoning') or 'Reasoning not supplied.'}\n")
-        file_names = {item["hash"]: Path(item["path"]).name
-                      for item in self.files if item.get("path")}
-        issues = attention_items(response, file_names, self.policy)
-        explanation.append("\nIssues requiring attention:\n")
-        if not issues:
-            explanation.append(
-                "No issues requiring attention were found in the assessed checks.\n"
-                "Checks or dimensions marked not assessed remain unassessed; they have not "
-                "been treated as passes.\n")
-        else:
-            for index, issue in enumerate(issues, 1):
-                explanation.append(
-                    f"\n{index}. {issue['status']} — {issue['affected']}\n"
-                    f"   {issue['explanation']}\n"
-                    f"   Suggested action: {issue['suggestion']}\n")
-        semantics = music_semantics_lines(response, file_names)
-        if semantics:
-            explanation.append("\n" + "\n".join(semantics) + "\n")
-        diagnostics = audio_diagnostic_lines(response, file_names)
-        if diagnostics:
-            explanation.append("\n" + "\n".join(diagnostics) + "\n")
-        for note in notes:
-            explanation.append(f"\nNote: {note}\n")
-        explanation.append(
-            "\nThe complete machine-readable response, including passed checks, is preserved "
-            "and available with Save result JSON…")
+        for axis in self._review["axes"]:
+            self.axis_tree.insert("", "end", values=(axis["label"], axis["availability"], axis["value"],
+                                                      axis["confidence"], axis["status"]))
+        text = review_text(self._review)
+        text = text[text.index("Items requiring attention"):]
         self.assessment_text.configure(state="normal")
         self.assessment_text.delete("1.0", "end")
-        self.assessment_text.insert("1.0", "\n".join(explanation))
-        # Too little signal is a normal outcome, so it is shown muted rather than as an error.
+        self.assessment_text.insert("1.0", text)
+        position = self.assessment_text.search("Items requiring attention", "1.0", stopindex="end")
+        self.assessment_text.mark_set("first_review_item", position or "1.0")
         self.assessment_text.tag_configure("muted", foreground="gray")
         position = "1.0"
         while True:
@@ -719,6 +774,31 @@ class App(tk.Tk):
             self.assessment_text.tag_add("muted", f"{position} linestart", f"{position} lineend")
             position = f"{position} lineend"
         self.assessment_text.configure(state="disabled")
+        self.assessment_text.yview_moveto(0)
+        self.raw_text.configure(state="normal")
+        self.raw_text.delete("1.0", "end")
+        supporting = [item for item in self._review["items"] if item["group"] == "support"]
+        self.raw_text.insert("1.0", "Other observations (not provenance)\n" +
+            "\n\n".join(item["title"] + "\n" + item["explanation"] for item in supporting) +
+            "\n\nComplete original machine response\n" + json.dumps(self._response, indent=2, ensure_ascii=False))
+        self.raw_text.configure(state="disabled")
+        self.detail_notebook.select(0)
+
+    def copy_review_text(self):
+        if self._review is not None:
+            self.clipboard_clear()
+            self.clipboard_append(review_text(self._review, include_support=True))
+
+    def save_review_report(self):
+        if self._review is None:
+            return
+        target = filedialog.asksaveasfilename(title="Save offline review report", defaultextension=".html",
+            initialfile="assessment-review.html", filetypes=[("Offline HTML", "*.html")])
+        if target:
+            try:
+                Path(target).write_text(render_review_html(self._review), encoding="utf-8")
+            except OSError as exc:
+                messagebox.showerror("Cannot save report", str(exc), parent=self)
 
     def save_response(self):
         if self._response is None:
@@ -750,6 +830,7 @@ class App(tk.Tk):
         self.storage_hint.configure(text=text)
 
     def refresh(self):
+        self._check_snapshot()
         self.file_tree.delete(*self.file_tree.get_children())
         for i, f in enumerate(self.files):
             available = bool(f["path"] and Path(f["path"]).is_file())
@@ -965,7 +1046,7 @@ class App(tk.Tk):
             self.check_tree.insert(
                 "", "end", values=(
                     "-", "-", "-", "",
-                    "No issues requiring attention were found in the assessed checks."))
+                    "No missing or unassessed workflow requirements were found in this preflight. Full evaluation is separate."))
         for r in visible:
             self.check_tree.insert("", "end", values=(
                 r["rule_id"], r["level"], r["display_status"],

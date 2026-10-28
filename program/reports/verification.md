@@ -1,5 +1,15 @@
 # Verification Record
 
+## Version 0.8.3 presentation release (2026-10-28)
+
+- Summary-first GUI, human text and offline HTML presentation; API `integrity` displayed as Core Evidence Consistency. No summary is inserted into response JSON.
+- **538 tests passed, no failures, errors or skips:** original 501 plus 37 new tests; 530 non-GUI tests in one process and 8 GUI cases in separate processes. Existing CPython 3.13.7 environment, REQUIRE_AUDIO_BACKENDS=1 and C2PA_SUNO_SAMPLE_DIR set to the verified Suno downloads.
+- Regression checks cover response immutability, unchanged axis value/confidence/status, real declared-range output, explicit non-scoring flags, deduplication, distinct windows, unknown outcomes, recording coverage, offline HTML escaping, snapshot warnings and 800x600 layout with Tk scaling 1.5.
+- Runtime/backend, schemas and policy byte comparison: only music_target/__init__.py differs, by VERSION 0.8.2 to 0.8.3. Four native/CSEC example replays preserve axes, findings, assessment_checks, execution status and schema version. Evidence: reports/ui-boundary-0.8.3.json. Program version and source digest identify 0.8.3; the earlier CSEC pin stays 0.8.2.
+- Manual appendix and GUI screenshot updated; README and local github-wiki pages synchronized. GitHub publishing is separate.
+- Current 0.8.3 coverage: **75.3% lines, 65.7% branches**, including the new presentation modules. Measurements come only from the final full run on Desktop/V3.
+- Test summary: reports/test-results.txt (0.8.2 and 0.8.3 entries); full per-test log: reports/test-results-0.8.3.txt. Coverage: reports/coverage/ and reports/coverage-0.8.3.json. This release makes no new calibration or real-data accuracy claim.
+
 ## Version 0.8.2 and the new CSEC pin (2026-10-27)
 
 - Pin: tag `csec-2026-10-27` (proposed), version 0.8.2, scoring profile `default-v7`, `source_revision` `sha256:90716ba4d277b654807a335106b054e2de7829c3fa3656f822fad0cad278b021`.

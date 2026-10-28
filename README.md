@@ -4,8 +4,9 @@ This directory contains an implemented baseline for assessing evidence from musi
 
 The main approach is to reuse Ben's evidence graph and execution framework, connect the music parsers and checks, and expose a runnable interface for CSEC.
 
-The current version is **0.8.2** (27 October 2026); see
-[Version 0.8.2](#version-082-27-october-2026) below. It follows 0.8.1
+The current version is **0.8.3** (28 October 2026); see
+[Version 0.8.3](#version-083-28-october-2026) below. It follows the released
+0.8.2 (27 October 2026) and 0.8.1
 (22 October 2026), which builds on 0.8.0, which
 focused on C2PA provenance: pinned trust lists, asymmetric trust and a
 plain-language finding for every state of the final artefact's C2PA manifest
@@ -64,6 +65,37 @@ lies inside the recording, so a start timecode moved by one second in both the
 WAV and the sound report was not caught. Version 0.8.2 closes the cheapest form
 of it (see below); the remaining fixes are listed in
 [`program/docs/NEXT_TASKS.md`](program/docs/NEXT_TASKS.md).
+
+### Version 0.8.3 (28 October 2026)
+
+This release changes the desktop GUI and human report presentation. The response
+schema, `axes.integrity` field, score values, confidence formulas, thresholds,
+policies and audio diagnostic records retain their existing meanings. The program
+version and its source digest identify this release; the 0.8.2 CSEC pin remains
+an earlier baseline.
+
+The GUI displays **Core Evidence Consistency** for `integrity`. The output order
+is assessment summary, prominent important finding, four dimensions, coverage and
+detailed evidence. Execution completion, core contradictions, non-scoring audio
+review findings, inconclusive comparisons and incomplete analysis are stated
+separately. A high core value does not validate every audio interval.
+
+Declared-range results are read from structured outcomes. A linked finding and
+its detail count once; distinct windows stay separate. Reported candidate
+positions and ambiguity are retained. Qualified recording checks show their
+numerator and denominator and distinguish consistent from contradicted recordings.
+
+**Save result JSON…** preserves the worker response; no summary or display field
+is added. **Save review report…** exports an offline HTML report from the same
+presentation model. **Copy report text** uses that model too. Submitted files or
+options changed after assessment are labelled as a previous snapshot.
+
+**Coverage:** 75.3% lines and 65.7% branches, including the new presentation modules.
+
+**Validation:** 538 tests passed, no skips (the original 501 plus 37 new tests); 530 non-GUI tests and eight GUI tests run separately. Four example replays preserve the original axes, findings and checks. See `program/reports/test-results-0.8.3.txt` and `program/reports/ui-boundary-0.8.3.json`.
+
+See [the report guide](program/docs/UI_REPORT_0.8.3.md) and the updated technical
+manual appendix for the screen, field mappings and regression checks.
 
 ### Version 0.8.2 (27 October 2026)
 
@@ -934,6 +966,15 @@ From `program/`, install `requirements.txt` and make sure Tkinter is available, 
 python3 builder_gui.py
 ```
 
+The Full assessment page uses the summary-first layout described above.
+Its label **Core Evidence Consistency** maps to the API field `integrity`;
+all API names and JSON structures remain unchanged. Audio review findings
+never alter any axis value, confidence or status. Important findings appear
+above the scores, and the details tab separates attention items from all checks
+and raw evidence. Confidence is labelled **Assessment confidence** and explained
+separately from recording coverage. The report's timestamp records when the GUI
+captured the result, not a signed production time.
+
 The builder imports and hashes files in the background, provides workflow
 preflight and full assessment, and can save the full machine-readable result.
 Full assessment uses a verified temporary snapshot and the same production
@@ -1004,7 +1045,11 @@ passed in one process (40 s) with 3 skipped (the Suno real-sample tests need
 a fresh export in a new virtual environment with all three requirement files:
 501 tests, all passed. The 496 non-GUI tests passed in one process (59 s) with
 no skips (`C2PA_SUNO_SAMPLE_DIR` set to the verified Suno downloads), and the
-five GUI tests passed separately.
+five GUI tests passed separately. Version 0.8.3 (28 October 2026) adds 37
+presentation tests (34 in `tests/test_builder_review.py` and three GUI cases):
+538 tests, all passed with no skips. The 530 non-GUI tests passed in one process
+(49 s) and the eight GUI tests passed separately (`reports/test-results.txt`;
+full per-test log in `reports/test-results-0.8.3.txt`).
 
 A line and branch coverage report of the same runs is in
 `reports/coverage/` (`index.html` and `coverage-summary.txt`); see
@@ -1037,7 +1082,7 @@ python3 -m pip install coverage
 ```
 
 ```bash
-cd tests && REQUIRE_AUDIO_BACKENDS=1 python3 -m coverage run --branch --parallel-mode --data-file=../.coverage --source=music_target,builder_operations,builder_results,builder_gui,manifest_logic,relationship_modes,run,check_public,wav_probe --omit='*/vendor/*' -m unittest $(ls test_*.py | grep -v test_builder.py | sed 's/\.py$//') test_builder.ManifestLimitTests test_builder.ExportTests test_builder.AssessmentTests
+cd tests && REQUIRE_AUDIO_BACKENDS=1 python3 -m coverage run --branch --parallel-mode --data-file=../.coverage --source=music_target,builder_operations,builder_results,builder_review,builder_report,builder_gui,manifest_logic,relationship_modes,run,check_public,wav_probe --omit='*/vendor/*' -m unittest $(ls test_*.py | grep -v test_builder.py | sed 's/\.py$//') test_builder.ManifestLimitTests test_builder.ExportTests test_builder.AssessmentTests
 ```
 
 Then run each `test_builder.GuiTests.<name>` the same way in its own process,
@@ -1047,14 +1092,16 @@ and combine:
 python3 -m coverage combine && python3 -m coverage html -d reports/coverage && python3 -m coverage report
 ```
 
-On 28 October 2026 (version 0.8.2, 501 tests, all passed with no skips) line
-coverage was 74.7% and branch coverage 65.0%. The policy-disabled legacy
+On 28 October 2026 (version 0.8.3, 538 tests, all passed with no skips) line
+coverage was 75.3% and branch coverage 65.7%. The policy-disabled legacy
 signal modules (`physical_audio_passes.py`, `audio_derivation.py`, 20%)
 account for most of the gap: active code is at 85%. The core evaluator and
 scoring are at 91%, the audio diagnostics at 93%, the parsers at 82% and the
-desktop builder at 72%, because its Tk widgets are tested end to end. Code run
-in builder worker subprocesses is not counted. On 25 October (466 tests) the
-figures were 73.3% and 63.5%.
+desktop builder at 75% (the new presentation modules `builder_review.py` 94%
+and `builder_report.py` 100%; `builder_gui.py` 63%, because its Tk widgets are
+tested end to end). Code run in builder worker subprocesses is not counted.
+Earlier the same day 0.8.2 (501 tests) measured 74.7% and 65.0%; on
+25 October (466 tests) the figures were 73.3% and 63.5%.
 
 [`program/docs/testing/04_TEST_TRACEABILITY.md`](program/docs/testing/04_TEST_TRACEABILITY.md)
 maps each numbered case in the three test plans (AU, AI, SU, SI, PC) to the
@@ -1113,6 +1160,12 @@ The locations below are relative to `program/`.
 | `tests/test_forge_cost.py` | 12 tests: profile validation and tier order, fact and subject costs, value invariance and reasoning |
 | `reports/coverage/` | Line and branch coverage of the full test suite (HTML and text summary) |
 | `run.py` | CSEC/local execution and explicit parent-side audio diagnostic orchestration |
+| `builder_gui.py`, `builder_operations.py`, `manifest_logic.py` | Tkinter desktop manifest builder, its background import/export/assessment operations, and manifest validation |
+| `builder_results.py` | Artist-facing adapters for checks, attention items and audio diagnostic lines |
+| `builder_review.py` | Detached, read-only review model (summary, grouped findings, coverage) shared by the GUI, copied text and HTML report; never written into the response JSON |
+| `builder_report.py` | Offline, escaped HTML review report rendered from that model |
+| `docs/UI_REPORT_0.8.3.md` | 0.8.3 result screen: reading order, audio outcome mapping and contract boundaries |
+| `tests/test_builder_review.py` | 34 presentation tests: response immutability, outcome mapping, deduplication, coverage wording, HTML escaping |
 | `schemas/` | Original CSEC candidate schemas and local music schemas |
 | `schemas/ddex/` | Pinned RIN 2.1 and ERN 4.3 XSD files, source hashes, and licence reminder |
 | `legacy_parsers/` | RIN, ERN, and C2PA parsers used by the production path, plus XSD validation and XML helpers; the C2PA parser verifies the pinned trust lists and matches known AI signers |

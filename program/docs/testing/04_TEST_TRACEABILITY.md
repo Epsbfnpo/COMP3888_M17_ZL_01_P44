@@ -1,3 +1,11 @@
+> 0.8.3 presentation update, 28 October 2026: the original 501 tests were rerun
+> with 37 added presentation tests (538 passed, 0 skipped). The dated mapping
+> below remains the 0.8.2 baseline; its core/audio behavior is unchanged.
+> New coverage is in `test_builder_review.py` (34 cases), three added GUI cases
+> in `test_builder.py`, and extra immutability assertions in the existing real
+> declared-range integration case. See `../UI_REPORT_0.8.3.md` and
+> `../../reports/verification.md`.
+
 # Test Plan Traceability
 
 **Updated:** 28 October 2026
