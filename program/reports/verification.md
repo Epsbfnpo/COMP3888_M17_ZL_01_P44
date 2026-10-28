@@ -8,7 +8,8 @@
 - Example responses regenerated: every axis value, confidence and status is identical to 0.8.1; each audio file now carries a passing `audio_samples_valid` row.
 - Real data: all 236 Project Rock WAVs (3.37 GiB) pass `audio_samples_valid` (1.2 s in total); all 233 recorder takes pass the bext/iXML timestamp check, and the forge-cost forgery of 10T07 (+1 s in bext only) fails it by 1.000 s.
 - The 25 October archive received by CSEC lacked both `schemas/ddex/*/allowed-value-sets.xsd` files. Hashing the 25 October export without them gives `sha256:a3c0a5ed…`, the value CSEC reported; with them it gives the pinned `sha256:ac048707…`.
-- Coverage was not re-measured for 0.8.2; `reports/coverage/` is from 25 October.
+- Coverage re-measured on 28 October 2026 at commit `f148497` (same code as the pin), following the README procedure with `C2PA_SUNO_SAMPLE_DIR` set: 496 non-GUI tests passed in one process (52 s, no skips) and the five GUI tests passed in separate processes. 74.7% of lines and 65.0% of branches; 85% of lines without the policy-disabled `physical_audio_passes.py` and `audio_derivation.py`. Report: `reports/coverage/`.
+- Test plan traceability (28 October 2026): `docs/testing/04_TEST_TRACEABILITY.md` maps the 86 numbered plan cases to tests. 77 are fully automated, 7 partly, 1 is manual (SI-10, Project Rock) and 1 has no test (AU-08, calibration profile digest mismatch).
 
 ## CSEC baseline pin and clean install (2026-10-25)
 
