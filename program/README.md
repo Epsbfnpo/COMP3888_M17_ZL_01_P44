@@ -225,6 +225,17 @@ preflight and full assessment, and can save the full machine-readable result.
 Full assessment uses a verified temporary snapshot and the same production
 worker as the command-line evaluator.
 
+Assessment results are organized into four layers: **Summary** for execution,
+coverage, and dimensions; **Items requiring attention** for actionable findings;
+**Expandable details** for provider evidence; and **Raw JSON** for the unchanged
+response. Audio findings are grouped by their reported outcomes and include
+the evidence references, declared and observed ranges, limitations, and
+recommended next steps. Integrity is presented as core-check consistency, not
+proof of authenticity or authorship; confidence is not a measure of how much
+was verified. The **Save review report...** action exports the same
+presentation model shown in the UI, while **Save result JSON...** preserves the
+machine-readable response.
+
 Portable exports place files in `objects/` under content-addressed names
 (`objects/<sha256>.<extension>`) accepted by the evaluator. The source files
 are never renamed or overwritten. By default, saving a manifest can instead
@@ -279,6 +290,7 @@ aggregation, and resource-budget degradation without contradiction.
 | `builder_gui.py` | Tkinter desktop manifest builder and result display |
 | `builder_operations.py` | Background file import, verified export, and isolated assessment operations |
 | `builder_results.py` | Artist-facing filtering and formatting of assessment results |
+| `builder_presentation.py` | Read-only layered assessment model shared by the GUI and review-text export |
 | `manifest_logic.py` | Manifest parsing, validation, policy checks, and object path construction for the UI |
 | `docs/PHYSICAL_SIMILARITY.md` | Technical contract for physical measurements, mode-specific decisions, scoring, resource bounds, and limitations |
 | `music_target/midi_parser.py` | Size- and structure-bounded Standard MIDI File parser |

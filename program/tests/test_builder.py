@@ -260,6 +260,37 @@ class GuiTests(unittest.TestCase):
         self.assertIn("status: error", self.app.assessment_label.cget("text"))
         self.assertIn("evaluation failed", self.app.assessment_text.get("1.0", "end"))
 
+    def test_layered_review_keeps_raw_response_and_exports_review_report(self):
+        from builder_presentation import report_text
+        from run import response_shell
+        request = json.loads((BASE / "examples" / "valid-generated" / "request.json").read_text())
+        response = response_shell(request, "native")
+        response["assessment_checks"] = {
+            "integrity_decision": [{"contradiction_count": 1, "assessed_fact_count": 8}],
+            "audio_declared_range": [{
+                "source_hash": "source", "target_hash": "target",
+                "relationship_type": "edited_from", "outcome": "content_found_elsewhere",
+                "declared_source_range_seconds": [7, 11],
+                "declared_target_range_seconds": [0, 4],
+                "best_source_range_seconds": [2, 6],
+                "search_supported_offsets_seconds": [2, 10],
+            }],
+        }
+        original = copy.deepcopy(response)
+        self.app.show_response(response)
+        self.assertEqual(response, original)
+        self.assertEqual(json.loads(self.app.raw_text.get("1.0", "end")), original)
+        self.assertEqual(len(self.app.review_tabs.tabs()), 4)
+        self.assertIn("contradiction", self.app.review_summary.cget("text"))
+        self.assertEqual(self.app.audio_review_link.cget("text"), "Audio requires review: 1 item(s)")
+        self.assertIn("Claimed segment requires review", self.app.assessment_text.get("1.0", "end"))
+        with tempfile.TemporaryDirectory() as folder:
+            target = Path(folder) / "assessment review.txt"
+            with patch("builder_gui.filedialog.asksaveasfilename", return_value=str(target)):
+                self.app.save_review_report()
+            self.assertEqual(target.read_text(encoding="utf-8"), report_text(self.app._review_model))
+            self.assertIn("Original response JSON", target.read_text(encoding="utf-8"))
+
     def test_load_export_assess_and_save_result_end_to_end(self):
         example = BASE / "examples" / "valid-generated" / "request.json"
         with patch("builder_gui.filedialog.askopenfilename", return_value=str(example)):

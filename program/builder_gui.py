@@ -22,7 +22,8 @@ from tkinter import filedialog, messagebox, ttk
 
 import manifest_logic as L
 import builder_operations as operations
-from builder_results import attention_items, attention_workflow_results
+from builder_results import attention_workflow_results
+from builder_presentation import build_report, report_text
 
 
 def parse_json_object(text: str, label: str) -> dict:
@@ -537,21 +538,79 @@ class App(tk.Tk):
         self.report_button = ttk.Button(bar, text="Save result JSON…", command=self.save_response,
                                         state="disabled")
         self.report_button.pack(side="left", padx=6)
+        self.review_report_button = ttk.Button(
+            bar, text="Save review report...", command=self.save_review_report, state="disabled")
+        self.review_report_button.pack(side="left", padx=6)
         self.assessment_label = ttk.Label(tab, text="No assessment run. Results describe a submission snapshot.")
         self.assessment_label.pack(fill="x", pady=4)
+        self.review_tabs = ttk.Notebook(tab)
+        self.review_tabs.pack(fill="both", expand=True)
+        summary_page = ttk.Frame(self.review_tabs)
+        attention_tab = ttk.Frame(self.review_tabs, padding=6)
+        details_tab = ttk.Frame(self.review_tabs, padding=6)
+        raw_tab = ttk.Frame(self.review_tabs, padding=6)
+        for frame, title in ((summary_page, "Summary"), (attention_tab, "Items requiring attention"),
+                             (details_tab, "Expandable details"), (raw_tab, "Raw JSON")):
+            self.review_tabs.add(frame, text=title)
+        summary_canvas = tk.Canvas(summary_page, highlightthickness=0)
+        summary_scroll = ttk.Scrollbar(summary_page, command=summary_canvas.yview)
+        summary_canvas.configure(yscrollcommand=summary_scroll.set)
+        summary_scroll.pack(side="right", fill="y")
+        summary_canvas.pack(fill="both", expand=True)
+        summary_tab = ttk.Frame(summary_canvas, padding=6)
+        summary_window = summary_canvas.create_window((0, 0), window=summary_tab, anchor="nw")
+        summary_tab.bind("<Configure>", lambda _event: summary_canvas.configure(
+            scrollregion=summary_canvas.bbox("all")))
+
+        def resize_summary(event):
+            summary_canvas.itemconfigure(summary_window, width=event.width)
+            for child in summary_tab.winfo_children():
+                if isinstance(child, ttk.Label):
+                    child.configure(wraplength=max(180, event.width - 24))
+
+        summary_canvas.bind("<Configure>", resize_summary)
+        self.review_summary = ttk.Label(summary_tab, wraplength=900, justify="left")
+        self.review_summary.pack(fill="x", pady=4)
+        self.coverage_label = ttk.Label(summary_tab, wraplength=900, justify="left")
+        self.coverage_label.pack(fill="x", pady=4)
         self.axis_tree = ttk.Treeview(
-            tab, columns=("dimension", "availability", "value", "confidence"),
+            summary_tab, columns=("dimension", "availability", "value", "confidence"),
             show="headings", height=4)
         for name in ("dimension", "availability", "value", "confidence"):
             self.axis_tree.heading(name, text=name)
         self.axis_tree.pack(fill="x")
-        details = ttk.Frame(tab)
+        self.integrity_note = ttk.Label(summary_tab, wraplength=900, justify="left")
+        self.integrity_note.pack(fill="x", pady=4)
+        self.audio_review_link = ttk.Button(
+            summary_tab, text="Review audio findings", command=lambda: self.review_tabs.select(attention_tab))
+        self.audio_review_link.pack(anchor="w")
+        self.axis_reasons = ttk.Label(summary_tab, wraplength=900, justify="left")
+        self.axis_reasons.pack(fill="x", pady=4)
+        details = ttk.Frame(attention_tab)
         details.pack(fill="both", expand=True, pady=6)
         self.assessment_text = tk.Text(details, wrap="word", state="disabled")
         scroll = ttk.Scrollbar(details, command=self.assessment_text.yview)
         self.assessment_text.configure(yscrollcommand=scroll.set)
         scroll.pack(side="right", fill="y")
         self.assessment_text.pack(fill="both", expand=True)
+        self.detail_tree = ttk.Treeview(details_tab, show="tree")
+        detail_scroll = ttk.Scrollbar(details_tab, command=self.detail_tree.yview)
+        self.detail_tree.configure(yscrollcommand=detail_scroll.set)
+        self.detail_tree.column("#0", width=1200, stretch=False)
+        detail_horizontal = ttk.Scrollbar(
+            details_tab, orient="horizontal", command=self.detail_tree.xview)
+        self.detail_tree.configure(xscrollcommand=detail_horizontal.set)
+        detail_horizontal.pack(side="bottom", fill="x")
+        detail_scroll.pack(side="right", fill="y")
+        self.detail_tree.pack(fill="both", expand=True)
+        self.raw_text = tk.Text(raw_tab, wrap="none", state="disabled")
+        raw_scroll = ttk.Scrollbar(raw_tab, command=self.raw_text.yview)
+        self.raw_text.configure(yscrollcommand=raw_scroll.set)
+        raw_horizontal = ttk.Scrollbar(raw_tab, orient="horizontal", command=self.raw_text.xview)
+        self.raw_text.configure(xscrollcommand=raw_horizontal.set)
+        raw_horizontal.pack(side="bottom", fill="x")
+        raw_scroll.pack(side="right", fill="y")
+        self.raw_text.pack(fill="both", expand=True)
 
     def _start_job(self, work, done):
         if self._job is not None:
@@ -635,44 +694,54 @@ class App(tk.Tk):
             self.show_response)
 
     def show_response(self, response):
-        self._response = response
+        self._response = copy.deepcopy(response)
+        file_names = {item["hash"]: Path(item["path"]).name
+                      for item in self.files if item.get("path")}
+        self._review_model = build_report(response, file_names, self.policy, self.files)
+        model = self._review_model
         self.report_button.configure(state="normal")
+        self.review_report_button.configure(state="normal")
         self.assessment_label.configure(
             text=f"Snapshot case {response['case_id']} | run {response['run_id']} | "
                  f"status: {response['execution_status']}")
         self.axis_tree.delete(*self.axis_tree.get_children())
-        explanation = [
-            "Content consistency does not prove authorship. AI disclosure is not AI detection.\n"]
-        if response.get("error"):
-            explanation.append(f"ERROR: {response['error']}\n")
-        for name, axis in response["axes"].items():
+        for axis in model["axes"]:
             self.axis_tree.insert("", "end", values=(
-                name, axis["availability"],
-                "Not assessed" if axis["value"] is None else f"{axis['value']:.3f}",
+                "integrity - Core Evidence Consistency" if axis["name"] == "integrity" else axis["name"],
+                axis["availability"], axis["label"],
                 "Not assessed" if axis["confidence"] is None else f"{axis['confidence']:.3f}"))
-            explanation.append(f"{name}: {axis.get('reasoning') or 'Reasoning not supplied.'}\n")
-        file_names = {item["hash"]: Path(item["path"]).name
-                      for item in self.files if item.get("path")}
-        issues = attention_items(response, file_names, self.policy)
-        explanation.append("\nIssues requiring attention:\n")
-        if not issues:
-            explanation.append(
-                "No issues requiring attention were found in the assessed checks.\n"
-                "Checks or dimensions marked not assessed remain unassessed; they have not "
-                "been treated as passes.\n")
-        else:
-            for index, issue in enumerate(issues, 1):
-                explanation.append(
-                    f"\n{index}. {issue['status']} — {issue['affected']}\n"
-                    f"   {issue['explanation']}\n"
-                    f"   Suggested action: {issue['suggestion']}\n")
-        explanation.append(
-            "\nThe complete machine-readable response, including passed checks, is preserved "
-            "and available with Save result JSON…")
+        self.review_summary.configure(text="\n".join(model["summary"]))
+        self.coverage_label.configure(text="Verification coverage\n" + "\n".join(model["coverage"]))
+        self.integrity_note.configure(text=model["integrity_note"])
+        self.audio_review_link.configure(text=f"Audio requires review: {len(model['audio'])} item(s)")
+        self.axis_reasons.configure(text="\n".join(
+            f"{axis['name']}: {axis['reason']}" for axis in model["axes"]))
+        explanation = model["attention"]
+        if response.get("error"):
+            explanation = "ERROR: " + response["error"] + "\n\n" + explanation
         self.assessment_text.configure(state="normal")
         self.assessment_text.delete("1.0", "end")
-        self.assessment_text.insert("1.0", "\n".join(explanation))
+        self.assessment_text.insert("1.0", explanation)
         self.assessment_text.configure(state="disabled")
+        self.raw_text.configure(state="normal")
+        self.raw_text.delete("1.0", "end")
+        self.raw_text.insert("1.0", model["raw_json"])
+        self.raw_text.configure(state="disabled")
+        self.detail_tree.delete(*self.detail_tree.get_children())
+        self.detail_tree.insert("", "end", text=model["details"])
+
+        def add_detail(parent, key, value):
+            if isinstance(value, (dict, list)):
+                node = self.detail_tree.insert(parent, "end", text=str(key))
+                entries = value.items() if isinstance(value, dict) else enumerate(value)
+                for child_key, child in entries:
+                    add_detail(node, child_key, child)
+            else:
+                self.detail_tree.insert(parent, "end", text=f"{key}: {value}")
+
+        for key in ("findings", "assessment_checks", "workflow_assessment"):
+            add_detail("", key, response.get(key, {}))
+        self.review_tabs.select(0)
 
     def save_response(self):
         if self._response is None:
@@ -687,6 +756,18 @@ class App(tk.Tk):
                     encoding="utf-8")
             except OSError as exc:
                 messagebox.showerror("Cannot save result", str(exc), parent=self)
+
+    def save_review_report(self):
+        if self._response is None:
+            return
+        target = filedialog.asksaveasfilename(
+            title="Save review report", defaultextension=".txt",
+            initialfile="assessment-review.txt", filetypes=[("Text", "*.txt")])
+        if target:
+            try:
+                operations.save_review_text(report_text(self._review_model), Path(target))
+            except (OSError, ValueError) as exc:
+                messagebox.showerror("Cannot save report", str(exc), parent=self)
 
     # ---- helpers ---------------------------------------------------------
     def selected(self, tree):

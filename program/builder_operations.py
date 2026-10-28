@@ -60,6 +60,15 @@ def inspect_files(paths: list[str], progress: Progress, cancel: Event) -> list[d
     return results
 
 
+def save_review_text(text: str, target: Path) -> None:
+    """Atomically publish a complete UTF-8 review report."""
+    target = Path(target)
+    with tempfile.TemporaryDirectory(prefix=".report-stage-", dir=target.parent) as staging:
+        staged = Path(staging) / "assessment-review.txt"
+        staged.write_text(text, encoding="utf-8")
+        os.replace(staged, target)
+
+
 def export_bundle(manifest: dict, files: list[dict], target: Path, copy_files: bool,
                   progress: Progress, cancel: Event) -> None:
     """Publish a verified reference manifest or a portable copied bundle."""
