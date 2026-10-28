@@ -353,13 +353,17 @@ class GuiTests(unittest.TestCase):
         self.app.files = [{"hash": SOURCE, "path": "source.wav"}, {"hash": TARGET, "path": "mix.wav"}]
         self.app.show_response(payload)
         self.assertEqual(payload, before)
-        self.assertIn("1 content finding(s) require review", self.app.summary_label.cget("text"))
+        self.assertIn("1 audio content finding(s) require review", self.app.summary_label.cget("text"))
+        for title in ("Evaluation Status", "Core Evidence Consistency", "Review Required",
+                      "Coverage & Limitations", "Other Key Results"):
+            self.assertIn(title, self.app.summary_label.cget("text"))
+        self.assertIn("Optional audio analysis is reported separately", self.app.summary_label.cget("text"))
         self.assertIn("7.00–11.00 s", self.app.first_finding.cget("text"))
         self.assertIn("Core Evidence Consistency", self.app.axis_tree.item(self.app.axis_tree.get_children()[0], "values"))
         self.app.view_findings()
         self.assertEqual(self.app.detail_notebook.index("current"), 0)
         self.app.copy_review_text()
-        self.assertIn("1 content finding(s) require review", self.app.clipboard_get())
+        self.assertIn("1 audio content finding(s) require review", self.app.clipboard_get())
         with tempfile.TemporaryDirectory() as folder:
             report = Path(folder) / "result.json"
             with patch("builder_gui.filedialog.asksaveasfilename", return_value=str(report)):
@@ -369,7 +373,7 @@ class GuiTests(unittest.TestCase):
             report = Path(folder) / "review.html"
             with patch("builder_gui.filedialog.asksaveasfilename", return_value=str(report)):
                 self.app.save_review_report()
-            self.assertIn("1 content finding(s) require review", report.read_text())
+            self.assertIn("1 audio content finding(s) require review", report.read_text())
 
     def test_report_snapshot_keeps_original_names_when_submission_changes(self):
         from test_builder_review import response, SOURCE
@@ -390,15 +394,29 @@ class GuiTests(unittest.TestCase):
         self.app.geometry("800x600")
         self.app.tk.call("tk", "scaling", 1.5)
         self.app.show_response(response())
-        notebook = self.app.axis_tree.master.master
-        notebook.select(self.app.axis_tree.master)
+        notebook = self.app.assessment_page.master
+        notebook.select(self.app.assessment_page)
         self.app.update()
         self.assertLess(self.app.summary_label.winfo_rooty(), self.app.first_finding.winfo_rooty())
         self.assertLess(self.app.first_finding.winfo_rooty(), self.app.axis_tree.winfo_rooty())
-        self.assertLess(self.app.axis_tree.winfo_rooty() + self.app.axis_tree.winfo_height(),
-                        self.app.winfo_rooty() + self.app.winfo_height())
+        # A small window scrolls the whole assessment page, retaining all five
+        # sections instead of clipping later blocks or hiding the footer.
+        self.app._reveal_report_widget(self.app.axis_tree)
+        self.app.update()
+        self.assertLessEqual(self.app.axis_tree.winfo_rooty() + self.app.axis_tree.winfo_height(),
+                             self.app.report_canvas.winfo_rooty() + self.app.report_canvas.winfo_height())
         self.assertTrue(self.app.finding_button.winfo_viewable())
         self.assertLessEqual(int(self.app.summary_label.cget("wraplength")), 800)
+        self.app.report_canvas.yview_moveto(1)
+        self.app.update()
+        self.assertGreaterEqual(self.app.report_canvas.yview()[1], .99)
+        self.assertTrue(self.app.report_scroll.winfo_viewable())
+        self.app.view_findings()
+        self.app.update()
+        self.assertGreater(self.app.report_canvas.yview()[0], 0)
+        self.assertLessEqual(self.app.cancel_button.winfo_rooty() + self.app.cancel_button.winfo_height(),
+                             self.app.winfo_rooty() + self.app.winfo_height())
+        self.assertIn("Other Key Results", self.app.summary_label.cget("text"))
 
 
 if __name__ == "__main__":

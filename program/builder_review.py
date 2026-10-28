@@ -14,9 +14,11 @@ from builder_results import (attention_items, audio_diagnostic_lines, axis_value
 TEMPLATE_VERSION = "0.8.3"
 AXIS_LABELS = {"completeness": "Completeness", "integrity": "Core Evidence Consistency",
                "attestation_strength": "Attestation Strength", "ai_disclosure": "AI Disclosure"}
-SCOPE_NOTE = ("Core Evidence Consistency (integrity) covers assessed core checks. Optional audio "
-              "diagnostics do not change its value, confidence or status. A high value does not "
-              "validate every audio interval or establish authorship or production history.")
+CORE_CHECK_SCOPE = ("File identity and readability, declared technical properties and relationships, "
+                    "and cross-evidence consistency. Optional audio analysis is reported separately "
+                    "and does not affect this score.")
+SCOPE_NOTE = ("Scores describe assessed evidence, not proof of authorship or production history. "
+              "Optional audio observations do not change any score, confidence or status.")
 AUDIO_NOTE = ("Report-only audio observation: no change to any score or confidence. "
               "A content match does not establish production history.")
 RANGE_STATES = {
@@ -67,48 +69,215 @@ def _range(value):
 def _core_summary(response, decision):
     axis = (response.get("axes") or {}).get("integrity") or {}
     status = axis.get("status") or decision.get("status")
-    count = decision.get("contradiction_count")
-    pending = decision.get("not_completed_count")
+    count, pending = decision.get("contradiction_count"), decision.get("not_completed_count")
     parts = []
-    if status == "contradicted" or count:
-        parts.append(f"{count if count is not None else 'Count unknown:'} core contradiction(s) recorded")
+    if isinstance(count, int) and count > 0:
+        parts.append(f"{count} core contradiction(s) recorded.")
+    elif status == "contradicted":
+        parts.append("Core contradictions recorded; count not supplied.")
+    elif count == 0 and (status == "consistent" or decision.get("assessed_fact_count", 0) > 0):
+        parts.append("No contradictions were found in assessed core checks.")
     if status == "incomplete" or pending:
-        parts.append(f"{pending if pending is not None else 'Some'} file check(s) incomplete")
+        parts.append(f"{pending if pending is not None else 'Some'} file check(s) incomplete.")
     if axis.get("value") is None:
-        parts.append("numeric result withheld / not assessed")
+        reasons = {
+            "insufficient_qualifying_cross_evidence": "qualifying cross-evidence is missing",
+            "insufficient_assessed_layers": "too few contributing evidence layers were assessed",
+            "insufficient_support_breadth": "too few relevant sources have qualifying cross-evidence checks",
+            "file_checks_not_completed": "required file checks have not completed",
+            "final_attestation_unreadable": "the final file's attestation could not be read",
+            "no_assessed_layers": "no contributing evidence layers were assessed",
+        }
         reason = decision.get("release_reason")
-        if reason:
-            parts.append(str(reason).replace("_", " "))
-    elif status == "consistent":
-        parts.append("no contradictions found in assessed core checks")
-    elif status not in {"contradicted", "incomplete"}:
-        parts.append(f"core status: {status or 'unknown'}")
-    return "; ".join(parts)
+        if reason in reasons:
+            parts.append("Score withheld because " + reasons[reason] + ".")
+        elif decision.get("numeric_release") == "withheld":
+            parts.append("Score withheld; release reason: " + str(reason or "not supplied").replace("_", " ") + ".")
+        elif response.get("execution_status") != "succeeded":
+            parts.append("Core consistency was not assessed because core evaluation did not complete.")
+        else:
+            parts.append("Score not available; a complete release explanation was not supplied.")
+    else:
+        parts.append("Score available.")
+        if status not in {"consistent", "contradicted", "incomplete"}:
+            parts.append(f"Recorded core-check state: {status or 'unknown'}.")
+        if decision.get("release_reason") == "severe_contradiction_cap":
+            parts.append("The severe-contradiction cap applies.")
+    return " ".join(parts)
 
 
 def _coverage(checks):
     breadth = _first(checks, "support_breadth")
     if not breadth:
-        return ["Recording evidence coverage: unknown (not supplied)."]
+        return ["Source cross-evidence coverage: unknown (not supplied)."]
     if breadth.get("applicable") is False:
-        return ["Recording evidence coverage: not applicable to the reported scope."]
+        return ["Source cross-evidence coverage: not applicable to the reported scope."]
     total = breadth.get("required_recording_count")
     supported, contradicted = breadth.get("supported"), breadth.get("contradicted")
     if all(isinstance(n, int) for n in (total, supported, contradicted)):
         checked = supported + contradicted
-        rows = [f"Qualified recording cross-checks: {checked}/{total}; consistent {supported}; "
-                f"contradicted {contradicted}; without qualifying checks {max(0, total - checked)}."]
+        rows = [f"{checked}/{total} relevant source files have qualifying cross-evidence checks "
+                f"({supported} consistent; {contradicted} contradicted); "
+                f"{max(0, total - checked)} lack qualifying checks."]
     else:
-        rows = ["Qualified recording cross-checks: unknown (counts not supplied)."]
+        rows = ["Source cross-evidence coverage: unknown (counts not supplied)."]
     assets = breadth.get("assets")
     bound = sum(item.get("bound") is True for item in assets) if isinstance(assets, list) else None
-    rows.append(f"Recording material available: {bound if bound is not None else 'unknown'}/{total if total is not None else 'unknown'}. "
-                "Material presence is separate from qualified cross-checks.")
+    rows.append(f"Source material available: {bound if bound is not None else 'unknown'}/{total if total is not None else 'unknown'}.")
     if breadth.get("coverage_scope") == "provisional":
         rows.append(f"Provisional coverage: {breadth.get('unmatched_references', 'unknown')} AAF reference(s) "
-                    "cannot be matched to submitted recordings; do not assume all were omitted.")
-    rows.append("Checked includes both consistent and contradicted recordings; it is not a pass rate.")
+                    "cannot be matched to submitted sources; do not assume all were omitted.")
+    rows.append("Qualifying means accepted by the scoring policy; optional audio matching is excluded. "
+                "Checked includes both consistent and contradicted sources; it is not a pass rate.")
+    types = breadth.get("relevant_asset_types")
+    if types:
+        rows.append("Source types in this coverage denominator: " + ", ".join(types) + ".")
     return rows
+
+
+def _audio_run_state(checks, audio_requested):
+    audio = _first(checks, "audio_diagnostic_summary")
+    if not audio:
+        return ("Optional audio analysis was not enabled for this snapshot." if audio_requested is False else
+                "Audio analysis was requested, but no diagnostic result returned." if audio_requested is True else
+                "Audio analysis run state unknown: no diagnostic summary was supplied.")
+    if audio.get("enabled") is False:
+        return "Optional audio analysis was not enabled for this snapshot."
+    if audio.get("reason_code"):
+        return "Audio analysis not completed: " + str(audio.get("message") or audio["reason_code"])
+    completed, unavailable = audio.get("completed_provider_tasks"), audio.get("unavailable_provider_tasks")
+    if not isinstance(completed, int) or not isinstance(unavailable, int):
+        return "Audio analysis completion state unknown: task counts are incomplete."
+    if completed == unavailable == 0:
+        return "No audio algorithm tasks were reported; no content comparison is claimed."
+    if unavailable:
+        return (f"Audio analysis partly completed: {completed} algorithm task(s) completed; "
+                f"{unavailable} unavailable or unable to conclude.")
+    return f"Audio analysis completed {completed} algorithm task(s) within the reported scope."
+
+
+def _audio_limitations(checks):
+    """Explain unavailable providers separately from interval-level review counts."""
+    labels = {"music_semantics": "Musical-semantics analysis", "librosa": "Acoustic-structure analysis",
+              "audfprint": "audfprint", "spectromap": "SpectroMap", "bandwidth": "Bandwidth analysis",
+              "fingerprint_agreement": "Fingerprint agreement"}
+    normal = {"silent_signal", "insufficient_signal", "insufficient_landmarks", "insufficient_peaks",
+              "insufficient_spectral_frames", "channel_cancellation"}
+    reasons = {"provider_failed": "the analysis could not run successfully; see diagnostic details",
+               "dependency_unavailable": "a required dependency was unavailable",
+               "provider_inputs_unavailable": "the required input observations were unavailable"}
+    seen, limits = set(), []
+    for name, rows in checks.items():
+        if not name.startswith("audio_") or not isinstance(rows, list):
+            continue
+        for row in rows:
+            if not isinstance(row, dict) or not row.get("provider") or row.get("status") != "unavailable":
+                continue
+            provider, reason = row["provider"], row.get("reason_code", "unknown")
+            if (provider, reason) in seen:
+                continue
+            seen.add((provider, reason))
+            why = ("too little usable audio for musical comparison" if provider == "music_semantics" and reason == "insufficient_signal" else
+                   "insufficient usable signal to conclude" if reason in normal else
+                   reasons.get(reason, str(row.get("message") or reason.replace("_", " "))))
+            limits.append(f"{labels.get(provider, provider)}: {why}.")
+    return limits
+
+
+def _other_key_results(response, checks):
+    results = []
+    rules = (response.get("workflow_assessment") or {}).get("rule_results")
+    if rules:
+        required = [row for row in rules if row.get("level") in {"required", "conditional"}
+                    and row.get("status") != "not_applicable"]
+        missing = sum(row.get("status") == "missing" for row in required)
+        unassessed = sum(row.get("status") == "not_assessed" for row in required)
+        unknown = sum(row.get("status") not in {"missing", "not_assessed", "satisfied"} for row in required)
+        if missing or unassessed or unknown:
+            results.append(f"Workflow requirements: {missing} missing; {unassessed} not assessed; {unknown} unrecognized.")
+        elif required:
+            results.append("Applicable workflow evidence requirements were met.")
+        else:
+            results.append("No applicable workflow requirements were reported.")
+    else:
+        results.append("Workflow requirements were not assessed or not supplied.")
+    final = next((f for f in response.get("findings", []) if f.get("code") == "C2PA_FINAL_ATTESTATION"), {})
+    state = final.get("final_c2pa_state")
+    c2pa = {"absent": "no manifest found; absence is not evidence against the submission",
+            "invalid": "manifest invalid; review the validation findings",
+            "unreadable": "manifest could not be read", "not_checked": "not checked",
+            "untrusted": "manifest intact, but signer not trusted under the configured policy",
+            "trusted_c2pa": "valid manifest; signer trusted under the configured C2PA policy",
+            "trusted_legacy_itl": "valid manifest; signer trusted under the configured legacy policy",
+            "unclear": "state unclear; inspect the detailed findings"}
+    results.append("Final-file C2PA: " + c2pa.get(state, "state not supplied" if state is None else f"uninterpreted state {state}") + ".")
+    disclosure = _first(checks, "ai_disclosure_coverage")
+    declared, assessed = disclosure.get("declared_audio_count"), disclosure.get("assessed_audio_count")
+    if isinstance(declared, int) and isinstance(assessed, int) and assessed > 0:
+        results.append(f"Creation methods declared for {declared}/{assessed} assessed audio files (declarations, not AI detection).")
+        excluded = disclosure.get("excluded_input_error_count", 0)
+        if excluded:
+            results.append(f"{excluded} audio file(s) excluded from declaration coverage because of input errors.")
+    elif assessed == 0:
+        results.append("Creation-method disclosure: no assessable audio files.")
+    else:
+        results.append("Creation-method disclosure coverage not supplied.")
+    if any(row.get("rule") == "c2pa_ai_source_type_matches_creation_method" and row.get("passed") is False
+           for row in checks.get("cross_evidence", [])):
+        results.append("A creation-method declaration conflicts with signed evidence.")
+    return " ".join(results)
+
+
+def _review_summary(items, counts, decision):
+    parts = []
+    if counts["core"]:
+        parts.append(f"{counts['core']} execution/check/evidence item(s) need attention.")
+    elif decision.get("contradiction_count"):
+        parts.append("Core contradictions require review; see the recorded decision.")
+    if counts["audio_review"]:
+        parts.append(f"{counts['audio_review']} audio content finding(s) require review (non-scoring).")
+    if counts["audio_unresolved"]:
+        parts.append(f"{counts['audio_unresolved']} audio comparison(s) are inconclusive (non-scoring).")
+    if counts["audio_gap"]:
+        parts.append(f"{counts['audio_gap']} interval assessment(s) could not conclude (non-scoring).")
+    if counts["gap"]:
+        parts.append(f"{counts['gap']} evidence/check gap(s) require attention.")
+    if counts["unknown"]:
+        parts.append(f"{counts['unknown']} uninterpreted item(s) require inspection.")
+    if not parts:
+        parts.append("No review items identified in the available display details; unassessed analyses are not passes.")
+    elsewhere = next((item for item in items if item.get("outcome") == "content_found_elsewhere"), None)
+    if elsewhere:
+        row = elsewhere["raw"][0]
+        parts.append(f"Declared source {_range(row.get('declared_source_range_seconds'))}; "
+                     f"reported source candidate {_range(row.get('best_source_range_seconds'))}.")
+        if len(row.get("search_supported_offsets_seconds") or []) > 1:
+            parts.append("Multiple source positions were reported; see the findings.")
+    return " ".join(parts)
+
+
+def _summary_sections(response, checks, decision, items, counts, coverage, audio_requested):
+    execution = response.get("execution_status", "unknown")
+    run_text = {"succeeded": "Core evaluation completed.", "error": "Core evaluation failed.",
+                "timeout": "Core evaluation timed out.", "unsupported": "The submission is unsupported by the core evaluator."}
+    evaluation = run_text.get(execution, f"Core evaluation state: {execution}.")
+    if response.get("error"):
+        evaluation += " " + str(response["error"])
+    evaluation += " " + _audio_run_state(checks, audio_requested)
+    # Provider task failures and insufficient signal are limitations, not interval contradictions.
+    limitations = _audio_limitations(checks)
+    coverage_text = " ".join(coverage[:3] if _first(checks, "support_breadth").get("coverage_scope") == "provisional" else coverage[:2])
+    if limitations:
+        coverage_text += " " + " ".join(limitations[:2])
+        if len(limitations) > 2:
+            coverage_text += f" {len(limitations) - 2} additional provider limitation(s); see detailed diagnostics."
+    return [
+        {"title": "Evaluation Status", "text": evaluation},
+        {"title": "Core Evidence Consistency", "text": _core_summary(response, decision), "scope": CORE_CHECK_SCOPE},
+        {"title": "Review Required", "text": _review_summary(items, counts, decision)},
+        {"title": "Coverage & Limitations", "text": coverage_text},
+        {"title": "Other Key Results", "text": _other_key_results(response, checks)},
+    ]
 
 
 def _refs(row):
@@ -252,25 +421,8 @@ def build_review_presentation(response, file_names=None, policy_rules=None, *, a
                           "diagnostic_ids": _refs(finding), "raw": [copy.deepcopy(finding)]})
     items.sort(key=lambda item: ORDER[item["group"]])
     counts = {key: sum(item["group"] == key for item in items) for key in GROUP_LABELS}
-    audio = _first(checks, "audio_diagnostic_summary")
-    if not audio:
-        audio_status = ("not enabled for this snapshot" if audio_requested is False else
-                        "requested, but no diagnostic result returned" if audio_requested is True else
-                        "run state unknown (no diagnostic summary)")
-    elif audio.get("enabled") is False:
-        audio_status = "not enabled for this snapshot"
-    elif audio.get("reason_code"):
-        audio_status = "not completed: " + str(audio.get("message") or audio["reason_code"])
-    elif audio.get("unavailable_provider_tasks", 0) or counts["audio_gap"]:
-        audio_status = "partly completed; some analyses unavailable"
-    elif isinstance(audio.get("completed_provider_tasks"), int):
-        audio_status = "completed within reported scope"
-    else:
-        audio_status = "completion state unknown"
-    audio_status += (f"; {counts['audio_review']} content finding(s) require review; "
-                     f"{counts['audio_unresolved']} inconclusive comparison(s); "
-                     f"{counts['audio_gap']} analysis gap(s); {counts['unknown']} uninterpreted result(s)")
     coverage = _coverage(checks)
+    audio = _first(checks, "audio_diagnostic_summary")
     if audio:
         coverage.append(f"Audio provider tasks: {audio.get('completed_provider_tasks', 'unknown')} completed; "
                         f"{audio.get('unavailable_provider_tasks', 'unknown')} unavailable. "
@@ -283,13 +435,10 @@ def build_review_presentation(response, file_names=None, policy_rules=None, *, a
                      "confidence": "Not assessed" if axis.get("confidence") is None else f"{axis['confidence']:.3f}",
                      "status": _core_summary(response, decision) if name == "integrity" else axis.get("status") or axis.get("availability", "unknown"),
                      "reasoning": axis.get("reasoning") or "Reasoning not supplied; structured checks remain available."})
-    summary = ["Core execution: " + str(response.get("execution_status", "unknown")) +
-               (" (execution completed; findings still require interpretation)" if response.get("execution_status") == "succeeded" else ""),
-               "Core checks: " + _core_summary(response, decision),
-               "Audio diagnostics: " + audio_status, coverage[0]]
-    if response.get("error"):
-        summary.insert(1, "Execution detail: " + str(response["error"]))
-    return {"template_version": TEMPLATE_VERSION, "summary": summary, "scope_note": SCOPE_NOTE,
+    sections = _summary_sections(response, checks, decision, items, counts, coverage, audio_requested)
+    summary = [section["title"] + ": " + section["text"] +
+               ("\nScope: " + section["scope"] if section.get("scope") else "") for section in sections]
+    return {"template_version": TEMPLATE_VERSION, "summary": summary, "summary_sections": sections, "scope_note": SCOPE_NOTE,
             "items": items, "counts": counts, "axes": axes, "coverage": coverage,
             "metadata": {"case_id": response.get("case_id"), "run_id": response.get("run_id"),
                          "snapshot_time": snapshot_time or "not recorded",

@@ -352,8 +352,10 @@ class App(tk.Tk):
         self._pending_snapshot = None
         self.protocol("WM_DELETE_WINDOW", self.close)
 
+        self.rowconfigure(0, weight=1)
+        self.columnconfigure(0, weight=1)
         notebook = ttk.Notebook(self)
-        notebook.pack(fill="both", expand=True, padx=8, pady=8)
+        notebook.grid(row=0, column=0, sticky="nsew", padx=8, pady=8)
         self._case_tab(notebook)
         self._files_tab(notebook)
         self._rels_tab(notebook)
@@ -361,19 +363,19 @@ class App(tk.Tk):
         self._assessment_tab(notebook)
 
         bar = ttk.Frame(self)
-        bar.pack(fill="x", padx=8, pady=(0, 8))
+        bar.grid(row=1, column=0, sticky="ew", padx=8, pady=(0, 8))
         self.copy_var = tk.BooleanVar(value=False)
         ttk.Checkbutton(bar, text="Copy files into a portable submission folder",
                         variable=self.copy_var).pack(side="left")
         self.storage_hint = ttk.Label(self, text="References originals; keep them available at their current paths.")
-        self.storage_hint.pack(fill="x", padx=12, pady=(0, 4))
+        self.storage_hint.grid(row=2, column=0, sticky="ew", padx=12, pady=(0, 4))
         self.copy_var.trace_add("write", self._update_storage_hint)
         ttk.Button(bar, text="Save manifest…", command=self.save).pack(side="right")
         ttk.Button(bar, text="Preview JSON", command=self.preview).pack(side="right", padx=6)
         ttk.Button(bar, text="Load manifest…", command=self.load).pack(side="right")
 
         progress_bar = ttk.Frame(self)
-        progress_bar.pack(fill="x", padx=8, pady=(0, 8))
+        progress_bar.grid(row=3, column=0, sticky="ew", padx=8, pady=(0, 8))
         self.progress_label = ttk.Label(progress_bar, text="Ready")
         self.progress_label.pack(side="left", fill="x", expand=True)
         self.progress_spinner = ttk.Progressbar(progress_bar, mode="indeterminate", length=110)
@@ -559,8 +561,22 @@ class App(tk.Tk):
         self.check_tree.tag_configure("not_applicable", foreground="gray")
 
     def _assessment_tab(self, notebook):
-        tab = ttk.Frame(notebook, padding=8)
-        notebook.add(tab, text="Full assessment")
+        self.assessment_page = ttk.Frame(notebook)
+        notebook.add(self.assessment_page, text="Full assessment")
+        self.report_canvas = tk.Canvas(self.assessment_page, highlightthickness=0,
+                                       takefocus=True, background=self.cget("background"))
+        self.report_scroll = ttk.Scrollbar(self.assessment_page, command=self.report_canvas.yview)
+        self.report_canvas.configure(yscrollcommand=self.report_scroll.set)
+        self.report_scroll.pack(side="right", fill="y")
+        self.report_canvas.pack(fill="both", expand=True)
+        tab = ttk.Frame(self.report_canvas, padding=8)
+        self.report_content = tab
+        self._report_window = self.report_canvas.create_window(0, 0, anchor="nw", window=tab)
+        tab.bind("<Configure>", lambda _event:
+                 self.report_canvas.configure(scrollregion=self.report_canvas.bbox("all")))
+        self.report_canvas.bind("<Configure>", self._resize_report)
+        self.report_canvas.bind("<Next>", lambda _event: self.report_canvas.yview_scroll(1, "pages"))
+        self.report_canvas.bind("<Prior>", lambda _event: self.report_canvas.yview_scroll(-1, "pages"))
         bar = ttk.Frame(tab)
         bar.pack(fill="x", pady=(0, 6))
         ttk.Button(bar, text="Run assessment", command=self.run_assessment).pack(side="left")
@@ -581,10 +597,10 @@ class App(tk.Tk):
         self.assessment_label.pack(fill="x", pady=4)
         summary_frame = ttk.LabelFrame(tab, text="Assessment summary", padding=6)
         summary_frame.pack(fill="x")
-        self.summary_label = ttk.Label(summary_frame, text="Run an assessment to see execution, core and audio states.",
-                                       wraplength=930, justify="left")
+        self.summary_label = ttk.Label(summary_frame,
+            text="Run an assessment to see the five summary sections.", wraplength=900, justify="left")
         self.summary_label.pack(fill="x")
-        self.scope_label = ttk.Label(summary_frame, text=SCOPE_NOTE, wraplength=930, justify="left")
+        self.scope_label = ttk.Label(tab, text=SCOPE_NOTE, wraplength=930, justify="left")
         self.scope_label.pack(fill="x", pady=(4, 0))
         self.first_finding = ttk.Label(tab, text="", wraplength=950, justify="left")
         self.first_finding.pack(fill="x", pady=4)
@@ -610,12 +626,29 @@ class App(tk.Tk):
             return widget
         self.assessment_text = text_page("Findings and explanations")
         self.raw_text = text_page("All checks and raw evidence")
-        tab.bind("<Configure>", self._resize_report)
+        def enable_report_scroll(parent):
+            for widget in parent.winfo_children():
+                if isinstance(widget, (tk.Text, ttk.Treeview, ttk.Scrollbar)):
+                    continue
+                widget.bind("<MouseWheel>", self._scroll_report)
+                enable_report_scroll(widget)
+        enable_report_scroll(self.assessment_page)
 
     def _resize_report(self, event):
-        width = max(250, event.width - 35)
+        self.report_canvas.itemconfigure(self._report_window, width=max(250, event.width))
+        width = max(200, event.width - 35)
         for label in (self.assessment_label, self.summary_label, self.scope_label, self.first_finding):
             label.configure(wraplength=width)
+
+    def _scroll_report(self, event):
+        units = -int(event.delta / 120) if abs(event.delta) >= 120 else -int(event.delta)
+        self.report_canvas.yview_scroll(units, "units")
+        return "break"
+
+    def _reveal_report_widget(self, widget):
+        self.update_idletasks()
+        height = max(1, self.report_content.winfo_height())
+        self.report_canvas.yview_moveto(max(0, widget.winfo_y() - 8) / height)
 
     def _submission_signature(self):
         return json.dumps({"files": self.files, "relationships": self.rels,
@@ -642,6 +675,7 @@ class App(tk.Tk):
 
     def view_findings(self):
         self.detail_notebook.select(0)
+        self._reveal_report_widget(self.detail_notebook)
         self.assessment_text.see("first_review_item")
         self.assessment_text.focus_set()
 
@@ -746,7 +780,8 @@ class App(tk.Tk):
         for button in (self.report_button, self.html_button, self.copy_report_button, self.finding_button):
             button.configure(state="normal")
         self._check_snapshot()
-        self.summary_label.configure(text="\n".join(self._review["summary"]))
+        self.summary_label.configure(text="\n\n".join(self._review["summary"]))
+        self.report_canvas.yview_moveto(0)
         visible = [item for item in self._review["items"] if item["group"] != "support"]
         first = visible[0] if visible else None
         self.first_finding.configure(text=(first["title"] + " — " + (first["affected"] if len(first["affected"]) < 130 else first["affected"][:127] + "…") + "\n" +

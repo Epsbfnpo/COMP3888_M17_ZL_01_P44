@@ -1,13 +1,16 @@
 # Assessment result presentation in 0.8.3
 
-Updated 28 October 2026. This release changes the GUI and human reports. The API
+Updated 29 October 2026. Summary wording refined without changing version 0.8.3. This release changes the GUI and human reports. The API
 field remains `integrity`; its GUI label is **Core Evidence Consistency**.
 The score, confidence, status, scoring policies and response schema are unchanged.
 
 ## Reading order
 
-1. **Assessment summary:** execution state, core-check state, audio-review state,
-   and qualified recording cross-check coverage. `succeeded` means execution completed.
+1. **Assessment summary:** five information blocks in one summary layer, in this order:
+   Evaluation Status; Core Evidence Consistency; Review Required;
+   Coverage & Limitations; Other Key Results. The core scope explicitly names
+   file identity/readability, technical properties/relationships and cross-evidence
+   consistency, and excludes optional audio analysis from that score.
 2. **Important finding:** visible before the scores, with affected files and
    declared/candidate intervals. **View findings** focuses the full findings panel.
 3. **Four dimensions:** original values and confidence; a high core value retains
@@ -18,11 +21,25 @@ The score, confidence, status, scoring policies and response schema are unchange
 5. **All checks and raw evidence:** supporting observations and the complete
    original response, including records not promoted to the attention list.
 
-![Actual 0.8.3 desktop interface](images/assessment-summary-0.8.3.png)
+The summary uses complete sentences. Algorithm-task completion is reported
+separately from interval-level review items; it does not display misleading zero
+gap counters beside an unavailable provider. Missing evidence, failed execution,
+withheld scores, absent C2PA and untrusted signers have distinct explanations.
+Workflow and creation-method declaration coverage are included when structured
+records are available; missing records remain unknown. No values are inferred
+from a high completeness score or a zero attestation score.
 
-The screenshot uses a constructed layout-test response, not measured customer
-results. It demonstrates 1.000 alongside an audio interval requiring review and
-1/13 qualified recording cross-check coverage.
+In small windows, the Full assessment page scrolls so all five sections, findings
+and scores remain reachable. Mouse-wheel and keyboard scrolling are supported,
+and View findings moves to the detailed findings panel. The footer stays visible.
+HTML and copied text use the same five sections. The version, scoring policy,
+response schema and original response JSON are unchanged by this refinement.
+
+![Five-section assessment summary](images/assessment-summary-five-sections.png)
+
+The screenshot shows the controlled synthetic excerpt example, not customer
+material: a declared 7–11 second source interval, corresponding content found
+elsewhere, a withheld core score and 0/1 qualifying source cross-check coverage.
 
 ## Audio result mapping
 
@@ -59,8 +76,9 @@ remain in the complete raw response; successful checks are not deleted.
   the word audio is not used to classify a check as non-scoring.
 - Presentation groups and colours do not create backend severity or axis states.
   Original severity and evidence references remain available in the report.
-- The 0.8.3 version metadata and its source digest change. The CSEC schema version
-  stays `0.2-candidate`; policies, thresholds and evidence graphs are unchanged.
+- This refinement retains version 0.8.3 and the existing backend source digest.
+  The CSEC schema version stays `0.2-candidate`; policies, thresholds and
+  evidence graphs are unchanged.
 
 ## Reports and snapshots
 
