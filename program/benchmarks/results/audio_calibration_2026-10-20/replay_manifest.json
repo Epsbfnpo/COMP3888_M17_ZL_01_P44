@@ -1,166 +1,167 @@
 {
   "notes": "V1 Lumina test families became regression cases after a tempo failure was discovered. V2 semantic parameters were predeclared before the natural_test DSP evaluation. Natural section boundary labels had been inspected for the separate A02 study. No claim that these audio files were unseen for every purpose. Each original was truncated to first 24 seconds ONLY for the explicitly bounded DSP benchmark; runtime is not truncated.",
+  "data_root": "../../local-data",
   "families": [
     {
       "id": "old_A",
       "partition": "development",
-      "path": "/Users/hongjiedeng/.codex/.chatgpt-projects/g-p-6a7fea7884e881919acda7d64baad7be/output/lumina_pilot_2026-10-19/originals/lumina_piano_A.wav",
+      "path": "lumina_pilot_2026-10-19/originals/lumina_piano_A.wav",
       "sha256": "8b1486d0963772d618d79a0a8fcf842416896b5fb09bf9c461a678fe99e642b7"
     },
     {
       "id": "old_B",
       "partition": "development",
-      "path": "/Users/hongjiedeng/.codex/.chatgpt-projects/g-p-6a7fea7884e881919acda7d64baad7be/output/lumina_pilot_2026-10-19/originals/lumina_generated_B.wav",
+      "path": "lumina_pilot_2026-10-19/originals/lumina_generated_B.wav",
       "sha256": "3894cdf0197e84c7959ba7ab3abd15e473a89265c212f83096f5d2434ac25cc3"
     },
     {
       "id": "old_C",
       "partition": "development",
-      "path": "/Users/hongjiedeng/.codex/.chatgpt-projects/g-p-6a7fea7884e881919acda7d64baad7be/output/lumina_extended_2026-10-19/originals/C_rhythm.wav",
+      "path": "lumina_extended_2026-10-19/originals/C_rhythm.wav",
       "sha256": "46c4ff8fbc477594162704c5a3b794f411f6fca36b1ba586f44d7edafab3c173"
     },
     {
       "id": "old_F",
       "partition": "development",
-      "path": "/Users/hongjiedeng/.codex/.chatgpt-projects/g-p-6a7fea7884e881919acda7d64baad7be/output/lumina_extended_2026-10-19/originals/F_funk.wav",
+      "path": "lumina_extended_2026-10-19/originals/F_funk.wav",
       "sha256": "6052d739a28b759c3870811ab8926e7433c81917e61509c5799951ee2b000155"
     },
     {
       "id": "old_G",
       "partition": "development",
-      "path": "/Users/hongjiedeng/.codex/.chatgpt-projects/g-p-6a7fea7884e881919acda7d64baad7be/output/lumina_extended_2026-10-19/originals/G_waltz.wav",
+      "path": "lumina_extended_2026-10-19/originals/G_waltz.wav",
       "sha256": "ef5d8c389d59ff7cdc52b188fd3df01bf38a5ea405259c89b85a650c1a4bd622"
     },
     {
       "id": "N02",
       "partition": "lumina_regression",
-      "path": "/Users/hongjiedeng/.codex/.chatgpt-projects/g-p-6a7fea7884e881919acda7d64baad7be/output/lumina_repair_2026-10-20/originals/N02.wav",
+      "path": "lumina_repair_2026-10-20/originals/N02.wav",
       "sha256": "46664bd93150f2bfc2d6c896852899c54a6f8a7726565c233365ba84689a6f20"
     },
     {
       "id": "N04",
       "partition": "lumina_regression",
-      "path": "/Users/hongjiedeng/.codex/.chatgpt-projects/g-p-6a7fea7884e881919acda7d64baad7be/output/lumina_repair_2026-10-20/originals/N04.wav",
+      "path": "lumina_repair_2026-10-20/originals/N04.wav",
       "sha256": "ffb6c3d8815741f48456faa3b9bb1fc155acfb2c2fe7ed4f6fc1b0d12a99fa51"
     },
     {
       "id": "N05",
       "partition": "development",
-      "path": "/Users/hongjiedeng/.codex/.chatgpt-projects/g-p-6a7fea7884e881919acda7d64baad7be/output/lumina_repair_2026-10-20/originals/N05.wav",
+      "path": "lumina_repair_2026-10-20/originals/N05.wav",
       "sha256": "87e0223bde43b1e0b7ec0bf985bec90c9a090a01cf19f8b13ef5f70576c1c7cb"
     },
     {
       "id": "N06",
       "partition": "lumina_regression",
-      "path": "/Users/hongjiedeng/.codex/.chatgpt-projects/g-p-6a7fea7884e881919acda7d64baad7be/output/lumina_repair_2026-10-20/originals/N06.wav",
+      "path": "lumina_repair_2026-10-20/originals/N06.wav",
       "sha256": "20c9295f66ae3628dcd33d160454b21f2f10aa6e49b773e814cdc05ca3512231"
     },
     {
       "id": "N08",
       "partition": "lumina_regression",
-      "path": "/Users/hongjiedeng/.codex/.chatgpt-projects/g-p-6a7fea7884e881919acda7d64baad7be/output/lumina_repair_2026-10-20/originals/N08.wav",
+      "path": "lumina_repair_2026-10-20/originals/N08.wav",
       "sha256": "bda0dd6adc22e4605adf0ea5a2256197ea36080909b3ef29a79c530b369e6092"
     },
     {
       "id": "N11",
       "partition": "development",
-      "path": "/Users/hongjiedeng/.codex/.chatgpt-projects/g-p-6a7fea7884e881919acda7d64baad7be/output/lumina_repair_2026-10-20/originals/N11.wav",
+      "path": "lumina_repair_2026-10-20/originals/N11.wav",
       "sha256": "f73818e9bfec6455f9a560d2876b4a63f954be411aea03e12529090c914300ff"
     },
     {
       "id": "SALAMI_1454",
       "partition": "natural_section_development",
-      "path": "/Users/hongjiedeng/.codex/.chatgpt-projects/g-p-6a7fea7884e881919acda7d64baad7be/output/lumina_repair_2026-10-20/natural_benchmark/salami-audio/1454.mp3",
+      "path": "lumina_repair_2026-10-20/natural_benchmark/salami-audio/1454.mp3",
       "sha256": "2af963cb64c4cf51c0dc53fa0f21aa992ffe8c715f3ab483ac08db6413101ac7"
     },
     {
       "id": "SALAMI_1459",
       "partition": "natural_test",
-      "path": "/Users/hongjiedeng/.codex/.chatgpt-projects/g-p-6a7fea7884e881919acda7d64baad7be/output/lumina_repair_2026-10-20/natural_benchmark/salami-audio/1459.mp3",
+      "path": "lumina_repair_2026-10-20/natural_benchmark/salami-audio/1459.mp3",
       "sha256": "dc78166016b2972d61f510be65707db6c2f79bc9b24bcb628fd5d6ea1617787c"
     },
     {
       "id": "SALAMI_1213",
       "partition": "natural_section_development",
-      "path": "/Users/hongjiedeng/.codex/.chatgpt-projects/g-p-6a7fea7884e881919acda7d64baad7be/output/lumina_repair_2026-10-20/natural_benchmark/salami-audio/1213.mp3",
+      "path": "lumina_repair_2026-10-20/natural_benchmark/salami-audio/1213.mp3",
       "sha256": "fe74bac13ad00141928fa609d5147aa203cf21fe83e74c2c842c5f65dafbf67b"
     },
     {
       "id": "SALAMI_1012",
       "partition": "natural_test",
-      "path": "/Users/hongjiedeng/.codex/.chatgpt-projects/g-p-6a7fea7884e881919acda7d64baad7be/output/lumina_repair_2026-10-20/natural_benchmark/salami-audio/1012.mp3",
+      "path": "lumina_repair_2026-10-20/natural_benchmark/salami-audio/1012.mp3",
       "sha256": "8616d81af6a2221b583fdae08a678b417424ba41b76da5968f43f7413f00a000"
     },
     {
       "id": "SALAMI_1391",
       "partition": "natural_section_development",
-      "path": "/Users/hongjiedeng/.codex/.chatgpt-projects/g-p-6a7fea7884e881919acda7d64baad7be/output/lumina_repair_2026-10-20/natural_benchmark/salami-audio/1391.mp3",
+      "path": "lumina_repair_2026-10-20/natural_benchmark/salami-audio/1391.mp3",
       "sha256": "933d35ef486360a07c560b0d2645194feba48521a47f97ee33bbd1a02317749d"
     },
     {
       "id": "SALAMI_1111",
       "partition": "natural_test",
-      "path": "/Users/hongjiedeng/.codex/.chatgpt-projects/g-p-6a7fea7884e881919acda7d64baad7be/output/lumina_repair_2026-10-20/natural_benchmark/salami-audio/1111.mp3",
+      "path": "lumina_repair_2026-10-20/natural_benchmark/salami-audio/1111.mp3",
       "sha256": "da43551ede005f3fdf473401d8e9afe6329a00138b397831c25278208c234292"
     },
     {
       "id": "SALAMI_1347",
       "partition": "natural_section_development",
-      "path": "/Users/hongjiedeng/.codex/.chatgpt-projects/g-p-6a7fea7884e881919acda7d64baad7be/output/lumina_repair_2026-10-20/natural_benchmark/salami-audio/1347.mp3",
+      "path": "lumina_repair_2026-10-20/natural_benchmark/salami-audio/1347.mp3",
       "sha256": "c0e2aa4a9fbc1fdb603447d088d17576a535ab0b1acab1314b5085233d079ce4"
     },
     {
       "id": "SALAMI_1027",
       "partition": "natural_test",
-      "path": "/Users/hongjiedeng/.codex/.chatgpt-projects/g-p-6a7fea7884e881919acda7d64baad7be/output/lumina_repair_2026-10-20/natural_benchmark/salami-audio/1027.mp3",
+      "path": "lumina_repair_2026-10-20/natural_benchmark/salami-audio/1027.mp3",
       "sha256": "f9f67746816c2dd7171759bc69d0f28d1103fc40187c96b61e797def01404528"
     },
     {
       "id": "SALAMI_1181",
       "partition": "natural_section_development",
-      "path": "/Users/hongjiedeng/.codex/.chatgpt-projects/g-p-6a7fea7884e881919acda7d64baad7be/output/lumina_repair_2026-10-20/natural_benchmark/salami-audio/1181.mp3",
+      "path": "lumina_repair_2026-10-20/natural_benchmark/salami-audio/1181.mp3",
       "sha256": "b5ab1dbe090d62b33fa1cd2e200b0b3bbdaae8ed09dfcdf73e5d716bb01600d9"
     },
     {
       "id": "SALAMI_1004",
       "partition": "natural_test",
-      "path": "/Users/hongjiedeng/.codex/.chatgpt-projects/g-p-6a7fea7884e881919acda7d64baad7be/output/lumina_repair_2026-10-20/natural_benchmark/salami-audio/1004.mp3",
+      "path": "lumina_repair_2026-10-20/natural_benchmark/salami-audio/1004.mp3",
       "sha256": "126387ace71c0ba53a4a11f7f31ad7f6599ab53495dfa3fa3392897b169d09fc"
     },
     {
       "id": "SALAMI_1295",
       "partition": "natural_section_development",
-      "path": "/Users/hongjiedeng/.codex/.chatgpt-projects/g-p-6a7fea7884e881919acda7d64baad7be/output/lumina_repair_2026-10-20/natural_benchmark/salami-audio/1295.mp3",
+      "path": "lumina_repair_2026-10-20/natural_benchmark/salami-audio/1295.mp3",
       "sha256": "ee9f452c52134eda4ff9459f645d2e602aa51c3b8ebd8b4f936e537046dd52b6"
     },
     {
       "id": "SALAMI_1219",
       "partition": "natural_test",
-      "path": "/Users/hongjiedeng/.codex/.chatgpt-projects/g-p-6a7fea7884e881919acda7d64baad7be/output/lumina_repair_2026-10-20/natural_benchmark/salami-audio/1219.mp3",
+      "path": "lumina_repair_2026-10-20/natural_benchmark/salami-audio/1219.mp3",
       "sha256": "85cd9bcdff23a4cf59ab2801c5205e46e6a5146d2a7dd0b2de0e5eb8c27f2796"
     },
     {
       "id": "SALAMI_1018",
       "partition": "natural_section_development",
-      "path": "/Users/hongjiedeng/.codex/.chatgpt-projects/g-p-6a7fea7884e881919acda7d64baad7be/output/lumina_repair_2026-10-20/natural_benchmark/salami-audio/1018.mp3",
+      "path": "lumina_repair_2026-10-20/natural_benchmark/salami-audio/1018.mp3",
       "sha256": "bbe5a79f52cf62c2edf1babbc108a8992444560e3f5d4abe9b9eee445a87eac7"
     },
     {
       "id": "SALAMI_1120",
       "partition": "natural_test",
-      "path": "/Users/hongjiedeng/.codex/.chatgpt-projects/g-p-6a7fea7884e881919acda7d64baad7be/output/lumina_repair_2026-10-20/natural_benchmark/salami-audio/1120.mp3",
+      "path": "lumina_repair_2026-10-20/natural_benchmark/salami-audio/1120.mp3",
       "sha256": "05636180285466cdc467b57f092ab594b69f347ce4772b7ee05d5831f528816b"
     },
     {
       "id": "SALAMI_992",
       "partition": "natural_section_development",
-      "path": "/Users/hongjiedeng/.codex/.chatgpt-projects/g-p-6a7fea7884e881919acda7d64baad7be/output/lumina_repair_2026-10-20/natural_benchmark/salami-audio/992.mp3",
+      "path": "lumina_repair_2026-10-20/natural_benchmark/salami-audio/992.mp3",
       "sha256": "94e9a740876d9ab550bd45d162953bd8563bf7b5b7f21433455ff90a006a22ac"
     },
     {
       "id": "SALAMI_1125",
       "partition": "natural_test",
-      "path": "/Users/hongjiedeng/.codex/.chatgpt-projects/g-p-6a7fea7884e881919acda7d64baad7be/output/lumina_repair_2026-10-20/natural_benchmark/salami-audio/1125.mp3",
+      "path": "lumina_repair_2026-10-20/natural_benchmark/salami-audio/1125.mp3",
       "sha256": "37a8c1d9bff06914b54141fd415f51ffc4ee5d226a610c4ff2bdaf8715ee9acc"
     }
   ]

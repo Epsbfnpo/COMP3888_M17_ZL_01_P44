@@ -134,16 +134,19 @@ transposition_status and rejection_reasons. Local candidates must not be display
 See AUDIO_DIAGNOSTICS.md for detailed gates and field semantics. The confidence issue remains deferred
 as requested by the user.
 
-Complete experimental records are in the workspace at output/lumina_repair_2026-10-20; shareable JSON
-snapshots are in program/benchmarks/results/audio_calibration_2026-10-20. Original audio stays in the
-workspace and is not distributed with the code patch. replay_manifest.json records local paths and original
-file hashes. Update paths when moving to another machine, while preserving the original hashes.
+Shareable experimental snapshots are in program/benchmarks/results/audio_calibration_2026-10-20.
+replay_manifest.json records relative paths, original file hashes, family IDs and partitions.
+Its data_root is resolved relative to the manifest; the local default is program/benchmarks/local-data.
+Original calibration audio is not distributed with the code or delivery archive. On another machine,
+preserve the subdirectory layout under a licensed local dataset and pass --data-root to the replay
+command. All file hashes and partition checks still apply. These Lumina/SALAMI calibration inputs
+are separate from the client's Project Rock production files.
 
 ```sh
 python -m pip install -r requirements.txt -r requirements-audio.txt -r requirements-benchmark.txt
 REQUIRE_AUDIO_BACKENDS=1 python -B -m unittest discover -s tests
-python -B benchmarks/audio_calibration.py /path/to/replay_manifest.json --partition natural_test --out /tmp/music.json
-python -B benchmarks/audio_calibration.py /path/to/replay_manifest.json --partition lumina_regression --mode fingerprint --out /tmp/fingerprint.json
+python -B benchmarks/audio_calibration.py /path/to/replay_manifest.json --data-root /path/to/calibration-data --partition natural_test --out /tmp/music.json
+python -B benchmarks/audio_calibration.py /path/to/replay_manifest.json --data-root /path/to/calibration-data --partition lumina_regression --mode fingerprint --out /tmp/fingerprint.json
 python -B benchmarks/structure_benchmark.py salami --data /path/to/natural_benchmark --out /tmp/sections
 ```
 

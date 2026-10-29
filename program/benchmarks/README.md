@@ -5,6 +5,27 @@ observation semantics, see [the remediation record](../docs/REMEDIATION_2026-10-
 Structure benchmark evaluation additionally needs `requirements-benchmark.txt`
 (`mir_eval`); install it alongside the runtime and audio dependencies.
 
+## Portable replay data
+
+`results/audio_calibration_2026-10-20/replay_manifest.json` keeps relative
+audio paths and the original SHA-256 hashes, family IDs and partitions.
+Its `data_root` is relative to the manifest and defaults to `local-data/`
+under this benchmarks directory. Local audio in that directory is ignored
+by Git and is not included in delivery archives. It contains calibration
+inputs from Lumina and SALAMI, separate from the client's Project Rock data.
+
+To use another licensed local copy, preserve the directory layout and set
+`--data-root /path/to/calibration-data`. This overrides the manifest's base
+directory without editing it. Manifests without `data_root` retain their
+previous manifest-relative paths; legacy absolute paths are also accepted.
+The loader verifies all original hashes and partition separation before
+running a measurement. Run from `program/`, for example:
+
+```sh
+python -B benchmarks/audio_calibration.py benchmarks/results/audio_calibration_2026-10-20/replay_manifest.json \
+  --data-root /path/to/calibration-data --partition natural_test --out /tmp/music.json
+```
+
 ## Case counts and intervals
 
 `audio_calibration.py` stores a `summary` beside its rows and prints it: each

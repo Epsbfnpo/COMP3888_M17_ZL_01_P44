@@ -51,3 +51,36 @@ Coverage, same split: 75.3% lines, 65.7% branches, including builder_review.py (
 Contract check: four example replays keep axes, findings and assessment_checks unchanged;
   reports/ui-boundary-0.8.3.json.
 Full per-test log: reports/test-results-0.8.3.txt.
+
+COMP3888 music target v0.8.3, Assessment Summary refinement (no version change)
+Date: 2026-10-29
+Platform: CPython 3.13.7 on macOS (Darwin); same environment as the 28 October run
+source_revision: sha256:db9f07a3a2eb8a977a19ec3bf9f43bbfbd6698608cc2b760e1a526c458451172
+  (unchanged; only builder_review.py, builder_report.py, builder_gui.py and their tests changed)
+
+Non-GUI tests, one process:
+  cd tests && C2PA_SUNO_SAMPLE_DIR=<folder with the verified Suno downloads> REQUIRE_AUDIO_BACKENDS=1 python -B -m unittest <every test module except test_builder> test_builder.ManifestLimitTests test_builder.ExportTests test_builder.AssessmentTests
+  Ran 547 tests in 43 seconds. OK (no skips)
+
+GUI tests, one process each: the same eight cases as on 28 October, all OK.
+
+Total: 555 tests (the 538 of 28 October plus 17 new summary tests in test_builder_review);
+  555 passed, 0 skipped, 0 failures, 0 errors.
+Coverage was not re-measured; the 28 October figures above are the latest.
+Full per-test log: reports/assessment-summary-2026-10-29-tests.txt.
+
+COMP3888 music target v0.8.3, calibration replay portability (no version change)
+Date: 2026-10-30
+Platform: CPython 3.13.7 on macOS (Darwin); project virtual environment
+source_revision: sha256:db9f07a3a2eb8a977a19ec3bf9f43bbfbd6698608cc2b760e1a526c458451172
+  (unchanged; only the benchmark replay helper, its tests, the replay manifest and documentation changed)
+
+Non-GUI tests, one process:
+  cd tests && C2PA_SUNO_SAMPLE_DIR=<folder with the verified Suno downloads> REQUIRE_AUDIO_BACKENDS=1 python -B -m unittest <every test module except test_builder> test_builder.ManifestLimitTests test_builder.ExportTests test_builder.AssessmentTests
+  Ran 551 tests in 45 seconds. OK (no skips)
+
+GUI tests, one process each: the same eight cases, all OK.
+
+Total: 559 tests (the 555 of 29 October plus four replay-location regressions in test_audio_calibration);
+  559 passed, 0 skipped, 0 failures, 0 errors.
+Coverage was not re-measured; the 28 October figures above are the latest.

@@ -1,6 +1,10 @@
 """Observable safety/abstention regressions for the bounded audio profile."""
 import copy
+import contextlib
+import hashlib
 import importlib.util
+import io
+import json
 import os
 from pathlib import Path
 import sys
@@ -15,6 +19,70 @@ from music_target.audio_diagnostics.providers.calibration import profile, path_r
 from music_target.audio_diagnostics.providers.music_semantics import _path_quality, _aligned_tempo_candidate
 from music_target.audio_diagnostics.providers.structure import detect_sections
 from music_target.audio_diagnostics.worker import execute
+
+
+class ReplayLocationTests(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        file = Path(__file__).resolve().parents[1] / "benchmarks/audio_calibration.py"
+        spec = importlib.util.spec_from_file_location("calibration_replay", file)
+        cls.replay = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(cls.replay)
+
+    def dataset(self, folder, root_value=None):
+        data = folder / "inputs"
+        data.mkdir()
+        families = []
+        for name, partition in [("first", "test"), ("second", "test"), ("other", "development")]:
+            file = data / (name + ".bin")
+            file.write_bytes(name.encode())
+            families.append({"id": name, "partition": partition, "path": file.name,
+                             "sha256": hashlib.sha256(file.read_bytes()).hexdigest()})
+        document = {"families": families}
+        if root_value is not None:
+            document["data_root"] = root_value
+        manifest = folder / "manifest.json"
+        manifest.write_text(json.dumps(document))
+        return manifest, data, document
+
+    def test_manifest_root_works_outside_the_current_directory(self):
+        with tempfile.TemporaryDirectory() as directory:
+            manifest, data, _ = self.dataset(Path(directory), "inputs")
+            rows = self.replay.load_families(manifest, "test")
+            self.assertEqual([row["id"] for row in rows], ["first", "second"])
+            self.assertTrue(all(Path(row["path"]).parent == data.resolve() for row in rows))
+
+    def test_legacy_manifest_relative_and_absolute_paths_still_work(self):
+        with tempfile.TemporaryDirectory() as directory:
+            manifest, data, document = self.dataset(Path(directory))
+            for row in document["families"]:
+                row["path"] = str(data / row["path"]) if row["id"] == "first" else "inputs/" + row["path"]
+            manifest.write_text(json.dumps(document))
+            self.assertEqual(len(self.replay.load_families(manifest, "test")), 2)
+
+    def test_root_override_still_checks_unselected_family_hashes(self):
+        with tempfile.TemporaryDirectory() as directory:
+            manifest, data, _ = self.dataset(Path(directory), "missing-old-location")
+            self.assertEqual(len(self.replay.load_families(manifest, "test", data)), 2)
+            (data / "other.bin").write_bytes(b"changed")
+            with self.assertRaisesRegex(ValueError, "Audio hash mismatch: other"):
+                self.replay.load_families(manifest, "test", data)
+
+    def test_cli_uses_the_relocated_root_without_rewriting_the_manifest(self):
+        with tempfile.TemporaryDirectory() as directory:
+            folder = Path(directory)
+            manifest, data, _ = self.dataset(folder, "missing-old-location")
+            before = manifest.read_bytes()
+            output = folder / "replay.json"
+            args = ["audio_calibration.py", str(manifest), "--data-root", str(data),
+                    "--partition", "test", "--out", str(output)]
+            with mock.patch.object(sys, "argv", args), \
+                 mock.patch.object(self.replay, "semantic_rows", return_value=[]) as measure, \
+                 contextlib.redirect_stdout(io.StringIO()):
+                self.replay.main()
+            self.assertEqual([row["id"] for row in measure.call_args.args[0]], ["first", "second"])
+            self.assertEqual(json.loads(output.read_text())["families"], ["first", "second"])
+            self.assertEqual(manifest.read_bytes(), before)
 
 
 class AlignmentGateTests(unittest.TestCase):

@@ -1,5 +1,13 @@
 # Verification Record
 
+## Calibration replay location portability (2026-10-29)
+
+- Calibration replay paths are relative to a configurable dataset root. The manifest uses `../../local-data`; `--data-root` can select another licensed local copy. No workstation-specific absolute paths are stored in it. Legacy manifests remain supported.
+- All 27 original audio hashes, family IDs and partitions were preserved and verified at the local default root across four partitions. These inputs are Lumina/SALAMI calibration material, separate from Project Rock client production files. Local calibration audio is excluded from Git and delivery archives.
+- **13 targeted audio-calibration tests passed, no skips:** nine existing cases plus four replay-location regressions, including root relocation, legacy paths, hash validation of unselected families and CLI wiring. **Full suite rerun on 30 October: 559 passed, no failures, errors or skips** (551 non-GUI tests in one process, eight GUI cases in separate processes; CPython 3.13.7 project environment, all optional audio backends required, verified Suno samples enabled). Coverage was not remeasured.
+- Program version stays 0.8.3 and the runtime `source_revision` stays `sha256:db9f07a3a2eb8a977a19ec3bf9f43bbfbd6698608cc2b760e1a526c458451172`. Only the standalone benchmark location helper, its tests, replay manifest and documentation changed. No score, policy, response schema or runtime audio-analysis algorithm changed.
+- The local 27 October CSEC ZIP was repacked with the same replay-location helper and reproduction instructions. Its evaluator remains 0.8.2. `PACKAGING_NOTES.md` identifies the repack, `MANIFEST.sha256` was regenerated and verified, and the other archived contents remain byte-identical. Original production data was not edited or added to the archive.
+
 ## Assessment Summary refinement without a version change (2026-10-29)
 
 - Version stays **0.8.3**. The backend source digest stays `sha256:db9f07a3a2eb8a977a19ec3bf9f43bbfbd6698608cc2b760e1a526c458451172`; scoring, policies, schemas and response JSON are unchanged.
@@ -9,6 +17,7 @@
 - **555 tests passed, no failures, errors or skips:** 547 non-GUI tests and eight GUI cases in separate processes. Includes 17 new summary tests. Existing CPython 3.13.7 environment, all optional audio backends required, verified Suno samples enabled. Log: `reports/assessment-summary-2026-10-29-tests.txt`.
 - Response immutability, unchanged axes/non-scoring flags, five-section ordering, all C2PA states, declaration counts, unknown data, provider failures, score withholding, HTML escaping, JSON export and small-window scroll access are covered.
 - Coverage was not remeasured for this wording refinement; the dated coverage figures below belong to the previous 28 October snapshot.
+- Documentation condensed the same day for client reading: the README now summarises and links to the manual, version history moved to `CHANGELOG.md`, internal team notes to `docs/TEAM_NOTES.md`; the manual's Appendix A became Section 1, "Reading assessment results", and Section 9's verification history became one table. No program file changed.
 
 
 ## Version 0.8.3 presentation release (2026-10-28)

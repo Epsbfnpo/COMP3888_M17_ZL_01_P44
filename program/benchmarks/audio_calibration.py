@@ -3,7 +3,10 @@
 python -B benchmarks/audio_calibration.py manifest.json --partition test --out /tmp/replay.json
 
 Manifest: {"families": [{"id": "N02", "partition": "test", "path": "/data/N02.wav",
-                         "sha256": "..."}]}. Paths may be relative to the manifest.
+                         "sha256": "..."}]}. Relative paths use the manifest's
+data_root (relative to the manifest), or its directory when data_root is omitted.
+--data-root overrides that base for a relocated local dataset. File hashes and
+family partitions are still checked before any measurement.
 All derivatives and mixture parents remain inside the requested partition.
 Known DSP relationships are ground truth; distinct recordings are controls,
 not a claim about authorship or absence of shared musical material.
@@ -29,16 +32,22 @@ SUPPORTED = "supported_within_profile"
 OFFSET_TOLERANCE_SECONDS = 0.1
 
 
-def load_families(manifest, partition):
+def load_families(manifest, partition, data_root=None):
     path = Path(manifest).resolve()
-    families = json.loads(path.read_text())["families"]
+    document = json.loads(path.read_text())
+    families = document["families"]
+    if data_root is not None:
+        base = Path(data_root).expanduser().resolve()
+    else:
+        base = Path(document.get("data_root", ".")).expanduser()
+        base = (base if base.is_absolute() else path.parent / base).resolve()
     ids, hashes = set(), {}
     for row in families:
         if row["id"] in ids:
             raise ValueError("Duplicate family id")
         ids.add(row["id"])
         file = Path(row["path"])
-        file = file if file.is_absolute() else path.parent / file
+        file = file if file.is_absolute() else base / file
         digest = hashlib.sha256(file.read_bytes()).hexdigest()
         if digest != row["sha256"]:
             raise ValueError("Audio hash mismatch: " + row["id"])
@@ -160,11 +169,13 @@ def fingerprint_summary(rows):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("manifest", type=Path)
+    parser.add_argument("--data-root", type=Path,
+                        help="Local dataset directory for relative family paths (overrides manifest data_root)")
     parser.add_argument("--partition", required=True)
     parser.add_argument("--mode", choices=("semantics", "fingerprint"), default="semantics")
     parser.add_argument("--out", type=Path, required=True)
     args = parser.parse_args()
-    families = load_families(args.manifest, args.partition)
+    families = load_families(args.manifest, args.partition, args.data_root)
     rows = semantic_rows(families) if args.mode == "semantics" else fingerprint_rows(families)
     summary = semantic_summary(rows) if args.mode == "semantics" else fingerprint_summary(rows)
     output = {"profile_sha256": profile()["freeze_sha256"], "partition": args.partition,
