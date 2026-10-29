@@ -5,6 +5,11 @@
 > in `test_builder.py`, and extra immutability assertions in the existing real
 > declared-range integration case. See `../UI_REPORT_0.8.3.md` and
 > `../../reports/verification.md`.
+>
+> Assessment Summary refinement, 29 October 2026 (version stays 0.8.3): 17
+> more summary tests in `test_builder_review.py` (51 cases in all); 555 passed,
+> 0 skipped. No test plan case changes status. Log:
+> `../../reports/assessment-summary-2026-10-29-tests.txt`.
 
 # Test Plan Traceability
 
